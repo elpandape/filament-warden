@@ -1,6 +1,5 @@
 # The MIT License (MIT)
 
-Copyright (c) Joseph Silber (original Bouncer)
 Copyright (c) 2026 elpandape
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this
