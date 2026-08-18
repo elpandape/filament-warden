@@ -4,9 +4,25 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Tests;
 
+use BladeUI\Heroicons\BladeHeroiconsServiceProvider;
+use BladeUI\Icons\BladeIconsServiceProvider;
+use Carbon\Laravel\ServiceProvider as CarbonServiceProvider;
 use ElPandaPe\FilamentWarden\FilamentWardenServiceProvider;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Providers\BarePanelProvider;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Providers\TestPanelProvider;
 use ElPandaPe\Warden\WardenServiceProvider;
+use Filament\Actions\ActionsServiceProvider;
+use Filament\Facades\Filament;
+use Filament\FilamentServiceProvider;
+use Filament\Forms\FormsServiceProvider;
+use Filament\Infolists\InfolistsServiceProvider;
+use Filament\Notifications\NotificationsServiceProvider;
+use Filament\QueryBuilder\QueryBuilderServiceProvider;
+use Filament\Schemas\SchemasServiceProvider;
+use Filament\Support\SupportServiceProvider;
+use Filament\Tables\TablesServiceProvider;
+use Filament\Widgets\WidgetsServiceProvider;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Migrations\Migration;
@@ -14,6 +30,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as ApplicationTestCase;
 
 /**
@@ -34,17 +51,45 @@ abstract class TestCase extends ApplicationTestCase
         // The applications this package is built for run Eloquent strictly: without this the
         // suite tests a laxer world than the one it ships into.
         Model::shouldBeStrict();
+
+        // No request has been through the panel's middleware here, so nothing has told
+        // Filament which panel it is serving. Without this every resource resolves against
+        // no panel at all and its pages refuse to mount.
+        Filament::setCurrentPanel('test');
+        Filament::bootCurrentPanel();
     }
 
     /**
+     * Filament has to register before Livewire: `SupportServiceProvider` binds `DataStore`
+     * with an unshared `bind()` that overwrites Livewire's instance, so every
+     * `store($component)->set(...)` is lost and the render dies on a null error bag.
+     *
      * @param  Application  $app
      * @return array<int, class-string>
      */
     protected function getPackageProviders($app): array
     {
         return [
+            BladeHeroiconsServiceProvider::class,
+            BladeIconsServiceProvider::class,
             WardenServiceProvider::class,
             FilamentWardenServiceProvider::class,
+            ActionsServiceProvider::class,
+            FilamentServiceProvider::class,
+            FormsServiceProvider::class,
+            InfolistsServiceProvider::class,
+            NotificationsServiceProvider::class,
+            QueryBuilderServiceProvider::class,
+            SchemasServiceProvider::class,
+            SupportServiceProvider::class,
+            TablesServiceProvider::class,
+            WidgetsServiceProvider::class,
+            LivewireServiceProvider::class,
+            // Carbon does not follow `App::setLocale()` on its own; a consuming application
+            // gets this provider auto-discovered.
+            CarbonServiceProvider::class,
+            TestPanelProvider::class,
+            BarePanelProvider::class,
         ];
     }
 
