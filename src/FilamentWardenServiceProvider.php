@@ -17,12 +17,14 @@ final class FilamentWardenServiceProvider extends ServiceProvider
     {
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'filament-warden');
 
-        $this->publishes([
-            __DIR__.'/../config/filament-warden.php' => config_path('filament-warden.php'),
-        ], 'filament-warden-config');
+        if ($this->app->runningInConsole()) {
+            $this->publishes([
+                __DIR__.'/../config/filament-warden.php' => config_path('filament-warden.php'),
+            ], 'filament-warden-config');
 
-        $this->publishes([
-            __DIR__.'/../lang' => lang_path('vendor/filament-warden'),
-        ], 'filament-warden-translations');
+            $this->publishes([
+                __DIR__.'/../lang' => lang_path('vendor/filament-warden'),
+            ], 'filament-warden-translations');
+        }
     }
 }

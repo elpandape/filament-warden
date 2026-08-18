@@ -7,6 +7,7 @@ namespace ElPandaPe\FilamentWarden\Tests;
 use BladeUI\Heroicons\BladeHeroiconsServiceProvider;
 use BladeUI\Icons\BladeIconsServiceProvider;
 use Carbon\Laravel\ServiceProvider as CarbonServiceProvider;
+use Composer\InstalledVersions;
 use ElPandaPe\FilamentWarden\FilamentWardenServiceProvider;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Providers\BarePanelProvider;
@@ -32,6 +33,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as ApplicationTestCase;
+use RuntimeException;
 
 /**
  * The boot every test file asks for with `pest()->extend(TestCase::class)`, which resolves
@@ -128,12 +130,20 @@ abstract class TestCase extends ApplicationTestCase
      * The hook is `defineDatabaseMigrationsAfterDatabaseRefreshed()` and not
      * `defineDatabaseMigrations()`: testbench calls the second *before* refreshing the
      * database, and with sqlite in memory the refresh raises an empty one over everything
-     * created there. The symptom is a `no such table` halfway through the suite.
+     * created there. The symptom is a `no such table` halfway through the suite. The install
+     * path is resolved through Composer's runtime API rather than hardcoded, so a custom
+     * `vendor-dir` or a path repository does not break it.
      */
     protected function defineDatabaseMigrationsAfterDatabaseRefreshed(): void
     {
+        $installPath = InstalledVersions::getInstallPath('elpandape/warden');
+
+        if ($installPath === null) {
+            throw new RuntimeException('Could not resolve the install path of elpandape/warden.');
+        }
+
         /** @var Migration $migration */
-        $migration = require dirname(__DIR__).'/vendor/elpandape/warden/database/migrations/create_warden_tables.php.stub';
+        $migration = require $installPath.'/database/migrations/create_warden_tables.php.stub';
 
         $migration->up(); // @phpstan-ignore method.notFound
 
