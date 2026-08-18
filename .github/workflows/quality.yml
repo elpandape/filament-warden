@@ -1,0 +1,47 @@
+name: Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: pcov
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Pint
+        run: vendor/bin/pint --test
+
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --error-format=github --memory-limit=1G
+
+      - name: Rector
+        run: vendor/bin/rector process --dry-run
+
+      - name: Coverage
+        run: php -d zend.assertions=1 vendor/bin/pest --ci --coverage --min=100
+
+      - name: Type coverage
+        run: php -d zend.assertions=1 vendor/bin/pest --type-coverage --min=100
+
+      - name: Profanity
+        run: vendor/bin/pest --profanity
