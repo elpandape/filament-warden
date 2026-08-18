@@ -1,6 +1,6 @@
 # Security Policy
 
-This package renders Filament screens on top of an authorization engine
+This package exists to render Filament screens on top of an authorization engine
 (`elpandape/warden`): security reports are treated as top priority.
 
 Please do **not** open public issues for vulnerabilities. Report them privately through

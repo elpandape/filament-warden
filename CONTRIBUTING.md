@@ -31,6 +31,12 @@ Useful targets: `make test`, `make lint-fix`, `make rector-fix`, `make shell`.
   permission catalogue derivation, config-driven limits), a test that proves it
   fails *closed*.
 - Comments only where the code cannot speak for itself, in English.
+- Package config keys are never read with a bare `config('filament-warden.…')`, because
+  `mergeConfigFrom` is a no-op when the consuming application has cached its config —
+  every key would read `null`. Read keys through an accessor that falls back to the
+  packaged defaults, or, for a security flag, phrase it so that absent means on:
+  `guard.pages` and `guard.widgets` default to `true`, so a bare read would disable the
+  guard on exactly the machines set up for production.
 
 ## Commits
 
