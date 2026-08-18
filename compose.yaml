@@ -1,0 +1,10 @@
+services:
+  php:
+    build:
+      context: docker
+      args:
+        PHP_VERSION: "8.5"
+    volumes:
+      - .:/app
+    environment:
+      COMPOSER_CACHE_DIR: /app/.cache/composer

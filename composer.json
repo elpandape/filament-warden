@@ -1,0 +1,80 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "elpandape/filament-warden",
+    "description": "Roles and permissions for Filament, built on elpandape/warden — a permission grid derived from your policies, explicit denials, and conditional grants.",
+    "keywords": [
+        "authorization",
+        "laravel",
+        "filament",
+        "filament-plugin",
+        "roles",
+        "permissions",
+        "warden"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Carlos Mayorga",
+            "email": "cmayorgahilario@elpanda.pe",
+            "homepage": "https://carlosmayorga.me/",
+            "role": "Author and maintainer"
+        }
+    ],
+    "homepage": "https://github.com/elpandape/filament-warden",
+    "support": {
+        "issues": "https://github.com/elpandape/filament-warden/issues",
+        "source": "https://github.com/elpandape/filament-warden"
+    },
+    "require": {
+        "php": "^8.5",
+        "elpandape/warden": "^1.0",
+        "filament/filament": "^5.7",
+        "illuminate/auth": "^13.0",
+        "illuminate/contracts": "^13.0",
+        "illuminate/database": "^13.0",
+        "illuminate/support": "^13.0",
+        "illuminate/view": "^13.0"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.10",
+        "laravel/pint": "^1.27",
+        "mockery/mockery": "^1.6",
+        "nunomaduro/collision": "^8.9",
+        "orchestra/testbench": "^11.1",
+        "pestphp/pest": "^5.0",
+        "pestphp/pest-plugin-laravel": "^5.0",
+        "pestphp/pest-plugin-livewire": "^5.0",
+        "pestphp/pest-plugin-phpstan": "^5.0",
+        "pestphp/pest-plugin-profanity": "^5.0",
+        "pestphp/pest-plugin-rector": "^5.0",
+        "pestphp/pest-plugin-type-coverage": "^5.0",
+        "phpunit/phpunit": "^13.2.6",
+        "rector/rector": "^2.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "ElPandaPe\\FilamentWarden\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ElPandaPe\\FilamentWarden\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ElPandaPe\\FilamentWarden\\FilamentWardenServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "preferred-install": "dist",
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
