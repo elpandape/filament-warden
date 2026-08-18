@@ -1,4 +1,4 @@
-DC = docker compose
+DC = UID=$(shell id -u) GID=$(shell id -g) docker compose
 PHP = $(DC) run --rm php
 
 .PHONY: build install update test coverage types stan lint lint-fix rector rector-fix profanity ci shell

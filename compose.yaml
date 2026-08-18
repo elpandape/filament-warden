@@ -4,7 +4,12 @@ services:
       context: docker
       args:
         PHP_VERSION: "8.5"
+    # Writes land in a bind mount of the repository: as root they would be owned by root
+    # on the host, where nobody can rewrite them without sudo.
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - .:/app
     environment:
       COMPOSER_CACHE_DIR: /app/.cache/composer
+      # The mapped user has no home inside the image, and composer refuses to run without one.
+      HOME: /tmp

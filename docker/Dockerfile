@@ -5,5 +5,6 @@ RUN apk add --no-cache git unzip linux-headers icu-dev libzip-dev $PHPIZE_DEPS \
  && docker-php-ext-install intl zip
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # The mounted repo belongs to the host user; git refuses "dubious ownership" otherwise.
-RUN git config --global --add safe.directory /app
+# `--system` and not `--global`: the container runs as the host user, who never reads root's.
+RUN git config --system --add safe.directory /app
 WORKDIR /app
