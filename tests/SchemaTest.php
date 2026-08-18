@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
+use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Facades\Warden;
 use ElPandaPe\Warden\Models\Grant;
 use ElPandaPe\Warden\Models\Permission;

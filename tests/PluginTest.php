@@ -28,9 +28,9 @@ test('this version registers no screens at all', function (): void {
 
     $panel->plugin(FilamentWardenPlugin::make());
 
-    expect($panel->getResources())->toBe([])
-        ->and($panel->getPages())->toBe([])
-        ->and($panel->getWidgets())->toBe([]);
+    expect($panel->getResources())->toBeEmpty()
+        ->and($panel->getPages())->toBeEmpty()
+        ->and($panel->getWidgets())->toBeEmpty();
 });
 
 test('booting the plugin leaves the panel exactly as it found it', function (): void {

@@ -55,6 +55,5 @@ test('the package publishes its config and its translations, and nothing else', 
 });
 
 test('a tag the package never registered publishes nothing', function (): void {
-    expect(ServiceProvider::pathsToPublish(FilamentWardenServiceProvider::class, 'filament-warden-views'))
-        ->toBe([]);
+    expect(ServiceProvider::pathsToPublish(FilamentWardenServiceProvider::class, 'filament-warden-views'))->toBeEmpty();
 });
