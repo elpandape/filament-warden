@@ -26,8 +26,17 @@ test('an application that declares part of the config keeps its own values and i
     $this->app->register(FilamentWardenServiceProvider::class, true);
 
     expect(config('filament-warden.permissions.create'))->toBeTrue()
-        ->and(config('filament-warden.permissions.delete'))->toBe('orphaned')
-        ->and(config('filament-warden.roles.protected'))->toBe(['super-admin']);
+        ->and(config('filament-warden.roles.protected'))->toBe(['super-admin'])
+        ->and(config('filament-warden.guard.pages'))->toBeTrue()
+        ->and(config('filament-warden.grid.explain'))->toBeTrue();
+});
+
+test('declaring one block replaces that block whole, siblings inside it included', function (): void {
+    config()->set('filament-warden', ['permissions' => ['create' => true]]);
+
+    $this->app->register(FilamentWardenServiceProvider::class, true);
+
+    expect(config('filament-warden.permissions.delete'))->toBeNull();
 });
 
 test('the package publishes its config and its translations, and nothing else', function (): void {

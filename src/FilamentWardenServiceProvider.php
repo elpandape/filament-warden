@@ -10,10 +10,7 @@ final class FilamentWardenServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // mergeConfigFrom() only merges the top level: an app that overrides one key inside
-        // `permissions` would lose every sibling key the package ships under it. The
-        // recursive variant keeps the app's own values and still inherits the rest.
-        $this->replaceConfigRecursivelyFrom(__DIR__.'/../config/filament-warden.php', 'filament-warden');
+        $this->mergeConfigFrom(__DIR__.'/../config/filament-warden.php', 'filament-warden');
     }
 
     public function boot(): void
