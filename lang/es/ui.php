@@ -56,6 +56,28 @@ return [
         'replicate' => 'Duplicar',
     ],
 
+    'explain' => [
+        'causes' => [
+            'granted-directly' => 'Concedido por el permiso :permission, en poder del propio rol.',
+            'granted-via-role' => 'Concedido por el permiso :permission, a través del rol :role.',
+            'granted-to-everyone' => 'Concedido por el permiso :permission, dado a todo el mundo.',
+            'forbidden-directly' => 'Prohibido explícitamente por el permiso :permission, en poder del propio rol.',
+            'forbidden-via-role' => 'Prohibido explícitamente por el permiso :permission, a través del rol :role.',
+            'forbidden-to-everyone' => 'Prohibido explícitamente por el permiso :permission, aplicado a todo el mundo.',
+            'no-matching-grant' => 'Ninguna concesión casa. Warden se abstiene y deciden las Policies de tu aplicación.',
+            'not-applicable' => 'No es una pregunta para warden: la entidad no es un modelo.',
+        ],
+        'no_permission' => 'ningún permiso',
+        'narrowed' => 'Hay una regla estrechada para esta celda. Con condiciones, la concesión solo responde con un registro delante — y una comprobación de clase, como la que hace un listado, falla cerrada.',
+        'pending' => 'En pantalla lo has puesto en «:stance». Guarda para que la tienda lo diga.',
+    ],
+
+    'stances' => [
+        'abstain' => 'se abstiene',
+        'granted' => 'concedido',
+        'forbidden' => 'prohibido',
+    ],
+
     'grid' => [
         'panel' => 'El panel',
         'locked' => 'Este rol está protegido: lo que puede hacer no se toca desde aquí.',

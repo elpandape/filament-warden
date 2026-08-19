@@ -56,6 +56,28 @@ return [
         'replicate' => 'Duplicate',
     ],
 
+    'explain' => [
+        'causes' => [
+            'granted-directly' => 'Granted by the permission :permission, held by the role itself.',
+            'granted-via-role' => 'Granted by the permission :permission, through the role :role.',
+            'granted-to-everyone' => 'Granted by the permission :permission, given to everyone.',
+            'forbidden-directly' => 'Explicitly forbidden by the permission :permission, held by the role itself.',
+            'forbidden-via-role' => 'Explicitly forbidden by the permission :permission, through the role :role.',
+            'forbidden-to-everyone' => 'Explicitly forbidden by the permission :permission, applied to everyone.',
+            'no-matching-grant' => 'No grant matches. Warden abstains and your application policies decide.',
+            'not-applicable' => 'Not a question for warden: the entity is not a model.',
+        ],
+        'no_permission' => 'no permission',
+        'narrowed' => 'There is a narrowed rule for this cell. With conditions, a grant only answers with a record in front of it — and a class check, like the one a listing makes, fails closed.',
+        'pending' => 'On screen you have set this to «:stance». Save for the store to say so.',
+    ],
+
+    'stances' => [
+        'abstain' => 'abstains',
+        'granted' => 'granted',
+        'forbidden' => 'forbidden',
+    ],
+
     'grid' => [
         'panel' => 'The panel',
         'locked' => 'This role is protected: what it can do is fixed here.',
