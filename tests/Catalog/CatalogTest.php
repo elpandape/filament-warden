@@ -78,7 +78,7 @@ test('each action lands in the scope the map gives it', function (): void {
         'create' => Scope::Write,
         'update' => Scope::Write,
         'delete' => Scope::Withdraw,
-        'deleteAny' => Scope::Write,
+        'deleteAny' => Scope::Withdraw,
     ]);
 });
 

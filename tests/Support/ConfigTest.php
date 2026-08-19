@@ -29,8 +29,8 @@ test('the scope map arrives keyed by scope, with only the action names in it', f
     expect(Config::scopes())->toBe([
         'read' => ['viewAny', 'view'],
         'write' => ['create', 'update'],
-        'withdraw' => ['delete', 'restore'],
-        'irreversible' => ['forceDelete'],
+        'withdraw' => ['delete', 'deleteAny', 'restore', 'restoreAny'],
+        'irreversible' => ['forceDelete', 'forceDeleteAny'],
     ]);
 });
 

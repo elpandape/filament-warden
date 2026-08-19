@@ -80,8 +80,8 @@ return [
         'scopes' => [
             'read' => ['viewAny', 'view'],
             'write' => ['create', 'update'],
-            'withdraw' => ['delete', 'restore'],
-            'irreversible' => ['forceDelete'],
+            'withdraw' => ['delete', 'deleteAny', 'restore', 'restoreAny'],
+            'irreversible' => ['forceDelete', 'forceDeleteAny'],
         ],
     ],
 
