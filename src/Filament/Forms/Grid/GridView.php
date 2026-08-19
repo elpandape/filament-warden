@@ -67,7 +67,7 @@ final readonly class GridView
      * @return array{
      *     order: list<string>,
      *     manage: string,
-     *     rows: array<string, list<string>>,
+     *     rows: array<string, array{actions: list<string>, read: list<string>}>,
      *     tabs: list<array{key: string, rows: list<string>}>,
      * }
      */
@@ -77,7 +77,10 @@ final readonly class GridView
 
         foreach ($this->tabs as $tab) {
             foreach ($tab->rows as $row) {
-                $rows[$row->key] = $row->editableActions();
+                $rows[$row->key] = [
+                    'actions' => $row->editableActions(),
+                    'read' => $row->readActions(),
+                ];
             }
         }
 

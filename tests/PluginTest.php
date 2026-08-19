@@ -6,6 +6,7 @@ use ElPandaPe\FilamentWarden\FilamentWardenPlugin;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use Filament\Facades\Filament;
 use Filament\Panel;
+use Filament\Support\Facades\FilamentAsset;
 
 pest()->extend(TestCase::class);
 
@@ -59,4 +60,11 @@ test('the plugin is built through the container, so an application can put its o
 
 test('a panel that never took the plugin does not answer for it', function (): void {
     expect(Filament::getPanel('bare')->getPlugins())->not->toHaveKey('filament-warden');
+});
+
+test('the plugin ships a stylesheet and a script for filament:assets to publish', function (): void {
+    expect(FilamentAsset::getStyleHref('permission-grid', 'elpandape/filament-warden'))
+        ->toContain('permission-grid')
+        ->and(FilamentAsset::getAlpineComponentSrc('permission-grid', 'elpandape/filament-warden'))
+        ->toContain('permission-grid');
 });

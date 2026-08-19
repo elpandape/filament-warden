@@ -109,7 +109,7 @@ test('a row offers the browser only the actions its own policy declares', functi
 
     $grid = gridFor(Panel::make()->id('scratch')->resources([PostResource::class]));
 
-    expect($grid->alpine()['rows'][Tag::class])->toBe(['viewAny', 'view']);
+    expect($grid->alpine()['rows'][Tag::class]['actions'])->toBe(['viewAny', 'view']);
 });
 
 test('what the role wrote is what the cell shows', function (): void {
@@ -183,6 +183,7 @@ test('the browser is handed the cycle order and the actions a wildcard reaches',
 
     expect($alpine['order'])->toBe(['abstain', 'granted', 'forbidden'])
         ->and($alpine['manage'])->toBe('manage')
-        ->and($alpine['rows'][Post::class])
-        ->toBe(['viewAny', 'view', 'create', 'update', 'delete', 'deleteAny']);
+        ->and($alpine['rows'][Post::class]['actions'])
+        ->toBe(['viewAny', 'view', 'create', 'update', 'delete', 'deleteAny'])
+        ->and($alpine['rows'][Post::class]['read'])->toBe(['viewAny', 'view']);
 });

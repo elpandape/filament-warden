@@ -34,10 +34,28 @@ public function panel(Panel $panel): Panel
 }
 ```
 
+Publish the package's assets so the grid arrives with its styles. This is a plain file
+copy, not a build step — there is no Tailwind and no bundler in this package — and it has
+to run again on every deploy, so applications usually hang it off composer's
+`post-autoload-dump`:
+
+```bash
+php artisan filament:assets
+```
+
+Until it runs, the panel asks for a stylesheet that answers 404 and the grid renders
+unstyled.
+
 Publish the configuration if you want to change what the screens let people do:
 
 ```bash
 php artisan vendor:publish --tag=filament-warden-config
+```
+
+Publish the views if you want to rewrite the grid's markup:
+
+```bash
+php artisan vendor:publish --tag=filament-warden-views
 ```
 
 ## Usage

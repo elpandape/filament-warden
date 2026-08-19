@@ -102,3 +102,54 @@ test('what the field offers is what the catalogue holds', function (): void {
     expect(RoleGrants::of($role, Catalog::for(Filament::getPanel('test')))->stances)->toBeEmpty()
         ->and($grid->getName())->toBe('permissions');
 });
+
+test('the browser is handed the component, the state and the rules, in that order', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('x-load-src', escape: false)
+        ->assertSee('permission-grid', escape: false)
+        ->assertSee('wardenPermissionGrid({', escape: false)
+        ->assertSee('$wire.$entangle(', escape: false);
+});
+
+test('the cycle order travels to the browser instead of being written there', function (): void {
+    $role = makeRole();
+
+    $html = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
+
+    $matches = [];
+    preg_match("/JSON\.parse\('(.+?)'\)/", $html, $matches);
+    $encoded = $matches[1] ?? '';
+
+    $unescaped = json_decode('"'.$encoded.'"');
+
+    /** @var array{order: list<string>, manage: string} $payload */
+    $payload = json_decode(is_string($unescaped) ? $unescaped : '{}', true, 512, JSON_THROW_ON_ERROR);
+
+    expect($payload['order'])->toBe(['abstain', 'granted', 'forbidden'])
+        ->and($payload['manage'])->toBe('manage');
+});
+
+test('the script carries no stance of its own, so php stays the only authority', function (): void {
+    $script = (string) file_get_contents(dirname(__DIR__, 3).'/resources/js/permission-grid.js');
+
+    foreach (['abstain', 'granted', 'forbidden'] as $stance) {
+        expect(str_contains($script, "'{$stance}'"))->toBeFalse("[{$stance}] is written into the script");
+    }
+});
+
+test('shift reaches the denial from the keyboard too, which the mouse alone did not', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('x-on:keydown.enter.prevent', escape: false)
+        ->assertSee('$event.shiftKey', escape: false);
+});
+
+test('the state binding stays deferred, so a click costs no round trip', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('$entangle(&#039;data.permissions&#039;, false)', escape: false);
+});

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Filament\Forms\Grid;
 
+use ElPandaPe\FilamentWarden\Catalog\Scope;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -43,9 +44,29 @@ final readonly class Row
      */
     public function editableActions(): array
     {
-        return array_values(array_map(
-            static fn (Cell $cell): string => $cell->action,
-            array_filter($this->cells, static fn (Cell $cell): bool => $cell->isEditable()),
+        return $this->actionsOf(array_filter($this->cells, static fn (Cell $cell): bool => $cell->isEditable()));
+    }
+
+    /**
+     * The reading half of the row, so the shortcut does not have to carry a copy
+     * of the scope map into the browser.
+     *
+     * @return list<string>
+     */
+    public function readActions(): array
+    {
+        return $this->actionsOf(array_filter(
+            $this->cells,
+            static fn (Cell $cell): bool => $cell->isEditable() && $cell->scope === Scope::Read,
         ));
+    }
+
+    /**
+     * @param  array<int, Cell>  $cells
+     * @return list<string>
+     */
+    private function actionsOf(array $cells): array
+    {
+        return array_values(array_map(static fn (Cell $cell): string => $cell->action, $cells));
     }
 }

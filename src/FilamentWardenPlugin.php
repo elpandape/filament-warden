@@ -6,6 +6,8 @@ namespace ElPandaPe\FilamentWarden;
 
 use Filament\Contracts\Plugin;
 use Filament\Panel;
+use Filament\Support\Assets\AlpineComponent;
+use Filament\Support\Assets\Css;
 
 final class FilamentWardenPlugin implements Plugin
 {
@@ -19,7 +21,21 @@ final class FilamentWardenPlugin implements Plugin
         return 'filament-warden';
     }
 
-    public function register(Panel $panel): void {}
+    /**
+     * Registered here and not in `boot()`: `Panel::boot()` never runs in the
+     * console, so `php artisan filament:assets` would copy nothing and the panel
+     * would ask for a stylesheet that answers 404.
+     *
+     * The package name is the composer one, literally: anything else makes the
+     * cache-busting query string fall back to Filament's own version.
+     */
+    public function register(Panel $panel): void
+    {
+        $panel->assets([
+            Css::make('permission-grid', __DIR__.'/../resources/css/permission-grid.css'),
+            AlpineComponent::make('permission-grid', __DIR__.'/../resources/js/permission-grid.js'),
+        ], package: 'elpandape/filament-warden');
+    }
 
     public function boot(Panel $panel): void {}
 }
