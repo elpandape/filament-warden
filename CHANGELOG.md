@@ -6,6 +6,53 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Before `1.0.0` the public API may change between minor versions.
 
+## [0.8.0] - 2026-08-19
+
+The guard and the audit. **This version changes how a panel starts.**
+
+### Added
+
+- **A panel no longer starts with a screen that does not decide who gets in.**
+  Filament's `Page::canAccess()` and `Widget::canView()` return `true` literally
+  and `->strictAuthorization()` never reaches either, so a page registered
+  without a decision was open to anybody who could reach the panel — in silence,
+  with nothing to read. The guard names the screens in the exception. Filament's
+  own screens are its own business; this is about the ones somebody registered.
+  Turn it off with `guard.pages` / `guard.widgets`, which have been in the config
+  file since `0.1.0` and are read from here.
+- **`filament-warden:audit`**, which writes nothing and reports six things:
+  screens nobody guards, resources whose model has no policy, permissions no
+  grant points at, grants for actions nothing declares any more, whole entity
+  types nothing declares — a morph alias that moved — and models only a relation
+  manager reaches. With `--check` it exits 1, which is how a build goes red and
+  the only way the guard reaches CI at all: no artisan command ever starts a
+  panel.
+- **Relation managers are walked, for the half that is free.** One that declares
+  `$relatedResource` hands over its model through two public statics, so its
+  actions now appear in the grid without anybody declaring anything. One that
+  declares only `$relationship` is named by the audit instead: reaching its model
+  means running the relationship, and a `MorphTo` does not fail there — it
+  quietly answers with the owner's model.
+
+### Fixed
+
+- **A resource pointing at a class nobody wrote no longer takes the grid with
+  it.** `Resource::getModel()` guesses `App\Models\{Basename}` when the
+  resource does not declare one, and the catalogue built it without asking: the
+  whole grid died on an `Error` naming a class the developer never wrote. It is
+  skipped now, and the audit names the resource.
+- **A policy that cannot be built is no longer fatal either.**
+  `Gate::getPolicyFor()` throws when the registered class does not exist, and
+  anything the policy's constructor throws comes out the same way.
+
+### Not included
+
+- The audit deletes nothing. `warden:clean` is what removes orphans, and putting
+  deletion in a command that runs on deploy turns a configuration mistake into
+  lost data.
+- A relation manager that declares only `$relationship` is reported, never
+  resolved. Declare its model in `catalog.models`.
+
 ## [0.7.0] - 2026-08-19
 
 Handing roles out from the account's own screen, and the way back.

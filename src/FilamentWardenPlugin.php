@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden;
 
+use ElPandaPe\FilamentWarden\Filament\Guard;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use Filament\Contracts\Plugin;
@@ -36,7 +37,13 @@ final class FilamentWardenPlugin implements Plugin
         $panel->resources([
             RoleResource::class,
             PermissionResource::class,
-        ])->assets([
+        ])->bootUsing(static function (Panel $panel): void {
+            // Registered here and run at panel boot, which is the only point
+            // where the panel is whole: `Plugin::register()` sees only what was
+            // chained above it, and with cached components it suddenly sees
+            // everything — a plugin cannot rely on where it sits in the chain.
+            Guard::enforce($panel);
+        })->assets([
             Css::make('permission-grid', __DIR__.'/../resources/css/permission-grid.css'),
             AlpineComponent::make('permission-grid', __DIR__.'/../resources/js/permission-grid.js'),
         ], package: 'elpandape/filament-warden');

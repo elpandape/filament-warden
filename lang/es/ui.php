@@ -174,6 +174,15 @@ return [
     ],
 
     'console' => [
+        'audit' => [
+            'open' => 'Pantallas que no deciden quién entra. Filament contesta que sí por ellas, así que están abiertas a cualquiera que llegue al panel.',
+            'unpoliced' => 'Recursos cuyo modelo no tiene Policy. Es el caso en el que Filament falla abierto.',
+            'orphans' => 'Permisos a los que no apunta ninguna concesión. Nada los consulta. Quien los borra es `warden:clean`.',
+            'strays' => 'Concesiones a acciones que ya no declara nadie: un método de Policy renombrado, una errata en un seeder, una pantalla borrada.',
+            'drifted' => 'Tipos de entidad que nadie declara. Un alias de morph entero dejó de casar: el mapa se movió y todas sus filas se callaron.',
+            'unwalkable' => 'Modelos a los que solo llega un relation manager, y que no se pueden recorrer sin ejecutar la relación.',
+            'clean' => 'Nada que informar.',
+        ],
         'assign' => [
             'missing_role' => 'No hay ningún rol llamado [:role]. No se creó nada: asignar por nombre habría acuñado uno.',
             'missing_authority' => 'No se pudo leer [:authority]. Se escribe como Clase:id, por ejemplo "App\\Models\\User:1".',

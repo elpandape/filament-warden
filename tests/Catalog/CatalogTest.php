@@ -8,6 +8,7 @@ use ElPandaPe\FilamentWarden\Catalog\Origin;
 use ElPandaPe\FilamentWarden\Catalog\Scope;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\CommentResource;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\LedgerResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\PostResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Widgets\Summary;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
@@ -188,4 +189,43 @@ test('a resource wins the deduplication, so an entry knows the screen it belongs
 
     expect(entriesFrom($catalog->entries, Origin::Resource))->toHaveCount(6)
         ->and(namesFor(entriesFrom($catalog->entries, Origin::Model), Post::class))->toBeEmpty();
+});
+
+test('a relation manager that says where it points brings its model in', function (): void {
+    $catalog = Catalog::for(Panel::make()->id('scratch')->resources([LedgerResource::class]));
+
+    $names = [];
+
+    foreach ($catalog->entries as $entry) {
+        if ($entry->model === Tag::class) {
+            $names[] = $entry->name;
+        }
+    }
+
+    expect($names)->toContain('viewAny')
+        ->and($names)->toContain('view');
+});
+
+test('a relation manager that says nothing is never resolved, whatever it costs', function (): void {
+    // `Ledger::explosive()` throws. Reaching its model would mean running it, and
+    // the suite would die here rather than in somebody's console.
+    $catalog = Catalog::for(Panel::make()->id('scratch')->resources([LedgerResource::class]));
+
+    expect($catalog->entries)->not->toBeEmpty();
+});
+
+test('a resource pointing at a class nobody wrote does not take the grid with it', function (): void {
+    $ghost = new class extends Filament\Resources\Resource {};
+
+    $catalog = Catalog::for(Panel::make()->id('scratch')->resources([$ghost::class, PostResource::class]));
+
+    $models = [];
+
+    foreach ($catalog->entries as $entry) {
+        if ($entry->model !== null) {
+            $models[] = $entry->model;
+        }
+    }
+
+    expect($models)->toContain(Post::class);
 });

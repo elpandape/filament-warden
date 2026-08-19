@@ -8,6 +8,7 @@ use Illuminate\Auth\Access\HandlesAuthorization;
 use Illuminate\Support\Facades\Gate;
 use ReflectionClass;
 use ReflectionMethod;
+use Throwable;
 
 /**
  * The actions that exist for a model are the methods its policy declares, and
@@ -25,8 +26,16 @@ final class Abilities
      */
     public static function of(string $model): array
     {
-        // Laravel hands back an instance, built through the container, or null.
-        $policy = Gate::getPolicyFor($model);
+        // Laravel hands back an instance, built through the container, or null —
+        // and it is not total: a policy registered against a class that is not
+        // there throws a BindingResolutionException, and so does anything the
+        // policy's constructor throws. A catalogue that let that out would take
+        // the whole grid with it; the audit names it instead.
+        try {
+            $policy = Gate::getPolicyFor($model);
+        } catch (Throwable) {
+            return [];
+        }
 
         if (! is_object($policy)) {
             return [];

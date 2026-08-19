@@ -4,10 +4,11 @@
 > [elpandape/warden](https://github.com/elpandape/warden) — a permission grid derived from
 > your policies, explicit denials, and conditional grants.
 
-**Status: `0.7.0` — handing roles out.** A roles screen with the permission grid inside
+**Status: `0.8.0` — the guard and the audit.** A roles screen with the permission grid inside
 it, derived from your policies; an inspector that says why each cell is the way it is; a builder
 that narrows a grant to the rows it should reach; a permissions screen that says where every
-row of the catalogue came from; and a field that hands roles to an account. See [CHANGELOG.md](CHANGELOG.md) for what each version adds.
+row of the catalogue came from; a field that hands roles to an account; and a guard that stops a panel starting with a screen
+nobody decides. See [CHANGELOG.md](CHANGELOG.md) for what each version adds.
 
 ## Requirements
 
@@ -249,6 +250,47 @@ php artisan filament-warden:assign super-admin "App\Models\User:1"
 For whoever locks themselves out. It refuses a role that does not exist rather than creating one —
 assigning by name would have minted it, silently and with a generated title — and it only hands
 roles out: you lock yourself out by not having a role, never by having one.
+
+### The guard
+
+**From `0.8.0`, a panel does not start with a page or a widget that does not decide who gets in.**
+Filament's own `Page::canAccess()` and `Widget::canView()` return `true` literally, and
+`->strictAuthorization()` reaches neither — so a screen registered without a decision is open to
+anybody who can reach the panel, in silence and with nothing to read.
+
+The exception names the screens. Give each one a decision:
+
+```php
+use ElPandaPe\FilamentWarden\Filament\Concerns\AuthorizesPageAccess;
+
+class Reports extends Page
+{
+    use AuthorizesPageAccess;
+}
+```
+
+Filament's own screens are its own business; this is about the ones you or a package registered.
+Turn either half off with `guard.pages` / `guard.widgets`.
+
+### The audit
+
+```bash
+php artisan filament-warden:audit
+php artisan filament-warden:audit --check   # exits 1 when anything is found
+```
+
+It writes nothing, and reports six things:
+
+- **screens nobody guards** — the same finding the guard throws on, which is how it reaches CI at
+  all: no artisan command ever starts a panel;
+- **resources whose model has no policy** — the case Filament fails open on, told apart from a
+  policy that declares nothing and from a resource pointing at a class that does not exist;
+- **permissions no grant points at** — `warden:clean` is what removes them;
+- **grants for actions nothing declares any more** — a renamed policy method, a typo in a seeder, a
+  screen that was deleted: the silent mistake warden has no way to detect;
+- **whole entity types nothing declares** — a morph alias that moved, reported apart because the fix
+  is the opposite one;
+- **models only a relation manager reaches**, with the `catalog.models` line that settles it.
 
 ### Read the catalogue
 

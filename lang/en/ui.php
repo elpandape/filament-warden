@@ -174,6 +174,15 @@ return [
     ],
 
     'console' => [
+        'audit' => [
+            'open' => 'Screens that do not decide who gets in. Filament answers true for these, so they are open to anybody who reaches the panel.',
+            'unpoliced' => 'Resources whose model has no policy. This is the case Filament fails open on.',
+            'orphans' => 'Permissions no grant points at. Nothing consults them. `warden:clean` is what removes them.',
+            'strays' => 'Grants for actions nothing declares any more — a renamed policy method, a typo in a seeder, a screen that was deleted.',
+            'drifted' => 'Entity types nothing declares at all. A whole morph alias stopped matching: the map moved, and every row of it went quiet.',
+            'unwalkable' => 'Models only a relation manager reaches, which cannot be walked without running the relationship.',
+            'clean' => 'Nothing to report.',
+        ],
         'assign' => [
             'missing_role' => 'No role named [:role]. Nothing was created: assigning by name would have minted one.',
             'missing_authority' => 'Could not read [:authority]. Give it as Class:id, for example "App\\Models\\User:1".',
