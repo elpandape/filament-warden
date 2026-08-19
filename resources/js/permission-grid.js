@@ -14,6 +14,37 @@ export default function ({ state, grid }) {
 
         tab: grid.tabs.length > 0 ? grid.tabs[0].key : null,
 
+        selected: null,
+
+        why: null,
+
+        loading: false,
+
+        /**
+         * Cycling and selecting at once: the person who changes a cell is the one
+         * who wants to know what it meant.
+         */
+        pick(row, action, label, name, backwards = false) {
+            this.cycle(row, action, backwards)
+            this.select(row, action, label, name)
+        },
+
+        /**
+         * The answer is worked out on the server, one cell at a time, and arrives
+         * already written: nothing here composes a sentence.
+         */
+        async select(row, action, label, name) {
+            this.selected = { row, action, title: label, subtitle: name ?? row }
+            this.why = null
+            this.loading = true
+
+            try {
+                this.why = await this.$wire.callSchemaComponentMethod(this.grid.key, 'explainCell', { row, action })
+            } finally {
+                this.loading = false
+            }
+        },
+
         /**
          * Abstaining is the absence of a key, never a value.
          */

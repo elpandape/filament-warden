@@ -60,6 +60,101 @@
     --fw-surface: var(--gray-900);
 }
 
+/* The layout: the grid, and the panel that explains it ------------------- */
+
+.fw-layout {
+    display: grid;
+    gap: 1rem;
+    align-items: start;
+}
+
+@media (min-width: 64rem) {
+    .fw-layout {
+        grid-template-columns: minmax(0, 1fr) 19rem;
+    }
+}
+
+.fw-main {
+    min-inline-size: 0;
+}
+
+.fw-inspector {
+    border: 1px solid var(--fw-line);
+    border-radius: 0.5rem;
+    background: var(--fw-surface);
+    overflow: hidden;
+}
+
+.fw-inspector-head {
+    padding: 0.75rem;
+    border-block-end: 1px solid var(--fw-hairline);
+    background: var(--fw-raised);
+}
+
+.fw-inspector-title {
+    font-weight: 600;
+}
+
+.fw-inspector-sub {
+    color: var(--fw-ghost);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.6875rem;
+    overflow-wrap: anywhere;
+}
+
+.fw-inspector-body {
+    padding: 0.75rem;
+}
+
+.fw-inspector-empty {
+    margin: 0;
+    color: var(--fw-muted);
+}
+
+/* The verdict is the first thing read, so it carries the colour. */
+.fw-why {
+    display: grid;
+    gap: 0.375rem;
+    padding: 0.625rem;
+    border-inline-start: 3px solid var(--fw-ghost);
+    border-radius: 0.375rem;
+    background: var(--fw-raised);
+}
+
+.fw-why[data-verdict='granted'] {
+    border-inline-start-color: var(--fw-yes);
+    background: var(--fw-yes-soft);
+}
+
+.fw-why[data-verdict='forbidden'] {
+    border-inline-start-color: var(--fw-no);
+    background: var(--fw-no-soft);
+}
+
+/* The raw case, because "granted to everyone" is an inference warden never
+   proves — somebody has to be able to trace it when it does not add up. */
+.fw-why-cause {
+    color: var(--fw-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.6875rem;
+}
+
+.fw-note {
+    margin: 0.625rem 0 0;
+    padding-inline-start: 0.625rem;
+    border-inline-start: 3px solid var(--fw-noted);
+    color: var(--fw-muted);
+    font-size: 0.8125rem;
+}
+
+.fw-note-pending {
+    border-inline-start-color: var(--fw-accent);
+}
+
+.fw-box[data-selected='true'] {
+    box-shadow: 0 0 0 2px var(--fw-accent);
+}
+
 /* Tabs ------------------------------------------------------------------- */
 
 .fw-tabs {

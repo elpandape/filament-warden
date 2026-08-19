@@ -153,3 +153,93 @@ test('the state binding stays deferred, so a click costs no round trip', functio
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
         ->assertSee('$entangle(&#039;data.permissions&#039;, false)', escape: false);
 });
+
+test('the browser can ask why one cell is the way it is', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', roleClass());
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'explainCell', [roleClass(), 'viewAny'])
+        ->assertReturned(fn (array $why): bool => $why['verdict'] === 'granted'
+            && $why['cause'] === 'granted-directly'
+            && is_string($why['summary'])
+            && $why['pending'] === null);
+});
+
+test('a forbidden cell says forbidden, not merely not allowed', function (): void {
+    $role = makeRole();
+
+    Warden::forbid($role)->to('viewAny', roleClass());
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'explainCell', [roleClass(), 'viewAny'])
+        ->assertReturned(fn (array $why): bool => $why['verdict'] === 'forbidden'
+            && $why['cause'] === 'forbidden-directly');
+});
+
+test('a cell nothing matches says warden abstains, which is another answer', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'explainCell', [roleClass(), 'create'])
+        ->assertReturned(fn (array $why): bool => $why['verdict'] === 'abstain'
+            && $why['cause'] === 'no-matching-grant'
+            && $why['permission'] === null);
+});
+
+test('a stance changed on screen is called out, because the answer is about the store', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', roleClass());
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->fillForm(['permissions' => [roleClass() => ['viewAny' => 'forbidden']]])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'explainCell', [roleClass(), 'viewAny'])
+        ->assertReturned(fn (array $why): bool => $why['verdict'] === 'granted' && is_string($why['pending']));
+});
+
+test('the wildcard column is explained too, though no policy declares it', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->toManage(roleClass());
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'explainCell', [roleClass(), 'manage'])
+        ->assertReturned(fn (array $why): bool => $why['verdict'] === 'granted');
+});
+
+test('a door is explained by its own name', function (): void {
+    $role = makeRole();
+    $door = 'panel:test';
+
+    Warden::allow($role)->to($door);
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'explainCell', [$door, 'access'])
+        ->assertReturned(fn (array $why): bool => $why['verdict'] === 'granted');
+});
+
+test('a cell that is not on the grid is not explained', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'explainCell', ['App\Models\Nothing', 'viewAny'])
+        ->assertReturned([]);
+});
+
+test('the inspector is on the screen, waiting to be asked', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('fw-inspector', escape: false)
+        ->assertSee('Click a cell of the grid')
+        ->assertSee('x-on:click="pick(', escape: false);
+});
+
+test('the script asks the server for the answer and composes none of it', function (): void {
+    $script = (string) file_get_contents(dirname(__DIR__, 3).'/resources/js/permission-grid.js');
+
+    expect($script)->toContain("callSchemaComponentMethod(this.grid.key, 'explainCell'")
+        ->and($script)->not->toContain('Granted by');
+});
