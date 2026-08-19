@@ -156,5 +156,13 @@ abstract class TestCase extends ApplicationTestCase
             $table->string('password');
             $table->timestamps();
         });
+
+        // The one fixture model the suite persists: a grant over a record is not
+        // a cell of the grid, and proving it needs a record.
+        Schema::create('posts', static function (Blueprint $table): void {
+            $table->id();
+            $table->string('title');
+            $table->timestamps();
+        });
     }
 }
