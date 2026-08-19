@@ -63,8 +63,15 @@ test('the package publishes its config and its translations, and nothing else', 
         ->and(Arr::first($translations))->toEndWith('vendor/filament-warden');
 });
 
+test('the package publishes its views, so an application can rewrite the grid', function (): void {
+    $views = ServiceProvider::pathsToPublish(FilamentWardenServiceProvider::class, 'filament-warden-views');
+
+    expect($views)->toHaveCount(1)
+        ->and(Arr::first($views))->toEndWith('views/vendor/filament-warden');
+});
+
 test('a tag the package never registered publishes nothing', function (): void {
-    expect(ServiceProvider::pathsToPublish(FilamentWardenServiceProvider::class, 'filament-warden-views'))->toBeEmpty();
+    expect(ServiceProvider::pathsToPublish(FilamentWardenServiceProvider::class, 'filament-warden-assets'))->toBeEmpty();
 });
 
 test('the package registers the policies its own two models need', function (): void {

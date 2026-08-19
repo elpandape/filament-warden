@@ -32,6 +32,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\View;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as ApplicationTestCase;
 use RuntimeException;
@@ -104,6 +105,10 @@ abstract class TestCase extends ApplicationTestCase
         $config = $app['config'];
 
         $config->set('app.key', 'base64:AckfSECXIvnK5r28GVIWUAxmbBSjTsmF/0kOO7HH+Z8=');
+
+        // The fixture views the suite renders, under a namespace of their own so
+        // they can never be mistaken for the ones the package ships.
+        View::addNamespace('filament-warden-tests', __DIR__.'/Fixtures/resources/views');
 
         $config->set('app.locale', 'en');
         $config->set('app.fallback_locale', 'en');

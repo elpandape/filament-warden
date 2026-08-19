@@ -8,4 +8,10 @@ return [
         'roles' => 'Roles',
         'permissions' => 'Permisos',
     ],
+
+    'grid' => [
+        'entity' => 'Entidad',
+        'manage' => 'Todo',
+        'undeclared' => 'La Policy no declara esta acción',
+    ],
 ];

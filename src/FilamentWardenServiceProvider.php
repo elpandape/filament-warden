@@ -20,6 +20,7 @@ final class FilamentWardenServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'filament-warden');
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'filament-warden');
 
         $this->registerPolicies();
 
@@ -31,6 +32,10 @@ final class FilamentWardenServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__.'/../lang' => lang_path('vendor/filament-warden'),
             ], 'filament-warden-translations');
+
+            $this->publishes([
+                __DIR__.'/../resources/views' => resource_path('views/vendor/filament-warden'),
+            ], 'filament-warden-views');
         }
     }
 

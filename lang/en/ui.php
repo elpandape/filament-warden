@@ -8,4 +8,10 @@ return [
         'roles' => 'Roles',
         'permissions' => 'Permissions',
     ],
+
+    'grid' => [
+        'entity' => 'Entity',
+        'manage' => 'Everything',
+        'undeclared' => 'The policy does not declare this action',
+    ],
 ];
