@@ -11,6 +11,7 @@ use Composer\InstalledVersions;
 use ElPandaPe\FilamentWarden\FilamentWardenServiceProvider;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Providers\BarePanelProvider;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Providers\LaxPanelProvider;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Providers\TestPanelProvider;
 use ElPandaPe\Warden\WardenServiceProvider;
 use Filament\Actions\ActionsServiceProvider;
@@ -92,6 +93,7 @@ abstract class TestCase extends ApplicationTestCase
             CarbonServiceProvider::class,
             TestPanelProvider::class,
             BarePanelProvider::class,
+            LaxPanelProvider::class,
         ];
     }
 

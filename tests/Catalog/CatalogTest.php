@@ -127,6 +127,24 @@ test('the door of the panel is in the catalogue, or nobody could ever be given i
         ->and($door->scope)->toBe(Scope::Read);
 });
 
+test('the two models this package owns are in the catalogue before it owns a screen', function (): void {
+    $catalog = Catalog::for(Panel::make()->id('scratch'));
+
+    expect(namesFor($catalog->entries, roleClass()))
+        ->toBe(['viewAny', 'view', 'create', 'update', 'delete', 'deleteAny'])
+        ->and(namesFor($catalog->entries, permissionClass()))
+        ->toBe(['viewAny', 'view', 'create', 'update', 'delete', 'deleteAny']);
+});
+
+test('the two models this package owns carry the morph alias warden writes for them', function (): void {
+    $catalog = Catalog::for(Panel::make()->id('scratch'));
+
+    $role = entriesFrom($catalog->entries, Origin::Model)[0];
+
+    expect($role->entityType)->toBe('warden.role')
+        ->and($role->source)->toBeNull();
+});
+
 test('a model an application declares by config needs no resource to be catalogued', function (): void {
     config()->set('filament-warden.catalog.models', [Tag::class]);
 

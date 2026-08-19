@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden;
 
+use ElPandaPe\FilamentWarden\Policies\PermissionPolicy;
+use ElPandaPe\FilamentWarden\Policies\RolePolicy;
+use ElPandaPe\Warden\Context;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 final class FilamentWardenServiceProvider extends ServiceProvider
@@ -17,6 +21,8 @@ final class FilamentWardenServiceProvider extends ServiceProvider
     {
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'filament-warden');
 
+        $this->registerPolicies();
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__.'/../config/filament-warden.php' => config_path('filament-warden.php'),
@@ -26,5 +32,22 @@ final class FilamentWardenServiceProvider extends ServiceProvider
                 __DIR__.'/../lang' => lang_path('vendor/filament-warden'),
             ], 'filament-warden-translations');
         }
+    }
+
+    /**
+     * Both models live in vendor, and Laravel's guessing never reaches this
+     * namespace. Without this, Filament finds no policy and answers `allow`.
+     *
+     * Registered against the configured classes, not the shipped ones: an
+     * application may swap either. And registered unconditionally — an
+     * application that wants its own policy registers it in its own service
+     * provider, which boots after every package provider and wins.
+     */
+    private function registerPolicies(): void
+    {
+        $context = Context::resolve();
+
+        Gate::policy($context->roleClass(), RolePolicy::class);
+        Gate::policy($context->permissionClass(), PermissionPolicy::class);
     }
 }

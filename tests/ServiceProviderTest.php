@@ -3,9 +3,17 @@
 declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\FilamentWardenServiceProvider;
+use ElPandaPe\FilamentWarden\Policies\PermissionPolicy;
+use ElPandaPe\FilamentWarden\Policies\RolePolicy;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Comment;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
+use ElPandaPe\Warden\Facades\Warden;
+use Filament\Facades\Filament;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+
+use function Filament\get_authorization_response;
 
 pest()->extend(TestCase::class);
 
@@ -57,4 +65,19 @@ test('the package publishes its config and its translations, and nothing else', 
 
 test('a tag the package never registered publishes nothing', function (): void {
     expect(ServiceProvider::pathsToPublish(FilamentWardenServiceProvider::class, 'filament-warden-views'))->toBeEmpty();
+});
+
+test('the package registers the policies its own two models need', function (): void {
+    expect(Gate::getPolicyFor(roleClass()))->toBeInstanceOf(RolePolicy::class)
+        ->and(Gate::getPolicyFor(permissionClass()))->toBeInstanceOf(PermissionPolicy::class);
+});
+
+test('a model with no policy walks straight past filament, which is why this package registers its own', function (): void {
+    $user = signIn();
+
+    Filament::setCurrentPanel('lax');
+
+    Warden::forbid($user)->to('viewAny', Comment::class);
+
+    expect(get_authorization_response('viewAny', Comment::class)->allowed())->toBeTrue();
 });
