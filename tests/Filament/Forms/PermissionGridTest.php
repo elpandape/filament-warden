@@ -404,3 +404,14 @@ test('closing the builder keeps a narrowed rule instead of widening it', functio
     expect($narrowing->shape)->toBe(ElPandaPe\FilamentWarden\Conditions\Shape::Conditions)
         ->and($narrowing->rules[0]->value)->toBe('editor');
 });
+
+test('the tally of a role that holds everything lights up, instead of reading zero', function (): void {
+    $role = makeRole('super-admin');
+
+    Warden::allow($role)->everything();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('fw-wider', escape: false)
+        ->assertSee('data-on="true"', escape: false)
+        ->assertDontSee('>0</span>', escape: false);
+});

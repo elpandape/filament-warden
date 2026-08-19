@@ -8,6 +8,9 @@ namespace ElPandaPe\FilamentWarden\Filament\Forms\Grid;
  * One group of the grid, with the tally that lights up the moment it grants
  * anything: one save writes every tab, and a role reaching a dangerous page
  * would otherwise read as harmless from whichever tab happens to be open.
+ *
+ * The tally counts what each cell ANSWERS, not what the role wrote on it. A role
+ * holding the wildcard wrote nothing on any cell and reaches all of them.
  */
 final readonly class Tab
 {
@@ -25,7 +28,7 @@ final readonly class Tab
 
         foreach ($this->rows as $row) {
             foreach ($row->allCells() as $cell) {
-                if ($cell->isGranted()) {
+                if ($cell->declared && $cell->answers() === Stance::Granted) {
                     $granted++;
                 }
             }

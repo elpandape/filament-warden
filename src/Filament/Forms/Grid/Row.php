@@ -62,6 +62,28 @@ final readonly class Row
     }
 
     /**
+     * Every cell the browser draws on this row, with the permission name each one
+     * stands for — which is what a rule written over every entity is keyed by.
+     *
+     * The tally counts over this and not over what was written: a cell nobody
+     * wrote still answers when a wildcard reaches it.
+     *
+     * @return list<array{action: string, name: string|null}>
+     */
+    public function drawnCells(): array
+    {
+        $cells = [];
+
+        foreach ($this->allCells() as $cell) {
+            if ($cell->declared) {
+                $cells[] = ['action' => $cell->action, 'name' => $cell->entry?->name];
+            }
+        }
+
+        return $cells;
+    }
+
+    /**
      * @param  array<int, Cell>  $cells
      * @return list<string>
      */

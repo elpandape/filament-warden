@@ -42,9 +42,17 @@ final readonly class Cell
         return new self($row, $action, $label, Stance::Abstain, declared: false, scope: $scope);
     }
 
-    public function isGranted(): bool
+    /**
+     * What the cell ANSWERS, which is not what the role wrote on it.
+     *
+     * A role holding the wildcard has written nothing on any cell — `*` over `*`
+     * is not a cell — and every one of them still answers granted. Counting what
+     * was written made the most dangerous role in the installation tally zero
+     * while the whole grid was ticks.
+     */
+    public function answers(): Stance
     {
-        return $this->stance === Stance::Granted;
+        return $this->stance->isWritten() ? $this->stance : ($this->reach ?? Stance::Abstain);
     }
 
     /**

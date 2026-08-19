@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Before `1.0.0` the public API may change between minor versions.
 
+## [0.6.1] - 2026-08-19
+
+### Fixed
+
+- **A role holding the wildcard no longer tallies zero.** The tab counters
+  counted what the role had written on each cell, and a role holding `*` over
+  `*` has written nothing on any of them — `*` is not a cell. The grid drew
+  every cell as granted and every counter said `0`, which is the same failure
+  `0.3.1` fixed for the drawings and left in the counters. They now count what
+  each cell **answers**, and the browser is handed every drawable cell so it
+  counts the same way.
+
 ## [0.6.0] - 2026-08-19
 
 The permissions screen. The catalogue, with its provenance visible.

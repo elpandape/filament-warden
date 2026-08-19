@@ -163,7 +163,12 @@ test('the tally counts what the tab grants, wildcard included', function (): voi
         [Post::class => ['viewAny' => 'granted', StateKey::MANAGE => 'granted', 'delete' => 'forbidden']],
     );
 
-    expect(tabNamed($grid, 'resources')->granted())->toBe(2);
+    $tab = tabNamed($grid, 'resources');
+    $row = rowFor($tab, Post::class);
+
+    // The wildcard of the row reaches every cell of it, so the tally is every
+    // drawable cell but the one written forbidden.
+    expect($tab->granted())->toBe(count($row->drawnCells()) - 1);
 });
 
 test('a page and a widget are doors, with one action each and no wildcard', function (): void {
@@ -288,4 +293,67 @@ test('the legend names every drawing the grid uses', function (): void {
         ->toBe(['abstain', 'granted', 'forbidden', 'broader', 'abstain', 'granted', 'granted'])
         ->and(array_column($grid->legend(), 'locked'))
         ->toBe([false, false, false, false, false, false, true]);
+});
+
+test('a role that holds the wildcard does not tally zero, whatever it wrote', function (): void {
+    $grid = gridFor(
+        Panel::make()->id('scratch')->resources([PostResource::class]),
+        [],
+        [],
+        ['*' => 'granted'],
+    );
+
+    $tab = tabNamed($grid, 'resources');
+    $drawn = array_sum(array_map(static fn (Row $row): int => count($row->drawnCells()), $tab->rows));
+
+    expect($drawn)->toBeGreaterThan(0)
+        ->and($tab->granted())->toBe($drawn);
+});
+
+test('a wildcard that forbids tallies nothing, because it grants nothing', function (): void {
+    $grid = gridFor(
+        Panel::make()->id('scratch')->resources([PostResource::class]),
+        [],
+        [],
+        ['*' => 'forbidden'],
+    );
+
+    expect(tabNamed($grid, 'resources')->granted())->toBe(0);
+});
+
+test('the wildcard of one row reaches that row and no other', function (): void {
+    $grid = gridFor(
+        Panel::make()->id('scratch')->resources([PostResource::class]),
+        [Post::class => [StateKey::MANAGE => 'granted']],
+    );
+
+    $tab = tabNamed($grid, 'resources');
+
+    // The other rows of the tab wrote nothing and are reached by nothing.
+    expect($tab->granted())->toBe(count(rowFor($tab, Post::class)->drawnCells()));
+});
+
+test('an action no policy declares is not a cell, so the tally never counts it', function (): void {
+    $grid = gridFor(
+        Panel::make()->id('scratch')->resources([PostResource::class])->pages([Reports::class]),
+        [],
+        [],
+        ['*' => 'granted'],
+    );
+
+    $tab = tabNamed($grid, 'resources');
+    $row = rowFor($tab, Post::class);
+
+    expect(count($row->drawnCells()))->toBeLessThan(count($row->allCells()) + 1)
+        ->and(array_column($row->drawnCells(), 'action'))->not->toContain('restore');
+});
+
+test('the browser is handed every drawable cell, so it can tally the same way', function (): void {
+    $grid = gridFor(Panel::make()->id('scratch')->resources([PostResource::class]));
+
+    $cells = $grid->alpine()['rows'][Post::class]['cells'];
+
+    expect(array_column($cells, 'action'))->toContain(StateKey::MANAGE)
+        ->and(array_column($cells, 'action'))->toContain('viewAny')
+        ->and($cells)->toHaveSameSize(rowFor(tabNamed($grid, 'resources'), Post::class)->drawnCells());
 });

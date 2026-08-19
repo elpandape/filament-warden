@@ -262,6 +262,12 @@ function grid({ state, grid, interactive }) {
             this.narrow(row, action, { mode: 'all', rules: [] })
         },
 
+        /**
+         * What the tab GRANTS, which is not what was written on it: a role
+         * holding the wildcard wrote nothing on any cell and reaches all of them.
+         * `Tab::granted()` in PHP counts the same way, and there is a test that
+         * pins the two together on a role that only holds the wildcard.
+         */
         granted(tabKey) {
             const tab = this.grid.tabs.find((candidate) => candidate.key === tabKey)
 
@@ -270,10 +276,16 @@ function grid({ state, grid, interactive }) {
             }
 
             return tab.rows.reduce(
-                (total, row) => total + Object.values(this.state.stances?.[row] ?? {})
-                    .filter((stance) => stance === this.grid.order[1]).length,
+                (total, row) => total + (this.grid.rows[row]?.cells ?? [])
+                    .filter((cell) => this.answers(row, cell.action, cell.name) === this.grid.order[1]).length,
                 0,
             )
+        },
+
+        answers(row, action, name) {
+            const drawn = this.drawn(row, action, name)
+
+            return drawn === 'broader' ? this.reached(row, action, name) : drawn
         },
 
         write(row, action, stance) {

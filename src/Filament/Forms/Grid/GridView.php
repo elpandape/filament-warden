@@ -80,7 +80,7 @@ final readonly class GridView
      * @return array{
      *     order: list<string>,
      *     manage: string,
-     *     rows: array<string, array{actions: list<string>, read: list<string>}>,
+     *     rows: array<string, array{actions: list<string>, read: list<string>, cells: list<array{action: string, name: string|null}>}>,
      *     tabs: list<array{key: string, rows: list<string>}>,
      *     wider: array<string, string>,
      *     operators: list<string>,
@@ -100,6 +100,7 @@ final readonly class GridView
                 $rows[$row->key] = [
                     'actions' => $row->editableActions(),
                     'read' => $row->readActions(),
+                    'cells' => $row->drawnCells(),
                 ];
             }
         }
