@@ -81,6 +81,14 @@ return [
         'forbidden' => 'prohibido',
     ],
 
+    'probe' => [
+        'narrowed' => 'Esta regla necesita una fila delante. Preguntada por la clase, warden se la salta y contesta que no casó nada — que se lee exactamente igual que si la regla no existiera. Elige un registro para preguntar de verdad.',
+        'no_record' => 'Ninguna fila de esa entidad tiene esa clave, así que no se preguntó nada. No es la misma respuesta que «no casa».',
+        'no_model' => 'Este permiso no tiene ningún modelo detrás, así que no hay fila que ponerle delante. Se pregunta sin ella.',
+        'unresolved' => 'La entidad a la que apunta este permiso ya no resuelve a ningún modelo. No falla con ruido: simplemente deja de casar con nada.',
+        'unreadable' => 'Esta fila no tiene nombre, así que no hay pregunta que hacerle.',
+    ],
+
     'conditions' => [
         'scope' => 'Alcance de la regla',
         'if' => 'si',

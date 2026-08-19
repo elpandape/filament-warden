@@ -81,6 +81,14 @@ return [
         'forbidden' => 'forbidden',
     ],
 
+    'probe' => [
+        'narrowed' => 'This rule needs a record in front of it. Asked about the class, warden skips it and answers that nothing matched — which reads exactly like the rule not being there. Choose a record to ask properly.',
+        'no_record' => 'No row of that entity has that key, so nothing was asked. This is not the same answer as nothing matching.',
+        'no_model' => 'This permission has no model behind it, so there is no row to put in front of it. It is asked without one.',
+        'unresolved' => 'The entity this permission points at no longer resolves to a model. It does not fail loudly: it simply stops matching anything.',
+        'unreadable' => 'This row carries no name, so there is no question to ask of it.',
+    ],
+
     'conditions' => [
         'scope' => 'Rule scope',
         'if' => 'if',
