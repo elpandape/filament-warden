@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Before `1.0.0` the public API may change between minor versions.
 
+## [0.5.1] - 2026-08-19
+
+Two switches that did nothing, and a guarantee nothing tested.
+
+### Fixed
+
+- **`grid.explain` and `grid.constraints` are read.** Both were declared in the
+  config file and consulted nowhere, so an installation that turned either off
+  got the feature anyway. Turning the inspector off now stops the panel being
+  asked why; turning the builder off stops it being asked what a condition could
+  be built from, and neither is drawn.
+- **Closing the builder no longer widens the rules it can no longer show.** With
+  the builder off, the screen sends no reach at all — which is not the same as
+  sending "every row", and reading it as the latter would have taken the
+  conditions off every narrowed cell of the grid the first time somebody saved.
+
+### Added
+
+- **A test that a protected role survives the delete action itself**, and not
+  only the check behind it. `Resource::canDelete()` does not gate the built-in
+  action — Filament's actions call `getDeleteAuthorizationResponse()` directly —
+  so the guarantee rests on the table's own `->visible()`. Removing that line
+  deleted a protected role through a plain livewire call with the whole suite
+  still green. Now it goes red.
+
 ## [0.5.0] - 2026-08-19
 
 The condition builder. A cell now carries two things, and they are saved together.

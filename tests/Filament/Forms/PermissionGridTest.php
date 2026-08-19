@@ -345,3 +345,62 @@ test('saving carries the condition the screen drew all the way to the store', fu
         ->and($narrowing->rules[0]->value)->toBe('editor')
         ->and(Access::granted($user, 'update', roleClass()))->toBeFalse();
 });
+
+test('an installation that closed the inspector is not asked why', function (): void {
+    config()->set('filament-warden.grid.explain', false);
+
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', roleClass());
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'explainCell', [roleClass(), 'viewAny'])
+        ->assertReturned(fn (array $why): bool => $why === []);
+});
+
+test('an installation that closed the builder is not asked what to build with', function (): void {
+    config()->set('filament-warden.grid.constraints', false);
+
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'narrowingFor', [roleClass(), 'update'])
+        ->assertReturned(fn (array $narrowing): bool => $narrowing === []);
+});
+
+test('a grid with both closed draws no inspector at all', function (): void {
+    config()->set('filament-warden.grid.explain', false);
+    config()->set('filament-warden.grid.constraints', false);
+
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('fw-grid', escape: false)
+        ->assertDontSee('fw-inspector', escape: false);
+});
+
+test('closing the builder keeps a narrowed rule instead of widening it', function (): void {
+    config()->set('filament-warden.grid.constraints', false);
+
+    $role = makeRole();
+    $user = makeUser();
+    Warden::assign($role)->to($user);
+
+    Warden::allow($role)->to('update', roleClass())->where('name', 'editor');
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->fillForm(['permissions' => ['stances' => [
+            roleClass() => ['update' => 'granted', 'viewAny' => 'granted'],
+        ]]])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    // Nullable in the signature and never null in fact.
+    /** @var Panel $panel */
+    $panel = Filament::getCurrentOrDefaultPanel();
+
+    $narrowing = RoleGrants::of($role, Catalog::for($panel))->narrowings[roleClass()]['update'];
+
+    expect($narrowing->shape)->toBe(ElPandaPe\FilamentWarden\Conditions\Shape::Conditions)
+        ->and($narrowing->rules[0]->value)->toBe('editor');
+});

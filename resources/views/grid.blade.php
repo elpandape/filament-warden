@@ -147,6 +147,7 @@
                 </div>
         </div>
 
+        @if ($grid->alpine()['explain'] || $grid->alpine()['constraints'])
         <aside class="fw-inspector">
             <div class="fw-inspector-head">
                 <div class="fw-inspector-title" x-text="selected ? selected.title : @js(__('filament-warden::ui.explain.title'))"></div>
@@ -157,7 +158,7 @@
                 <p class="fw-inspector-empty" x-show="! selected">{{ __('filament-warden::ui.explain.empty') }}</p>
                 <p class="fw-inspector-empty" x-show="selected && loading" x-cloak>{{ __('filament-warden::ui.explain.loading') }}</p>
 
-                <template x-if="why && ! loading">
+                <template x-if="why && ! loading && grid.explain">
                     <div>
                         <div class="fw-why" x-bind:data-verdict="why.verdict">
                             <span x-text="why.summary"></span>
@@ -171,5 +172,6 @@
                 @include('filament-warden::builder')
             </div>
         </aside>
+        @endif
     </div>
 </div>

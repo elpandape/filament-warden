@@ -9,6 +9,7 @@ use ElPandaPe\FilamentWarden\Filament\Concerns\DrawsThePermissionGrid;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\State;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
+use ElPandaPe\FilamentWarden\Support\Config;
 use Filament\Forms\Components\Field;
 use Illuminate\Database\Eloquent\Model;
 
@@ -110,10 +111,14 @@ final class PermissionGrid extends Field
      * How far each cell reaches on screen. Only the field has one: a screen that
      * only reads has nothing pending.
      *
-     * @return array<string, array<string, mixed>>
+     * With the builder switched off this answers null rather than an empty map,
+     * and the difference is the whole point: an empty map would read as "every
+     * cell reaches every row" and widen every narrowed rule on the first save.
+     *
+     * @return array<string, array<string, mixed>>|null
      */
-    private function gridNarrowings(): array
+    private function gridNarrowings(): ?array
     {
-        return State::narrowings($this->getState());
+        return Config::enabled('grid.constraints') ? State::narrowings($this->getState()) : null;
     }
 }

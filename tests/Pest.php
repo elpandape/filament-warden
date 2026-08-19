@@ -111,3 +111,15 @@ function stringsOf(array $payload, string $key): array
 {
     return array_values(array_filter(partOf($payload, $key), is_string(...)));
 }
+
+/**
+ * A record key in the shape livewire sends it, narrowed so static analysis can
+ * read it: `getKey()` is `mixed`, and a key that does not look like a key would
+ * address no row at all.
+ */
+function recordKey(Model $model): string
+{
+    $key = $model->getKey();
+
+    return is_int($key) || is_string($key) ? (string) $key : '';
+}

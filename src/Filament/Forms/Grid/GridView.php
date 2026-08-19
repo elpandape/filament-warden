@@ -87,6 +87,8 @@ final readonly class GridView
      *     authority: string,
      *     joiners: array{and: string, or: string},
      *     modes: array<string, array{name: string, hint: string}>,
+     *     explain: bool,
+     *     constraints: bool,
      * }
      */
     public function alpine(): array
@@ -120,6 +122,8 @@ final readonly class GridView
                 'and' => self::translated('filament-warden::ui.conditions.and', 'and'),
                 'or' => self::translated('filament-warden::ui.conditions.or', 'or'),
             ],
+            'explain' => Config::enabled('grid.explain'),
+            'constraints' => Config::enabled('grid.constraints'),
             'modes' => [
                 'all' => [
                     'name' => self::translated('filament-warden::ui.conditions.modes.all.name', 'all'),

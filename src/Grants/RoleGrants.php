@@ -98,9 +98,9 @@ final class RoleGrants
      * every entity-scoped cell as a bare name and delete the rest.
      *
      * @param  array<string, array<string, string>>  $desired
-     * @param  array<string, array<string, mixed>>  $narrowings
+     * @param  array<string, array<string, mixed>>|null  $narrowings  null when the screen does not offer them
      */
-    public static function apply(Model $role, Catalog $catalog, array $desired, array $narrowings = []): void
+    public static function apply(Model $role, Catalog $catalog, array $desired, ?array $narrowings = null): void
     {
         $changes = self::changes($role, $catalog, $desired, $narrowings);
 
@@ -119,10 +119,10 @@ final class RoleGrants
 
     /**
      * @param  array<string, array<string, string>>  $desired
-     * @param  array<string, array<string, mixed>>  $narrowings
+     * @param  array<string, array<string, mixed>>|null  $narrowings  null when the screen does not offer them
      * @return list<Change>
      */
-    public static function changes(Model $role, Catalog $catalog, array $desired, array $narrowings = []): array
+    public static function changes(Model $role, Catalog $catalog, array $desired, ?array $narrowings = null): array
     {
         $current = self::of($role, $catalog);
         $changes = [];
@@ -141,9 +141,15 @@ final class RoleGrants
 
             // Abstaining is the absence of a row, and a row that does not exist
             // has no reach to narrow.
-            $wanted = $to === Stance::Abstain
-                ? Narrowing::all()
-                : self::wanted($narrowings[$row][$action] ?? null, $entity);
+            //
+            // And a screen with the builder switched off keeps what the store
+            // has: reading "no reach on screen" as "every row" would widen every
+            // narrowed cell of the grid the first time somebody saved it.
+            $wanted = match (true) {
+                $to === Stance::Abstain => Narrowing::all(),
+                $narrowings === null => $stored,
+                default => self::wanted($narrowings[$row][$action] ?? null, $entity),
+            };
 
             if (! $wanted instanceof Narrowing) {
                 continue;

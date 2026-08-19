@@ -82,6 +82,18 @@ final class Config
     }
 
     /**
+     * A switch an installation can turn off, defaulting to on.
+     *
+     * Only `false` closes it: a key that is absent — which is every key of this
+     * package under `config:cache` without a published file — must not read as a
+     * closed door, and neither must a value somebody typed as `'no'`.
+     */
+    public static function enabled(string $key): bool
+    {
+        return self::get($key) !== false;
+    }
+
+    /**
      * The name an installation already uses for a panel's door, if any.
      */
     public static function panelPermission(string $panel): ?string

@@ -265,3 +265,26 @@ test('a protected role does not take a condition from the payload either', funct
 
     expect(Context::resolve()->grantClass()::query()->count())->toBe(2);
 });
+
+test('a protected role survives the delete action itself, not only the check', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $protected = makeRole('super-admin');
+    $plain = makeRole('editor');
+
+    // Straight at livewire, the way a crafted request arrives: `callAction()`
+    // asserts the action is visible before calling it, so it would prove the
+    // button is hidden and nothing about whether the server refuses.
+    livewire(ListRoles::class)
+        ->call('mountAction', 'delete', [], ['table' => true, 'recordKey' => recordKey($protected)])
+        ->call('callMountedAction', []);
+
+    livewire(ListRoles::class)
+        ->call('mountAction', 'delete', [], ['table' => true, 'recordKey' => recordKey($plain)])
+        ->call('callMountedAction', []);
+
+    expect(roleClass()::query()->whereKey($protected->getKey())->exists())->toBeTrue()
+        ->and(roleClass()::query()->whereKey($plain->getKey())->exists())->toBeFalse();
+});

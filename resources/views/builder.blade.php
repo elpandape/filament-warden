@@ -10,7 +10,7 @@
     The words all arrive from PHP; the only rule this file's script decides is
     the clause cut, and `Narrowing::clauses()` is its authority.
 --}}
-<template x-if="offered()">
+<template x-if="grid.constraints && offered()">
     <div class="fw-builder">
         <div class="fw-field-label">{{ __('filament-warden::ui.conditions.scope') }}</div>
 

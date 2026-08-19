@@ -17,6 +17,7 @@ use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Grants\Explanation;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Grants\RoleState;
+use ElPandaPe\FilamentWarden\Support\Config;
 use Filament\Facades\Filament;
 use Filament\Panel;
 use Filament\Support\Components\Attributes\ExposedLivewireMethod;
@@ -58,6 +59,10 @@ trait DrawsThePermissionGrid
     #[Renderless]
     public function explainCell(string $row, string $action): array
     {
+        if (! Config::enabled('grid.explain')) {
+            return [];
+        }
+
         $role = $this->getRecord();
         $entry = $this->catalogEntryFor($row, $action);
 
@@ -93,6 +98,10 @@ trait DrawsThePermissionGrid
     #[Renderless]
     public function narrowingFor(string $row, string $action): array
     {
+        if (! Config::enabled('grid.constraints')) {
+            return [];
+        }
+
         $model = $this->catalogEntryFor($row, $action)?->model;
 
         if ($model === null) {
