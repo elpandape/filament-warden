@@ -104,6 +104,17 @@ final readonly class Rule
     }
 
     /**
+     * The line as warden's own object, for the one screen that writes the
+     * catalogue row itself instead of pointing a grant at a twin.
+     */
+    public function constraint(): Constraint
+    {
+        return $this->authorityColumn === null
+            ? new ValueConstraint($this->column, $this->operator, $this->value)
+            : new ColumnConstraint($this->column, $this->operator, $this->authorityColumn);
+    }
+
+    /**
      * Three arguments, always: warden reads the arity, and with two it would
      * take the operator for the value and compare by equality without saying so.
      */

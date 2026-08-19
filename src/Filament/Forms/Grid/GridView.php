@@ -9,9 +9,9 @@ use ElPandaPe\FilamentWarden\Catalog\Entry;
 use ElPandaPe\FilamentWarden\Catalog\Origin;
 use ElPandaPe\FilamentWarden\Catalog\Scope;
 use ElPandaPe\FilamentWarden\Conditions\Narrowing;
+use ElPandaPe\FilamentWarden\Conditions\Words;
 use ElPandaPe\FilamentWarden\Grants\RoleState;
 use ElPandaPe\FilamentWarden\Support\Config;
-use ElPandaPe\Warden\Enums\ComparisonOperator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
@@ -113,31 +113,9 @@ final readonly class GridView
                 'rows' => array_map(static fn (Row $row): string => $row->key, $tab->rows),
             ], $this->tabs),
             'wider' => $this->wider,
-            'operators' => array_map(
-                static fn (ComparisonOperator $operator): string => $operator->value,
-                ComparisonOperator::cases(),
-            ),
-            'authority' => self::translated('filament-warden::ui.conditions.authority', 'account'),
-            'joiners' => [
-                'and' => self::translated('filament-warden::ui.conditions.and', 'and'),
-                'or' => self::translated('filament-warden::ui.conditions.or', 'or'),
-            ],
             'explain' => Config::enabled('grid.explain'),
             'constraints' => Config::enabled('grid.constraints'),
-            'modes' => [
-                'all' => [
-                    'name' => self::translated('filament-warden::ui.conditions.modes.all.name', 'all'),
-                    'hint' => self::translated('filament-warden::ui.conditions.modes.all.hint', 'all'),
-                ],
-                'owned' => [
-                    'name' => self::translated('filament-warden::ui.conditions.modes.owned.name', 'owned'),
-                    'hint' => self::translated('filament-warden::ui.conditions.modes.owned.hint', 'owned'),
-                ],
-                'conditions' => [
-                    'name' => self::translated('filament-warden::ui.conditions.modes.conditions.name', 'conditions'),
-                    'hint' => self::translated('filament-warden::ui.conditions.modes.conditions.hint', 'conditions'),
-                ],
-            ],
+            ...Words::all(),
         ];
     }
 

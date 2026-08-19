@@ -219,6 +219,26 @@ final readonly class Narrowing
     }
 
     /**
+     * The rule as warden's own group, or nothing when there is no rule. Only the
+     * permission screen needs it: everywhere else a condition is written by the
+     * fluent API, which serializes for itself.
+     */
+    public function toGroup(): ?Group
+    {
+        if ($this->shape !== Shape::Conditions) {
+            return null;
+        }
+
+        $items = [];
+
+        foreach ($this->rules as $rule) {
+            $items[] = [$rule->logic, $rule->constraint()];
+        }
+
+        return new Group($items);
+    }
+
+    /**
      * @return array{mode: string, rules: list<array<string, string>>}
      */
     public function toPayload(): array
