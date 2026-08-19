@@ -6,6 +6,60 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Before `1.0.0` the public API may change between minor versions.
 
+## [0.5.0] - 2026-08-19
+
+The condition builder. A cell now carries two things, and they are saved together.
+
+### Added
+
+- **How far a rule reaches, as a choice of three**: every row, only what it owns,
+  or with these conditions. It lives in the inspector, under the explanation, and
+  is offered on a cell that says something whose row has a model behind it.
+- **A flat list of conditions with a joiner per line**, and the precedence drawn.
+  `Group::passes()` binds `and` tighter than `or`, the way SQL does, so the lines
+  joined by `and` are boxed together and the preview reads
+  `name = editor or (scope >= 2 and title = account.name)`. A flat list that did
+  not draw its groups would say the wrong thing.
+- **Two kinds of line**: compare a column of the row with a value, or with a
+  column of the account being checked. Six operators and no more — no `LIKE`, no
+  `IN`, no nulls. `not` is in warden's enum and its serializer refuses any group
+  carrying one, so it is not offered.
+- **Values are typed by round trip.** `2` is an integer, `2.5` a decimal,
+  `true`/`false` booleans, and everything else text — but only when casting back
+  to text returns exactly what was typed, so a SKU of `007` stays a string. The
+  type is part of what identifies a twin permission: `'2'` and `2` are two rows.
+- **A narrowed cell can now be changed**, where before it was shown and disabled.
+- **Two marks instead of one**: amber for a rule that needs a record in front of
+  it and can be changed here, red for one this screen can read and cannot draw.
+- **Two states the grid says out loud rather than approximating**: a rule whose
+  conditions cannot be read — a corrupt blob, an empty group, a nested group —
+  and a cell the store holds more than one rule for, which is what an edit made
+  with the wrong sequence leaves behind. Both are shown, explained and untouched.
+- Row presets (`read`, `all`, `none`) now also put every cell they touch back to
+  every row. "All" that left a condition underneath said the opposite of what it
+  promised.
+
+### Fixed
+
+- **Editing a condition no longer widens the grant.** Warden's `reconstrain()`
+  deletes only the grant pointing at the permission it has in hand, so a fresh
+  `allow()->to()->where()` starts from the plain row and leaves the previous
+  twin's grant standing — the old condition goes on authorizing and nothing says
+  so. Every cell is now cleared in both shapes before it is written, because
+  `to()` and `toOwn()` are disjoint revokes.
+
+### Not included
+
+- No nested groups, and no way to build one: the builder draws a flat list.
+- **Orphaned twin permissions are not pruned.** A twin another role still points
+  at is reused and kept; the audit command in `0.8.0` is where they are reported.
+- The permission resource, with the builder embedded and the ownership checkbox,
+  is `0.6.0`.
+- A condition is only ever written through warden's fluent API. `options` is
+  never touched by hand: valid JSON that does not deserialize fails closed in
+  both polarities, but invalid JSON is decoded to `null` by Eloquent before the
+  serializer sees it, and the resolvers then treat the rule as unconditional.
+
 ## [0.4.0] - 2026-08-19
 
 Reading a role. Every cell can now say why it is the way it is.

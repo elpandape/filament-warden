@@ -4,9 +4,10 @@
 > [elpandape/warden](https://github.com/elpandape/warden) — a permission grid derived from
 > your policies, explicit denials, and conditional grants.
 
-**Status: `0.4.0` — reading a role.** A roles screen with the permission grid inside it,
-derived from your policies, and an inspector that says why each cell is the way it is. See
-[CHANGELOG.md](CHANGELOG.md) for what each version adds.
+**Status: `0.5.0` — the condition builder.** A roles screen with the permission grid inside
+it, derived from your policies, an inspector that says why each cell is the way it is, and a
+builder that narrows a grant to the rows it should reach. See [CHANGELOG.md](CHANGELOG.md)
+for what each version adds.
 
 ## Requirements
 
@@ -145,8 +146,7 @@ records does not look like deleting them for good — plus a wildcard column.
 
 A cell cycles: click to go from abstaining to granted to forbidden, and hold shift to walk
 the cycle backwards and reach a denial in one step. An action no policy declares is a dot
-and not a control, because nobody could grant it. A cell carrying conditions is drawn with
-an amber mark and left alone: revoking it by name would delete every twin that shares it.
+and not a control, because nobody could grant it.
 
 Nothing is written until you save, and the save is a diff — only the cells that changed
 reach the store.
@@ -162,6 +162,34 @@ panel says that too rather than appearing to contradict the screen.
 
 A role can also be read without being changed: `view` and `update` are separate permissions,
 and the read-only screen draws the same grid and answers the same questions.
+
+### How far a rule reaches
+
+Under the explanation, a cell that grants or forbids something says how far it reaches, in
+three alternatives: **every row**, **only what it owns**, or **with these conditions**.
+Ownership is offered only when it can actually resolve — warden's default attribute is the
+literal `user_id` and cannot be turned off, so a model whose table has no such column is
+told why the alternative is closed to it.
+
+The conditions are a flat list. Each line compares a column of the row against a value or
+against a column of the account being checked, with one of warden's six operators, and each
+line carries the joiner that ties it to the one above. `and` binds tighter than `or`, the
+way it does in SQL, so the builder boxes the lines a group contains and prints the rule as
+it will be read:
+
+```text
+name = editor or (scope >= 2 and title = account.name)
+```
+
+A cell marked amber is narrowed: with conditions, the grant only answers with a record in
+front of it, and a class check — the one a listing makes when it asks `viewAny` — fails
+closed. A cell marked red is one this screen can read and cannot draw: conditions that do
+not deserialize, or two rules stored for the same action. Those are shown, explained, and
+never written over.
+
+Every write goes through warden's fluent API, in one transaction, and clears the cell in
+both of its shapes first: `to()` and `toOwn()` are disjoint revokes, and editing a condition
+any other way leaves the previous twin's grant standing and the old rule still authorizing.
 
 ### Read the catalogue
 
