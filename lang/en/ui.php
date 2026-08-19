@@ -81,6 +81,42 @@ return [
         'forbidden' => 'forbidden',
     ],
 
+    'conditions' => [
+        'scope' => 'Rule scope',
+        'if' => 'if',
+        'and' => 'and',
+        'or' => 'or',
+        'authority' => 'account',
+        'value' => 'value',
+        'drop' => 'Remove the condition',
+        'add_value' => '+ compare with a value',
+        'add_column' => '+ compare with the account',
+        'empty' => 'With no conditions this grant is back to every row.',
+        'warning' => 'With conditions, this grant only answers with a record in front of it. A class check — the one a listing makes when it asks viewAny — fails closed.',
+        'no_model' => 'This permission has no model behind it. A condition on it would be stored, shown, and would never grant anything.',
+        'no_ownership' => 'The table :table has no :column column, which is where ownership would resolve.',
+        'modes' => [
+            'all' => [
+                'name' => 'Every row',
+                'hint' => 'The grant holds for any record of this entity.',
+            ],
+            'owned' => [
+                'name' => 'Only what it owns',
+                'hint' => 'Warden resolves ownership with ownedVia().',
+            ],
+            'conditions' => [
+                'name' => 'With these conditions',
+                'hint' => 'Attributes of the row are compared. Stored as a twin permission of its own.',
+            ],
+        ],
+        'locked' => [
+            'corrupt' => 'The stored conditions cannot be read. They are shown as they are and left alone: rewriting them would replace a rule nobody can see.',
+            'empty' => 'The stored rule carries an empty condition group: it answers only with a record in front of it, and then always.',
+            'shape' => 'The stored conditions use a shape this builder cannot draw — a nested group, or a value that is neither text nor a number.',
+            'tangled' => 'This cell holds more than one rule for the same action. The grid cannot show that, so it does not touch it.',
+        ],
+    ],
+
     'grid' => [
         'panel' => 'The panel',
         'locked' => 'This role is protected: what it can do is fixed here.',
@@ -103,6 +139,7 @@ return [
             'broader' => 'reached by a broader rule',
             'undeclared' => 'the policy does not declare it',
             'narrowed' => 'the rule is narrowed',
+            'locked' => 'the rule cannot be changed here',
         ],
         'shift' => 'Hold shift to walk the cycle backwards.',
     ],

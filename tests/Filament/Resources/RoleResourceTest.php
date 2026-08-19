@@ -8,6 +8,7 @@ use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ListRoles;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
+use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Support\Icons\Heroicon;
 
@@ -86,7 +87,7 @@ test('saving the edit screen hands the grid to warden', function (): void {
     livewire(EditRole::class, ['record' => $role->getKey()])
         ->fillForm([
             'name' => 'editor',
-            'permissions' => [roleClass() => ['viewAny' => 'granted']],
+            'permissions' => ['stances' => [roleClass() => ['viewAny' => 'granted']]],
         ])
         ->call('save')
         ->assertHasNoFormErrors();
@@ -189,7 +190,7 @@ test('saving a protected role leaves its permissions alone, whatever the browser
     Warden::assign($role)->to($holder);
 
     livewire(EditRole::class, ['record' => $role->getKey()])
-        ->fillForm(['permissions' => [roleClass() => ['viewAny' => 'granted']]])
+        ->fillForm(['permissions' => ['stances' => [roleClass() => ['viewAny' => 'granted']]]])
         ->call('save')
         ->assertHasNoFormErrors();
 
@@ -225,7 +226,7 @@ test('a role nobody protected is still operated as before', function (): void {
     Warden::assign($role)->to($holder);
 
     livewire(EditRole::class, ['record' => $role->getKey()])
-        ->fillForm(['permissions' => [roleClass() => ['viewAny' => 'granted']]])
+        ->fillForm(['permissions' => ['stances' => [roleClass() => ['viewAny' => 'granted']]]])
         ->call('save');
 
     expect(Access::granted($holder, 'viewAny', roleClass()))->toBeTrue();
@@ -242,4 +243,25 @@ test('the form is two questions in two sections, not four stacked blocks', funct
         ->assertSee('The role')
         ->assertSee('Permissions')
         ->assertSee('One row per entity');
+});
+
+test('a protected role does not take a condition from the payload either', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole('super-admin');
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->fillForm(['permissions' => [
+            'stances' => [roleClass() => ['update' => 'granted']],
+            'narrowing' => [roleClass() => ['update' => [
+                'mode' => 'conditions',
+                'rules' => [['logic' => 'and', 'kind' => 'value', 'column' => 'name', 'operator' => '=', 'value' => 'editor']],
+            ]]],
+        ]])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(Context::resolve()->grantClass()::query()->count())->toBe(2);
 });

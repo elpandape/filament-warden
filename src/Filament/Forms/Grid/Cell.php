@@ -6,28 +6,36 @@ namespace ElPandaPe\FilamentWarden\Filament\Forms\Grid;
 
 use ElPandaPe\FilamentWarden\Catalog\Entry;
 use ElPandaPe\FilamentWarden\Catalog\Scope;
+use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 
 /**
  * One control of the grid, or the absence of one.
  *
  * `declared` false is the grey dot: the policy does not declare that action, so
- * nobody can grant it and there is nothing to draw. `narrowed` true is the amber
- * mark: the permission carries conditions or an ownership flag, so it is shown
- * and left alone — revoking by name would delete every twin that shares it.
+ * nobody can grant it and there is nothing to draw.
+ *
+ * The narrowing is the mark in the corner. Amber is a rule that needs a record
+ * in front of it — conditions, or ownership — and it can be changed from here.
+ * Red is a rule this screen can read and cannot draw, and it is shown, explained
+ * and left exactly as it is.
  */
 final readonly class Cell
 {
+    public Narrowing $narrowing;
+
     public function __construct(
         public string $row,
         public string $action,
         public string $label,
         public Stance $stance,
         public bool $declared = true,
-        public bool $narrowed = false,
+        ?Narrowing $narrowing = null,
         public ?Scope $scope = null,
         public ?Entry $entry = null,
         public ?Stance $reach = null,
-    ) {}
+    ) {
+        $this->narrowing = $narrowing ?? Narrowing::all();
+    }
 
     public static function undeclared(string $row, string $action, string $label, ?Scope $scope = null): self
     {
@@ -57,10 +65,20 @@ final readonly class Cell
     }
 
     /**
-     * A narrowed cell is shown, explained and left untouched by the save.
+     * A narrowed cell can be changed; one this screen cannot draw cannot.
      */
     public function isEditable(): bool
     {
-        return $this->declared && ! $this->narrowed;
+        return $this->declared && $this->narrowing->isEditable();
+    }
+
+    public function isNarrowed(): bool
+    {
+        return $this->narrowing->isNarrowed();
+    }
+
+    public function isLocked(): bool
+    {
+        return ! $this->narrowing->isEditable();
     }
 }

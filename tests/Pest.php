@@ -75,3 +75,39 @@ function permissionClass(): string
 {
     return Context::resolve()->permissionClass();
 }
+
+/**
+ * One part of a payload the bridge answered with.
+ *
+ * An assertion callback receives a plain `array`, so everything inside it is
+ * `mixed` and reading two levels down is not something static analysis will
+ * allow. Narrowing once here keeps the tests readable.
+ *
+ * @param  array<mixed>  $payload
+ * @return array<string, mixed>
+ */
+function partOf(array $payload, string $key): array
+{
+    $part = $payload[$key] ?? null;
+
+    if (! is_array($part)) {
+        return [];
+    }
+
+    $narrowed = [];
+
+    foreach ($part as $name => $value) {
+        $narrowed[(string) $name] = $value;
+    }
+
+    return $narrowed;
+}
+
+/**
+ * @param  array<mixed>  $payload
+ * @return list<string>
+ */
+function stringsOf(array $payload, string $key): array
+{
+    return array_values(array_filter(partOf($payload, $key), is_string(...)));
+}

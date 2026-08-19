@@ -81,6 +81,42 @@ return [
         'forbidden' => 'prohibido',
     ],
 
+    'conditions' => [
+        'scope' => 'Alcance de la regla',
+        'if' => 'si',
+        'and' => 'y',
+        'or' => 'o',
+        'authority' => 'cuenta',
+        'value' => 'valor',
+        'drop' => 'Quitar la condición',
+        'add_value' => '+ comparar con un valor',
+        'add_column' => '+ comparar con la cuenta',
+        'empty' => 'Sin condiciones, esta concesión vuelve a valer para todas las filas.',
+        'warning' => 'Con condiciones, esta concesión solo responde con una fila delante. Una comprobación de clase —la que hace un listado al preguntar viewAny— falla cerrado.',
+        'no_model' => 'Este permiso no tiene ningún modelo detrás. Una condición aquí quedaría guardada, visible, y no concedería nada nunca.',
+        'no_ownership' => 'La tabla :table no tiene la columna :column, que es por donde se resolvería la propiedad.',
+        'modes' => [
+            'all' => [
+                'name' => 'Todas las filas',
+                'hint' => 'La concesión vale para cualquier registro de esta entidad.',
+            ],
+            'owned' => [
+                'name' => 'Solo lo que posee',
+                'hint' => 'Warden resuelve la propiedad con ownedVia().',
+            ],
+            'conditions' => [
+                'name' => 'Con estas condiciones',
+                'hint' => 'Se comparan atributos de la fila. Se guarda como un permiso gemelo propio.',
+            ],
+        ],
+        'locked' => [
+            'corrupt' => 'Las condiciones guardadas no se pueden leer. Se enseñan como están y se dejan en paz: reescribirlas sustituiría una regla que nadie puede ver.',
+            'empty' => 'La regla guardada lleva un grupo de condiciones vacío: solo responde con una fila delante, y entonces siempre.',
+            'shape' => 'Las condiciones guardadas usan una forma que este constructor no sabe dibujar: un grupo anidado, o un valor que no es ni texto ni número.',
+            'tangled' => 'Esta celda tiene más de una regla para la misma acción. La rejilla no sabe enseñar eso, así que no la toca.',
+        ],
+    ],
+
     'grid' => [
         'panel' => 'El panel',
         'locked' => 'Este rol está protegido: lo que puede hacer no se toca desde aquí.',
@@ -103,6 +139,7 @@ return [
             'broader' => 'lo alcanza una regla más amplia',
             'undeclared' => 'la Policy no la declara',
             'narrowed' => 'la regla está estrechada',
+            'locked' => 'la regla no se cambia desde aquí',
         ],
         'shift' => 'Con Shift el ciclo va hacia atrás.',
     ],

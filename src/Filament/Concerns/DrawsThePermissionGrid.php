@@ -8,6 +8,9 @@ use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Catalog\Entry;
 use ElPandaPe\FilamentWarden\Catalog\Origin;
 use ElPandaPe\FilamentWarden\Catalog\Scope;
+use ElPandaPe\FilamentWarden\Conditions\Columns;
+use ElPandaPe\FilamentWarden\Conditions\Narrowing;
+use ElPandaPe\FilamentWarden\Conditions\Ownership;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
@@ -69,17 +72,62 @@ trait DrawsThePermissionGrid
             entry: $entry,
             rowKey: $row,
             action: $action,
-            narrowed: $stored->narrowed,
+            narrowed: $stored->narrowed(),
             onScreen: $this->onScreenStance($row, $action),
             stored: self::stanceIn($stored->stances, $row, $action),
         )->toPayload();
     }
 
+    /**
+     * What can be built into a condition for this cell, asked when the cell is
+     * opened and not before: listing a table's columns costs a query — two on
+     * sqlite — and nothing in Laravel caches one.
+     *
+     * What comes back is what is AVAILABLE and what is STORED. What is on screen
+     * lives in the browser and does not travel: asking for it here would be
+     * asking the server to confirm what the browser just wrote.
+     *
+     * @return array<string, mixed>
+     */
+    #[ExposedLivewireMethod]
+    #[Renderless]
+    public function narrowingFor(string $row, string $action): array
+    {
+        $model = $this->catalogEntryFor($row, $action)?->model;
+
+        if ($model === null) {
+            return [
+                'model' => null,
+                'columns' => [],
+                'authority' => [],
+                'ownership' => [
+                    'available' => false,
+                    'reason' => self::line('filament-warden::ui.conditions.no_model'),
+                ],
+                'stored' => null,
+            ];
+        }
+
+        $ownership = Ownership::of($model);
+
+        return [
+            'model' => $model,
+            'columns' => Columns::of($model),
+            'authority' => Columns::authority(),
+            'ownership' => [
+                'available' => $ownership->available,
+                'reason' => $ownership->available ? null : self::line('filament-warden::ui.conditions.no_ownership', [
+                    'table' => new $model()->getTable(),
+                    'column' => $ownership->column ?? '',
+                ]),
+            ],
+            'stored' => self::stored($this->storedState()->narrowings[$row][$action] ?? Narrowing::all()),
+        ];
+    }
+
     public function getGrid(): GridView
     {
-        $stored = $this->storedState();
-
-        return GridView::for($this->catalog(), $this->gridState(), $stored->narrowed, $stored->wider);
+        return GridView::for($this->catalog(), $this->storedState(), $this->gridState());
     }
 
     /**
@@ -141,5 +189,32 @@ trait DrawsThePermissionGrid
         }
 
         return null;
+    }
+
+    /**
+     * @return array{mode: string, preview: string, locked: bool, note: string|null}
+     */
+    private static function stored(Narrowing $narrowing): array
+    {
+        return [
+            'mode' => $narrowing->shape->value,
+            'preview' => $narrowing->preview(
+                self::line('filament-warden::ui.conditions.authority'),
+                self::line('filament-warden::ui.conditions.and'),
+                self::line('filament-warden::ui.conditions.or'),
+            ),
+            'locked' => ! $narrowing->isEditable(),
+            'note' => $narrowing->reason === null ? null : self::line('filament-warden::ui.conditions.locked.'.$narrowing->reason),
+        ];
+    }
+
+    /**
+     * @param  array<string, string>  $replace
+     */
+    private static function line(string $key, array $replace = []): string
+    {
+        $line = __($key, $replace);
+
+        return is_string($line) ? $line : $key;
     }
 }

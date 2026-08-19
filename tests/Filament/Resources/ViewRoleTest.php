@@ -95,3 +95,30 @@ test('a screen that cannot change anything never says something is unsaved', fun
         ->call('callSchemaComponentMethod', 'infolist.permissions', 'explainCell', [roleClass(), 'viewAny'])
         ->assertReturned(fn (array $why): bool => $why['pending'] === null);
 });
+
+test('a screen that only reads still says how far a rule reaches', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    // Two gates, not one: the resource opens on `viewAny` and the record on `view`.
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', $role);
+    Warden::allow($role)->to('update', roleClass())->where('name', 'editor');
+
+    livewire(ViewRole::class, ['record' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'infolist.permissions', 'narrowingFor', [roleClass(), 'update'])
+        ->assertReturned(fn (array $narrowing): bool => partOf($narrowing, 'stored')['preview'] === 'name = editor');
+});
+
+test('the builder is on the read-only screen with nothing to operate', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    // Two gates, not one: the resource opens on `viewAny` and the record on `view`.
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', $role);
+
+    livewire(ViewRole::class, ['record' => $role->getKey()])
+        ->assertSee('fw-builder', escape: false)
+        ->assertSee('interactive: false', escape: false);
+});

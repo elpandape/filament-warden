@@ -385,8 +385,12 @@
     opacity: 1;
 }
 
-/* The rule is narrowed: it carries conditions or an ownership flag. */
-.fw-noted {
+/* The rule is narrowed: it carries conditions or an ownership flag. Amber is one
+   this screen can change; red is one it can read and cannot draw, which is shown
+   and left exactly as it is. */
+.fw-box[data-noted='true']::after,
+.fw-box[data-locked='true']::after {
+    content: '';
     position: absolute;
     inset-block-start: -0.1875rem;
     inset-inline-end: -0.1875rem;
@@ -394,6 +398,11 @@
     block-size: 0.4375rem;
     border-radius: 999px;
     background: var(--fw-noted);
+}
+
+.fw-box[data-locked='true']::after {
+    border-radius: 1px;
+    background: var(--fw-no);
 }
 
 /* The policy does not declare this action, so nobody can grant it. */
@@ -509,4 +518,197 @@ tr:hover .fw-shortcuts,
 .fw-wider code {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.75rem;
+}
+
+/* The condition builder --------------------------------------------------- */
+
+.fw-builder {
+    margin-block-start: 1rem;
+    padding-block-start: 0.875rem;
+    border-block-start: 1px solid var(--fw-hairline);
+}
+
+.fw-field-label {
+    margin-block-end: 0.5rem;
+    color: var(--fw-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.fw-modes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.fw-mode {
+    display: block;
+    padding: 0.4375rem 0.5625rem;
+    border: 1px solid var(--fw-line);
+    border-radius: 0.375rem;
+    background: transparent;
+    color: inherit;
+    text-align: start;
+    cursor: pointer;
+}
+
+.fw-mode[data-on='true'] {
+    border-color: var(--fw-accent);
+    background: color-mix(in oklab, var(--primary-500) 10%, transparent);
+}
+
+.fw-mode[disabled] {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.fw-mode-name {
+    display: block;
+    font-weight: 600;
+}
+
+.fw-mode-hint {
+    display: block;
+    margin-block-start: 0.125rem;
+    color: var(--fw-muted);
+    font-size: 0.75rem;
+}
+
+.fw-conditions {
+    margin-block-start: 0.75rem;
+}
+
+/* One clause is one group the precedence created: `and` binds tighter than `or`,
+   so the lines joined by `and` are drawn together. This box IS the parentheses —
+   without it a flat list would read left to right and say the wrong thing. */
+.fw-clause {
+    margin-block-end: 0.4375rem;
+    padding: 0.4375rem 0.5rem;
+    border: 1px solid var(--fw-line);
+    border-inline-start: 3px solid var(--fw-ghost);
+    border-radius: 0 0.375rem 0.375rem 0;
+    background: var(--fw-raised);
+}
+
+.fw-condition {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.fw-condition + .fw-condition {
+    margin-block-start: 0.25rem;
+}
+
+.fw-condition select,
+.fw-condition input {
+    min-inline-size: 0;
+    padding: 0.1875rem 0.3125rem;
+    border: 1px solid var(--fw-line);
+    border-radius: 0.25rem;
+    background: var(--fw-surface);
+    color: inherit;
+    font-size: 0.8125rem;
+}
+
+/* Each control is given its share by name. The inspector is a narrow column and
+   the row wraps: what is compared reads on the first line, what it is compared
+   against on the second — and the same way every time, or the list stops being
+   a list. Every one of these needs `.fw-condition` in front of it, or the shared
+   rule above outranks it. */
+.fw-condition .fw-column {
+    flex: 1 1 5rem;
+}
+
+.fw-condition .fw-against,
+.fw-condition input {
+    flex: 1 1 8rem;
+}
+
+.fw-condition select[disabled],
+.fw-condition input[disabled] {
+    opacity: 0.6;
+}
+
+.fw-condition .fw-joiner {
+    flex: 0 0 3.25rem;
+    color: var(--fw-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+
+.fw-condition .fw-operator {
+    flex: 0 0 3rem;
+    font-family: ui-monospace, monospace;
+    text-align: center;
+}
+
+.fw-drop {
+    flex: 0 0 auto;
+    padding: 0 0.25rem;
+    border: 0;
+    background: transparent;
+    color: var(--fw-muted);
+    cursor: pointer;
+}
+
+.fw-drop:hover {
+    color: var(--fw-no);
+}
+
+.fw-adds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-block-start: 0.5rem;
+}
+
+.fw-add {
+    padding: 0.25rem 0.5rem;
+    border: 1px dashed var(--fw-line);
+    border-radius: 0.375rem;
+    background: transparent;
+    color: var(--fw-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.fw-add:hover:not([disabled]) {
+    border-color: var(--fw-accent);
+    color: var(--fw-accent);
+}
+
+.fw-add[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* With conditions the grant only answers with a record in front of it, and a
+   class check fails closed. That is not a footnote. */
+.fw-warn {
+    margin: 0.625rem 0 0;
+    padding: 0.4375rem 0.5625rem;
+    border-inline-start: 3px solid var(--fw-noted);
+    border-radius: 0 0.375rem 0.375rem 0;
+    background: color-mix(in oklab, var(--warning-500) 10%, transparent);
+    font-size: 0.75rem;
+}
+
+.fw-note-locked {
+    border-inline-start-color: var(--fw-no);
+}
+
+.fw-preview {
+    display: block;
+    margin-block-start: 0.5rem;
+    padding: 0.375rem 0.5rem;
+    border-radius: 0.375rem;
+    background: var(--fw-raised);
+    color: var(--fw-muted);
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    overflow-x: auto;
 }

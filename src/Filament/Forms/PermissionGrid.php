@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Filament\Forms;
 
+use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Filament\Concerns\DrawsThePermissionGrid;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\State;
@@ -38,7 +39,12 @@ final class PermissionGrid extends Field
         $this->validatedWhenNotDehydrated(false);
 
         $this->afterStateHydrated(static function (self $component): void {
-            $component->state($component->storedState()->stances);
+            $stored = $component->storedState();
+
+            $component->state([
+                'stances' => $stored->stances,
+                'narrowing' => self::payloadOf($stored->narrowings),
+            ]);
         });
 
         $this->saveRelationshipsUsing(static function (self $component): void {
@@ -51,7 +57,12 @@ final class PermissionGrid extends Field
             // payload still reaches the field's state even when it is disabled, so
             // this is the last thing standing between it and the store.
             if ((! $component->isDisabled()) && $role instanceof Model) {
-                RoleGrants::apply($role, $component->catalog(), $component->gridState());
+                RoleGrants::apply(
+                    $role,
+                    $component->catalog(),
+                    $component->gridState(),
+                    $component->gridNarrowings(),
+                );
             }
         });
     }
@@ -61,11 +72,48 @@ final class PermissionGrid extends Field
      */
     protected function gridState(): array
     {
-        return State::normalize($this->getState());
+        return State::stances($this->getState());
     }
 
     protected function onScreenStance(string $row, string $action): Stance
     {
         return self::stanceIn($this->gridState(), $row, $action);
+    }
+
+    /**
+     * A cell that is not in the map reaches every row, so only the narrowed ones
+     * travel: this whole map goes to the browser on every render.
+     *
+     * And only the ones this screen can draw. A rule it cannot is drawn from the
+     * server once and never touched again — putting it in the state would offer
+     * the browser something to edit that nothing would accept back.
+     *
+     * @param  array<string, array<string, Narrowing>>  $narrowings
+     * @return array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>
+     */
+    private static function payloadOf(array $narrowings): array
+    {
+        $payload = [];
+
+        foreach ($narrowings as $row => $actions) {
+            foreach ($actions as $action => $narrowing) {
+                if ($narrowing->isNarrowed() && $narrowing->isEditable()) {
+                    $payload[$row][$action] = $narrowing->toPayload();
+                }
+            }
+        }
+
+        return $payload;
+    }
+
+    /**
+     * How far each cell reaches on screen. Only the field has one: a screen that
+     * only reads has nothing pending.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function gridNarrowings(): array
+    {
+        return State::narrowings($this->getState());
     }
 }

@@ -2,13 +2,18 @@
  * The permission grid.
  *
  * It carries no rules of its own. The cycle order, which actions each row
- * offers, and which of them are reads all arrive from PHP in `grid`, because the
- * generation before this one implemented the same precedence twice — once in PHP
- * and once here — and nothing could tell when the two disagreed.
+ * offers, which of them are reads, the six operators and every word the builder
+ * says all arrive from PHP in `grid`, because the generation before this one
+ * implemented the same precedence twice — once in PHP and once here — and
+ * nothing could tell when the two disagreed.
+ *
+ * The one exception is the clause cut, and it is marked where it happens.
  */
-export default function ({ state, grid }) {
+export default function ({ state, grid, interactive }) {
     return {
         grid,
+
+        interactive,
 
         state: state ?? {},
 
@@ -17,6 +22,8 @@ export default function ({ state, grid }) {
         selected: null,
 
         why: null,
+
+        narrowing: null,
 
         loading: false,
 
@@ -30,16 +37,24 @@ export default function ({ state, grid }) {
         },
 
         /**
-         * The answer is worked out on the server, one cell at a time, and arrives
-         * already written: nothing here composes a sentence.
+         * Both answers are worked out on the server, one cell at a time, and
+         * arrive already written: nothing here composes a sentence. They are
+         * asked for together because they are one question about one cell.
          */
         async select(row, action, label, name) {
             this.selected = { row, action, title: label, subtitle: name ?? row }
             this.why = null
+            this.narrowing = null
             this.loading = true
 
             try {
-                this.why = await this.$wire.callSchemaComponentMethod(this.grid.key, 'explainCell', { row, action })
+                const [why, narrowing] = await Promise.all([
+                    this.$wire.callSchemaComponentMethod(this.grid.key, 'explainCell', { row, action }),
+                    this.$wire.callSchemaComponentMethod(this.grid.key, 'narrowingFor', { row, action }),
+                ])
+
+                this.why = why
+                this.narrowing = narrowing
             } finally {
                 this.loading = false
             }
@@ -49,7 +64,7 @@ export default function ({ state, grid }) {
          * Abstaining is the absence of a key, never a value.
          */
         stanceOf(row, action) {
-            return (this.state?.[row] ?? {})[action] ?? this.grid.order[0]
+            return (this.state.stances?.[row] ?? {})[action] ?? this.grid.order[0]
         },
 
         /**
@@ -97,26 +112,34 @@ export default function ({ state, grid }) {
          * `read` grants the reading half and leaves the rest as it was; `all`
          * grants the wildcard and everything the policy declares; `clear` says
          * nothing about anything.
+         *
+         * All three also put every cell they touch back to every row: "all" that
+         * left a condition underneath would say the opposite of what it promises.
          */
         apply(row, preset) {
             const offered = this.grid.rows[row] ?? { actions: [], read: [] }
             const granted = this.grid.order[1]
 
             if (preset === 'read') {
-                offered.read.forEach((action) => this.write(row, action, granted))
+                offered.read.forEach((action) => this.widen(row, action, granted))
 
                 return
             }
 
             if (preset === 'all') {
-                this.write(row, this.grid.manage, granted)
-                offered.actions.forEach((action) => this.write(row, action, granted))
+                this.widen(row, this.grid.manage, granted)
+                offered.actions.forEach((action) => this.widen(row, action, granted))
 
                 return
             }
 
-            this.write(row, this.grid.manage, this.grid.order[0])
-            offered.actions.forEach((action) => this.write(row, action, this.grid.order[0]))
+            this.widen(row, this.grid.manage, this.grid.order[0])
+            offered.actions.forEach((action) => this.widen(row, action, this.grid.order[0]))
+        },
+
+        widen(row, action, stance) {
+            this.write(row, action, stance)
+            this.narrow(row, action, { mode: 'all', rules: [] })
         },
 
         granted(tabKey) {
@@ -127,14 +150,14 @@ export default function ({ state, grid }) {
             }
 
             return tab.rows.reduce(
-                (total, row) => total + Object.values(this.state?.[row] ?? {})
+                (total, row) => total + Object.values(this.state.stances?.[row] ?? {})
                     .filter((stance) => stance === this.grid.order[1]).length,
                 0,
             )
         },
 
         write(row, action, stance) {
-            const held = { ...(this.state?.[row] ?? {}) }
+            const held = { ...(this.state.stances?.[row] ?? {}) }
 
             if (stance === this.grid.order[0]) {
                 delete held[action]
@@ -142,9 +165,145 @@ export default function ({ state, grid }) {
                 held[action] = stance
             }
 
-            // Replaced whole rather than mutated in place: livewire only notices
-            // a change it can see on the entangled property itself.
-            const next = { ...(this.state ?? {}) }
+            this.state = { ...this.state, stances: this.replace(this.state.stances, row, held) }
+        },
+
+        /* ── How far a cell reaches ─────────────────────────────────────── */
+
+        narrowedAt(row, action) {
+            return this.narrowingAt(row, action).mode !== 'all'
+        },
+
+        narrowingAt(row, action) {
+            return (this.state.narrowing?.[row] ?? {})[action] ?? { mode: 'all', rules: [] }
+        },
+
+        current() {
+            return this.selected === null
+                ? { mode: 'all', rules: [] }
+                : this.narrowingAt(this.selected.row, this.selected.action)
+        },
+
+        rules() {
+            return this.current().rules ?? []
+        },
+
+        modeOf() {
+            return this.current().mode
+        },
+
+        /**
+         * The builder is offered on a cell that says something and whose row has
+         * a model behind it: a permission with no model and conditions on it is
+         * created, shown, and grants nothing ever.
+         */
+        offered() {
+            return this.selected !== null
+                && this.narrowing !== null
+                && this.narrowing.model !== null
+                && this.narrowing.stored !== null
+                && this.stanceOf(this.selected.row, this.selected.action) !== this.grid.order[0]
+        },
+
+        /**
+         * The groups the precedence draws. This is the one rule written twice:
+         * `Narrowing::clauses()` in PHP is the authority — it is what gets saved
+         * and what the suite pins — and this copy exists because the pending
+         * state never reaches the server between one keystroke and the next.
+         */
+        clauses() {
+            const clauses = []
+            let clause = []
+
+            this.rules().forEach((rule, at) => {
+                if (at > 0 && rule.logic === 'or') {
+                    clauses.push(clause)
+                    clause = []
+                }
+
+                clause.push({ ...rule, at })
+            })
+
+            if (clause.length > 0) {
+                clauses.push(clause)
+            }
+
+            return clauses
+        },
+
+        preview() {
+            const groups = this.clauses()
+
+            return groups
+                .map((clause) => {
+                    const text = clause.map((rule) => this.lineOf(rule)).join(' ' + this.grid.joiners.and + ' ')
+
+                    return clause.length > 1 && groups.length > 1 ? '(' + text + ')' : text
+                })
+                .join(' ' + this.grid.joiners.or + ' ')
+        },
+
+        lineOf(rule) {
+            const right = rule.kind === 'column'
+                ? this.grid.authority + '.' + rule.authority
+                : rule.value
+
+            return rule.column + ' ' + rule.operator + ' ' + right
+        },
+
+        setMode(mode) {
+            this.narrow(this.selected.row, this.selected.action, {
+                mode,
+                rules: mode === 'conditions' ? this.rules() : [],
+            })
+        },
+
+        add(kind) {
+            this.narrow(this.selected.row, this.selected.action, {
+                mode: 'conditions',
+                rules: [...this.rules(), {
+                    logic: 'and',
+                    kind,
+                    column: this.narrowing.columns[0] ?? '',
+                    operator: this.grid.operators[0],
+                    value: '',
+                    authority: kind === 'column' ? (this.narrowing.authority[0] ?? '') : '',
+                }],
+            })
+        },
+
+        edit(at, field, value) {
+            this.narrow(this.selected.row, this.selected.action, {
+                mode: 'conditions',
+                rules: this.rules().map((rule, index) => (index === at ? { ...rule, [field]: value } : rule)),
+            })
+        },
+
+        drop(at) {
+            this.narrow(this.selected.row, this.selected.action, {
+                mode: 'conditions',
+                rules: this.rules().filter((rule, index) => index !== at),
+            })
+        },
+
+        narrow(row, action, narrowing) {
+            const held = { ...(this.state.narrowing?.[row] ?? {}) }
+
+            if (narrowing.mode === 'all') {
+                delete held[action]
+            } else {
+                held[action] = narrowing
+            }
+
+            this.state = { ...this.state, narrowing: this.replace(this.state.narrowing, row, held) }
+        },
+
+        /**
+         * Replaced whole rather than mutated in place: livewire only notices a
+         * change it can see on the entangled property itself.
+         */
+        replace(map, row, held) {
+            const next = { ...(map ?? {}) }
 
             if (Object.keys(held).length === 0) {
                 delete next[row]
@@ -152,7 +311,7 @@ export default function ({ state, grid }) {
                 next[row] = held
             }
 
-            this.state = next
+            return next
         },
     }
 }

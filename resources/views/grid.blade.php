@@ -12,6 +12,7 @@
     x-data="wardenPermissionGrid({
         state: {{ $binding }},
         grid: @js($grid->alpine() + ['key' => $componentKey]),
+        interactive: @js($interactive),
     })"
     class="fw-grid"
 >
@@ -130,11 +131,14 @@
                             @if ($item['void'])
                                 <span class="fw-void" aria-hidden="true">·</span>
                             @else
-                                <span class="fw-box" data-state="{{ $item['state'] }}" data-broader="{{ $item['broader'] }}" aria-hidden="true">
-                                    @if ($item['noted'])
-                                        <span class="fw-noted"></span>
-                                    @endif
-                                </span>
+                                <span
+                                    class="fw-box"
+                                    data-state="{{ $item['state'] }}"
+                                    data-broader="{{ $item['broader'] }}"
+                                    data-noted="{{ $item['noted'] ? 'true' : 'false' }}"
+                                    data-locked="{{ $item['locked'] ? 'true' : 'false' }}"
+                                    aria-hidden="true"
+                                ></span>
                             @endif
                             {{ $item['label'] }}
                         </span>
@@ -163,6 +167,8 @@
                         <p class="fw-note fw-note-pending" x-show="why.pending" x-text="why.pending" x-cloak></p>
                     </div>
                 </template>
+
+                @include('filament-warden::builder')
             </div>
         </aside>
     </div>

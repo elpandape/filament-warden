@@ -7,10 +7,12 @@ use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Support\Access;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\GridHost;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Facades\Filament;
+use Filament\Panel;
 
 use function Pest\Livewire\livewire;
 
@@ -29,14 +31,14 @@ test('the grid fills itself from the store, not from the record', function (): v
     Warden::allow($role)->to('viewAny', roleClass());
 
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
-        ->assertSet('data.permissions.'.roleClass().'.viewAny', 'granted');
+        ->assertSet('data.permissions.stances.'.roleClass().'.viewAny', 'granted');
 });
 
 test('a role that holds nothing opens on an empty grid', function (): void {
     $role = makeRole();
 
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
-        ->assertSet('data.permissions', []);
+        ->assertSet('data.permissions', ['stances' => [], 'narrowing' => []]);
 });
 
 test('saving writes what the grid says through warden', function (): void {
@@ -45,7 +47,7 @@ test('saving writes what the grid says through warden', function (): void {
     Warden::assign($role)->to($user);
 
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
-        ->fillForm(['permissions' => [roleClass() => ['viewAny' => 'granted']]])
+        ->fillForm(['permissions' => ['stances' => [roleClass() => ['viewAny' => 'granted']]]])
         ->call('save')
         ->assertHasNoFormErrors();
 
@@ -60,7 +62,7 @@ test('saving takes away what the grid stopped saying', function (): void {
     Warden::allow($role)->to('viewAny', roleClass());
 
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
-        ->fillForm(['permissions' => [roleClass() => ['viewAny' => 'abstain']]])
+        ->fillForm(['permissions' => ['stances' => [roleClass() => ['viewAny' => 'abstain']]]])
         ->call('save');
 
     expect(Access::granted($user, 'viewAny', roleClass()))->toBeFalse();
@@ -85,13 +87,25 @@ test('a cell the policy does not declare renders as a dot and not as a control',
         ->assertSee('fw-void', escape: false);
 });
 
-test('a narrowed cell renders disabled, so a save cannot touch it', function (): void {
+test('a narrowed cell is marked, and its rule travels to the browser', function (): void {
     $role = makeRole();
 
     Warden::allow($role)->to('update', roleClass())->where('id', 1);
 
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
-        ->assertSee('fw-noted', escape: false);
+        ->assertSet('data.permissions.narrowing.'.roleClass().'.update.mode', 'conditions')
+        ->assertSee('data-noted="true"', escape: false);
+});
+
+test('a rule this screen cannot draw is marked, locked, and kept out of the state', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('update', roleClass())->where('id', 1);
+    Warden::allow($role)->to('update', roleClass());
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSet('data.permissions.narrowing', [])
+        ->assertSee('data-locked="true"', escape: false);
 });
 
 test('what the field offers is what the catalogue holds', function (): void {
@@ -194,7 +208,7 @@ test('a stance changed on screen is called out, because the answer is about the 
     Warden::allow($role)->to('viewAny', roleClass());
 
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
-        ->fillForm(['permissions' => [roleClass() => ['viewAny' => 'forbidden']]])
+        ->fillForm(['permissions' => ['stances' => [roleClass() => ['viewAny' => 'forbidden']]]])
         ->call('callSchemaComponentMethod', 'form.permissions', 'explainCell', [roleClass(), 'viewAny'])
         ->assertReturned(fn (array $why): bool => $why['verdict'] === 'granted' && is_string($why['pending']));
 });
@@ -242,4 +256,92 @@ test('the script asks the server for the answer and composes none of it', functi
 
     expect($script)->toContain("callSchemaComponentMethod(this.grid.key, 'explainCell'")
         ->and($script)->not->toContain('Granted by');
+});
+
+test('the browser is told what a condition on this cell could be built from', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'narrowingFor', [roleClass(), 'update'])
+        ->assertReturned(fn (array $narrowing): bool => $narrowing['model'] === roleClass()
+            && in_array('name', stringsOf($narrowing, 'columns'), true)
+            && in_array('email', stringsOf($narrowing, 'authority'), true)
+            && partOf($narrowing, 'stored')['mode'] === 'all');
+});
+
+test('a door has no model, so it is told why it can hold no condition', function (): void {
+    $role = makeRole();
+    $door = 'page:'.Reports::class;
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'narrowingFor', [$door, StateKey::DOOR])
+        ->assertReturned(fn (array $narrowing): bool => $narrowing['model'] === null
+            && $narrowing['stored'] === null
+            && is_string(partOf($narrowing, 'ownership')['reason']));
+});
+
+test('ownership is refused with the column that is missing named', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'narrowingFor', [roleClass(), 'update'])
+        ->assertReturned(function (array $narrowing): bool {
+            $ownership = partOf($narrowing, 'ownership');
+            $reason = $ownership['reason'] ?? null;
+
+            return $ownership['available'] === false && is_string($reason) && str_contains($reason, 'user_id');
+        });
+});
+
+test('a stored condition comes back written out, so the screen can read it aloud', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('update', roleClass())->where('name', 'editor');
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'narrowingFor', [roleClass(), 'update'])
+        ->assertReturned(fn (array $narrowing): bool => partOf($narrowing, 'stored')['mode'] === 'conditions'
+            && partOf($narrowing, 'stored')['preview'] === 'name = editor'
+            && partOf($narrowing, 'stored')['locked'] === false
+            && partOf($narrowing, 'stored')['note'] === null);
+});
+
+test('a rule this screen cannot draw comes back locked, with the reason written', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('update', roleClass())->where('name', 'editor');
+    Warden::allow($role)->to('update', roleClass());
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'narrowingFor', [roleClass(), 'update'])
+        ->assertReturned(fn (array $narrowing): bool => partOf($narrowing, 'stored')['locked'] === true
+            && is_string(partOf($narrowing, 'stored')['note']));
+});
+
+test('saving carries the condition the screen drew all the way to the store', function (): void {
+    $role = makeRole();
+    $user = makeUser();
+    Warden::assign($role)->to($user);
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->fillForm(['permissions' => [
+            'stances' => [roleClass() => ['update' => 'granted']],
+            'narrowing' => [roleClass() => ['update' => [
+                'mode' => 'conditions',
+                'rules' => [['logic' => 'and', 'kind' => 'value', 'column' => 'name', 'operator' => '=', 'value' => 'editor']],
+            ]]],
+        ]])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    // Nullable in the signature and never null in fact: it throws when there is
+    // no panel at all.
+    /** @var Panel $panel */
+    $panel = Filament::getCurrentOrDefaultPanel();
+
+    $narrowing = RoleGrants::of($role, Catalog::for($panel))->narrowings[roleClass()]['update'];
+
+    expect($narrowing->rules[0]->column)->toBe('name')
+        ->and($narrowing->rules[0]->value)->toBe('editor')
+        ->and(Access::granted($user, 'update', roleClass()))->toBeFalse();
 });

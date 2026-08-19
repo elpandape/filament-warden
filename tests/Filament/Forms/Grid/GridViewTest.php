@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
+use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Cell;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Row;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Tab;
+use ElPandaPe\FilamentWarden\Grants\RoleState;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\PostResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Widgets\Summary;
@@ -21,12 +23,12 @@ pest()->extend(TestCase::class);
 
 /**
  * @param  array<string, array<string, string>>  $state
- * @param  array<string, array<string, bool>>  $narrowed
+ * @param  array<string, array<string, Narrowing>>  $narrowings
  * @param  array<string, string>  $wider
  */
-function gridFor(Panel $panel, array $state = [], array $narrowed = [], array $wider = []): GridView
+function gridFor(Panel $panel, array $state = [], array $narrowings = [], array $wider = []): GridView
 {
-    return GridView::for(Catalog::for($panel), $state, $narrowed, $wider);
+    return GridView::for(Catalog::for($panel), new RoleState([], $narrowings, $wider), $state);
 }
 
 function tabNamed(GridView $grid, string $key): Tab
@@ -126,18 +128,33 @@ test('what the role wrote is what the cell shows', function (): void {
         ->and(cellFor($row, 'update')->stance)->toBe(Stance::Abstain);
 });
 
-test('a narrowed cell is shown and left alone', function (): void {
+test('a narrowed cell is marked and can still be changed', function (): void {
     $grid = gridFor(
         Panel::make()->id('scratch')->resources([PostResource::class]),
         [Post::class => ['update' => 'granted']],
-        [Post::class => ['update' => true]],
+        [Post::class => ['update' => Narrowing::owned()]],
     );
 
     $cell = cellFor(rowFor(tabNamed($grid, 'resources'), Post::class), 'update');
 
     expect($cell->stance)->toBe(Stance::Granted)
-        ->and($cell->narrowed)->toBeTrue()
-        ->and($cell->isEditable())->toBeFalse();
+        ->and($cell->isNarrowed())->toBeTrue()
+        ->and($cell->isLocked())->toBeFalse()
+        ->and($cell->isEditable())->toBeTrue();
+});
+
+test('a rule this screen cannot draw is shown and left exactly alone', function (): void {
+    $grid = gridFor(
+        Panel::make()->id('scratch')->resources([PostResource::class]),
+        [Post::class => ['update' => 'granted']],
+        [Post::class => ['update' => Narrowing::tangled()]],
+    );
+
+    $cell = cellFor(rowFor(tabNamed($grid, 'resources'), Post::class), 'update');
+
+    expect($cell->isLocked())->toBeTrue()
+        ->and($cell->isEditable())->toBeFalse()
+        ->and(rowFor(tabNamed($grid, 'resources'), Post::class)->editableActions())->not->toContain('update');
 });
 
 test('the tally counts what the tab grants, wildcard included', function (): void {
@@ -266,7 +283,9 @@ test('an action the map does not name still gets a column, after the ones it doe
 test('the legend names every drawing the grid uses', function (): void {
     $grid = gridFor(Panel::make()->id('scratch'));
 
-    expect($grid->legend())->toHaveCount(6)
+    expect($grid->legend())->toHaveCount(7)
         ->and(array_column($grid->legend(), 'state'))
-        ->toBe(['abstain', 'granted', 'forbidden', 'broader', 'abstain', 'granted']);
+        ->toBe(['abstain', 'granted', 'forbidden', 'broader', 'abstain', 'granted', 'granted'])
+        ->and(array_column($grid->legend(), 'locked'))
+        ->toBe([false, false, false, false, false, false, true]);
 });
