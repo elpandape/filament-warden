@@ -22,10 +22,11 @@ pest()->extend(TestCase::class);
 /**
  * @param  array<string, array<string, string>>  $state
  * @param  array<string, array<string, bool>>  $narrowed
+ * @param  array<string, string>  $wider
  */
-function gridFor(Panel $panel, array $state = [], array $narrowed = []): GridView
+function gridFor(Panel $panel, array $state = [], array $narrowed = [], array $wider = []): GridView
 {
-    return GridView::for(Catalog::for($panel), $state, $narrowed);
+    return GridView::for(Catalog::for($panel), $state, $narrowed, $wider);
 }
 
 function tabNamed(GridView $grid, string $key): Tab
@@ -186,4 +187,86 @@ test('the browser is handed the cycle order and the actions a wildcard reaches',
         ->and($alpine['rows'][Post::class]['actions'])
         ->toBe(['viewAny', 'view', 'create', 'update', 'delete', 'deleteAny'])
         ->and($alpine['rows'][Post::class]['read'])->toBe(['viewAny', 'view']);
+});
+
+test('a role that holds everything does not read as a role that holds nothing', function (): void {
+    $grid = gridFor(
+        Panel::make()->id('scratch')->resources([PostResource::class]),
+        wider: ['*' => 'granted'],
+    );
+
+    $cell = cellFor(rowFor(tabNamed($grid, 'resources'), Post::class), 'viewAny');
+
+    expect($cell->stance)->toBe(Stance::Abstain)
+        ->and($cell->drawn())->toBe('broader')
+        ->and($cell->broader())->toBe('granted')
+        ->and($grid->wider)->toBe(['*' => 'granted']);
+});
+
+test('the wildcard on a row reaches the cells of that row and no other', function (): void {
+    $grid = gridFor(
+        Panel::make()->id('scratch')->resources([PostResource::class]),
+        [Post::class => [StateKey::MANAGE => 'granted']],
+    );
+
+    $post = rowFor(tabNamed($grid, 'resources'), Post::class);
+    $role = rowFor(tabNamed($grid, 'resources'), roleClass());
+
+    expect(cellFor($post, 'viewAny')->drawn())->toBe('broader')
+        ->and(cellFor($post, StateKey::MANAGE)->drawn())->toBe('granted')
+        ->and(cellFor($role, 'viewAny')->drawn())->toBe('abstain');
+});
+
+test('a forbidden wider rule is what the cell shows, not a granted one', function (): void {
+    $grid = gridFor(
+        Panel::make()->id('scratch')->resources([PostResource::class]),
+        [Post::class => [StateKey::MANAGE => 'granted']],
+        wider: ['*' => 'forbidden'],
+    );
+
+    expect(cellFor(rowFor(tabNamed($grid, 'resources'), Post::class), 'viewAny')->broader())
+        ->toBe('forbidden');
+});
+
+test('a door is reached by a rule over everything too', function (): void {
+    $grid = gridFor(Panel::make()->id('scratch'), wider: ['*' => 'granted']);
+
+    expect(tabNamed($grid, 'loose')->rows[0]->cells[0]->drawn())->toBe('broader');
+});
+
+test('the columns follow the order the scope map declares, not the first policy walked', function (): void {
+    config()->set('filament-warden.catalog.scopes', [
+        'read' => ['view', 'viewAny'],
+        'write' => ['update', 'create'],
+        'withdraw' => ['deleteAny', 'delete'],
+    ]);
+
+    $grid = gridFor(Panel::make()->id('scratch')->resources([PostResource::class]));
+
+    $actions = [];
+
+    foreach ($grid->groups as $group) {
+        foreach ($group->columns as $column) {
+            $actions[] = $column->action;
+        }
+    }
+
+    expect($actions)->toBe(['view', 'viewAny', 'update', 'create', 'deleteAny', 'delete']);
+});
+
+test('an action the map does not name still gets a column, after the ones it does', function (): void {
+    config()->set('filament-warden.catalog.scopes', ['write' => ['create']]);
+
+    $grid = gridFor(Panel::make()->id('scratch')->resources([PostResource::class]));
+
+    expect($grid->groups)->toHaveCount(1)
+        ->and($grid->groups[0]->columns[0]->action)->toBe('create');
+});
+
+test('the legend names every drawing the grid uses', function (): void {
+    $grid = gridFor(Panel::make()->id('scratch'));
+
+    expect($grid->legend())->toHaveCount(6)
+        ->and(array_column($grid->legend(), 'state'))
+        ->toBe(['abstain', 'granted', 'forbidden', 'broader', 'abstain', 'granted']);
 });

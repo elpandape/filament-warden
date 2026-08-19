@@ -21,6 +21,16 @@
         })"
         class="fw-grid"
     >
+        @if ($grid->wider !== [])
+            <p class="fw-wider">
+                {{ __('filament-warden::ui.grid.wider') }}
+                @foreach ($grid->wider as $name => $stance)
+                    <span class="fw-box" data-state="{{ $stance }}" aria-hidden="true"></span>
+                    <code>{{ $name }}</code>
+                @endforeach
+            </p>
+        @endif
+
         <div class="fw-tabs" role="tablist">
             @foreach ($grid->tabs as $tab)
                 <button
@@ -90,9 +100,10 @@
                                                         class="fw-box"
                                                         data-fw-row="{{ $cell->row }}"
                                                         data-fw-action="{{ $cell->action }}"
-                                                        data-state="{{ $cell->stance->value }}"
-                                                        x-bind:data-state="drawn(@js($cell->row), @js($cell->action))"
-                                                        x-bind:data-broader="reached(@js($cell->row))"
+                                                        data-state="{{ $cell->drawn() }}"
+                                                        data-broader="{{ $cell->broader() }}"
+                                                        x-bind:data-state="drawn(@js($cell->row), @js($cell->action), @js($cell->entry?->name))"
+                                                        x-bind:data-broader="reached(@js($cell->row), @js($cell->action), @js($cell->entry?->name))"
                                                         x-on:click="cycle(@js($cell->row), @js($cell->action), $event.shiftKey)"
                                                         x-on:keydown.enter.prevent="cycle(@js($cell->row), @js($cell->action), $event.shiftKey)"
                                                         x-on:keydown.space.prevent="cycle(@js($cell->row), @js($cell->action), $event.shiftKey)"
@@ -123,8 +134,10 @@
                                         class="fw-box"
                                         data-fw-row="{{ $cell->row }}"
                                         data-fw-action="{{ $cell->action }}"
-                                        data-state="{{ $cell->stance->value }}"
-                                        x-bind:data-state="drawn(@js($cell->row), @js($cell->action))"
+                                        data-state="{{ $cell->drawn() }}"
+                                        data-broader="{{ $cell->broader() }}"
+                                        x-bind:data-state="drawn(@js($cell->row), @js($cell->action), @js($cell->entry?->name))"
+                                        x-bind:data-broader="reached(@js($cell->row), @js($cell->action), @js($cell->entry?->name))"
                                         x-on:click="cycle(@js($cell->row), @js($cell->action), $event.shiftKey)"
                                         x-on:keydown.enter.prevent="cycle(@js($cell->row), @js($cell->action), $event.shiftKey)"
                                         x-on:keydown.space.prevent="cycle(@js($cell->row), @js($cell->action), $event.shiftKey)"
@@ -148,10 +161,21 @@
         @endforeach
 
         <div class="fw-legend">
-            @foreach (['abstains', 'granted', 'forbidden', 'broader', 'undeclared', 'narrowed'] as $item)
-                <span class="fw-legend-item">{{ __('filament-warden::ui.grid.legend.'.$item) }}</span>
+            @foreach ($grid->legend() as $item)
+                <span class="fw-legend-item">
+                    @if ($item['void'])
+                        <span class="fw-void" aria-hidden="true">·</span>
+                    @else
+                        <span class="fw-box" data-state="{{ $item['state'] }}" data-broader="{{ $item['broader'] }}" aria-hidden="true">
+                            @if ($item['noted'])
+                                <span class="fw-noted"></span>
+                            @endif
+                        </span>
+                    @endif
+                    {{ $item['label'] }}
+                </span>
             @endforeach
-            <span class="fw-legend-item">{{ __('filament-warden::ui.grid.shift') }}</span>
+            <span class="fw-legend-item fw-legend-shift">{{ __('filament-warden::ui.grid.shift') }}</span>
         </div>
     </div>
 </x-dynamic-component>

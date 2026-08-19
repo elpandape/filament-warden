@@ -162,3 +162,31 @@ test('a permission over a model the panel does not show is left out of the grid'
 
     expect(RoleGrants::of($role, gridCatalog())->stances)->toBeEmpty();
 });
+
+test('a rule written over every entity is reported, not swallowed', function (): void {
+    $role = makeRole('super-admin');
+
+    Warden::allow($role)->everything();
+
+    $state = RoleGrants::of($role, gridCatalog());
+
+    expect($state->stances)->toBeEmpty()
+        ->and($state->wider)->toBe(['*' => 'granted']);
+});
+
+test('an action written over every entity is reported by its own name', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('view', '*');
+
+    expect(RoleGrants::of($role, gridCatalog())->wider)->toBe(['view' => 'granted']);
+});
+
+test('a forbidden wider rule wins over a granted one of the same name', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->everything();
+    Warden::forbid($role)->everything();
+
+    expect(RoleGrants::of($role, gridCatalog())->wider)->toBe(['*' => 'forbidden']);
+});

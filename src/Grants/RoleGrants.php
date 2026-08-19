@@ -34,12 +34,23 @@ final class RoleGrants
 
         $stances = [];
         $narrowed = [];
+        $wider = [];
 
         foreach (self::held($role) as [$permission, $forbidden]) {
             $type = $permission->getAttribute('entity_type');
             $name = $permission->getAttribute('name');
 
             if (! is_string($name) || $permission->getAttribute('entity_id') !== null) {
+                continue;
+            }
+
+            if ($type === '*') {
+                // Forbidden wins wherever it is written, so it never loses to a
+                // grant that arrives later in the loop.
+                if ($forbidden || ! isset($wider[$name])) {
+                    $wider[$name] = $forbidden ? Stance::Forbidden->value : Stance::Granted->value;
+                }
+
                 continue;
             }
 
@@ -63,7 +74,7 @@ final class RoleGrants
             }
         }
 
-        return new RoleState($stances, $narrowed);
+        return new RoleState($stances, $narrowed, $wider);
     }
 
     /**

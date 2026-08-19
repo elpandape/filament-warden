@@ -25,20 +25,33 @@ export default function ({ state, grid }) {
          * What the cell draws. A cell nobody wrote still shows when a granted or
          * forbidden wildcard already reaches it, and it says which.
          */
-        drawn(row, action) {
+        drawn(row, action, name) {
             const stance = this.stanceOf(row, action)
 
-            if (stance !== this.grid.order[0] || action === this.grid.manage) {
+            if (stance !== this.grid.order[0]) {
                 return stance
             }
 
-            return this.reached(row) === null ? stance : 'broader'
+            return this.reached(row, action, name) === null ? stance : 'broader'
         },
 
-        reached(row) {
-            const wildcard = this.stanceOf(row, this.grid.manage)
+        /**
+         * What already answers for a cell nobody wrote: the wildcard on its own
+         * row, or a rule written over every entity at once. Forbidden wins, the
+         * same way it wins when the store resolves the check.
+         */
+        reached(row, action, name) {
+            const candidates = [
+                action === this.grid.manage ? null : this.stanceOf(row, this.grid.manage),
+                this.grid.wider['*'] ?? null,
+                this.grid.wider[name ?? action] ?? null,
+            ].filter((stance) => stance !== null && stance !== this.grid.order[0])
 
-            return wildcard === this.grid.order[0] ? null : wildcard
+            if (candidates.length === 0) {
+                return null
+            }
+
+            return candidates.includes(this.grid.order[2]) ? this.grid.order[2] : this.grid.order[1]
         },
 
         cycle(row, action, backwards = false) {

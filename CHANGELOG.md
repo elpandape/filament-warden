@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Before `1.0.0` the public API may change between minor versions.
 
+## [0.3.1] - 2026-08-19
+
+What the grid was not saying, and how it looked while not saying it.
+
+### Fixed
+
+- **A role holding a rule over every entity read as a role holding nothing.**
+  `Warden::allow($role)->everything()` writes a permission over `*`, which owns no
+  cell of the grid, so it was skipped entirely — and the most dangerous role in an
+  installation was drawn empty. It is now reported above the grid and every cell
+  it answers is drawn dashed, which is what the fourth drawing was always for. A
+  written stance still beats it, and an action no policy declares is still a dot:
+  a wildcard cannot grant what nothing consults.
+- **The columns are ordered by the scope map**, not by whichever policy happened
+  to be walked first. `delete` came after `deleteAny` for no reason a reader could
+  see.
+
+### Changed
+
+- The grid is denser: the action columns take what they need and the entity column
+  keeps the rest, instead of the cells drifting apart across an empty table.
+- The entity column stays pinned while the rest scrolls sideways.
+- The legend draws the sample it names, rather than describing it in words.
+- Row shortcuts appear on hovering the row, not only its first cell.
+
 ## [0.3.0] - 2026-08-19
 
 The role grid. The first tag that is worth installing: a roles screen with the

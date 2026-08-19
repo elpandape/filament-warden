@@ -53,7 +53,9 @@ final class PermissionGrid extends Field
 
     public function getGrid(): GridView
     {
-        return GridView::for($this->catalog(), $this->desired(), $this->stored()->narrowed);
+        $stored = $this->stored();
+
+        return GridView::for($this->catalog(), $this->desired(), $stored->narrowed, $stored->wider);
     }
 
     /**

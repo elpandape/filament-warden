@@ -26,6 +26,7 @@ final readonly class Cell
         public bool $narrowed = false,
         public ?Scope $scope = null,
         public ?Entry $entry = null,
+        public ?Stance $reach = null,
     ) {}
 
     public static function undeclared(string $row, string $action, string $label, ?Scope $scope = null): self
@@ -36,6 +37,23 @@ final readonly class Cell
     public function isGranted(): bool
     {
         return $this->stance === Stance::Granted;
+    }
+
+    /**
+     * What the server draws without javascript, which is also what the browser
+     * starts from: the stance the role wrote, or the dashed mark of a rule this
+     * cell never asked for.
+     */
+    public function drawn(): string
+    {
+        return $this->stance->isWritten() || ! $this->reach instanceof Stance
+            ? $this->stance->value
+            : 'broader';
+    }
+
+    public function broader(): ?string
+    {
+        return $this->reach?->value;
     }
 
     /**

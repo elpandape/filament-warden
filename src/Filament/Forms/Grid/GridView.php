@@ -8,6 +8,7 @@ use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Catalog\Entry;
 use ElPandaPe\FilamentWarden\Catalog\Origin;
 use ElPandaPe\FilamentWarden\Catalog\Scope;
+use ElPandaPe\FilamentWarden\Support\Config;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
@@ -23,17 +24,20 @@ final readonly class GridView
     /**
      * @param  list<Tab>  $tabs
      * @param  list<ColumnGroup>  $groups
+     * @param  array<string, string>  $wider
      */
     private function __construct(
         public array $tabs,
         public array $groups,
+        public array $wider,
     ) {}
 
     /**
      * @param  array<string, array<string, string>>  $state  what the role says, keyed row => action
      * @param  array<string, array<string, bool>>  $narrowed  cells carrying conditions or ownership
+     * @param  array<string, string>  $wider  rules written over every entity at once
      */
-    public static function for(Catalog $catalog, array $state = [], array $narrowed = []): self
+    public static function for(Catalog $catalog, array $state = [], array $narrowed = [], array $wider = []): self
     {
         $groups = self::groups($catalog);
 
@@ -46,10 +50,10 @@ final readonly class GridView
         }
 
         $tabs = [
-            self::matrix($catalog, $columns, $state, $narrowed),
-            self::doors('pages', $catalog, [Origin::Page], $state, $narrowed),
-            self::doors('widgets', $catalog, [Origin::Widget], $state, $narrowed),
-            self::doors('loose', $catalog, [Origin::Custom, Origin::Panel], $state, $narrowed),
+            self::matrix($catalog, $columns, $state, $narrowed, $wider),
+            self::doors('pages', $catalog, [Origin::Page], $state, $narrowed, $wider),
+            self::doors('widgets', $catalog, [Origin::Widget], $state, $narrowed, $wider),
+            self::doors('loose', $catalog, [Origin::Custom, Origin::Panel], $state, $narrowed, $wider),
         ];
 
         // An empty tab is a tab that shows nothing: the generation before this
@@ -57,6 +61,7 @@ final readonly class GridView
         return new self(
             tabs: array_values(array_filter($tabs, static fn (Tab $tab): bool => ! $tab->isEmpty())),
             groups: $groups,
+            wider: $wider,
         );
     }
 
@@ -69,6 +74,7 @@ final readonly class GridView
      *     manage: string,
      *     rows: array<string, array{actions: list<string>, read: list<string>}>,
      *     tabs: list<array{key: string, rows: list<string>}>,
+     *     wider: array<string, string>,
      * }
      */
     public function alpine(): array
@@ -92,6 +98,26 @@ final readonly class GridView
                 'key' => $tab->key,
                 'rows' => array_map(static fn (Row $row): string => $row->key, $tab->rows),
             ], $this->tabs),
+            'wider' => $this->wider,
+        ];
+    }
+
+    /**
+     * The six drawings, each with the sample the reader compares against. It
+     * lives here and not in the template for the same reason everything else
+     * does: this is the half that is measured.
+     *
+     * @return list<array{state: string, broader: string|null, void: bool, noted: bool, label: string}>
+     */
+    public function legend(): array
+    {
+        return [
+            ['state' => 'abstain', 'broader' => null, 'void' => false, 'noted' => false, 'label' => $this->line('abstains')],
+            ['state' => 'granted', 'broader' => null, 'void' => false, 'noted' => false, 'label' => $this->line('granted')],
+            ['state' => 'forbidden', 'broader' => null, 'void' => false, 'noted' => false, 'label' => $this->line('forbidden')],
+            ['state' => 'broader', 'broader' => 'granted', 'void' => false, 'noted' => false, 'label' => $this->line('broader')],
+            ['state' => 'abstain', 'broader' => null, 'void' => true, 'noted' => false, 'label' => $this->line('undeclared')],
+            ['state' => 'granted', 'broader' => null, 'void' => false, 'noted' => true, 'label' => $this->line('narrowed')],
         ];
     }
 
@@ -112,13 +138,23 @@ final readonly class GridView
         }
 
         $groups = [];
+        $map = Config::scopes();
 
         foreach (Scope::cases() as $scope) {
+            $declared = $map[$scope->value] ?? [];
             $columns = [];
 
+            // First in the order the scope map declares, which is intentional;
+            // then whatever landed here without being named, which is not.
+            foreach ($declared as $action) {
+                if (($scopes[$action] ?? null) === $scope) {
+                    $columns[] = self::column($action, $scope);
+                }
+            }
+
             foreach ($scopes as $action => $actionScope) {
-                if ($actionScope === $scope) {
-                    $columns[] = new Column((string) $action, self::actionLabel((string) $action), $scope);
+                if ($actionScope === $scope && ! in_array((string) $action, $declared, true)) {
+                    $columns[] = self::column((string) $action, $scope);
                 }
             }
 
@@ -130,12 +166,18 @@ final readonly class GridView
         return $groups;
     }
 
+    private static function column(string $action, Scope $scope): Column
+    {
+        return new Column($action, self::actionLabel($action), $scope);
+    }
+
     /**
      * @param  list<Column>  $columns
      * @param  array<string, array<string, string>>  $state
      * @param  array<string, array<string, bool>>  $narrowed
+     * @param  array<string, string>  $wider
      */
-    private static function matrix(Catalog $catalog, array $columns, array $state, array $narrowed): Tab
+    private static function matrix(Catalog $catalog, array $columns, array $state, array $narrowed, array $wider): Tab
     {
         /** @var array<string, list<Entry>> $byModel */
         $byModel = [];
@@ -163,7 +205,7 @@ final readonly class GridView
                 $entry = $declared[$column->action] ?? null;
 
                 $cells[] = $entry instanceof Entry
-                    ? self::cell($key, $column->action, $column->label, $state, $narrowed, $column->scope, $entry)
+                    ? self::cell($key, $column->action, $column->label, $state, $narrowed, $wider, $column->scope, $entry)
                     : Cell::undeclared($key, $column->action, $column->label, $column->scope);
             }
 
@@ -173,7 +215,7 @@ final readonly class GridView
                 label: self::entityLabel($model, $entries),
                 model: $model,
                 cells: $cells,
-                manage: self::cell($key, StateKey::MANAGE, self::translated('filament-warden::ui.grid.manage', StateKey::MANAGE), $state, $narrowed),
+                manage: self::cell($key, StateKey::MANAGE, self::translated('filament-warden::ui.grid.manage', StateKey::MANAGE), $state, $narrowed, $wider),
             );
         }
 
@@ -184,8 +226,9 @@ final readonly class GridView
      * @param  list<Origin>  $origins
      * @param  array<string, array<string, string>>  $state
      * @param  array<string, array<string, bool>>  $narrowed
+     * @param  array<string, string>  $wider
      */
-    private static function doors(string $key, Catalog $catalog, array $origins, array $state, array $narrowed): Tab
+    private static function doors(string $key, Catalog $catalog, array $origins, array $state, array $narrowed, array $wider): Tab
     {
         $rows = [];
 
@@ -201,7 +244,7 @@ final readonly class GridView
                 key: $row,
                 label: $label,
                 model: null,
-                cells: [self::cell($row, StateKey::DOOR, $label, $state, $narrowed, $entry->scope, $entry)],
+                cells: [self::cell($row, StateKey::DOOR, $label, $state, $narrowed, $wider, $entry->scope, $entry)],
             );
         }
 
@@ -211,6 +254,7 @@ final readonly class GridView
     /**
      * @param  array<string, array<string, string>>  $state
      * @param  array<string, array<string, bool>>  $narrowed
+     * @param  array<string, string>  $wider
      */
     private static function cell(
         string $row,
@@ -218,6 +262,7 @@ final readonly class GridView
         string $label,
         array $state,
         array $narrowed,
+        array $wider,
         ?Scope $scope = null,
         ?Entry $entry = null,
     ): Cell {
@@ -232,7 +277,39 @@ final readonly class GridView
             narrowed: (bool) ($narrowed[$row][$action] ?? false),
             scope: $scope,
             entry: $entry,
+            reach: self::reach($row, $action, $entry->name ?? $action, $state, $wider),
         );
+    }
+
+    /**
+     * What already answers for a cell nobody wrote: the wildcard on its own row,
+     * or a rule written over every entity at once. Forbidden wins, the same way
+     * it wins when the store resolves the check.
+     *
+     * @param  array<string, array<string, string>>  $state
+     * @param  array<string, string>  $wider
+     */
+    private static function reach(string $row, string $action, string $name, array $state, array $wider): ?Stance
+    {
+        $candidates = [
+            $action === StateKey::MANAGE ? null : ($state[$row][StateKey::MANAGE] ?? null),
+            $wider['*'] ?? null,
+            $wider[$name] ?? null,
+        ];
+
+        $reach = null;
+
+        foreach ($candidates as $candidate) {
+            $stance = Stance::tryFrom(is_string($candidate) ? $candidate : '');
+
+            if ($stance === Stance::Forbidden) {
+                return $stance;
+            }
+
+            $reach ??= $stance === Stance::Granted ? $stance : null;
+        }
+
+        return $reach;
     }
 
     /**
@@ -285,5 +362,10 @@ final readonly class GridView
     private static function humanize(string $value): string
     {
         return Str::headline($value);
+    }
+
+    private function line(string $key): string
+    {
+        return self::translated('filament-warden::ui.grid.legend.'.$key, $key);
     }
 }
