@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\FilamentWardenPlugin;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use Filament\Facades\Filament;
@@ -24,12 +25,12 @@ test('registering the plugin does not break a panel', function (): void {
     expect($panel->getPlugin('filament-warden'))->toBeInstanceOf(FilamentWardenPlugin::class);
 });
 
-test('this version registers no screens at all', function (): void {
+test('the plugin puts the role resource on the panel, and nothing else yet', function (): void {
     $panel = Panel::make()->id('scratch');
 
     $panel->plugin(FilamentWardenPlugin::make());
 
-    expect($panel->getResources())->toBeEmpty()
+    expect($panel->getResources())->toBe([RoleResource::class])
         ->and($panel->getPages())->toBeEmpty()
         ->and($panel->getWidgets())->toBeEmpty();
 });

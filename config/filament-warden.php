@@ -25,6 +25,25 @@ return [
         'probe' => true,            // the test bench, built on explain()
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Navigation
+    |--------------------------------------------------------------------------
+    |
+    | Left null, the group falls back to this package's own translated one and
+    | the icon to a shield. The slug is what the URL says.
+    |
+    */
+
+    'navigation' => [
+        'group' => null,
+        'roles' => [
+            'slug' => 'roles',
+            'icon' => null,
+            'sort' => null,
+        ],
+    ],
+
     'roles' => [
         'create' => true,
         'delete' => 'unassigned',   // false | 'unassigned' | 'all'

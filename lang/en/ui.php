@@ -5,11 +5,25 @@ declare(strict_types=1);
 return [
     'navigation' => [
         'group' => 'Security',
-        'roles' => 'Roles',
-        'permissions' => 'Permissions',
+    ],
+
+    'resources' => [
+        'roles' => [
+            'model' => 'Role',
+            'models' => 'Roles',
+            'fields' => [
+                'name' => 'Name',
+                'title' => 'Title',
+            ],
+            'columns' => [
+                'name' => 'Name',
+                'title' => 'Title',
+            ],
+        ],
     ],
 
     'grid' => [
+        'label' => 'Permissions',
         'entity' => 'Entity',
         'manage' => 'Everything',
         'undeclared' => 'The policy does not declare this action',
