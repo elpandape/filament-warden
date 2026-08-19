@@ -4,8 +4,8 @@
 > [elpandape/warden](https://github.com/elpandape/warden) — a permission grid derived from
 > your policies, explicit denials, and conditional grants.
 
-**Status: `0.2.0` — the catalogue and the lock.** The package derives the list of actions
-from your policies and closes the doors Filament leaves open. No screens yet. See
+**Status: `0.3.0` — the role grid.** The first tag worth installing: a roles screen with
+the permission grid inside it, derived from your policies. See
 [CHANGELOG.md](CHANGELOG.md) for what each version adds.
 
 ## Requirements
@@ -136,6 +136,20 @@ final class RevenueChart extends ChartWidget
 
 Pages of a resource need nothing: they are already covered by the resource's own
 `canAccess()`, which asks the model's policy.
+
+### The grid
+
+Registering the plugin puts a roles screen on the panel. Inside its form, the grid draws one
+row per entity and one column per action the policy declares — grouped by scope, so listing
+records does not look like deleting them for good — plus a wildcard column.
+
+A cell cycles: click to go from abstaining to granted to forbidden, and hold shift to walk
+the cycle backwards and reach a denial in one step. An action no policy declares is a dot
+and not a control, because nobody could grant it. A cell carrying conditions is drawn with
+an amber mark and left alone: revoking it by name would delete every twin that shares it.
+
+Nothing is written until you save, and the save is a diff — only the cells that changed
+reach the store.
 
 ### Read the catalogue
 

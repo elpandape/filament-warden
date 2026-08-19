@@ -6,6 +6,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Before `1.0.0` the public API may change between minor versions.
 
+## [0.3.0] - 2026-08-19
+
+The role grid. The first tag that is worth installing: a roles screen with the
+permission grid inside it, derived from your policies.
+
+### Added
+
+- A roles resource — list, create, edit — whose model, slug, icon, group and sort
+  all come from config, and whose labels are translated.
+- `Filament\Forms\PermissionGrid`, a form field holding the whole grid: tabs per
+  group with a tally, one row per entity, columns per action grouped by scope,
+  plus the wildcard column warden stores as `*`. Pages, widgets and loose
+  permissions are drawn as doors, because a page is not a model.
+- A cell cycles between abstaining, granted and forbidden; shift walks the cycle
+  backwards, from the mouse and from the keyboard, and reaches a denial in one
+  step.
+- Four drawings and no more: an empty box, a tick, a cross, and a dashed one for a
+  cell nobody wrote that a broader rule already answers. An action the policy does
+  not declare is a dot, not a control.
+- `Grants\RoleGrants`, which reads what a role holds and applies the grid as a
+  diff — never a sync, and never through the relation.
+- A hand-written stylesheet and a hand-written Alpine component, both published by
+  `php artisan filament:assets`. There is no Tailwind and no bundler in this
+  package.
+- Views are publishable under `filament-warden-views`, so an application can
+  rewrite the grid's markup.
+- Every string of the grid is translated in English and Spanish, including the
+  action names, with a humanised fallback for an action only your application
+  knows about.
+
+### Changed
+
+- `catalog.scopes` now names `deleteAny`, `restoreAny` and `forceDeleteAny`. Left
+  unnamed they fell into `write`, which put "delete any" next to "create" on
+  screen.
+- A new `navigation` config block holds the roles resource's group, icon, sort and
+  slug.
+
+### Not included
+
+- **A narrowed cell is shown and cannot be changed.** A permission carrying
+  conditions or an ownership flag is drawn with its amber mark and left alone,
+  because revoking by name would delete every twin that shares it. Editing those
+  is `0.6.0`.
+- No inspector: why a cell is where it is arrives in `0.4.0`, from `explain()`.
+- No condition builder: `0.5.0`.
+- Without javascript the grid still renders every stance the store holds, but it
+  does not derive the dashed drawing of a broader rule.
+- The visual polish — a pinned entity column, transitions, spacing — is `0.3.1`.
+
 ## [0.2.0] - 2026-08-18
 
 The catalogue and the lock. The package now knows which actions exist, and closes
