@@ -123,3 +123,13 @@ function recordKey(Model $model): string
 
     return is_int($key) || is_string($key) ? (string) $key : '';
 }
+
+/**
+ * The account the suite signed in, typed as a model so warden's actions accept it.
+ */
+function signedIn(): Model
+{
+    $user = Auth::user();
+
+    return $user instanceof Model ? $user : makeUser();
+}

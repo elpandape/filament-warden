@@ -6,6 +6,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Before `1.0.0` the public API may change between minor versions.
 
+## [0.7.0] - 2026-08-19
+
+Handing roles out from the account's own screen, and the way back.
+
+### Added
+
+- **A field for handing roles to an account.** One line in the consuming
+  application's own account form:
+
+  ```php
+  use ElPandaPe\FilamentWarden\Filament\Forms\RoleAssignment;
+
+  RoleAssignment::make('roles')->columnSpanFull(),
+  ```
+
+  It is a field and not a relation manager for two measured reasons. A package
+  cannot attach a relation manager to a resource it does not own —
+  `Resource::getRelations()` is a concrete static and nothing can write to it —
+  and the actions of one, `AttachAction` and `DetachAction`, **check no policy at
+  all** in Filament 5.7: they are gated only by `isReadOnly()`, which is false on
+  any edit page.
+- **You may hand out a role if you may edit it.** No new permission: `update`
+  over a role is already in the catalogue, and property 3 of this package
+  already says whoever may edit roles hands out everything. A role you cannot
+  edit is shown, locked, and carries the reason.
+- **An assignment narrowed to a context is shown, marked and left alone**, the
+  same way a narrowed cell of the grid is. Taking it back from here would take
+  every context with it, which is not what a checkbox says.
+- **`filament-warden:assign {role} {authority}`** — the way back, for whoever
+  locks themselves out. Same `Class:id` shape warden's own `warden:show` reads.
+  It refuses a role that does not exist rather than creating one, which is what
+  assigning by name would have done.
+
+### Fixed
+
+- **A role handed out from a screen answers immediately.** `attach()`, `detach()`
+  and `sync()` all skip warden's cache bump — only its own actions make it — so
+  the usual `->relationship()` approach leaves every check answering the old way,
+  silently and with no expiry. Every write here goes through the fluent API.
+
+### Not included
+
+- The command only hands roles out. You lock yourself out by not having a role,
+  never by having one, and a console command that takes access away turns a typo
+  into lost access.
+- Assigning a role *on* a context is not offered: contexts are `0.10.0`. An
+  assignment that already has one is shown and protected.
+- No bulk toggle on the field: one click that hands out every role in the
+  installation, with the untouchable ones dropped server-side in silence, is not
+  a convenience.
+
 ## [0.6.1] - 2026-08-19
 
 ### Fixed

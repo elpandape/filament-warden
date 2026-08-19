@@ -164,6 +164,23 @@ return [
         'unreadable' => 'This row carries no name, so there is no question to ask of it.',
     ],
 
+    'relations' => [
+        'roles' => [
+            'label' => 'Roles',
+            'help' => 'What this account is. A role hands out whatever its permissions say, the moment it is given.',
+            'protected' => 'You cannot edit this role, so you cannot hand it out either.',
+            'restricted' => 'This account holds this role in a context. Taking it back from here would take every context with it, so it is left alone.',
+        ],
+    ],
+
+    'console' => [
+        'assign' => [
+            'missing_role' => 'No role named [:role]. Nothing was created: assigning by name would have minted one.',
+            'missing_authority' => 'Could not read [:authority]. Give it as Class:id, for example "App\\Models\\User:1".',
+            'done' => 'The role [:role] now belongs to [:authority].',
+        ],
+    ],
+
     'conditions' => [
         'scope' => 'Rule scope',
         'if' => 'if',

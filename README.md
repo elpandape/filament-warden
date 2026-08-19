@@ -4,10 +4,10 @@
 > [elpandape/warden](https://github.com/elpandape/warden) — a permission grid derived from
 > your policies, explicit denials, and conditional grants.
 
-**Status: `0.6.1` — the permissions screen.** A roles screen with the permission grid inside
+**Status: `0.7.0` — handing roles out.** A roles screen with the permission grid inside
 it, derived from your policies; an inspector that says why each cell is the way it is; a builder
-that narrows a grant to the rows it should reach; and a permissions screen that says where every
-row of the catalogue came from. See [CHANGELOG.md](CHANGELOG.md) for what each version adds.
+that narrows a grant to the rows it should reach; a permissions screen that says where every
+row of the catalogue came from; and a field that hands roles to an account. See [CHANGELOG.md](CHANGELOG.md) for what each version adds.
 
 ## Requirements
 
@@ -215,6 +215,40 @@ changes the rule for **everyone holding that row** — a constrained permission 
 which is correct for a catalogue and is said on screen. And deleting a permission takes its grants
 with it through a foreign key, below Eloquent and with no event of its own, so the confirmation
 names who loses it: afterwards there is no trace.
+
+### Handing roles to an account
+
+Add one line to your own account resource's form:
+
+```php
+use ElPandaPe\FilamentWarden\Filament\Forms\RoleAssignment;
+
+RoleAssignment::make('roles')->columnSpanFull(),
+```
+
+It has to be your line because Filament reads a resource's relation managers and fields from the
+resource class itself, and a package cannot write to `getRelations()` from outside — Filament's own
+generator says the same thing when it scaffolds one.
+
+**Do not reach for `CheckboxList::make('roles')->relationship(...)` instead.** It looks equivalent
+and it is not: `->relationship()` saves through `sync()`, and `sync()`, `attach()` and `detach()`
+all skip warden's cache invalidation. A role handed out that way goes on answering the old way,
+silently and with no expiry. This field writes through warden's own API, so the store answers for a
+role the moment it is given.
+
+You may hand out a role if you may edit it — `update` over that role. A role you cannot edit is
+shown, locked, and says why; so is a role this account holds *in a context*, because taking that
+back would take every context with it.
+
+### The way back
+
+```bash
+php artisan filament-warden:assign super-admin "App\Models\User:1"
+```
+
+For whoever locks themselves out. It refuses a role that does not exist rather than creating one —
+assigning by name would have minted it, silently and with a generated title — and it only hands
+roles out: you lock yourself out by not having a role, never by having one.
 
 ### Read the catalogue
 

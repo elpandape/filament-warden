@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden;
 
+use ElPandaPe\FilamentWarden\Console\AssignRoleCommand;
 use ElPandaPe\FilamentWarden\Policies\PermissionPolicy;
 use ElPandaPe\FilamentWarden\Policies\RolePolicy;
 use ElPandaPe\Warden\Context;
@@ -25,6 +26,10 @@ final class FilamentWardenServiceProvider extends ServiceProvider
         $this->registerPolicies();
 
         if ($this->app->runningInConsole()) {
+            $this->commands([
+                AssignRoleCommand::class,
+            ]);
+
             $this->publishes([
                 __DIR__.'/../config/filament-warden.php' => config_path('filament-warden.php'),
             ], 'filament-warden-config');

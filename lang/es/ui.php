@@ -164,6 +164,23 @@ return [
         'unreadable' => 'Esta fila no tiene nombre, así que no hay pregunta que hacerle.',
     ],
 
+    'relations' => [
+        'roles' => [
+            'label' => 'Roles',
+            'help' => 'Lo que esta cuenta es. Un rol reparte lo que digan sus permisos en cuanto se da.',
+            'protected' => 'No puedes editar este rol, así que tampoco puedes repartirlo.',
+            'restricted' => 'Esta cuenta tiene este rol en un contexto. Quitarlo desde aquí se llevaría todos los contextos, así que se deja en paz.',
+        ],
+    ],
+
+    'console' => [
+        'assign' => [
+            'missing_role' => 'No hay ningún rol llamado [:role]. No se creó nada: asignar por nombre habría acuñado uno.',
+            'missing_authority' => 'No se pudo leer [:authority]. Se escribe como Clase:id, por ejemplo "App\\Models\\User:1".',
+            'done' => 'El rol [:role] ya es de [:authority].',
+        ],
+    ],
+
     'conditions' => [
         'scope' => 'Alcance de la regla',
         'if' => 'si',
