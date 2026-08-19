@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden;
 
+use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
@@ -34,6 +35,7 @@ final class FilamentWardenPlugin implements Plugin
     {
         $panel->resources([
             RoleResource::class,
+            PermissionResource::class,
         ])->assets([
             Css::make('permission-grid', __DIR__.'/../resources/css/permission-grid.css'),
             AlpineComponent::make('permission-grid', __DIR__.'/../resources/js/permission-grid.js'),

@@ -25,6 +25,81 @@ return [
                 'title' => 'Title',
             ],
         ],
+        'permissions' => [
+            'model' => 'Permission',
+            'models' => 'Permissions',
+            'sections' => [
+                'identity' => 'The permission',
+                'reach' => 'How far it reaches',
+                'holders' => 'Who holds it',
+            ],
+            'entity' => [
+                'none' => 'None: a loose permission',
+                'any' => 'Any entity',
+            ],
+            'columns' => [
+                'title' => 'Title',
+                'entity' => 'Entity',
+                'provenance' => 'Provenance',
+                'reach' => 'Reach',
+            ],
+            'filters' => [
+                'held' => 'Held by somebody',
+                'any' => 'Any',
+                'held_yes' => 'Held',
+                'held_no' => 'Orphaned',
+            ],
+            'fields' => [
+                'name' => 'Name',
+                'name_help_derived' => 'The policy method that declares it writes this. Changing it does not break anything loudly — it disconnects the row from the code that asks for it.',
+                'name_help_loose' => 'You choose it. It is what can() will ask for.',
+                'taken' => 'The catalogue already has a permission with this name and entity.',
+                'title' => 'Title',
+                'title_help' => 'Only for reading. Warden writes it when the permission is created, and never again — a rename leaves the old one in place.',
+                'entity' => 'Entity',
+                'entity_help' => 'With no entity the permission is asked loose, with nothing in front of it.',
+                'only_owned' => 'Only what it owns',
+                'only_owned_help' => 'Warden resolves ownership with ownedVia().',
+                'only_owned_no_model' => 'There is no ownership to resolve where there is no entity.',
+                'conditions' => 'Conditions',
+                'conditions_shared' => 'This row is held :count times over. It is one row and one rule, so editing it here changes the rule for every one of them.',
+            ],
+            'holders' => [
+                'description' => 'Counted, not named. A permission can be held by every account in the installation.',
+                'roles' => 'Roles',
+                'accounts' => 'Accounts',
+                'everyone' => 'Everyone',
+                'forbidden' => 'Explicitly forbidden',
+                'yes' => 'yes',
+                'no' => 'no',
+            ],
+            'delete' => [
+                'nobody' => 'Nobody holds this permission, so nothing goes with it.',
+                'holders' => 'This takes the grants of :roles role(s) and :accounts account(s) with it, in the database and with no trace afterwards: :names.',
+            ],
+            'probe' => [
+                'label' => 'Test it',
+                'submit' => 'Ask the store',
+                'account' => 'Account',
+                'record' => 'Record',
+                'record_help' => 'The key of the row to put in front of it. Leave it empty to ask about the class — a narrowed rule can never match that way.',
+            ],
+        ],
+    ],
+
+    'provenance' => [
+        'wildcard' => 'Wildcard',
+        'policy' => 'From a policy',
+        'loose' => 'Loose',
+        'unknown' => 'Nothing declares it',
+    ],
+
+    'reach' => [
+        'all' => 'Every row',
+        'owned' => 'Only what it owns',
+        'conditions' => 'With conditions',
+        'unreadable' => 'Cannot be read',
+        'tangled' => 'More than one rule',
     ],
 
     'tabs' => [

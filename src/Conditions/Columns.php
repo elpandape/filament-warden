@@ -60,6 +60,18 @@ final class Columns
      */
     public static function authority(): array
     {
+        $model = self::authorityModel();
+
+        return $model === null ? [] : self::of($model);
+    }
+
+    /**
+     * The class behind that guard, when there is one to name.
+     *
+     * @return class-string<Model>|null
+     */
+    public static function authorityModel(): ?string
+    {
         // Asked of the auth manager and not of the guard: `getProvider()` is not
         // on the `Guard` contract, so a panel guard that is not a session guard
         // would not answer it.
@@ -74,7 +86,7 @@ final class Columns
         // Only an eloquent provider knows a model, and only a model has a table.
         // Anything else — a provider over a bare table, a custom one — leaves the
         // builder with no account columns to offer, and it says so.
-        return $provider instanceof EloquentUserProvider ? self::of($provider->getModel()) : [];
+        return $provider instanceof EloquentUserProvider ? $provider->getModel() : null;
     }
 
     /**

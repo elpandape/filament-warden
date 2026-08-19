@@ -25,6 +25,81 @@ return [
                 'title' => 'Título',
             ],
         ],
+        'permissions' => [
+            'model' => 'Permiso',
+            'models' => 'Permisos',
+            'sections' => [
+                'identity' => 'El permiso',
+                'reach' => 'Hasta dónde llega',
+                'holders' => 'Quién lo tiene',
+            ],
+            'entity' => [
+                'none' => 'Ninguna: permiso suelto',
+                'any' => 'Cualquier entidad',
+            ],
+            'columns' => [
+                'title' => 'Título',
+                'entity' => 'Entidad',
+                'provenance' => 'Procedencia',
+                'reach' => 'Alcance',
+            ],
+            'filters' => [
+                'held' => 'En poder de alguien',
+                'any' => 'Cualquiera',
+                'held_yes' => 'En poder de alguien',
+                'held_no' => 'Huérfano',
+            ],
+            'fields' => [
+                'name' => 'Nombre',
+                'name_help_derived' => 'Lo escribe el método de la Policy que lo declara. Cambiarlo no rompe nada con ruido: desconecta la fila del código que la pregunta.',
+                'name_help_loose' => 'Lo eliges tú. Es lo que preguntará can().',
+                'taken' => 'El catálogo ya tiene un permiso con este nombre y esta entidad.',
+                'title' => 'Título',
+                'title_help' => 'Solo para leerlo. Warden lo escribe al crear el permiso y nunca más: renombrarlo deja el viejo en su sitio.',
+                'entity' => 'Entidad',
+                'entity_help' => 'Sin entidad, el permiso se pregunta suelto, sin nada delante.',
+                'only_owned' => 'Solo lo que posee',
+                'only_owned_help' => 'Warden resuelve la propiedad con ownedVia().',
+                'only_owned_no_model' => 'No hay propiedad que resolver donde no hay entidad.',
+                'conditions' => 'Condiciones',
+                'conditions_shared' => 'Esta fila está en poder de :count. Es una fila y una regla, así que editarla aquí cambia la regla para todos ellos.',
+            ],
+            'holders' => [
+                'description' => 'Contados, no nombrados. Un permiso puede estar en poder de todas las cuentas de la instalación.',
+                'roles' => 'Roles',
+                'accounts' => 'Cuentas',
+                'everyone' => 'Todo el mundo',
+                'forbidden' => 'Prohibido explícitamente',
+                'yes' => 'sí',
+                'no' => 'no',
+            ],
+            'delete' => [
+                'nobody' => 'Nadie tiene este permiso, así que no se lleva nada por delante.',
+                'holders' => 'Esto se lleva las concesiones de :roles rol(es) y :accounts cuenta(s), en la base de datos y sin rastro después: :names.',
+            ],
+            'probe' => [
+                'label' => 'Probarlo',
+                'submit' => 'Preguntar al almacén',
+                'account' => 'Cuenta',
+                'record' => 'Registro',
+                'record_help' => 'La clave de la fila que ponerle delante. Déjalo vacío para preguntar por la clase — una regla estrechada no puede casar así.',
+            ],
+        ],
+    ],
+
+    'provenance' => [
+        'wildcard' => 'Comodín',
+        'policy' => 'De una Policy',
+        'loose' => 'Suelto',
+        'unknown' => 'Nada lo declara',
+    ],
+
+    'reach' => [
+        'all' => 'Todas las filas',
+        'owned' => 'Solo lo que posee',
+        'conditions' => 'Con condiciones',
+        'unreadable' => 'No se puede leer',
+        'tangled' => 'Más de una regla',
     ],
 
     'tabs' => [

@@ -91,6 +91,31 @@ final readonly class Holders
         );
     }
 
+    /**
+     * The first attribute the record actually carries, in the order a person
+     * would recognise it.
+     *
+     * Read through `getAttributes()` and never through `getAttribute()`: these
+     * are the consuming application's models, and under `Model::shouldBeStrict()`
+     * asking one for a column it does not have throws.
+     */
+    public static function label(Model $record): string
+    {
+        $attributes = $record->getAttributes();
+
+        foreach (['title', 'name', 'email'] as $candidate) {
+            $value = $attributes[$candidate] ?? null;
+
+            if (is_string($value) && $value !== '') {
+                return $value;
+            }
+        }
+
+        $key = $record->getKey();
+
+        return '#'.(is_int($key) || is_string($key) ? $key : '?');
+    }
+
     public function isOrphaned(): bool
     {
         return $this->roles === [] && $this->accountCount === 0 && ! $this->everyone;
@@ -151,30 +176,5 @@ final readonly class Holders
         }
 
         return $labels;
-    }
-
-    /**
-     * The first attribute the record actually carries, in the order a person
-     * would recognise it.
-     *
-     * Read through `getAttributes()` and never through `getAttribute()`: these
-     * are the consuming application's models, and under `Model::shouldBeStrict()`
-     * asking one for a column it does not have throws.
-     */
-    private static function label(Model $record): string
-    {
-        $attributes = $record->getAttributes();
-
-        foreach (['title', 'name', 'email'] as $candidate) {
-            $value = $attributes[$candidate] ?? null;
-
-            if (is_string($value) && $value !== '') {
-                return $value;
-            }
-        }
-
-        $key = $record->getKey();
-
-        return '#'.(is_int($key) || is_string($key) ? $key : '?');
     }
 }

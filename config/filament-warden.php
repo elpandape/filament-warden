@@ -42,6 +42,11 @@ return [
             'icon' => null,
             'sort' => null,
         ],
+        'permissions' => [
+            'slug' => 'permissions',
+            'icon' => null,
+            'sort' => null,
+        ],
     ],
 
     'roles' => [

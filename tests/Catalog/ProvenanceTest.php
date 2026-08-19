@@ -101,3 +101,40 @@ test('a permission carrying conditions keeps the provenance of the row it twins'
 
     expect(Provenance::of($twin, panelCatalog()))->toBe(Provenance::Policy);
 });
+
+test('the badge and the filter never disagree, whatever is in the catalogue', function (): void {
+    config()->set('filament-warden.catalog.custom', ['export-reports' => 'read']);
+
+    catalogRow('viewAny', new Post()->getMorphClass());
+    catalogRow('page:'.Reports::class);
+    catalogRow('export-reports');
+    catalogRow('panel:scratch');
+    catalogRow('*', '*');
+    catalogRow('view', '*');
+    catalogRow('*', 'post');
+    catalogRow('viwAny', new Post()->getMorphClass());
+    catalogRow('viewAny', 'gone.away');
+
+    $catalog = panelCatalog();
+    $class = Context::resolve()->permissionClass();
+
+    foreach (Provenance::cases() as $provenance) {
+        $filtered = $class::query()
+            ->withoutGlobalScopes()
+            ->where(fn (Illuminate\Database\Eloquent\Builder $query) => $provenance->applyTo($query, $catalog))
+            ->pluck('id')
+            ->all();
+
+        $badged = $class::query()
+            ->withoutGlobalScopes()
+            ->get()
+            ->filter(fn (Model $row): bool => Provenance::of($row, $catalog) === $provenance)
+            ->pluck('id')
+            ->all();
+
+        sort($filtered);
+        sort($badged);
+
+        expect($filtered)->toBe($badged, "[{$provenance->value}] the filter and the badge disagree");
+    }
+});
