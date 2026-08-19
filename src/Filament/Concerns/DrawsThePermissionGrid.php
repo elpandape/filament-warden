@@ -1,0 +1,145 @@
+<?php
+
+declare(strict_types=1);
+
+namespace ElPandaPe\FilamentWarden\Filament\Concerns;
+
+use ElPandaPe\FilamentWarden\Catalog\Catalog;
+use ElPandaPe\FilamentWarden\Catalog\Entry;
+use ElPandaPe\FilamentWarden\Catalog\Origin;
+use ElPandaPe\FilamentWarden\Catalog\Scope;
+use ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView;
+use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
+use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
+use ElPandaPe\FilamentWarden\Grants\Explanation;
+use ElPandaPe\FilamentWarden\Grants\RoleGrants;
+use ElPandaPe\FilamentWarden\Grants\RoleState;
+use Filament\Facades\Filament;
+use Filament\Panel;
+use Filament\Support\Components\Attributes\ExposedLivewireMethod;
+use Illuminate\Database\Eloquent\Model;
+use Livewire\Attributes\Renderless;
+
+/**
+ * What the screen that hands permissions out and the one that only reads them
+ * have in common: the view model, and the inspector behind it.
+ *
+ * The two differ in exactly one thing — whether there is an unsaved stance to
+ * compare against — and that is the one method each of them answers for itself.
+ */
+trait DrawsThePermissionGrid
+{
+    /**
+     * What the grid draws: the unsaved state on a form, the stored one on a page
+     * that only reads.
+     *
+     * @return array<string, array<string, string>>
+     */
+    abstract protected function gridState(): array;
+
+    /**
+     * Why one cell is the way it is — asked for, never volunteered.
+     *
+     * `explain()` costs three to seven queries with no cache and no batching, so
+     * a grid that explained every cell on render would spend more than a hundred
+     * on a screen nobody may ask a question about. It answers one cell at a time,
+     * and `#[Renderless]` keeps the click from re-rendering the whole page.
+     *
+     * The answer is about what is STORED — that is all `explain()` can read — so
+     * the payload also carries the stance on screen when the two disagree. The
+     * pending state arrives with this very call, before the method runs.
+     *
+     * @return array<string, string|null>
+     */
+    #[ExposedLivewireMethod]
+    #[Renderless]
+    public function explainCell(string $row, string $action): array
+    {
+        $role = $this->getRecord();
+        $entry = $this->catalogEntryFor($row, $action);
+
+        if (! $role instanceof Model || ! $entry instanceof Entry) {
+            return [];
+        }
+
+        $stored = $this->storedState();
+
+        return Explanation::of(
+            role: $role,
+            entry: $entry,
+            rowKey: $row,
+            action: $action,
+            narrowed: $stored->narrowed,
+            onScreen: $this->onScreenStance($row, $action),
+            stored: self::stanceIn($stored->stances, $row, $action),
+        )->toPayload();
+    }
+
+    public function getGrid(): GridView
+    {
+        $stored = $this->storedState();
+
+        return GridView::for($this->catalog(), $this->gridState(), $stored->narrowed, $stored->wider);
+    }
+
+    /**
+     * @param  array<string, array<string, string>>  $stances
+     */
+    protected static function stanceIn(array $stances, string $row, string $action): Stance
+    {
+        return Stance::tryFrom($stances[$row][$action] ?? '') ?? Stance::Abstain;
+    }
+
+    /**
+     * The stance on screen, when there is one that can differ from the store.
+     */
+    protected function onScreenStance(string $row, string $action): ?Stance
+    {
+        return null;
+    }
+
+    protected function storedState(): RoleState
+    {
+        $role = $this->getRecord();
+
+        return $role instanceof Model
+            ? RoleGrants::of($role, $this->catalog())
+            : new RoleState;
+    }
+
+    protected function catalog(): Catalog
+    {
+        // The return type is nullable but the method throws when there is no
+        // panel at all, which is the only way it could answer null.
+        /** @var Panel $panel */
+        $panel = Filament::getCurrentOrDefaultPanel();
+
+        return Catalog::for($panel);
+    }
+
+    /**
+     * The catalogue entry a cell stands for.
+     *
+     * The wildcard column is the one that is not in the catalogue: it is warden's
+     * `*` over the whole entity, offered by the grid rather than derived from a
+     * policy, so it is built here.
+     */
+    protected function catalogEntryFor(string $row, string $action): ?Entry
+    {
+        foreach ($this->catalog()->entries as $entry) {
+            if ($entry->model === null && $entry->name === $row && $action === StateKey::DOOR) {
+                return $entry;
+            }
+
+            if ($entry->model === $row && $entry->name === $action) {
+                return $entry;
+            }
+
+            if ($entry->model === $row && $action === StateKey::MANAGE) {
+                return new Entry('*', $entry->entityType, $entry->model, Scope::Write, Origin::Model);
+            }
+        }
+
+        return null;
+    }
+}
