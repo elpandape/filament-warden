@@ -8,6 +8,7 @@ use BladeUI\Heroicons\BladeHeroiconsServiceProvider;
 use BladeUI\Icons\BladeIconsServiceProvider;
 use Carbon\Laravel\ServiceProvider as CarbonServiceProvider;
 use Composer\InstalledVersions;
+use ElPandaPe\FilamentWarden\Conditions\Columns;
 use ElPandaPe\FilamentWarden\FilamentWardenServiceProvider;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Providers\BarePanelProvider;
@@ -55,6 +56,10 @@ abstract class TestCase extends ApplicationTestCase
         // The applications this package is built for run Eloquent strictly: without this the
         // suite tests a laxer world than the one it ships into.
         Model::shouldBeStrict();
+
+        // Nothing in Laravel caches a column listing, so the package does it itself.
+        // A suite raises a different schema for every case and would read the one before.
+        Columns::forget();
 
         // No request has been through the panel's middleware here, so nothing has told
         // Filament which panel it is serving. Without this every resource resolves against
@@ -167,6 +172,15 @@ abstract class TestCase extends ApplicationTestCase
         Schema::create('posts', static function (Blueprint $table): void {
             $table->id();
             $table->string('title');
+            $table->timestamps();
+        });
+
+        // The one with an ownership column, which is what makes "only what it
+        // owns" offerable for it and not for a post.
+        Schema::create('comments', static function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('user_id');
+            $table->string('body');
             $table->timestamps();
         });
     }
