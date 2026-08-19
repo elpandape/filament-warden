@@ -45,7 +45,13 @@ final class PermissionGrid extends Field
         $this->saveRelationshipsUsing(static function (self $component): void {
             $role = $component->getRecord();
 
-            if ($role instanceof Model) {
+            // Filament already skips a disabled field here, because `isSaved()` is
+            // false for one — measured, not assumed. The check stays anyway: a
+            // locked grid is a guarantee about who can take power away, and it
+            // should not rest on how another package derives a flag. The browser's
+            // payload still reaches the field's state even when it is disabled, so
+            // this is the last thing standing between it and the store.
+            if ((! $component->isDisabled()) && $role instanceof Model) {
                 RoleGrants::apply($role, $component->catalog(), $component->desired());
             }
         });

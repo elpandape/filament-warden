@@ -9,6 +9,8 @@
 @php
     $grid = $getGrid();
     $alpine = $grid->alpine();
+    // A locked grid is read, not operated: its cells are not controls at all.
+    $interactive = ! $isDisabled();
 @endphp
 
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
@@ -21,6 +23,10 @@
         })"
         class="fw-grid"
     >
+        @unless ($interactive)
+            <p class="fw-locked-notice">{{ __('filament-warden::ui.grid.locked') }}</p>
+        @endunless
+
         @if ($grid->wider !== [])
             <p class="fw-wider">
                 {{ __('filament-warden::ui.grid.wider') }}
@@ -82,7 +88,7 @@
                                         <th class="fw-entity" scope="row">
                                             <span class="fw-entity-name">{{ $row->label }}</span>
                                             <span class="fw-entity-model">{{ $row->model }}</span>
-                                            <span class="fw-shortcuts">
+                                            <span class="fw-shortcuts" @unless ($interactive) hidden @endunless>
                                                 @foreach (['read', 'all', 'clear'] as $preset)
                                                     <button
                                                         type="button"
@@ -95,25 +101,7 @@
                                         @foreach ($row->allCells() as $cell)
                                             <td class="fw-cell">
                                                 @if ($cell->declared)
-                                                    <button
-                                                        type="button"
-                                                        class="fw-box"
-                                                        data-fw-row="{{ $cell->row }}"
-                                                        data-fw-action="{{ $cell->action }}"
-                                                        data-state="{{ $cell->drawn() }}"
-                                                        data-broader="{{ $cell->broader() }}"
-                                                        x-bind:data-state="drawn(@js($cell->row), @js($cell->action), @js($cell->entry?->name))"
-                                                        x-bind:data-broader="reached(@js($cell->row), @js($cell->action), @js($cell->entry?->name))"
-                                                        x-on:click="cycle(@js($cell->row), @js($cell->action), $event.shiftKey)"
-                                                        x-on:keydown.enter.prevent="cycle(@js($cell->row), @js($cell->action), $event.shiftKey)"
-                                                        x-on:keydown.space.prevent="cycle(@js($cell->row), @js($cell->action), $event.shiftKey)"
-                                                        @disabled($cell->narrowed)
-                                                        aria-label="{{ $row->label }} · {{ $cell->label }}"
-                                                    >
-                                                        @if ($cell->narrowed)
-                                                            <span class="fw-noted"></span>
-                                                        @endif
-                                                    </button>
+                                                    @include('filament-warden::box', ['cell' => $cell, 'label' => $row->label.' · '.$cell->label, 'interactive' => $interactive])
                                                 @else
                                                     <span class="fw-void" title="{{ __('filament-warden::ui.grid.undeclared') }}">·</span>
                                                 @endif
@@ -129,25 +117,7 @@
                         @foreach ($tab->rows as $row)
                             @foreach ($row->cells as $cell)
                                 <li class="fw-door">
-                                    <button
-                                        type="button"
-                                        class="fw-box"
-                                        data-fw-row="{{ $cell->row }}"
-                                        data-fw-action="{{ $cell->action }}"
-                                        data-state="{{ $cell->drawn() }}"
-                                        data-broader="{{ $cell->broader() }}"
-                                        x-bind:data-state="drawn(@js($cell->row), @js($cell->action), @js($cell->entry?->name))"
-                                        x-bind:data-broader="reached(@js($cell->row), @js($cell->action), @js($cell->entry?->name))"
-                                        x-on:click="cycle(@js($cell->row), @js($cell->action), $event.shiftKey)"
-                                        x-on:keydown.enter.prevent="cycle(@js($cell->row), @js($cell->action), $event.shiftKey)"
-                                        x-on:keydown.space.prevent="cycle(@js($cell->row), @js($cell->action), $event.shiftKey)"
-                                        @disabled($cell->narrowed)
-                                        aria-label="{{ $row->label }}"
-                                    >
-                                        @if ($cell->narrowed)
-                                            <span class="fw-noted"></span>
-                                        @endif
-                                    </button>
+                                    @include('filament-warden::box', ['cell' => $cell, 'label' => $row->label, 'interactive' => $interactive])
                                     <span class="fw-door-text">
                                         <span class="fw-entity-name">{{ $row->label }}</span>
                                         <span class="fw-action-name">{{ $cell->entry?->name }}</span>

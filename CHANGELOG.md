@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Before `1.0.0` the public API may change between minor versions.
 
+## [0.3.2] - 2026-08-19
+
+A protected role was only half protected.
+
+### Fixed
+
+- **A protected role's permissions could be edited from the screen, and that
+  screen could only ever take power away.** A role like `super-admin` holds the
+  wildcard, which is not a cell, so nothing in the grid can grant it more — every
+  edit it allows is either noise or an explicit forbid cutting a hole in what the
+  role already has. The grid is now shown and locked on a protected role, and the
+  save is guarded on the server: the browser's payload still reaches the field
+  even when it is disabled.
+- A locked grid renders its cells as marks, not as disabled buttons: it is read,
+  not operated.
+
+### Changed
+
+- **The title of a protected role stays editable**, and that is deliberate. The
+  name is the identifier — `roles.protected` matches by it, so renaming it would
+  unprotect the role on the spot — and the grid is the role's powers. The title is
+  a label nothing resolves by: no grant, no check, no verdict reads it. What
+  changes behaviour is protected; what only changes the wording is not.
+- The role form is two sections — who the role is, and what it can do — instead of
+  four stacked blocks.
+
 ## [0.3.1] - 2026-08-19
 
 What the grid was not saying, and how it looked while not saying it.

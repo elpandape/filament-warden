@@ -162,3 +162,84 @@ test('a protected role cannot be renamed from the form', function (): void {
             checkComponentUsing: fn (Filament\Forms\Components\TextInput $field): bool => $field->isDisabled(),
         );
 });
+
+test('a protected role shows its grid and does not let it be operated', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole('super-admin');
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->assertSchemaComponentExists(
+            'permissions',
+            checkComponentUsing: fn (ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid $field): bool => $field->isDisabled(),
+        )
+        ->assertSee('fw-locked', escape: false)
+        ->assertDontSee('x-on:click="cycle(', escape: false);
+});
+
+test('saving a protected role leaves its permissions alone, whatever the browser sends', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole('super-admin');
+    $holder = makeUser('Holder');
+    Warden::assign($role)->to($holder);
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->fillForm(['permissions' => [roleClass() => ['viewAny' => 'granted']]])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(Access::granted($holder, 'viewAny', roleClass()))->toBeFalse();
+});
+
+test('the title of a protected role is its own business, and it saves', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole('super-admin');
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->assertSchemaComponentExists(
+            'title',
+            checkComponentUsing: fn (Filament\Forms\Components\TextInput $field): bool => ! $field->isDisabled(),
+        )
+        ->fillForm(['title' => 'Quien lo puede todo'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($role->refresh()->getAttribute('title'))->toBe('Quien lo puede todo');
+});
+
+test('a role nobody protected is still operated as before', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole('editor');
+    $holder = makeUser('Holder');
+    Warden::assign($role)->to($holder);
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->fillForm(['permissions' => [roleClass() => ['viewAny' => 'granted']]])
+        ->call('save');
+
+    expect(Access::granted($holder, 'viewAny', roleClass()))->toBeTrue();
+});
+
+test('the form is two questions in two sections, not four stacked blocks', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole();
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->assertSee('The role')
+        ->assertSee('Permissions')
+        ->assertSee('One row per entity');
+});

@@ -11,8 +11,13 @@ return [
         'roles' => [
             'model' => 'Role',
             'models' => 'Roles',
+            'sections' => [
+                'identity' => 'The role',
+            ],
             'fields' => [
                 'name' => 'Name',
+                'name_help' => 'How your code names it. Grants point at it.',
+                'title_help' => 'What people read on screen.',
                 'title' => 'Title',
             ],
             'columns' => [
@@ -53,6 +58,8 @@ return [
 
     'grid' => [
         'panel' => 'The panel',
+        'locked' => 'This role is protected: what it can do is fixed here.',
+        'description' => 'One row per entity, one column per action its policy declares. Click a cell to cycle it; hold shift to go backwards.',
         'label' => 'Permissions',
         'entity' => 'Entity',
         'manage' => 'Everything',

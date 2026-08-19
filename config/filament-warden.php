@@ -47,6 +47,9 @@ return [
     'roles' => [
         'create' => true,
         'delete' => 'unassigned',   // false | 'unassigned' | 'all'
+        // A protected role keeps its name and its permissions: both are shown
+        // and neither can be edited, and it cannot be deleted. Its title is left
+        // editable — nothing resolves by it.
         'protected' => ['super-admin'],
     ],
 

@@ -234,6 +234,20 @@
     cursor: not-allowed;
 }
 
+/* Not a control at all: a locked grid is read, not operated. */
+.fw-box.fw-locked {
+    cursor: default;
+}
+
+.fw-locked-notice {
+    margin: 0 0 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--fw-line);
+    border-radius: 0.5rem;
+    background: var(--fw-raised);
+    color: var(--fw-muted);
+}
+
 .fw-box[data-state='granted'] {
     border-color: var(--fw-yes-line);
     background: var(--fw-yes-soft);

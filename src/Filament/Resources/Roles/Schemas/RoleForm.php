@@ -7,14 +7,20 @@ namespace ElPandaPe\FilamentWarden\Filament\Resources\Roles\Schemas;
 use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A name, a title, and the grid.
+ * Who the role is, and what it can do — in that order, and in two sections,
+ * because they are two questions and the second one is the whole screen.
  *
- * The name of a protected role is shown and not editable: renaming it would
- * leave every grant that points at it answering for a role nobody guards.
+ * On a protected role the name and the grid are shown and not editable, and the
+ * title is left alone. The rule: what changes behaviour is protected, what only
+ * changes the wording is not. The name is the identifier — `roles.protected`
+ * matches by it, so renaming it unprotects the role on the spot — and the grid is
+ * its powers. The title is a label nothing resolves by.
  */
 class RoleForm
 {
@@ -23,20 +29,37 @@ class RoleForm
         return $schema
             ->columns(1)
             ->components([
-                TextInput::make('name')
-                    ->label(__('filament-warden::ui.resources.roles.fields.name'))
-                    ->required()
-                    ->maxLength(255)
-                    ->unique(ignoreRecord: true)
-                    ->disabled(static fn (?Model $record): bool => $record instanceof Model && RoleResource::isProtected($record)),
+                Section::make(__('filament-warden::ui.resources.roles.sections.identity'))
+                    ->icon(Heroicon::OutlinedIdentification)
+                    ->columns(2)
+                    ->schema([
+                        TextInput::make('name')
+                            ->label(__('filament-warden::ui.resources.roles.fields.name'))
+                            ->helperText(__('filament-warden::ui.resources.roles.fields.name_help'))
+                            ->required()
+                            ->maxLength(255)
+                            ->unique(ignoreRecord: true)
+                            ->disabled(static fn (?Model $record): bool => $record instanceof Model && RoleResource::isProtected($record)),
 
-                TextInput::make('title')
-                    ->label(__('filament-warden::ui.resources.roles.fields.title'))
-                    ->maxLength(255),
+                        TextInput::make('title')
+                            ->label(__('filament-warden::ui.resources.roles.fields.title'))
+                            ->helperText(__('filament-warden::ui.resources.roles.fields.title_help'))
+                            ->maxLength(255),
+                    ]),
 
-                PermissionGrid::make('permissions')
-                    ->label(__('filament-warden::ui.grid.label'))
-                    ->columnSpanFull(),
+                Section::make(__('filament-warden::ui.grid.label'))
+                    ->description(__('filament-warden::ui.grid.description'))
+                    ->icon(Heroicon::OutlinedKey)
+                    ->schema([
+                        // The grid can only ever take power away from a protected
+                        // role: it holds the wildcard, which is not a cell, so
+                        // nothing here can grant it more — only cut an explicit
+                        // hole in what it already has.
+                        PermissionGrid::make('permissions')
+                            ->hiddenLabel()
+                            ->disabled(static fn (?Model $record): bool => $record instanceof Model && RoleResource::isProtected($record))
+                            ->columnSpanFull(),
+                    ]),
             ]);
     }
 }

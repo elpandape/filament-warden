@@ -11,8 +11,13 @@ return [
         'roles' => [
             'model' => 'Rol',
             'models' => 'Roles',
+            'sections' => [
+                'identity' => 'El rol',
+            ],
             'fields' => [
                 'name' => 'Nombre',
+                'name_help' => 'Como lo nombra tu código. Las concesiones apuntan aquí.',
+                'title_help' => 'Lo que la gente lee en pantalla.',
                 'title' => 'Título',
             ],
             'columns' => [
@@ -53,6 +58,8 @@ return [
 
     'grid' => [
         'panel' => 'El panel',
+        'locked' => 'Este rol está protegido: lo que puede hacer no se toca desde aquí.',
+        'description' => 'Una fila por entidad y una columna por acción que su Policy declara. Pulsa una celda para ciclarla; con Shift, hacia atrás.',
         'label' => 'Permisos',
         'entity' => 'Entidad',
         'manage' => 'Todo',
