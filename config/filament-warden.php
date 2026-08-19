@@ -55,9 +55,15 @@ return [
     | Filament's own `canAccess()` and `canView()` return true, and
     | `strictAuthorization()` only reaches resources.
     |
+    | `panel` overrides the permission that opens a panel, keyed by panel id.
+    | Left empty, the name is derived from the id: a panel called `admin` is
+    | opened by `panel:admin`. An installation that already stores another name
+    | maps it here instead of renaming rows.
+    |
     */
 
     'guard' => [
+        'panel' => [],
         'pages' => true,
         'widgets' => true,
     ],
@@ -70,7 +76,7 @@ return [
 
     'catalog' => [
         'models' => [],   // models with a policy and no resource
-        'custom' => [],   // loose permissions declared by the application
+        'custom' => [],   // loose permissions, as name => scope
         'scopes' => [
             'read' => ['viewAny', 'view'],
             'write' => ['create', 'update'],

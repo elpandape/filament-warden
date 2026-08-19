@@ -17,7 +17,8 @@ test('a key the application never declared still answers with the package defaul
         ->and(config('filament-warden.roles.create'))->toBeTrue()
         ->and(config('filament-warden.roles.protected'))->toBe(['super-admin'])
         ->and(config('filament-warden.grid.explain'))->toBeTrue()
-        ->and(config('filament-warden.guard.pages'))->toBeTrue();
+        ->and(config('filament-warden.guard.pages'))->toBeTrue()
+        ->and(config('filament-warden.guard.panel'))->toBe([]);
 });
 
 test('an application that declares part of the config keeps its own values and inherits the rest', function (): void {
