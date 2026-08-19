@@ -22,7 +22,37 @@ return [
         ],
     ],
 
+    'tabs' => [
+        'resources' => 'Recursos',
+        'pages' => 'Páginas',
+        'widgets' => 'Widgets',
+        'loose' => 'Sueltos',
+    ],
+
+    'scopes' => [
+        'read' => 'Lectura',
+        'write' => 'Escritura',
+        'withdraw' => 'Retirada',
+        'irreversible' => 'Sin vuelta',
+    ],
+
+    'actions' => [
+        'viewAny' => 'Listar',
+        'view' => 'Ver',
+        'create' => 'Crear',
+        'update' => 'Editar',
+        'delete' => 'Borrar',
+        'deleteAny' => 'Borrar cualquiera',
+        'restore' => 'Restaurar',
+        'restoreAny' => 'Restaurar cualquiera',
+        'forceDelete' => 'Borrar del todo',
+        'forceDeleteAny' => 'Borrar del todo cualquiera',
+        'reorder' => 'Reordenar',
+        'replicate' => 'Duplicar',
+    ],
+
     'grid' => [
+        'panel' => 'El panel',
         'label' => 'Permisos',
         'entity' => 'Entidad',
         'manage' => 'Todo',

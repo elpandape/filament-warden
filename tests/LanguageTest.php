@@ -60,3 +60,50 @@ test('the package answers under its own namespace, in both languages', function 
 
     expect(trans('filament-warden::ui.navigation.group'))->toBe('Seguridad');
 });
+
+/**
+ * @return list<string>
+ */
+function referencedKeys(): array
+{
+    $root = dirname(__DIR__);
+    $files = [];
+
+    foreach (['src', 'resources'] as $directory) {
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/'.$directory));
+
+        foreach ($iterator as $file) {
+            if ($file instanceof SplFileInfo && $file->isFile()) {
+                $files[] = (string) $file->getRealPath();
+            }
+        }
+    }
+
+    $referenced = [];
+
+    foreach ($files as $file) {
+        preg_match_all('/filament-warden::ui\.([a-zA-Z0-9_.\-]*)/', (string) file_get_contents($file), $matches);
+
+        foreach ($matches[1] as $key) {
+            $referenced[] = $key;
+        }
+    }
+
+    return array_values(array_unique($referenced));
+}
+
+test('no line is declared that nothing reads', function (): void {
+    $referenced = referencedKeys();
+
+    foreach (array_keys(translations('en')) as $key) {
+        $read = in_array($key, $referenced, true);
+
+        foreach ($referenced as $reference) {
+            // A key composed at runtime — `ui.actions.` . $action — is referenced
+            // by its prefix, and the catalogue decides the rest.
+            $read = $read || (str_ends_with($reference, '.') && str_starts_with($key, $reference));
+        }
+
+        expect($read)->toBeTrue("[{$key}] is declared and nothing reads it");
+    }
+});

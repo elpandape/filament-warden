@@ -118,12 +118,12 @@ final readonly class GridView
 
             foreach ($scopes as $action => $actionScope) {
                 if ($actionScope === $scope) {
-                    $columns[] = new Column((string) $action, self::humanize((string) $action), $scope);
+                    $columns[] = new Column((string) $action, self::actionLabel((string) $action), $scope);
                 }
             }
 
             if ($columns !== []) {
-                $groups[] = new ColumnGroup($scope, self::humanize($scope->value), $columns);
+                $groups[] = new ColumnGroup($scope, self::translated('filament-warden::ui.scopes.'.$scope->value, $scope->value), $columns);
             }
         }
 
@@ -173,11 +173,11 @@ final readonly class GridView
                 label: self::entityLabel($model, $entries),
                 model: $model,
                 cells: $cells,
-                manage: self::cell($key, StateKey::MANAGE, self::humanize(StateKey::MANAGE), $state, $narrowed),
+                manage: self::cell($key, StateKey::MANAGE, self::translated('filament-warden::ui.grid.manage', StateKey::MANAGE), $state, $narrowed),
             );
         }
 
-        return new Tab('resources', self::humanize('resources'), $rows, matrix: true);
+        return new Tab('resources', self::translated('filament-warden::ui.tabs.resources', 'resources'), $rows, matrix: true);
     }
 
     /**
@@ -205,7 +205,7 @@ final readonly class GridView
             );
         }
 
-        return new Tab($key, self::humanize($key), $rows, matrix: false);
+        return new Tab($key, self::translated('filament-warden::ui.tabs.'.$key, $key), $rows, matrix: false);
     }
 
     /**
@@ -256,9 +256,30 @@ final readonly class GridView
     private static function doorLabel(Entry $entry): string
     {
         return match ($entry->origin) {
-            Origin::Panel => self::humanize('the panel'),
+            Origin::Panel => self::translated('filament-warden::ui.grid.panel', 'the panel'),
             default => self::humanize(class_basename(Str::afterLast($entry->name, ':'))),
         };
+    }
+
+    /**
+     * An action the package can name, it names; the rest are the application's
+     * own and only it knows what they are called.
+     */
+    private static function actionLabel(string $action): string
+    {
+        return self::translated('filament-warden::ui.actions.'.$action, $action);
+    }
+
+    /**
+     * Falls back to the humanised value when nothing translates it, because the
+     * catalogue is derived from the application's policies and no shipped file
+     * can list their names in advance.
+     */
+    private static function translated(string $key, string $fallback): string
+    {
+        $line = __($key);
+
+        return is_string($line) && $line !== $key ? $line : self::humanize($fallback);
     }
 
     private static function humanize(string $value): string
