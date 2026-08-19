@@ -6,6 +6,7 @@ use Pest\Rector\Set\PestSetList;
 use Rector\Caching\ValueObject\Storage\FileCacheStorage;
 use Rector\CodingStyle\Rector\ClassMethod\MakeInheritedMethodVisibilitySameAsParentRector;
 use Rector\Config\RectorConfig;
+use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPublicMethodParameterRector;
 use Rector\Php85\Rector\Property\AddOverrideAttributeToOverriddenPropertiesRector;
 use Rector\TypeDeclaration\Rector\StmtsAwareInterface\SafeDeclareStrictTypesRector;
 
@@ -27,6 +28,10 @@ return RectorConfig::configure()
         MakeInheritedMethodVisibilitySameAsParentRector::class,
         AddOverrideAttributeToOverriddenPropertiesRector::class,
         SafeDeclareStrictTypesRector::class,
+        // A policy method's parameters are its contract with the gate, used or not.
+        RemoveUnusedPublicMethodParameterRector::class => [
+            __DIR__.'/tests/Fixtures/Policies',
+        ],
     ])
     ->withPreparedSets(
         deadCode: true,
