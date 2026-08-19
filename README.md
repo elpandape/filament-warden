@@ -4,10 +4,10 @@
 > [elpandape/warden](https://github.com/elpandape/warden) — a permission grid derived from
 > your policies, explicit denials, and conditional grants.
 
-**Status: `0.5.0` — the condition builder.** A roles screen with the permission grid inside
-it, derived from your policies, an inspector that says why each cell is the way it is, and a
-builder that narrows a grant to the rows it should reach. See [CHANGELOG.md](CHANGELOG.md)
-for what each version adds.
+**Status: `0.6.0` — the permissions screen.** A roles screen with the permission grid inside
+it, derived from your policies; an inspector that says why each cell is the way it is; a builder
+that narrows a grant to the rows it should reach; and a permissions screen that says where every
+row of the catalogue came from. See [CHANGELOG.md](CHANGELOG.md) for what each version adds.
 
 ## Requirements
 
@@ -190,6 +190,31 @@ never written over.
 Every write goes through warden's fluent API, in one transaction, and clears the cell in
 both of its shapes first: `to()` and `toOwn()` are disjoint revokes, and editing a condition
 any other way leaves the previous twin's grant standing and the old rule still authorizing.
+
+### The permissions screen
+
+Registering the plugin also puts a permissions screen on the panel, and with the shipped defaults
+it is a reading surface: nothing can be created, only loose permissions can be edited, and only
+orphans can be deleted. Opening any of that up is one line of `permissions.*` config; closing it
+again afterwards means cleaning up whatever was created meanwhile.
+
+What it shows that warden cannot say for itself:
+
+- **Where each row came from** — derived from a policy, loose, the wildcard, or *nothing declares
+  it*. The last one is a permission no code asks for any more: a renamed policy method, a typo in
+  a seeder, a screen that was deleted.
+- **How far it reaches** — every row, only what it owns, or with conditions. A permission carrying
+  conditions is a twin of the plain row, and without this column the two are indistinguishable.
+- **Who holds it**, as counts, with explicit denials counted apart.
+- **A test bench**: pick an account and, if the permission has a model, the key of a row, and
+  warden answers with its verdict and its cause. It is the only place in the panel where the
+  question is asked the way your application asks it.
+
+Two things worth knowing before you edit anything here. Editing the conditions of a permission
+changes the rule for **everyone holding that row** — a constrained permission is a shared twin,
+which is correct for a catalogue and is said on screen. And deleting a permission takes its grants
+with it through a foreign key, below Eloquent and with no event of its own, so the confirmation
+names who loses it: afterwards there is no trace.
 
 ### Read the catalogue
 

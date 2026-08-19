@@ -6,6 +6,61 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Before `1.0.0` the public API may change between minor versions.
 
+## [0.6.0] - 2026-08-19
+
+The permissions screen. The catalogue, with its provenance visible.
+
+### Added
+
+- **A permissions resource, registered out of the box and read-only.** With the
+  conservative defaults — no manual creation, editing limited to loose
+  permissions, deletion limited to orphans — it is above all the screen that
+  says where each row came from, which is what warden cannot tell you.
+- **Provenance, derived by reading the store against the code**: from a policy,
+  loose, the wildcard, or **nothing declares it** — a renamed policy method, a
+  typo in a seeder, a screen that was deleted. That last one is the silent
+  mistake warden has no way to detect.
+- **Reach, as a column**: every row, only what it owns, with conditions, or one
+  of the two states this package can read and cannot draw. A twin permission is
+  otherwise indistinguishable from the plain row it twins.
+- **Who holds it, as counts** — roles, accounts, everyone — with explicit
+  denials counted apart, because a denial is a state and not an absence.
+- **A test bench**: `explain()` asked the way the application asks it, with a
+  real account and a real row. It tells four things apart that warden answers
+  identically: a narrowed rule asked about the class, a key that names no row, a
+  record put in front of a permission that has no model, and an entity type that
+  no longer resolves.
+- **The condition builder as a field of its own**, sharing its markup and its
+  script with the one in the grid's inspector. The three alternatives collapse
+  to two here: ownership is a checkbox of its own on this form.
+- **Every field says why it is closed.** No model behind the permission, no
+  ownership column on the table, a rule the installation does not allow editing
+  — each one draws the reason where a person is already reading.
+- All six `permissions.*` switches are read: `create`, `update`, `delete`,
+  `constraints`, `only_owned` and `probe`.
+
+### Fixed
+
+- **Renaming a permission no longer leaves the title lying.** Warden writes it
+  in the `creating` hook and only when it is null, and blanking it does not
+  bring it back — the hook is not consulted on an update at all. It is
+  regenerated here, and only when nobody had written one by hand.
+- **Every write refreshes warden's check cache.** Nothing in warden invalidates
+  it for a write made through the model layer: only its own fluent actions bump
+  the version, and the permission events have no listener. An edit would have
+  gone on answering the old way, silently and with no expiry.
+
+### Not included
+
+- Deleting a permission removes its grants through a foreign key, below Eloquent
+  and with no event of its own. The confirmation names who loses it, because
+  afterwards there is no trace. There is no bulk delete.
+- Editing the conditions of a permission changes the rule for **everybody**
+  holding that row: a constrained permission is a shared twin. That is correct
+  for a catalogue and it is said on screen.
+- Orphaned twins are still not pruned; the audit command is `0.8.0`.
+- Handing roles out from an account's own screen is `0.7.0`.
+
 ## [0.5.1] - 2026-08-19
 
 Two switches that did nothing, and a guarantee nothing tested.
