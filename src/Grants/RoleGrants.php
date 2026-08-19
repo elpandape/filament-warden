@@ -5,9 +5,15 @@ declare(strict_types=1);
 namespace ElPandaPe\FilamentWarden\Grants;
 
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
+use ElPandaPe\FilamentWarden\Conditions\Columns;
+use ElPandaPe\FilamentWarden\Conditions\Narrowing;
+use ElPandaPe\FilamentWarden\Conditions\Ownership;
+use ElPandaPe\FilamentWarden\Conditions\Shape;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
+use ElPandaPe\Warden\Actions\GrantsPermissions;
 use ElPandaPe\Warden\Context;
+use ElPandaPe\Warden\Exceptions\ConfigurationException;
 use ElPandaPe\Warden\Facades\Warden;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -32,8 +38,8 @@ final class RoleGrants
         $models = self::modelsByMorph($catalog);
         $doors = self::doorNames($catalog);
 
-        $stances = [];
-        $narrowed = [];
+        /** @var array<string, array<string, list<array{0: Narrowing, 1: bool}>>> $variants */
+        $variants = [];
         $wider = [];
 
         foreach (self::held($role) as [$permission, $forbidden]) {
@@ -67,14 +73,22 @@ final class RoleGrants
                 continue;
             }
 
-            $stances[$row][$action] = $forbidden ? Stance::Forbidden->value : Stance::Granted->value;
+            $variants[$row][$action][] = [Narrowing::of($permission), $forbidden];
+        }
 
-            if ($permission->getAttribute('options') !== null || (bool) $permission->getAttribute('only_owned')) {
-                $narrowed[$row][$action] = true;
+        $stances = [];
+        $narrowings = [];
+
+        foreach ($variants as $row => $actions) {
+            foreach ($actions as $action => $held) {
+                [$stance, $narrowing] = self::resolve($held);
+
+                $stances[$row][$action] = $stance->value;
+                $narrowings[$row][$action] = $narrowing;
             }
         }
 
-        return new RoleState($stances, $narrowed, $wider);
+        return new RoleState($stances, $narrowings, $wider);
     }
 
     /**
@@ -84,10 +98,11 @@ final class RoleGrants
      * every entity-scoped cell as a bare name and delete the rest.
      *
      * @param  array<string, array<string, string>>  $desired
+     * @param  array<string, array<string, mixed>>  $narrowings
      */
-    public static function apply(Model $role, Catalog $catalog, array $desired): void
+    public static function apply(Model $role, Catalog $catalog, array $desired, array $narrowings = []): void
     {
-        $changes = self::changes($role, $catalog, $desired);
+        $changes = self::changes($role, $catalog, $desired, $narrowings);
 
         if ($changes === []) {
             return;
@@ -104,23 +119,38 @@ final class RoleGrants
 
     /**
      * @param  array<string, array<string, string>>  $desired
+     * @param  array<string, array<string, mixed>>  $narrowings
      * @return list<Change>
      */
-    public static function changes(Model $role, Catalog $catalog, array $desired): array
+    public static function changes(Model $role, Catalog $catalog, array $desired, array $narrowings = []): array
     {
         $current = self::of($role, $catalog);
         $changes = [];
 
         foreach (self::cells($catalog) as [$row, $action, $name, $entity]) {
-            if ($current->narrowed[$row][$action] ?? false) {
+            $stored = $current->narrowings[$row][$action] ?? Narrowing::all();
+
+            // A cell the grid cannot draw is a cell it must not write: rewriting
+            // it would round it off into something it is not.
+            if (! $stored->isEditable()) {
                 continue;
             }
 
             $from = self::stanceIn($current->stances, $row, $action);
             $to = self::stanceIn($desired, $row, $action);
 
-            if ($from !== $to) {
-                $changes[] = new Change($name, $entity, $to);
+            // Abstaining is the absence of a row, and a row that does not exist
+            // has no reach to narrow.
+            $wanted = $to === Stance::Abstain
+                ? Narrowing::all()
+                : self::wanted($narrowings[$row][$action] ?? null, $entity);
+
+            if (! $wanted instanceof Narrowing) {
+                continue;
+            }
+
+            if ($from !== $to || ! $stored->is($wanted)) {
+                $changes[] = new Change($name, $entity, $to, $wanted);
             }
         }
 
@@ -128,30 +158,115 @@ final class RoleGrants
     }
 
     /**
-     * Every step pairs a write with the delete of its opposite.
+     * What a cell says when the store holds more than one row for it.
+     *
+     * Forbidden wins, the same way it wins when the engine resolves the check.
+     * And two rows of the same polarity differing only in how they are narrowed
+     * are a state the grid cannot draw — which is exactly what an edit made with
+     * the wrong sequence leaves behind, so the honest answer is to say so and
+     * keep hands off.
+     *
+     * @param  list<array{0: Narrowing, 1: bool}>  $held
+     * @return array{0: Stance, 1: Narrowing}
+     */
+    private static function resolve(array $held): array
+    {
+        $forbidden = array_values(array_filter($held, static fn (array $one): bool => $one[1]));
+        $chosen = $forbidden === [] ? $held : $forbidden;
+
+        return [
+            $forbidden === [] ? Stance::Granted : Stance::Forbidden,
+            count($chosen) === 1 ? $chosen[0][0] : Narrowing::tangled(),
+        ];
+    }
+
+    /**
+     * How far the screen is asking this cell to reach, checked against what the
+     * table actually has. Anything that does not add up answers null and the
+     * cell is left exactly as the store has it.
+     *
+     * @param  class-string<Model>|null  $entity
+     */
+    private static function wanted(mixed $payload, ?string $entity): ?Narrowing
+    {
+        // A permission with no model behind it and conditions on it is created,
+        // shown, and grants nothing ever: `passesConstraints()` wants an
+        // instance. The screen does not offer it and this does not accept it.
+        if ($payload === null || $entity === null) {
+            return Narrowing::all();
+        }
+
+        return Narrowing::fromPayload(
+            $payload,
+            Columns::of($entity),
+            Columns::authority(),
+            Ownership::of($entity),
+        );
+    }
+
+    /**
+     * Every step takes away whatever was there before it writes.
      *
      * `forbidden` is part of the unique key on grants, so granted and forbidden
      * coexist as two rows: allowing without revoking the forbid leaves both, and
      * the cell reads as forbidden for good.
+     *
+     * And a cell holds one rule, so every shape the store could be holding it in
+     * comes off first. `to()` and `toOwn()` are disjoint revokes — warden filters
+     * hard on `only_owned` — so both are needed; and `to()` is the one that also
+     * takes the grants of every twin sharing the name.
+     *
+     * Editing with a fresh `allow()->to()->where()` instead of this would leave
+     * the previous twin's grant standing: the old condition would go on
+     * authorizing and nothing would say so. Measured.
      */
     private static function write(Model $role, Change $change): void
     {
-        if ($change->to === Stance::Granted) {
-            Warden::unforbid($role)->to($change->name, $change->entity);
-            Warden::allow($role)->to($change->name, $change->entity);
-
-            return;
-        }
-
-        if ($change->to === Stance::Forbidden) {
-            Warden::disallow($role)->to($change->name, $change->entity);
-            Warden::forbid($role)->to($change->name, $change->entity);
-
-            return;
-        }
-
         Warden::disallow($role)->to($change->name, $change->entity);
         Warden::unforbid($role)->to($change->name, $change->entity);
+
+        if ($change->entity !== null) {
+            Warden::disallow($role)->toOwn($change->entity, $change->name);
+            Warden::unforbid($role)->toOwn($change->entity, $change->name);
+        }
+
+        if ($change->to === Stance::Abstain) {
+            return;
+        }
+
+        self::narrow(
+            $change->to === Stance::Granted ? Warden::allow($role) : Warden::forbid($role),
+            $change,
+        );
+    }
+
+    /**
+     * `toOwn()` takes the entity FIRST, the reverse of `to()`. Both parameters
+     * accept strings, so swapping them does not throw: it writes a permission
+     * named after the class.
+     */
+    private static function narrow(GrantsPermissions $chain, Change $change): void
+    {
+        $entity = $change->entity;
+
+        if ($entity !== null && $change->narrowing->shape === Shape::Owned) {
+            $chain->toOwn($entity, $change->name);
+
+            return;
+        }
+
+        $chain->to($change->name, $entity);
+
+        try {
+            foreach ($change->narrowing->rules as $index => $rule) {
+                $rule->applyTo($chain, $index === 0);
+            }
+        } catch (ConfigurationException) {
+            // Narrowing needs a grant in front of it, and an application
+            // listening to `GrantingPermission` can veto the one just asked for.
+            // Nothing was granted, so there is nothing to narrow — and the veto
+            // is the application's answer, not an error of this screen.
+        }
     }
 
     /**

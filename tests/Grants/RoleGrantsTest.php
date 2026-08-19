@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
+use ElPandaPe\FilamentWarden\Conditions\Shape;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Support\Access;
@@ -12,8 +13,13 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
+use ElPandaPe\Warden\Events\GrantingPermission;
+use ElPandaPe\Warden\Events\PermissionGranted;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Panel;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 
 pest()->extend(TestCase::class);
 
@@ -123,19 +129,29 @@ test('a cell that did not change is not written again', function (): void {
     expect(RoleGrants::changes($role, $catalog, $state))->toBeEmpty();
 });
 
-test('a permission carrying conditions is shown as narrowed and survives a save', function (): void {
+test('a permission carrying conditions is shown as narrowed', function (): void {
     $role = makeRole();
     $catalog = gridCatalog();
 
     Warden::allow($role)->to('update', Post::class)->where('id', 1);
 
-    $before = RoleGrants::of($role, $catalog);
+    $state = RoleGrants::of($role, $catalog);
 
-    expect($before->narrowed[Post::class]['update'])->toBeTrue();
+    expect($state->narrowed()[Post::class]['update'])->toBeTrue()
+        ->and($state->locked())->toBeEmpty()
+        ->and($state->narrowings[Post::class]['update']->shape)->toBe(Shape::Conditions);
+});
 
-    RoleGrants::apply($role, $catalog, []);
+test('a narrowed cell nobody touched is not rewritten', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
 
-    expect(RoleGrants::of($role, $catalog)->stances[Post::class]['update'])->toBe('granted');
+    Warden::allow($role)->to('update', Post::class)->where('id', 1);
+
+    $state = RoleGrants::of($role, $catalog);
+    $narrowings = [Post::class => ['update' => $state->narrowings[Post::class]['update']->toPayload()]];
+
+    expect(RoleGrants::changes($role, $catalog, $state->stances, $narrowings))->toBeEmpty();
 });
 
 test('a grant over one record is not a cell of the grid', function (): void {
@@ -189,4 +205,168 @@ test('a forbidden wider rule wins over a granted one of the same name', function
     Warden::forbid($role)->everything();
 
     expect(RoleGrants::of($role, gridCatalog())->wider)->toBe(['*' => 'forbidden']);
+});
+
+/**
+ * @return array{mode: string, rules: list<array<string, string>>}
+ */
+function conditionOn(string $column, string $value, string $logic = 'and'): array
+{
+    return ['mode' => 'conditions', 'rules' => [
+        ['logic' => $logic, 'kind' => 'value', 'column' => $column, 'operator' => '=', 'value' => $value],
+    ]];
+}
+
+/**
+ * @param  array<string, array<string, mixed>>  $narrowings
+ */
+function saveUpdateOnPosts(Model $role, array $narrowings): void
+{
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['update' => 'granted']], $narrowings);
+}
+
+test('a condition written from the grid leaves one grant and one twin', function (): void {
+    $role = makeRole();
+
+    saveUpdateOnPosts($role, [Post::class => ['update' => conditionOn('title', 'alpha')]]);
+
+    $narrowing = RoleGrants::of($role, gridCatalog())->narrowings[Post::class]['update'];
+
+    expect($narrowing->shape)->toBe(Shape::Conditions)
+        ->and($narrowing->rules[0]->value)->toBe('alpha')
+        ->and(grantCount())->toBe(1);
+});
+
+test('changing a condition stops the old one authorizing, which a fresh grant would not', function (): void {
+    $role = makeRole();
+    $user = makeUser();
+    Warden::assign($role)->to($user);
+
+    $alpha = Post::query()->create(['title' => 'alpha']);
+    $beta = Post::query()->create(['title' => 'beta']);
+
+    saveUpdateOnPosts($role, [Post::class => ['update' => conditionOn('title', 'alpha')]]);
+    saveUpdateOnPosts($role, [Post::class => ['update' => conditionOn('title', 'beta')]]);
+
+    expect(Access::granted($user, 'update', $beta))->toBeTrue()
+        ->and(Access::granted($user, 'update', $alpha))->toBeFalse()
+        ->and(grantCount())->toBe(1);
+});
+
+test('widening a narrowed cell answers for every record, and keeps no twin grant', function (): void {
+    $role = makeRole();
+    $user = makeUser();
+    Warden::assign($role)->to($user);
+
+    $alpha = Post::query()->create(['title' => 'alpha']);
+    $beta = Post::query()->create(['title' => 'beta']);
+
+    saveUpdateOnPosts($role, [Post::class => ['update' => conditionOn('title', 'alpha')]]);
+    saveUpdateOnPosts($role, []);
+
+    expect(Access::granted($user, 'update', $beta))->toBeTrue()
+        ->and(Access::granted($user, 'update', $alpha))->toBeTrue()
+        ->and(RoleGrants::of($role, gridCatalog())->narrowed())->toBeEmpty()
+        ->and(grantCount())->toBe(1);
+});
+
+test('leaving ownership behind takes its grant with it, though the revokes are disjoint', function (): void {
+    $role = makeRole();
+
+    Warden::ownedVia(Post::class, 'title');
+
+    saveUpdateOnPosts($role, [Post::class => ['update' => ['mode' => 'owned', 'rules' => []]]]);
+
+    expect(RoleGrants::of($role, gridCatalog())->narrowings[Post::class]['update']->shape)->toBe(Shape::Owned);
+
+    saveUpdateOnPosts($role, [Post::class => ['update' => conditionOn('title', 'alpha')]]);
+
+    expect(RoleGrants::of($role, gridCatalog())->narrowings[Post::class]['update']->shape)->toBe(Shape::Conditions)
+        ->and(grantCount())->toBe(1);
+});
+
+test('taking a narrowed cell away leaves nothing behind at all', function (): void {
+    $role = makeRole();
+
+    saveUpdateOnPosts($role, [Post::class => ['update' => conditionOn('title', 'alpha')]]);
+
+    RoleGrants::apply($role, gridCatalog(), [], []);
+
+    expect(grantCount())->toBe(0);
+});
+
+test('a denial can be narrowed too, and it is written as a denial', function (): void {
+    $role = makeRole();
+    $user = makeUser();
+    Warden::assign($role)->to($user);
+
+    $alpha = Post::query()->create(['title' => 'alpha']);
+
+    Warden::allow($role)->to('update', Post::class);
+
+    RoleGrants::apply(
+        $role,
+        gridCatalog(),
+        [Post::class => ['update' => 'forbidden']],
+        [Post::class => ['update' => conditionOn('title', 'alpha')]],
+    );
+
+    expect(Access::granted($user, 'update', $alpha))->toBeFalse()
+        ->and(RoleGrants::of($role, gridCatalog())->stances[Post::class]['update'])->toBe('forbidden');
+});
+
+test('a rule the table cannot hold leaves the store exactly as it was', function (): void {
+    $role = makeRole();
+
+    saveUpdateOnPosts($role, [Post::class => ['update' => conditionOn('title', 'alpha')]]);
+
+    $before = RoleGrants::of($role, gridCatalog())->narrowings[Post::class]['update'];
+
+    saveUpdateOnPosts($role, [Post::class => ['update' => conditionOn('nope', 'alpha')]]);
+
+    $after = RoleGrants::of($role, gridCatalog())->narrowings[Post::class]['update'];
+
+    expect($after->is($before))->toBeTrue()
+        ->and(grantCount())->toBe(1);
+});
+
+test('two rows for one cell are shown, said out loud, and never written over', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('update', Post::class)->where('title', 'alpha');
+    Warden::allow($role)->to('update', Post::class);
+
+    $state = RoleGrants::of($role, gridCatalog());
+
+    expect($state->narrowings[Post::class]['update']->shape)->toBe(Shape::Tangled)
+        ->and($state->locked()[Post::class]['update'])->toBeTrue()
+        ->and(RoleGrants::changes($role, gridCatalog(), [], []))->toBeEmpty();
+});
+
+test('an application that vetoes the grant is answered, not argued with', function (): void {
+    config()->set('warden.cancellable_events', true);
+
+    Event::listen(GrantingPermission::class, static fn (): bool => false);
+
+    $role = makeRole();
+
+    saveUpdateOnPosts($role, [Post::class => ['update' => conditionOn('title', 'alpha')]]);
+
+    expect(grantCount())->toBe(0);
+});
+
+test('the whole grid is written inside one transaction', function (): void {
+    $levels = [];
+    $outside = DB::transactionLevel();
+
+    Event::listen(PermissionGranted::class, static function () use (&$levels): void {
+        $levels[] = DB::transactionLevel();
+    });
+
+    $role = makeRole();
+
+    saveUpdateOnPosts($role, [Post::class => ['update' => conditionOn('title', 'alpha')]]);
+
+    expect($levels)->not->toBeEmpty()
+        ->and(array_unique($levels))->toBe([$outside + 1]);
 });

@@ -118,7 +118,7 @@ test('a narrowed cell says why nothing matched, which explain cannot', function 
     Warden::allow($role)->to('update', Post::class)->where('id', 1);
 
     $stored = RoleGrants::of($role, postCatalog());
-    $explanation = why($role, 'update', $stored->narrowed);
+    $explanation = why($role, 'update', $stored->narrowed());
 
     expect($explanation->cause)->toBe(Cause::NoMatchingGrant)
         ->and($explanation->narrowed)->not->toBeNull()
