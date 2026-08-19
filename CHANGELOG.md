@@ -6,6 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Before `1.0.0` the public API may change between minor versions.
 
+## [0.4.0] - 2026-08-19
+
+Reading a role. Every cell can now say why it is the way it is.
+
+### Added
+
+- **An inspector beside the grid.** Click a cell and it says why: the cause, the
+  decisive permission, and the role it came through. It tells "explicitly
+  forbidden" apart from "warden abstains and your policies decide" — the only
+  helper warden ships conflates them, and that distinction is the reason this
+  panel exists.
+- It is asked, never volunteered. `explain()` costs three to seven queries with
+  no cache and no batching, so a grid that explained every cell on render would
+  spend more than a hundred on a screen nobody may question. One cell at a time.
+- **It says when the screen and the store disagree.** The answer is always about
+  what is stored — that is all `explain()` can read — so when a cell has been
+  cycled and not saved, the panel says so rather than appearing to contradict it.
+- **It says when a rule is narrowed**, which `explain()` cannot. A permission
+  carrying conditions is skipped and reported as "nothing matched", and on a role
+  grid — where cells are asked about a class with no record in front of them — a
+  narrowed rule can never match. Left alone it read as if the rule were not there.
+- **A read-only screen for a role**, with its infolist and the same grid drawn
+  from the store. `view` and `update` are two permissions in warden, so somebody
+  may be trusted to read a role and not to change it, and until now they had
+  nowhere to look. The inspector answers there too: understanding is reading.
+- The eight causes are translated in English and Spanish, and the raw case is
+  shown beside the sentence.
+
+### Not included
+
+- The inspector explains **what is stored**, not what is pending.
+- It does not list the conditions of a narrowed rule, nor say which one failed —
+  warden does not know, and editing them is `0.5.0`.
+- "Granted to everyone" is what warden concludes without confirming a grant for
+  everyone exists. The raw case is printed so it can be traced when it does not
+  add up.
+
 ## [0.3.2] - 2026-08-19
 
 A protected role was only half protected.

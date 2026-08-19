@@ -4,8 +4,8 @@
 > [elpandape/warden](https://github.com/elpandape/warden) — a permission grid derived from
 > your policies, explicit denials, and conditional grants.
 
-**Status: `0.3.0` — the role grid.** The first tag worth installing: a roles screen with
-the permission grid inside it, derived from your policies. See
+**Status: `0.4.0` — reading a role.** A roles screen with the permission grid inside it,
+derived from your policies, and an inspector that says why each cell is the way it is. See
 [CHANGELOG.md](CHANGELOG.md) for what each version adds.
 
 ## Requirements
@@ -150,6 +150,18 @@ an amber mark and left alone: revoking it by name would delete every twin that s
 
 Nothing is written until you save, and the save is a diff — only the cells that changed
 reach the store.
+
+Click a cell and the inspector beside the grid says why it is the way it is: the cause, the
+permission that decided it, and the role it came through. It tells an explicit denial apart
+from warden abstaining — two different answers that most stores cannot distinguish. It is
+asked and never volunteered, because one explanation is three to seven queries and a grid
+full of them would be hundreds.
+
+The answer is about what is stored, so if you have cycled a cell and not saved it, the
+panel says that too rather than appearing to contradict the screen.
+
+A role can also be read without being changed: `view` and `update` are separate permissions,
+and the read-only screen draws the same grid and answers the same questions.
 
 ### Read the catalogue
 
