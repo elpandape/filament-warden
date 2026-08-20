@@ -6,11 +6,14 @@ namespace ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages;
 
 use ElPandaPe\FilamentWarden\Conditions\Columns;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
+use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Tables\PermissionsTable;
 use ElPandaPe\FilamentWarden\Grants\Holders;
 use ElPandaPe\FilamentWarden\Grants\Probe;
 use ElPandaPe\FilamentWarden\Grants\Reach;
 use ElPandaPe\FilamentWarden\Support\Config;
 use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -67,6 +70,42 @@ class ViewPermission extends ViewRecord
     }
 
     /**
+     * Three actions, and only the probe is optional.
+     *
+     * Both visibilities are written by hand: an edit or delete button asks
+     * `getEditAuthorizationResponse()` / `getDeleteAuthorizationResponse()`,
+     * which go straight to the policy, and the resource's `canEdit()` and
+     * `canDelete()` — where `permissions.update` and the orphan rule live — are
+     * never on that path. The modal description is the table's own, because a
+     * delete takes the grants with it below Eloquent and this is the last moment
+     * anybody is told.
+     *
+     * @return array<int, Action>
+     */
+    protected function getHeaderActions(): array
+    {
+        return [
+            EditAction::make()
+                ->visible(fn (Model $record): bool => PermissionResource::canEdit($record)),
+
+            DeleteAction::make()
+                ->modalDescription(static fn (Model $record): string => PermissionsTable::warning($record))
+                ->visible(fn (Model $record): bool => PermissionResource::canDelete($record)),
+
+            ...$this->probe(),
+        ];
+    }
+
+    private static function account(mixed $key): ?Model
+    {
+        $model = Columns::authorityModel();
+
+        return $model === null || ! is_int($key) && ! is_string($key)
+            ? null
+            : $model::query()->whereKey($key)->first();
+    }
+
+    /**
      * The test bench: `explain()` asked the way the application asks it, with a
      * real account and — when the permission has a model — a real row.
      *
@@ -76,7 +115,7 @@ class ViewPermission extends ViewRecord
      *
      * @return array<int, Action>
      */
-    protected function getHeaderActions(): array
+    private function probe(): array
     {
         if (! Config::enabled('permissions.probe') || Columns::authorityModel() === null) {
             return [];
@@ -104,15 +143,6 @@ class ViewPermission extends ViewRecord
                     $this->answer($data);
                 }),
         ];
-    }
-
-    private static function account(mixed $key): ?Model
-    {
-        $model = Columns::authorityModel();
-
-        return $model === null || ! is_int($key) && ! is_string($key)
-            ? null
-            : $model::query()->whereKey($key)->first();
     }
 
     /**

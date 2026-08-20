@@ -6,13 +6,35 @@ namespace ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages;
 
 use ElPandaPe\FilamentWarden\Catalog\PermissionName;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
+use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Tables\PermissionsTable;
 use ElPandaPe\Warden\Facades\Warden;
 use ElPandaPe\Warden\Support\Titles\PermissionTitle;
+use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Database\Eloquent\Model;
 
 class EditPermission extends EditRecord
 {
     protected static string $resource = PermissionResource::class;
+
+    /**
+     * The visibility is the guarantee: a delete button asks
+     * `getDeleteAuthorizationResponse()`, which goes straight to the policy, and
+     * the orphan rule lives in `PermissionResource::canDelete()`, off that path.
+     * The description is the table's own — the grants go with it by a foreign
+     * key, below Eloquent and with no event of their own.
+     *
+     * @return array<Action>
+     */
+    protected function getHeaderActions(): array
+    {
+        return [
+            DeleteAction::make()
+                ->modalDescription(static fn (Model $record): string => PermissionsTable::warning($record))
+                ->visible(fn (Model $record): bool => PermissionResource::canDelete($record)),
+        ];
+    }
 
     /**
      * The title never catches up on its own: warden writes it in the `creating`

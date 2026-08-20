@@ -5,6 +5,7 @@ declare(strict_types=1);
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages\CreatePermission;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages\EditPermission;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages\ListPermissions;
+use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages\ViewPermission;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Tables\PermissionsTable;
 use ElPandaPe\FilamentWarden\Support\Access;
@@ -102,6 +103,80 @@ test('a fresh installation is offered no button to mint what nothing consults', 
     Warden::allow($user)->to('create', permissionClass());
 
     livewire(ListPermissions::class)->assertActionHidden('create');
+});
+
+test('the edit and view screens carry the actions that belong on them', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+    config()->set('filament-warden.permissions.delete', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+    Warden::allow($user)->to('delete', permissionClass());
+
+    $permission = makePermission('view');
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->assertActionVisible('delete');
+
+    livewire(ViewPermission::class, ['record' => $permission->getKey()])
+        ->assertActionVisible('edit')
+        ->assertActionVisible('delete');
+});
+
+test('a permission somebody holds keeps its delete button off its own screens', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+    Warden::allow($user)->to('delete', permissionClass());
+
+    Warden::allow(makeRole('editor'))->to('viewAny', roleClass());
+
+    $held = heldRow('viewAny');
+
+    livewire(EditPermission::class, ['record' => $held->getKey()])
+        ->assertActionHidden('delete');
+
+    livewire(ViewPermission::class, ['record' => $held->getKey()])
+        ->assertActionHidden('delete');
+});
+
+test('a permission somebody holds survives the delete action on its own screens', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+    Warden::allow($user)->to('delete', permissionClass());
+
+    Warden::allow(makeRole('editor'))->to('viewAny', roleClass());
+
+    $held = heldRow('viewAny');
+
+    livewire(EditPermission::class, ['record' => $held->getKey()])
+        ->call('mountAction', 'delete', [])
+        ->call('callMountedAction', []);
+
+    livewire(ViewPermission::class, ['record' => $held->getKey()])
+        ->call('mountAction', 'delete', [])
+        ->call('callMountedAction', []);
+
+    expect(permissionClass()::query()->withoutGlobalScopes()->whereKey($held->getKey())->exists())->toBeTrue();
+});
+
+test('the config that closes editing takes the edit button with it', function (): void {
+    config()->set('filament-warden.permissions.update', false);
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $permission = makePermission('view');
+
+    livewire(ViewPermission::class, ['record' => $permission->getKey()])
+        ->assertActionHidden('edit');
 });
 
 test('what may be edited follows the rule the installation chose', function (bool|string $rule, bool $loose, bool $name): void {
