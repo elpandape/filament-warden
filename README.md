@@ -4,7 +4,7 @@
 > [elpandape/warden](https://github.com/elpandape/warden) — a permission grid derived from
 > your policies, explicit denials, and conditional grants.
 
-**Status: `0.10.2` — tenancy, honestly.** A roles screen with the permission grid inside
+**Status: `1.0.0-rc.1` — the freeze.** A roles screen with the permission grid inside
 it, derived from your policies; an inspector that says why each cell is the way it is; a builder
 that narrows a grant to the rows it should reach; a permissions screen that says where every
 row of the catalogue came from; a field that hands roles to an account; and a guard that stops a panel starting with a screen
@@ -138,6 +138,19 @@ final class RevenueChart extends ChartWidget
 
 Pages of a resource need nothing: they are already covered by the resource's own
 `canAccess()`, which asks the model's policy.
+
+For a screen that needs its own rule rather than the door permission, ask warden directly.
+`Access` resolves through the panel's guard, which `Gate::allows()` does not:
+
+```php
+use ElPandaPe\FilamentWarden\Support\Access;
+
+public static function canAccess(): bool
+{
+    return Access::grantedToCurrentUser('viewAny', Invoice::class)
+        && Access::grantedToCurrentUser('export-reports');
+}
+```
 
 ### The grid
 
@@ -352,6 +365,11 @@ permission that belongs to no model at all goes in `catalog.custom`, with its sc
 ],
 ```
 
+A custom name cannot contain a dot. Livewire addresses component state by splitting paths
+on them, so `reports.export` would address a nested array that does not exist and take the
+grid down with it. Rather than render something broken, the grid refuses to draw and names
+the permission in the message. Use `export-reports` or `reports:export`.
+
 ### Replacing what this package registers
 
 The policies for warden's `Role` and `Permission` are registered by this package, because
@@ -373,6 +391,63 @@ What it adds on top of a wall of checkboxes:
   nothing.
 - **A denial is a state, not an absence.**
 - **Every switch can say why it is where it is**, naming the row and the role that decided.
+
+## Stability
+
+From `1.0.0` on, everything below is covered by semantic versioning: changing any of it is a
+major. `tests/FrozenTest.php` is what says so — it fails when one of them moves.
+
+Two different kinds of thing are in that list and both matter for the same reason.
+
+**The names are rows in your database.** A permission called
+`page:App\Filament\Pages\Settings` was granted to a role a year ago. Renaming the prefix
+does not fail: the row stays, stays grantable, and opens nothing.
+
+**The keys are lines in your application** — a published config, an overridden translation,
+a command in a deploy script. Removing one is silent here and loud there.
+
+### Covered
+
+| | |
+|---|---|
+| Permission names | the `page:`, `widget:` and `panel:` prefixes, and `PermissionName` which mints and reads them |
+| The plugin | `FilamentWardenPlugin`, its id `filament-warden`, and the methods it accepts |
+| Fields | `PermissionGrid`, `PermissionGridEntry`, `ConditionBuilder`, `RoleAssignment`, and the `{stances, narrowing}` state envelope a form receives |
+| Traits | `AuthorizesPageAccess`, `AuthorizesWidgetView`, `AccessesPanels` |
+| Authorization | `WardenPolicy`, `Access` |
+| The catalogue | `Catalog::for()`, `Entry` and its `key()`, `Origin`, `Scope` |
+| The guard | `PanelIsOpen` |
+| Config | every key of `config/filament-warden.php` |
+| Translations | every key path of `lang/*/ui.php`, both locales |
+| Console | `filament-warden:assign` and `filament-warden:audit`, with their arguments |
+
+Adding a translation key or a config key is a minor, not a major: nothing you wrote stops
+working. Only removing or renaming one is a break.
+
+### Not covered
+
+`Grants\`, `Conditions\`, `Filament\Guard`, `Filament\Forms\Grid\` and everything in
+`Catalog\` other than the four named above are this package's insides. They move without
+warning, in any release.
+
+Three consequences worth saying out loud, because each one is a place the line is easy to
+cross by accident:
+
+- **A published view is pinned to those insides.** `filament-warden-views` is a real escape
+  hatch and you are welcome to it, but your copy calls `$getGrid()` and walks a `GridView`,
+  its tabs, rows and cells — all internal. Expect to re-merge it on a minor. If you want
+  markup that keeps working, wrap the field rather than forking its view.
+- **The screens are not an extension point.** `RoleResource`, `PermissionResource` and
+  their pages are left non-final so you can experiment, not because subclassing them is
+  supported. They change whenever the screens change.
+- **`whereCan()` is warden's, not ours.** Its answer can disagree with the panel's, and it
+  never consults the Gate or a policy.
+
+### Not frozen: the word *account*
+
+The condition builder offers the signed-in account's columns as `account.id` and the like.
+That word is a placeholder for whatever an application calls its user model, and it may
+change. Nothing is stored under it — it is a label on a screen.
 
 ## Development
 
