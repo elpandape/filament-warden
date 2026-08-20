@@ -384,7 +384,7 @@ test('a door written from the grid is titled by this package, not by a capital l
         ->where('name', $door)
         ->firstOrFail();
 
-    expect($permission->getAttribute('title'))->toBe('Reports');
+    expect($permission->getAttribute('title'))->toBe('Access Reports');
 });
 
 test('a title somebody wrote by hand is theirs, and stays', function (): void {
@@ -483,4 +483,21 @@ test('a grant of this tenant is writable, and one of no tenant is too when there
 
     expect(RoleGrants::of($role, gridCatalog())->narrowings[Post::class]['viewAny']->shape)
         ->toBe(Shape::All);
+});
+
+test('a title an older version of this package wrote is corrected, and a persons is not', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+    $door = 'page:'.Reports::class;
+    $class = Context::resolve()->permissionClass();
+
+    RoleGrants::apply($role, $catalog, [$door => [StateKey::DOOR => 'granted']]);
+
+    // What v0.9.1 wrote: the screen's name, with no verb.
+    $class::query()->withoutGlobalScopes()->where('name', $door)->update(['title' => 'Reports']);
+
+    RoleGrants::apply($role, $catalog, []);
+    RoleGrants::apply($role, $catalog, [$door => [StateKey::DOOR => 'granted']]);
+
+    expect($class::query()->withoutGlobalScopes()->where('name', $door)->value('title'))->toBe('Access Reports');
 });

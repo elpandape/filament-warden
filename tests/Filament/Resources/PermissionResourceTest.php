@@ -370,7 +370,7 @@ test('the form suggests the title this package would give a door, not a capital 
     $door = makePermission('widget:Filament\\Widgets\\AccountWidget');
 
     livewire(EditPermission::class, ['record' => $door->getKey()])
-        ->assertSee('Account Widget');
+        ->assertSee('Access Account Widget');
 });
 
 test('renaming a door regenerates its title the same way', function (): void {
@@ -389,5 +389,5 @@ test('renaming a door regenerates its title the same way', function (): void {
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect($door->refresh()->getAttribute('title'))->toBe('Summary');
+    expect($door->refresh()->getAttribute('title'))->toBe('Access Summary');
 });

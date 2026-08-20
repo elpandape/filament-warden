@@ -16,7 +16,6 @@ use ElPandaPe\Warden\Actions\GrantsPermissions;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Exceptions\ConfigurationException;
 use ElPandaPe\Warden\Facades\Warden;
-use ElPandaPe\Warden\Support\Titles\PermissionTitle;
 use ElPandaPe\Warden\Tenancy\Tenancy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -331,7 +330,10 @@ final class RoleGrants
             ->withoutGlobalScopes()
             ->where('name', $change->name)
             ->whereNull('entity_type')
-            ->where('title', PermissionTitle::generate($change->name, null, null, false))
+            // Every shape this package or warden has ever generated, because an
+            // installation upgraded from an older version still carries the older
+            // one — and a title somebody wrote is in none of them.
+            ->whereIn('title', PermissionName::generated($change->name))
             ->update(['title' => $title]);
     }
 

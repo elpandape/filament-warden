@@ -234,9 +234,15 @@ test('a resource pointing at a class nobody wrote does not take the grid with it
 test('a name this package minted reads back into something a person recognises', function (string $name, ?string $title): void {
     expect(PermissionName::title($name))->toBe($title);
 })->with([
-    'a widget' => ['widget:Filament\\Widgets\\AccountWidget', 'Account Widget'],
-    'a page' => ['page:App\\Filament\\Pages\\Reports', 'Reports'],
-    'the panel door' => ['panel:admin', 'Admin panel'],
+    'a widget' => ['widget:Filament\\Widgets\\AccountWidget', 'Access Account Widget'],
+    'a page' => ['page:App\\Filament\\Pages\\Reports', 'Access Reports'],
+    'the panel door' => ['panel:admin', 'Access the Admin panel'],
     'an action' => ['viewAny', null],
     'a loose name of the application' => ['export-reports', null],
 ]);
+
+test('a name this package never minted has no title of ours to correct', function (): void {
+    expect(PermissionName::generated('export-reports'))->toBeEmpty()
+        ->and(PermissionName::generated('page:App\\Filament\\Pages\\Reports'))
+        ->toBe(['Page:App\\Filament\\Pages\\Reports', 'Reports']);
+});
