@@ -1,8 +1,12 @@
 # Filament Warden
 
-[![Latest version](https://img.shields.io/packagist/v/elpandape/filament-warden.svg?style=flat-square)](https://packagist.org/packages/elpandape/filament-warden)
-[![Tests](https://img.shields.io/github/actions/workflow/status/elpandape/filament-warden/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/elpandape/filament-warden/actions/workflows/run-tests.yml)
-[![License](https://img.shields.io/packagist/l/elpandape/filament-warden.svg?style=flat-square)](LICENSE.md)
+[![Tests](https://github.com/elpandape/filament-warden/actions/workflows/run-tests.yml/badge.svg)](https://github.com/elpandape/filament-warden/actions/workflows/run-tests.yml)
+[![Quality](https://github.com/elpandape/filament-warden/actions/workflows/quality.yml/badge.svg)](https://github.com/elpandape/filament-warden/actions/workflows/quality.yml)
+[![Latest version](https://img.shields.io/packagist/v/elpandape/filament-warden.svg)](https://packagist.org/packages/elpandape/filament-warden)
+[![Downloads](https://img.shields.io/packagist/dt/elpandape/filament-warden.svg)](https://packagist.org/packages/elpandape/filament-warden)
+[![PHP](https://img.shields.io/packagist/dependency-v/elpandape/filament-warden/php.svg)](composer.json)
+[![Filament](https://img.shields.io/packagist/dependency-v/elpandape/filament-warden/filament%2Ffilament.svg?label=filament)](composer.json)
+[![License](https://img.shields.io/packagist/l/elpandape/filament-warden.svg)](LICENSE.md)
 
 > Roles and permissions for [Filament](https://filamentphp.com), built on
 > [elpandape/warden](https://github.com/elpandape/warden) — a permission grid derived from
