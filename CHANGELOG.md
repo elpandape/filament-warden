@@ -6,6 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Before `1.0.0` the public API may change between minor versions.
 
+## [0.10.0] - 2026-08-19
+
+Tenancy, honestly. **Read this one before upgrading a multi-tenant panel.**
+
+### Fixed
+
+- **A panel with `->tenant()` no longer breaks warden.** Filament scopes a
+  resource by putting a global scope on its **model**, and that scope demands a
+  relationship named after the tenant class — so with this plugin installed,
+  `Role::query()->count()`, `Role::create()` and every screen threw
+  `LogicException`. It did not break two screens: it poisoned warden's models for
+  the whole request, its own internals included. Both resources now say they
+  belong to no tenant, through the declared property and never through
+  `scopeToTenant()`, which is static and would un-scope every resource of the
+  consuming application.
+- **A cell whose grant belongs to another tenant can no longer be switched off in
+  silence.** A write targets one exact scope, so `disallow()` deleted nothing,
+  the screen reported success, and the cell came back green on reload. It is now
+  drawn, marked and left alone — the fourth reason a cell is locked, beside the
+  unreadable one and the tangled one.
+
+### Added
+
+- **The screens say when they are showing every tenant at once.** With no tenant
+  active and warden's shipped `null_behavior`, every read is unfiltered: that is
+  what the engine answers, so it is what the screen shows — hiding rows would
+  make the two disagree and somebody would take a permission away believing it
+  was not there. The notice appears only where it means something.
+- The permission screen says its holder counts cross every tenant, because
+  deleting a permission takes its grants with it through a foreign key and **that
+  cascade does not look at the tenant**.
+- A full read of both language files: `store` was translated into Spanish as a
+  shop in three places, and the reach map had no word for the new shape. Two
+  tests now pin the reach and stance maps to their enums, so a new case cannot
+  ship without its word.
+
+### Not included
+
+- Assigning a role **on a context** is still not offered from a screen. Warden
+  does not expose which classes are valid contexts, and a context-restricted
+  assignment is invisible in a grid — which asks about classes — drops out of
+  `getPermissions()` and out of `whereCan()`'s grant pass, and `explain()` cannot
+  say why. It is shown and protected where it already was.
+- Nothing bridges warden's tenant to Filament's. They are two different things
+  with the same name, and the bridge is a `TenantResolver` in your application.
+
 ## [0.9.1] - 2026-08-19
 
 ### Fixed

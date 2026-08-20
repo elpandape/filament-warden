@@ -4,7 +4,7 @@
 > [elpandape/warden](https://github.com/elpandape/warden) — a permission grid derived from
 > your policies, explicit denials, and conditional grants.
 
-**Status: `0.9.1` — the reach on screen.** A roles screen with the permission grid inside
+**Status: `0.10.0` — tenancy, honestly.** A roles screen with the permission grid inside
 it, derived from your policies; an inspector that says why each cell is the way it is; a builder
 that narrows a grant to the rows it should reach; a permissions screen that says where every
 row of the catalogue came from; a field that hands roles to an account; and a guard that stops a panel starting with a screen
@@ -313,6 +313,24 @@ dynamic `where "can" = ?` and answers zero rows in silence.
 **The number is a lower bound, not a fact**, and the screen says when. A role assigned in a context
 is excluded from `whereCan()`'s grant pass, so the panel itself will answer `true` for rows the query
 cannot see. `whereCan()` also never consults the Gate or a policy.
+
+### Multi-tenancy
+
+Two different things are called tenancy here and only one of them is Filament's. Warden scopes its
+own four tables with a `scope` column; Filament scopes a panel with a tenant model. **Nothing in
+warden knows about `Filament::getTenant()`** — bridging them is a `TenantResolver` in your
+application.
+
+This package's own resources declare that they belong to no tenant of Filament's, which they must:
+Filament scopes a resource by adding a global scope to its **model**, and that scope demands a
+relationship named after the tenant class. Without it, every read of warden's `Role` and
+`Permission` throws.
+
+With no tenant active, warden's shipped configuration reads every tenant at once. The screens show
+exactly that and say so, rather than hiding rows and disagreeing with what `can()` answers in the
+same request. A grant that belongs to another tenant is drawn, marked, and cannot be changed from
+there: a write targets one tenant, so switching it off would delete nothing and still report
+success.
 
 ### Read the catalogue
 
