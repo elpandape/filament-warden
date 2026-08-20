@@ -48,11 +48,24 @@ There is no `UPGRADING.md`, so the three things that can bite are here.
 ### Added
 
 - **A Stability section in the README**, and `tests/FrozenTest.php` behind it.
-  The permission name prefixes, the catalogue entry key, `Origin` and `Scope`,
-  the config keys, the translation keys and the two commands are covered by
-  semantic versioning from `1.0.0` on. Everything in `Grants\`, `Conditions\`,
-  `Filament\Guard`, `Filament\Forms\Grid\` and the rest of `Catalog\` is
-  this package's insides and moves without warning.
+  Covered from `1.0.0` on: the permission name prefixes, the plugin and its id,
+  the four fields and the `{stances, narrowing}` state a form receives, the
+  three traits, `WardenPolicy` and `Access`, `Catalog::for()`, `Entry`, `Origin`
+  and `Scope`, `PanelIsOpen`, every config key, every translation key path in
+  both locales, and the two commands. Adding a key is a minor; removing or
+  renaming one is a major.
+
+  Not covered, said plainly: `Grants\`, `Conditions\`, `Filament\Guard`,
+  `Filament\Forms\Grid\` and the rest of `Catalog\`. With the three consequences
+  that follow — a **published view is welded to those insides** and should be
+  expected to need re-merging, the **resources are non-final for experimenting
+  and not as an extension point**, and `whereCan()` is warden's, not this
+  package's.
+- **The two things the README taught around.** A custom permission name cannot
+  carry a dot — Livewire splits state paths on them, and the grid refuses to
+  draw rather than render something broken. And `Access` is how a hand-written
+  `canAccess()` asks warden through the panel's guard, which `Gate::allows()`
+  does not do; it was on the promised list and named nowhere.
 
 ### Not included
 
