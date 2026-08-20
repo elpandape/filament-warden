@@ -54,7 +54,14 @@ Publish the configuration if you want to change what the screens let people do:
 php artisan vendor:publish --tag=filament-warden-config
 ```
 
-Publish the views if you want to rewrite the grid's markup:
+Publish the translations if you want to reword the interface:
+
+```bash
+php artisan vendor:publish --tag=filament-warden-translations
+```
+
+Publish the views if you want to rewrite the grid's markup. Read the note under
+[Stability](#stability) first — a published view is welded to this package's insides:
 
 ```bash
 php artisan vendor:publish --tag=filament-warden-views
@@ -208,8 +215,10 @@ any other way leaves the previous twin's grant standing and the old rule still a
 ### The permissions screen
 
 Registering the plugin also puts a permissions screen on the panel, and with the shipped defaults
-it is a reading surface: nothing can be created, only loose permissions can be edited, and only
-orphans can be deleted. Opening any of that up is one line of `permissions.*` config; closing it
+it is a reading surface: nothing can be created, only orphans can be deleted, and of a derived
+permission only the label can be rewritten — its name, its entity and its rule are all closed,
+because those are what connect it to the policy that asks for it. A loose permission, which no
+policy declares, can be rewritten whole. Opening any of that up is one line of `permissions.*` config; closing it
 again afterwards means cleaning up whatever was created meanwhile.
 
 What it shows that warden cannot say for itself:
@@ -373,9 +382,11 @@ the permission in the message. Use `export-reports` or `reports:export`.
 ### Replacing what this package registers
 
 The policies for warden's `Role` and `Permission` are registered by this package, because
-Laravel's policy guessing never looks in a vendor namespace it does not own. An application
-that wants its own registers it in its own service provider, which boots after every
-package provider and therefore wins.
+Laravel's policy guessing only ever looks beside the model — for `Warden\Models\Role` it
+tries `ElPandaPe\Policies\RolePolicy`, `ElPandaPe\Warden\Policies\RolePolicy` and
+`ElPandaPe\Warden\Models\Policies\RolePolicy`, none of which exist and none of which is
+this package's namespace. An application that wants its own registers it in its own service
+provider, which boots after every package provider and therefore wins.
 
 ## Why this package
 
@@ -427,7 +438,7 @@ working. Only removing or renaming one is a break.
 ### Not covered
 
 `Grants\`, `Conditions\`, `Filament\Guard`, `Filament\Forms\Grid\` and everything in
-`Catalog\` other than the four named above are this package's insides. They move without
+`Catalog\` other than those named above are this package's insides. They move without
 warning, in any release.
 
 Three consequences worth saying out loud, because each one is a place the line is easy to
