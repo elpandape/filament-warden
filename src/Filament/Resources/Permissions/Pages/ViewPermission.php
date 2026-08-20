@@ -8,6 +8,7 @@ use ElPandaPe\FilamentWarden\Conditions\Columns;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
 use ElPandaPe\FilamentWarden\Grants\Holders;
 use ElPandaPe\FilamentWarden\Grants\Probe;
+use ElPandaPe\FilamentWarden\Grants\Reach;
 use ElPandaPe\FilamentWarden\Support\Config;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -126,19 +127,29 @@ class ViewPermission extends ViewRecord
         // not resolve is one whose row went away between opening the modal and
         // submitting it. There is nothing to answer, and nothing to say.
         if ($account instanceof Model) {
-            $this->tell(Probe::run(
-                $account,
-                $this->getRecord(),
-                is_string($record) && $record !== '' ? $record : null,
-            ));
+            $this->tell(
+                Probe::run(
+                    $account,
+                    $this->getRecord(),
+                    is_string($record) && $record !== '' ? $record : null,
+                ),
+                Reach::of($this->getRecord(), $account),
+            );
         }
     }
 
-    private function tell(Probe $probe): void
+    /**
+     * The verdict, and — where it can be counted — how far it reaches.
+     *
+     * The reach is worked out here and nowhere else: one `whereCan()` is six
+     * queries with no cache, so it happens when somebody asks and never on a
+     * render.
+     */
+    private function tell(Probe $probe, Reach $reach): void
     {
         Notification::make()
             ->title(__('filament-warden::ui.stances.'.$probe->verdict->value))
-            ->body(mb_trim($probe->summary.' '.($probe->note ?? '')))
+            ->body(mb_trim($probe->summary.' '.($probe->note ?? '').' '.$reach->sentence()))
             ->status(match ($probe->verdict->value) {
                 'granted' => 'success',
                 'forbidden' => 'danger',

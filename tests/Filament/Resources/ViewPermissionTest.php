@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages\ViewPermission;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Document;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Facades\Warden;
@@ -188,4 +189,26 @@ test('a guard that resolves no model offers no accounts to probe with', function
     Auth::forgetGuards();
 
     expect(ViewPermission::accounts('anything'))->toBeEmpty();
+});
+
+test('the test bench says how far the permission reaches, when it can be counted', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+
+    $holder = makeUser('Holder');
+
+    Document::query()->create(['title' => 'One']);
+    Document::query()->create(['title' => 'Two']);
+
+    Warden::allow($holder)->to('view', Document::class)->where('title', 'One');
+
+    $twin = permissionClass()::query()->withoutGlobalScopes()->whereNotNull('options')->firstOrFail();
+
+    livewire(ViewPermission::class, ['record' => $twin->getKey()])
+        ->callAction('probe', ['account' => $holder->getKey()])
+        ->assertNotified();
+
+    expect(ElPandaPe\FilamentWarden\Grants\Reach::of($twin, $holder)->sentence())
+        ->toBe('It falls on 1 of 2 rows.');
 });

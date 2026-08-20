@@ -157,6 +157,13 @@ return [
     ],
 
     'probe' => [
+        'reach' => [
+            'no_model' => 'Este permiso no tiene ningún modelo detrás, así que no cae sobre filas.',
+            'no_trait' => 'No se puede contar: [:model] no compone ElPandaPe\\Warden\\Concerns\\QueriesByPermission, y sin él warden no sabe preguntar sobre qué filas cae un permiso. Añade el trait al modelo.',
+            'failed' => 'No se pudo contar: :message',
+            'counted' => 'Cae sobre :matched de :total filas.',
+            'partial' => 'Cae sobre al menos :matched de :total filas. Esta cuenta tiene un rol asignado en un contexto, y la consulta no los ve — el panel contestará por más filas que estas.',
+        ],
         'narrowed' => 'Esta regla necesita una fila delante. Preguntada por la clase, warden se la salta y contesta que no casó nada — que se lee exactamente igual que si la regla no existiera. Elige un registro para preguntar de verdad.',
         'no_record' => 'Ninguna fila de esa entidad tiene esa clave, así que no se preguntó nada. No es la misma respuesta que «no casa».',
         'no_model' => 'Este permiso no tiene ningún modelo detrás, así que no hay fila que ponerle delante. Se pregunta sin ella.',

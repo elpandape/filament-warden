@@ -4,7 +4,7 @@
 > [elpandape/warden](https://github.com/elpandape/warden) — a permission grid derived from
 > your policies, explicit denials, and conditional grants.
 
-**Status: `0.8.0` — the guard and the audit.** A roles screen with the permission grid inside
+**Status: `0.9.0` — the reach on screen.** A roles screen with the permission grid inside
 it, derived from your policies; an inspector that says why each cell is the way it is; a builder
 that narrows a grant to the rows it should reach; a permissions screen that says where every
 row of the catalogue came from; a field that hands roles to an account; and a guard that stops a panel starting with a screen
@@ -291,6 +291,28 @@ It writes nothing, and reports six things:
 - **whole entity types nothing declares** — a morph alias that moved, reported apart because the fix
   is the opposite one;
 - **models only a relation manager reaches**, with the `catalog.models` line that settles it.
+
+### How far a permission reaches
+
+The test bench also answers *over how many rows* a permission falls, for the account being probed.
+It is opt-in on your side, one line on the model:
+
+```php
+use ElPandaPe\Warden\Concerns\QueriesByPermission;
+
+class Document extends Model
+{
+    use QueriesByPermission;
+}
+```
+
+Without it the screen says so and names the model, rather than printing a number: warden's
+`whereCan()` does not fail on a model that never composed the trait — Eloquent turns the call into a
+dynamic `where "can" = ?` and answers zero rows in silence.
+
+**The number is a lower bound, not a fact**, and the screen says when. A role assigned in a context
+is excluded from `whereCan()`'s grant pass, so the panel itself will answer `true` for rows the query
+cannot see. `whereCan()` also never consults the Gate or a policy.
 
 ### Read the catalogue
 

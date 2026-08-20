@@ -175,6 +175,15 @@ abstract class TestCase extends ApplicationTestCase
             $table->timestamps();
         });
 
+        // The one a consuming application opted in with, so `whereCan()` has
+        // something to answer about.
+        Schema::create('documents', static function (Blueprint $table): void {
+            $table->id();
+            $table->string('title');
+            $table->foreignId('user_id')->nullable();
+            $table->timestamps();
+        });
+
         // The one with an ownership column, which is what makes "only what it
         // owns" offerable for it and not for a post.
         Schema::create('comments', static function (Blueprint $table): void {

@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Before `1.0.0` the public API may change between minor versions.
 
+## [0.9.0] - 2026-08-19
+
+How far a permission reaches, said with its limits.
+
+### Added
+
+- **The test bench now says how many rows a permission falls on** for the account
+  being probed — `whereCan()` put on screen. It is worked out when somebody asks
+  and never on a render: one call is six queries with no cache, and it hydrates
+  the whole candidate catalogue every time.
+- **It says when the number cannot be trusted, which is half the feature.**
+  `whereCan()` and the panel's own checks do not answer the same thing, measured
+  in both directions: a role assigned in a context is excluded from the grant
+  pass and included in the forbid pass, so the panel can answer `true` for a row
+  the query cannot see at all. When the account holds a role in a context, the
+  line says the count is a lower bound and why.
+- **A model that never opted in is detected before it is asked.** Without
+  `QueriesByPermission` the call does not fail: Eloquent turns it into a dynamic
+  where — `where "can" = ?`, bound to the authority model — and answers zero rows
+  in silence. The screen names the model and the trait instead of printing a
+  number that means nothing.
+- A query that cannot run is a reason, not a fatal: `only_owned` on a model whose
+  ownership attribute is not a column emits invalid SQL and throws at execution.
+
+### Not included
+
+- No count anywhere else. A table column would be six queries per row.
+- `whereCan()` never consults the Gate or a policy, so a policy that denies is
+  invisible to it. That is warden's design, and it is one more reason the number
+  is shown as a bound rather than as a fact.
+
 ## [0.8.0] - 2026-08-19
 
 The guard and the audit. **This version changes how a panel starts.**
