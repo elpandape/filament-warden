@@ -66,6 +66,7 @@ return [
             ],
             'holders' => [
                 'description' => 'Contados, no nombrados. Un permiso puede estar en poder de todas las cuentas de la instalación.',
+                'every_tenant' => 'Contados en todos los tenants, porque borrar este permiso se lleva sus concesiones por una clave ajena — y esa cascada no mira el tenant.',
                 'roles' => 'Roles',
                 'accounts' => 'Cuentas',
                 'everyone' => 'Todo el mundo',

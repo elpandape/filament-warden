@@ -71,7 +71,7 @@ class PermissionInfolist
 
                 Section::make(__('filament-warden::ui.resources.permissions.sections.holders'))
                     ->icon(Heroicon::OutlinedUsers)
-                    ->description(__('filament-warden::ui.resources.permissions.holders.description'))
+                    ->description(__('filament-warden::ui.resources.permissions.holders.description').' '.__('filament-warden::ui.resources.permissions.holders.every_tenant'))
                     ->columns(4)
                     ->schema([
                         TextEntry::make('roles')

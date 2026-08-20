@@ -124,3 +124,26 @@ test('an account with no readable label is named by its key', function (): void 
 
     expect(Holders::of(heldPermission())->accounts)->toBe(['#'.recordKey($post)]);
 });
+
+test('the tally counts every tenant, because the delete cascade does not look at one', function (): void {
+    $permission = null;
+
+    Warden::tenant()->onceTo(7, static function (): void {
+        Warden::allow(makeRole('seven'))->to('viewAny', Post::class);
+    });
+
+    $permission = heldPermission();
+
+    Warden::allow(makeRole('global'))->to('viewAny', Post::class);
+
+    // Two grants, one of them another tenant's, and the delete would take both.
+    expect(Holders::of($permission)->roles)->toHaveCount(1);
+
+    $seven = Context::resolve()->permissionClass()::query()
+        ->withoutGlobalScopes()
+        ->where('name', 'viewAny')
+        ->orderBy('id')
+        ->firstOrFail();
+
+    expect(Holders::of($seven)->roles)->toHaveCount(1);
+});

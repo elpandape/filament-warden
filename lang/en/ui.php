@@ -66,6 +66,7 @@ return [
             ],
             'holders' => [
                 'description' => 'Counted, not named. A permission can be held by every account in the installation.',
+                'every_tenant' => 'Counted across every tenant, because deleting this permission takes its grants with it through a foreign key — and that cascade does not look at the tenant.',
                 'roles' => 'Roles',
                 'accounts' => 'Accounts',
                 'everyone' => 'Everyone',

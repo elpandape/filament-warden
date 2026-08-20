@@ -44,6 +44,13 @@ final readonly class Holders
     {
         $context = Context::resolve();
 
+        // Every tenant's grants, on purpose and not by accident: deleting a
+        // permission takes its grants with it through a foreign key, and THE
+        // CASCADE IS BLIND TO THE SCOPE. Counting only the active tenant's would
+        // promise a smaller loss than the delete actually causes.
+        //
+        // It is the one place in this package that reads wider than warden would
+        // answer, and the screen says so.
         $grants = $context->grantClass()::query()
             ->withoutGlobalScopes()
             ->where('permission_id', $permission->getKey())
