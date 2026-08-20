@@ -234,7 +234,7 @@ test('a resource pointing at a class nobody wrote does not take the grid with it
 test('a name this package minted reads back into something a person recognises', function (string $name, ?string $title): void {
     expect(PermissionName::title($name))->toBe($title);
 })->with([
-    'a widget' => ['widget:Filament\\Widgets\\AccountWidget', 'Access Account Widget'],
+    'a widget' => ['widget:Filament\\Widgets\\AccountWidget', 'View Account Widget'],
     'a page' => ['page:App\\Filament\\Pages\\Reports', 'Access Reports'],
     'the panel door' => ['panel:admin', 'Access the Admin panel'],
     'an action' => ['viewAny', null],
@@ -244,5 +244,11 @@ test('a name this package minted reads back into something a person recognises',
 test('a name this package never minted has no title of ours to correct', function (): void {
     expect(PermissionName::generated('export-reports'))->toBeEmpty()
         ->and(PermissionName::generated('page:App\\Filament\\Pages\\Reports'))
-        ->toBe(['Page:App\\Filament\\Pages\\Reports', 'Reports']);
+        ->toBe(['Page:App\\Filament\\Pages\\Reports', 'Reports', 'Access Reports']);
+});
+
+test('the verb is the question filament asks: a widget is seen, a page is entered', function (): void {
+    expect(PermissionName::title('widget:App\\Filament\\Widgets\\Summary'))->toStartWith('View ')
+        ->and(PermissionName::title('page:App\\Filament\\Pages\\Reports'))->toStartWith('Access ')
+        ->and(PermissionName::title('panel:admin'))->toStartWith('Access ');
 });

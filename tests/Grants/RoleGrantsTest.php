@@ -501,3 +501,22 @@ test('a title an older version of this package wrote is corrected, and a persons
 
     expect($class::query()->withoutGlobalScopes()->where('name', $door)->value('title'))->toBe('Access Reports');
 });
+
+test('a title the version before this one wrote is corrected too, and the list only grows', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+    $door = 'page:'.Reports::class;
+    $class = Context::resolve()->permissionClass();
+
+    RoleGrants::apply($role, $catalog, [$door => [StateKey::DOOR => 'granted']]);
+
+    foreach (['Page:'.Reports::class, 'Reports', 'Access Reports'] as $older) {
+        $class::query()->withoutGlobalScopes()->where('name', $door)->update(['title' => $older]);
+
+        RoleGrants::apply($role, $catalog, []);
+        RoleGrants::apply($role, $catalog, [$door => [StateKey::DOOR => 'granted']]);
+
+        expect($class::query()->withoutGlobalScopes()->where('name', $door)->value('title'))
+            ->toBe('Access Reports', "[{$older}] was not corrected");
+    }
+});

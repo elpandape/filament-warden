@@ -42,15 +42,17 @@ final class PermissionName
      * and a name like `widget:Filament\Widgets\AccountWidget` has no hyphens to
      * break on — so the title comes out as the name with one capital letter.
      *
-     * The verb is `Access`, and it is not a free choice: it is the word the grid
-     * already uses for a door — `StateKey::DOOR` is literally `access` — so the
-     * title and the column say the same thing about the same cell.
+     * The verb is not a free choice, and it is not one verb either: it is the
+     * word Filament itself asks with. A page and a panel answer `canAccess()`,
+     * a widget answers `canView()` — which is why this package's own traits are
+     * called `AuthorizesPageAccess` and `AuthorizesWidgetView`. A widget is seen;
+     * a page is entered. The title says the same.
      */
     public static function title(string $name): ?string
     {
         $screen = self::screen($name);
 
-        return $screen === null ? null : 'Access '.$screen;
+        return $screen === null ? null : self::verb($name).' '.$screen;
     }
 
     /**
@@ -72,9 +74,22 @@ final class PermissionName
         }
 
         return [
+            // What warden writes, for a permission with no entity.
             PermissionTitle::generate($name, null, null, false),
+            // What `0.9.1` wrote: the screen, with no verb at all.
             $screen,
+            // What `0.10.1` wrote: one verb for all three kinds.
+            'Access '.$screen,
         ];
+    }
+
+    /**
+     * `canAccess()` for a page and a panel, `canView()` for a widget — Filament's
+     * own two questions, and the reason this package has two traits and not one.
+     */
+    private static function verb(string $name): string
+    {
+        return str_starts_with($name, 'widget:') ? 'View' : 'Access';
     }
 
     /**
