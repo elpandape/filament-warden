@@ -8,6 +8,40 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [1.0.1] - 2026-08-20
+
+Reported from an installation: **there was no way in to either create screen.**
+
+### Fixed
+
+- **Neither listing declared a create action, so no button led to its own create
+  page.** Filament adds none by itself — `getHeaderActions()` defaults to an
+  empty array — and `grep CreateAction src/` found nothing in the whole package.
+  Measured on the reported installation: the authority held the wildcard,
+  `create` on `Role` resolved `true`, `admin/security/roles/create` answered
+  **200**, and the listing's HTML contained no link to it at all. Both listings
+  now carry one.
+- **The button's visibility is written by hand, because the config would not
+  have closed it.** A create button asks `getCreateAuthorizationResponse()`,
+  which goes straight to the policy and never passes through the resource's
+  `canCreate()` — where `roles.create` and `permissions.create` live. Broken on
+  purpose to see it: with the `visible()` gone, `permissions.create` false out of
+  the box still offers a button, and its own create page answers 403.
+- **A protected role could be deleted from its own edit and view screens.** The
+  same gap, one screen over: those pages now carry a delete action, and it is the
+  hand-written `visible()` that keeps `RoleResource::canDelete()` — the protected
+  list and the `roles.delete` rule — on the path. Measured with the guard
+  removed: `super-admin` was deleted outright and the following assertion died
+  with `ModelNotFoundException`. The table's action had this guard from `0.4.0`;
+  the pages had no action at all until now.
+
+### Added
+
+- Header actions on the role screens: delete on the edit page, edit and delete on
+  the view page. The edit action needs no guard of its own — the resource leaves
+  `canEdit()` alone, so the policy closes it, and a protected role opens with its
+  form disabled rather than not opening.
+
 ## [1.0.0] - 2026-08-20
 
 The freeze. **No code changed since `1.0.0-rc.1`** — the candidate went out, was
