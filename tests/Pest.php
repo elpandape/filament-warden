@@ -147,9 +147,12 @@ function flattenKeys(array $lines, string $prefix = ''): array
     foreach ($lines as $key => $value) {
         $path = $prefix === '' ? (string) $key : $prefix.'.'.$key;
 
-        $keys = is_array($value)
-            ? array_merge($keys, flattenKeys($value, $path))
-            : array_merge($keys, [$path]);
+        /** @var array<string, mixed>|null $nested */
+        $nested = is_array($value) ? $value : null;
+
+        $keys = $nested === null
+            ? array_merge($keys, [$path])
+            : array_merge($keys, flattenKeys($nested, $path));
     }
 
     return $keys;

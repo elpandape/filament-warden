@@ -107,9 +107,10 @@ test('the state a grid field hands to a form is frozen', function (): void {
     $role = makeRole();
     Warden::allow($role)->to('view', Post::class);
 
-    $state = livewire(EditRole::class, ['record' => $role->getKey()])
-        ->assertOk()
-        ->get('data');
+    $component = livewire(EditRole::class, ['record' => $role->getKey()]);
+    $component->assertOk();
+
+    $state = $component->get('data');
 
     expect(array_keys(partOf(is_array($state) ? $state : [], 'permissions')))
         ->toBe(['stances', 'narrowing']);

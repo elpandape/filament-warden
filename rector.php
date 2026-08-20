@@ -7,6 +7,7 @@ use Rector\Caching\ValueObject\Storage\FileCacheStorage;
 use Rector\CodingStyle\Rector\ClassMethod\MakeInheritedMethodVisibilitySameAsParentRector;
 use Rector\Config\RectorConfig;
 use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPublicMethodParameterRector;
+use Rector\Php55\Rector\String_\StringClassNameToClassConstantRector;
 use Rector\Php85\Rector\Property\AddOverrideAttributeToOverriddenPropertiesRector;
 use Rector\TypeDeclaration\Rector\StmtsAwareInterface\SafeDeclareStrictTypesRector;
 
@@ -31,6 +32,13 @@ return RectorConfig::configure()
         // A policy method's parameters are its contract with the gate, used or not.
         RemoveUnusedPublicMethodParameterRector::class => [
             __DIR__.'/tests/Fixtures/Policies',
+        ],
+        // The freeze test's whole point is that the name does NOT follow the code.
+        // `::class` is resolved from the class, so an IDE rename would carry the
+        // assertion along with it and the test would go green on the one change it
+        // exists to catch. The literal string is the promise.
+        StringClassNameToClassConstantRector::class => [
+            __DIR__.'/tests/FrozenTest.php',
         ],
     ])
     ->withPreparedSets(
