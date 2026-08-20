@@ -4,7 +4,62 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-Before `1.0.0` the public API may change between minor versions.
+Before `1.0.0` the public API may change between minor versions. From `1.0.0`
+on, what is covered is listed under **Stability** in the README and pinned by
+`tests/FrozenTest.php`.
+
+## [1.0.0-rc.1] - 2026-08-19
+
+A release candidate. Nothing new: this is where the package stops moving and
+says what can be relied on.
+
+### Coming from an older `0.x`? Read this first
+
+There is no `UPGRADING.md`, so the three things that can bite are here.
+
+- **The panel refuses to start with a page or widget nobody guards** — since
+  `0.8.0`. This is deliberate and it is the fourth of the seven properties: a
+  screen with no `canAccess()` is open to everyone, and Filament's
+  `strictAuthorization()` only reaches resources. Every page and widget you
+  register needs `AuthorizesPageAccess` or `AuthorizesWidgetView`. If you need
+  the panel up before you get to them, `guard.pages` and `guard.widgets` turn
+  the check off one kind at a time — and `filament-warden:audit` lists what is
+  open without stopping anything.
+- **`php artisan filament:assets` has to run**, and to run again on every
+  deploy. It is a file copy, not a build. Until it does, the panel asks for a
+  stylesheet that answers 404 and the grid renders unstyled.
+- **A grid cell has been stance *and* reach since `0.5.0`**, not a bare stance.
+  Nothing in an application reads that state — but a test that filled the field
+  by hand will not recognise it.
+
+### Changed
+
+- **Door titles stop being rewritten.** The list of shapes this package
+  recognises as its own grew three times in two days while the wording settled,
+  and each entry is a licence to rewrite rows in your database because we
+  changed our minds about a verb. It is closed at three: what warden generates,
+  the bare screen name `0.9.1` wrote, and the single verb `0.10.1` wrote. A row
+  carrying any of them is still corrected once; a fourth shape would be a major.
+- **The reach count says what it is.** It read `It falls on 3 of 12 rows.` and
+  let somebody decide on that. `whereCan()` never consults the Gate, so a policy
+  that denies is invisible to it — true of every count, not only the partial
+  ones, so both sentences now carry it.
+
+### Added
+
+- **A Stability section in the README**, and `tests/FrozenTest.php` behind it.
+  The permission name prefixes, the catalogue entry key, `Origin` and `Scope`,
+  the config keys, the translation keys and the two commands are covered by
+  semantic versioning from `1.0.0` on. Everything in `Grants\`, `Conditions\`,
+  `Filament\Guard`, `Filament\Forms\Grid\` and the rest of `Catalog\` is
+  this package's insides and moves without warning.
+
+### Not included
+
+- No new screens, no new columns, no new config. A candidate exists to be
+  installed and contradicted, not to add anything.
+- Nothing widens: `php: ^8.5` stays. Widening a constraint is not a break, so
+  `8.4` can be added in a minor if somebody turns up needing it.
 
 ## [0.10.2] - 2026-08-19
 
