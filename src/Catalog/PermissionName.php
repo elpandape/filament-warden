@@ -59,9 +59,15 @@ final class PermissionName
      * Every title this package or warden has ever generated for this name.
      *
      * A row carrying one of these was nobody's writing and may be rewritten; a
-     * row carrying anything else belongs to whoever wrote it. The list grows
-     * rather than changes, because an installation upgraded from an older version
-     * still has the older shape in its rows: `0.9.1` wrote the bare screen name.
+     * row carrying anything else belongs to whoever wrote it. There are three,
+     * because an installation upgraded from an older version still has the older
+     * shape in its rows: `0.9.1` wrote the bare screen name and `0.10.1` wrote
+     * one verb for all three kinds.
+     *
+     * CLOSED at `1.0.0`. It grew three times in two days while the wording was
+     * still being settled, and every entry added here is a licence to rewrite
+     * rows in somebody else's database because we changed our minds about a verb.
+     * A fourth shape is a MAJOR, and `tests/FrozenTest.php` is what says so.
      *
      * @return list<string>
      */
