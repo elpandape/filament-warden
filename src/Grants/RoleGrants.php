@@ -17,6 +17,7 @@ use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Exceptions\ConfigurationException;
 use ElPandaPe\Warden\Facades\Warden;
 use ElPandaPe\Warden\Support\Titles\PermissionTitle;
+use ElPandaPe\Warden\Tenancy\Tenancy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
@@ -40,11 +41,11 @@ final class RoleGrants
         $models = self::modelsByMorph($catalog);
         $doors = self::doorNames($catalog);
 
-        /** @var array<string, array<string, list<array{0: Narrowing, 1: bool}>>> $variants */
+        /** @var array<string, array<string, list<array{0: Narrowing, 1: bool, 2: int|string|null}>>> $variants */
         $variants = [];
         $wider = [];
 
-        foreach (self::held($role) as [$permission, $forbidden]) {
+        foreach (self::held($role) as [$permission, $forbidden, $scope]) {
             $type = $permission->getAttribute('entity_type');
             $name = $permission->getAttribute('name');
 
@@ -75,7 +76,7 @@ final class RoleGrants
                 continue;
             }
 
-            $variants[$row][$action][] = [Narrowing::of($permission), $forbidden];
+            $variants[$row][$action][] = [Narrowing::of($permission), $forbidden, $scope];
         }
 
         $stances = [];
@@ -174,7 +175,7 @@ final class RoleGrants
      * the wrong sequence leaves behind, so the honest answer is to say so and
      * keep hands off.
      *
-     * @param  list<array{0: Narrowing, 1: bool}>  $held
+     * @param  list<array{0: Narrowing, 1: bool, 2: int|string|null}>  $held
      * @return array{0: Stance, 1: Narrowing}
      */
     private static function resolve(array $held): array
@@ -182,10 +183,32 @@ final class RoleGrants
         $forbidden = array_values(array_filter($held, static fn (array $one): bool => $one[1]));
         $chosen = $forbidden === [] ? $held : $forbidden;
 
-        return [
-            $forbidden === [] ? Stance::Granted : Stance::Forbidden,
-            count($chosen) === 1 ? $chosen[0][0] : Narrowing::tangled(),
-        ];
+        $stance = $forbidden === [] ? Stance::Granted : Stance::Forbidden;
+
+        if (count($chosen) !== 1) {
+            return [$stance, Narrowing::tangled()];
+        }
+
+        // A grant that lives at another scope is read — warden answers with it —
+        // and cannot be written: a write targets one exact scope, so switching
+        // this cell off would delete nothing and report success.
+        return [$stance, self::writable($chosen[0][2]) ? $chosen[0][0] : Narrowing::elsewhere()];
+    }
+
+    /**
+     * Whether a row at this scope is one this screen could write.
+     *
+     * Compared as text on purpose: warden types a tenant `int|string` while the
+     * column is an integer, so a resolver handing back `'5'` must still match a
+     * row stamped `5`.
+     */
+    private static function writable(int|string|null $scope): bool
+    {
+        $writeScope = app(Tenancy::class)->writeScope();
+
+        return $scope === null && $writeScope === null
+            ? true
+            : (string) $scope === (string) $writeScope;
     }
 
     /**
@@ -351,7 +374,7 @@ final class RoleGrants
      * `permissions()` welds a raw tenant predicate that no scope removal can
      * strip, and typing the authority as a plain model says nothing about it.
      *
-     * @return list<array{0: Model, 1: bool}>
+     * @return list<array{0: Model, 1: bool, 2: int|string|null}>
      */
     private static function held(Model $role): array
     {
@@ -379,7 +402,13 @@ final class RoleGrants
             $permission = $permissions->get(self::identifier($grant->getAttribute('permission_id')));
 
             if ($permission instanceof Model) {
-                $held[] = [$permission, (bool) $grant->getAttribute('forbidden')];
+                $scope = $grant->getAttribute('scope');
+
+                $held[] = [
+                    $permission,
+                    (bool) $grant->getAttribute('forbidden'),
+                    is_int($scope) || is_string($scope) ? $scope : null,
+                ];
             }
         }
 

@@ -6,6 +6,7 @@ use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Conditions\Shape;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
+use ElPandaPe\FilamentWarden\Grants\RoleState;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\PostResource;
@@ -435,4 +436,51 @@ test('a loose name the application declared is left to warden, whose title is fi
         ->value('title');
 
     expect($title)->toBe('Export reports');
+});
+
+test('a grant that belongs to another tenant is shown, marked and left alone', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    // Written under tenant 7, read from tenant 7's neighbour.
+    Warden::tenant()->onceTo(7, static function () use ($role): void {
+        Warden::allow($role)->to('viewAny', Post::class);
+    });
+
+    $neighbour = Warden::tenant()->onceTo(8, static fn (): RoleState => RoleGrants::of($role, gridCatalog()));
+
+    expect($neighbour instanceof RoleState ? $neighbour->stances : ['unread'])->toBeEmpty();
+
+    // With no tenant active warden answers with every tenant's rows, so the cell
+    // is there — and it is not this screen's to write.
+    $state = RoleGrants::of($role, $catalog);
+
+    expect($state->stances[Post::class]['viewAny'])->toBe('granted')
+        ->and($state->narrowings[Post::class]['viewAny']->shape)->toBe(Shape::Elsewhere)
+        ->and($state->locked()[Post::class]['viewAny'])->toBeTrue();
+});
+
+test('switching off a cell that belongs to another tenant writes nothing, rather than saying it did', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    Warden::tenant()->onceTo(7, static function () use ($role): void {
+        Warden::allow($role)->to('viewAny', Post::class);
+    });
+
+    $before = grantCount();
+
+    RoleGrants::apply($role, $catalog, []);
+
+    expect(grantCount())->toBe($before)
+        ->and(RoleGrants::of($role, $catalog)->stances[Post::class]['viewAny'])->toBe('granted');
+});
+
+test('a grant of this tenant is writable, and one of no tenant is too when there is none', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    expect(RoleGrants::of($role, gridCatalog())->narrowings[Post::class]['viewAny']->shape)
+        ->toBe(Shape::All);
 });

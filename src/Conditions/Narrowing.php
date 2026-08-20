@@ -71,6 +71,19 @@ final readonly class Narrowing
     }
 
     /**
+     * The grant lives at a scope this screen cannot write.
+     *
+     * Warden's writes target one exact scope: `disallow()` filters on it and
+     * deletes nothing when the row belongs to another. A cell like that could be
+     * switched off, saved, reported as saved — and come back green on reload.
+     * Measured. So it is shown, marked and left alone.
+     */
+    public static function elsewhere(): self
+    {
+        return new self(Shape::Elsewhere, reason: 'elsewhere');
+    }
+
+    /**
      * What one catalogue row says about itself.
      */
     public static function of(Model $permission): self

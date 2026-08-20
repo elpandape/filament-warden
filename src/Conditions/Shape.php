@@ -7,7 +7,7 @@ namespace ElPandaPe\FilamentWarden\Conditions;
 /**
  * How far a grant reaches, and whether this screen may change it.
  *
- * The first three are the ones offered. The last two are states the store can
+ * The first three are the ones offered. The last three are states the store can
  * hold and the grid cannot draw: they are shown, explained and left alone —
  * drawing one of them as one of the other three and then saving would rewrite
  * a rule nobody could see.
@@ -23,6 +23,8 @@ enum Shape: string
     case Unreadable = 'unreadable';
 
     case Tangled = 'tangled';
+
+    case Elsewhere = 'elsewhere';
 
     public function isEditable(): bool
     {

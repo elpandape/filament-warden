@@ -230,6 +230,7 @@ return [
             'empty' => 'The stored rule carries an empty condition group: it answers only with a record in front of it, and then always.',
             'shape' => 'The stored conditions use a shape this builder cannot draw — a nested group, or a value that is neither text nor a number.',
             'tangled' => 'This cell holds more than one rule for the same action. The grid cannot show that, so it does not touch it.',
+            'elsewhere' => 'This grant belongs to another tenant, and a write targets one tenant at a time. Switching it off here would delete nothing and still report success, so it is left alone. Change tenant to touch it.',
         ],
     ],
 

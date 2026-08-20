@@ -230,6 +230,7 @@ return [
             'empty' => 'La regla guardada lleva un grupo de condiciones vacío: solo responde con una fila delante, y entonces siempre.',
             'shape' => 'Las condiciones guardadas usan una forma que este constructor no sabe dibujar: un grupo anidado, o un valor que no es ni texto ni número.',
             'tangled' => 'Esta celda tiene más de una regla para la misma acción. La rejilla no sabe enseñar eso, así que no la toca.',
+            'elsewhere' => 'Esta concesión es de otro tenant, y una escritura apunta a uno solo. Apagarla aquí no borraría nada y aun así diría que sí, así que se deja en paz. Cambia de tenant para tocarla.',
         ],
     ],
 
