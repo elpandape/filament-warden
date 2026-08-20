@@ -370,3 +370,69 @@ test('the whole grid is written inside one transaction', function (): void {
     expect($levels)->not->toBeEmpty()
         ->and(array_unique($levels))->toBe([$outside + 1]);
 });
+
+test('a door written from the grid is titled by this package, not by a capital letter', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+    $door = 'page:'.Reports::class;
+
+    RoleGrants::apply($role, $catalog, [$door => [StateKey::DOOR => 'granted']]);
+
+    $permission = Context::resolve()->permissionClass()::query()
+        ->withoutGlobalScopes()
+        ->where('name', $door)
+        ->firstOrFail();
+
+    expect($permission->getAttribute('title'))->toBe('Reports');
+});
+
+test('a title somebody wrote by hand is theirs, and stays', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+    $door = 'page:'.Reports::class;
+
+    RoleGrants::apply($role, $catalog, [$door => [StateKey::DOOR => 'granted']]);
+
+    Context::resolve()->permissionClass()::query()
+        ->withoutGlobalScopes()
+        ->where('name', $door)
+        ->update(['title' => 'The reporting screen']);
+
+    RoleGrants::apply($role, $catalog, []);
+    RoleGrants::apply($role, $catalog, [$door => [StateKey::DOOR => 'granted']]);
+
+    $title = Context::resolve()->permissionClass()::query()
+        ->withoutGlobalScopes()
+        ->where('name', $door)
+        ->value('title');
+
+    expect($title)->toBe('The reporting screen');
+});
+
+test('an action over a model is left to warden, which titles it well already', function (): void {
+    $role = makeRole();
+
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'granted']]);
+
+    $permission = Context::resolve()->permissionClass()::query()
+        ->withoutGlobalScopes()
+        ->where('name', 'viewAny')
+        ->firstOrFail();
+
+    expect($permission->getAttribute('title'))->toBe('ViewAny posts');
+});
+
+test('a loose name the application declared is left to warden, whose title is fine for it', function (): void {
+    config()->set('filament-warden.catalog.custom', ['export-reports' => 'read']);
+
+    $role = makeRole();
+
+    RoleGrants::apply($role, gridCatalog(), ['export-reports' => [StateKey::DOOR => 'granted']]);
+
+    $title = Context::resolve()->permissionClass()::query()
+        ->withoutGlobalScopes()
+        ->where('name', 'export-reports')
+        ->value('title');
+
+    expect($title)->toBe('Export reports');
+});

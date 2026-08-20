@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ElPandaPe\FilamentWarden\Grants;
 
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
+use ElPandaPe\FilamentWarden\Catalog\PermissionName;
 use ElPandaPe\FilamentWarden\Conditions\Columns;
 use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Conditions\Ownership;
@@ -15,6 +16,7 @@ use ElPandaPe\Warden\Actions\GrantsPermissions;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Exceptions\ConfigurationException;
 use ElPandaPe\Warden\Facades\Warden;
+use ElPandaPe\Warden\Support\Titles\PermissionTitle;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
@@ -263,6 +265,8 @@ final class RoleGrants
 
         $chain->to($change->name, $entity);
 
+        self::settleTitle($change);
+
         try {
             foreach ($change->narrowing->rules as $index => $rule) {
                 $rule->applyTo($chain, $index === 0);
@@ -273,6 +277,39 @@ final class RoleGrants
             // Nothing was granted, so there is nothing to narrow — and the veto
             // is the application's answer, not an error of this screen.
         }
+    }
+
+    /**
+     * Give a permission this package minted the title it deserves.
+     *
+     * Warden writes the title in the `creating` hook, and for a permission with
+     * no entity that title is `Str::ucfirst()` of the name — for
+     * `widget:Filament\Widgets\AccountWidget` that is the name with one capital
+     * letter, which is what a person then reads on the permission screen. Warden
+     * is not wrong: it has no way to know that `widget:` means anything.
+     *
+     * Only a row whose title is EXACTLY what warden would have generated is
+     * touched, which is the same rule the permission screen uses when it renames:
+     * a title somebody wrote by hand is theirs.
+     */
+    private static function settleTitle(Change $change): void
+    {
+        if ($change->entity !== null) {
+            return;
+        }
+
+        $title = PermissionName::title($change->name);
+
+        if ($title === null) {
+            return;
+        }
+
+        Context::resolve()->permissionClass()::query()
+            ->withoutGlobalScopes()
+            ->where('name', $change->name)
+            ->whereNull('entity_type')
+            ->where('title', PermissionTitle::generate($change->name, null, null, false))
+            ->update(['title' => $title]);
     }
 
     /**

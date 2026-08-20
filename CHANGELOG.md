@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Before `1.0.0` the public API may change between minor versions.
 
+## [0.9.1] - 2026-08-19
+
+### Fixed
+
+- **A page, widget or panel permission is no longer titled with its own name.**
+  Warden writes a permission's title in the `creating` hook, and for one with no
+  entity that title is `Str::ucfirst()` of the name — so
+  `widget:Filament\Widgets\AccountWidget` came out as
+  `Widget:Filament\Widgets\AccountWidget`, the same string with one capital
+  letter, which is what a person then read on the permission screen. Warden is
+  not wrong: it has no way to know that `widget:` means anything.
+
+  This package does know — `PermissionName` is the one place those names are
+  minted, and now the one place they are read back. A door written from the grid
+  is titled `Account Widget`, the permission form suggests the same, and renaming
+  one regenerates it the same way. A title somebody wrote by hand is theirs and
+  is never touched; a name the application declared in `catalog.custom` is left
+  to warden, whose title for it was already good.
+
+### Changed
+
+- CI checks out with `actions/checkout@v7`.
+
 ## [0.9.0] - 2026-08-19
 
 How far a permission reaches, said with its limits.

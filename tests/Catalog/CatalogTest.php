@@ -5,6 +5,7 @@ declare(strict_types=1);
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Catalog\Entry;
 use ElPandaPe\FilamentWarden\Catalog\Origin;
+use ElPandaPe\FilamentWarden\Catalog\PermissionName;
 use ElPandaPe\FilamentWarden\Catalog\Scope;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\CommentResource;
@@ -229,3 +230,13 @@ test('a resource pointing at a class nobody wrote does not take the grid with it
 
     expect($models)->toContain(Post::class);
 });
+
+test('a name this package minted reads back into something a person recognises', function (string $name, ?string $title): void {
+    expect(PermissionName::title($name))->toBe($title);
+})->with([
+    'a widget' => ['widget:Filament\\Widgets\\AccountWidget', 'Account Widget'],
+    'a page' => ['page:App\\Filament\\Pages\\Reports', 'Reports'],
+    'the panel door' => ['panel:admin', 'Admin panel'],
+    'an action' => ['viewAny', null],
+    'a loose name of the application' => ['export-reports', null],
+]);

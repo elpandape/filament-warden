@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages;
 
+use ElPandaPe\FilamentWarden\Catalog\PermissionName;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
 use ElPandaPe\Warden\Facades\Warden;
 use ElPandaPe\Warden\Support\Titles\PermissionTitle;
@@ -41,8 +42,12 @@ class EditPermission extends EditRecord
             return $data;
         }
 
-        $data['title'] = PermissionTitle::generate(
-            $this->text($data['name'] ?? null),
+        $name = $this->text($data['name'] ?? null);
+
+        // A name this package minted has a title only this package can read back:
+        // warden's generator has no way to know that `widget:` means anything.
+        $data['title'] = PermissionName::title($name) ?? PermissionTitle::generate(
+            $name,
             $this->nullableText($data['entity_type'] ?? null),
             null,
             (bool) ($data['only_owned'] ?? false),

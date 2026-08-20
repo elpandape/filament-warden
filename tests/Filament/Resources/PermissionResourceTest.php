@@ -359,3 +359,35 @@ test('a permission created here is asked for straight away, cache and all', func
     expect($created->getAttribute('title'))->toBe('Export reports')
         ->and($created->getAttribute('entity_type'))->toBeNull();
 });
+
+test('the form suggests the title this package would give a door, not a capital letter', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $door = makePermission('widget:Filament\\Widgets\\AccountWidget');
+
+    livewire(EditPermission::class, ['record' => $door->getKey()])
+        ->assertSee('Account Widget');
+});
+
+test('renaming a door regenerates its title the same way', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $door = makePermission('page:App\\Filament\\Pages\\Reports');
+
+    expect($door->getAttribute('title'))->toBe('Page:App\\Filament\\Pages\\Reports');
+
+    livewire(EditPermission::class, ['record' => $door->getKey()])
+        ->fillForm(['name' => 'widget:App\\Filament\\Widgets\\Summary'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($door->refresh()->getAttribute('title'))->toBe('Summary');
+});

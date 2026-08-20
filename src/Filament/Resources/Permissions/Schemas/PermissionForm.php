@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Schemas;
 
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
+use ElPandaPe\FilamentWarden\Catalog\PermissionName;
 use ElPandaPe\FilamentWarden\Conditions\Ownership;
 use ElPandaPe\FilamentWarden\Filament\Forms\ConditionBuilder;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
@@ -150,9 +151,13 @@ class PermissionForm
         $name = $get('name');
         $type = $get('entity_type');
 
-        return is_string($name) && $name !== ''
-            ? PermissionTitle::generate($name, is_string($type) ? $type : null, null, (bool) $get('only_owned'))
-            : '';
+        if (! is_string($name) || $name === '') {
+            return '';
+        }
+
+        // A name this package minted has a title only this package can read back.
+        return PermissionName::title($name)
+            ?? PermissionTitle::generate($name, is_string($type) ? $type : null, null, (bool) $get('only_owned'));
     }
 
     /**
