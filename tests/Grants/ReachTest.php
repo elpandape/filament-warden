@@ -77,7 +77,8 @@ test('a model that opted in is counted', function (): void {
         ->and($reach->matched)->toBe(3)
         ->and($reach->total)->toBe(3)
         ->and($reach->partial)->toBeFalse()
-        ->and($reach->sentence())->toBe('It falls on 3 of 3 rows.');
+        ->and($reach->sentence())->toStartWith('It falls on 3 of 3 rows.')
+        ->and($reach->sentence())->toContain('a policy that denies never shows up in it');
 });
 
 test('a narrowed grant falls on the rows it narrows to', function (): void {
@@ -137,7 +138,8 @@ test('a role held in a context makes the count a lower bound, and it says so', f
     // query cannot see it at all.
     expect($reach->partial)->toBeTrue()
         ->and($reach->sentence())->toContain('at least')
-        ->and($reach->sentence())->toContain('the panel itself will answer for more rows');
+        ->and($reach->sentence())->toContain('the panel will answer for more rows')
+        ->and($reach->sentence())->toContain('a policy that denies never shows up in it');
 });
 
 test('a query that cannot run is a reason, not a fatal', function (): void {

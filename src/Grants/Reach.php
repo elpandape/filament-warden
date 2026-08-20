@@ -20,8 +20,11 @@ use Throwable;
  * own checks do not answer the same thing, measured in both directions: a role
  * assigned with a context grants rows the query cannot see, and a permission
  * whose conditions do not deserialize loses its row scope on the forbid side and
- * blackens the whole table. So this says when it cannot be trusted, rather than
- * printing a number and letting somebody decide on it.
+ * blackens the whole table. It also never consults the Gate, so a policy that
+ * denies is invisible to it — and that one is true of every count, not only the
+ * partial ones, which is why both sentences carry it. So this says when it
+ * cannot be trusted, rather than printing a number and letting somebody decide
+ * on it.
  */
 final readonly class Reach
 {

@@ -210,5 +210,5 @@ test('the test bench says how far the permission reaches, when it can be counted
         ->assertNotified();
 
     expect(ElPandaPe\FilamentWarden\Grants\Reach::of($twin, $holder)->sentence())
-        ->toBe('It falls on 1 of 2 rows.');
+        ->toStartWith('It falls on 1 of 2 rows.');
 });
