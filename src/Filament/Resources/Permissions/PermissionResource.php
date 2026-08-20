@@ -37,6 +37,23 @@ class PermissionResource extends Resource
 
     protected static bool $isGloballySearchable = false;
 
+    /**
+     * Warden's models belong to no tenant of Filament's, and saying so is not
+     * optional.
+     *
+     * A panel with `->tenant()` puts a global scope on every resource's MODEL —
+     * not on the resource — and that scope demands a relationship named after the
+     * tenant class, throwing `LogicException` when it is missing. Measured: with
+     * this line gone, `Role::query()->count()`, `Role::create()` and the
+     * resource's own query all throw. It does not break two screens; it poisons
+     * warden's model for the whole request, its internals included.
+     *
+     * Declared as the property and never through `scopeToTenant()`, which is
+     * static and would un-scope every resource of the consuming application — a
+     * cross-tenant leak this package would have caused.
+     */
+    protected static bool $isScopedToTenant = false;
+
     public static function getModel(): string
     {
         return Context::resolve()->permissionClass();

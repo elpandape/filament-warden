@@ -175,6 +175,13 @@ abstract class TestCase extends ApplicationTestCase
             $table->timestamps();
         });
 
+        // A tenant in Filament's sense, which is not warden's.
+        Schema::create('teams', static function (Blueprint $table): void {
+            $table->id();
+            $table->string('name');
+            $table->timestamps();
+        });
+
         // The one a consuming application opted in with, so `whereCan()` has
         // something to answer about.
         Schema::create('documents', static function (Blueprint $table): void {
