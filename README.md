@@ -4,7 +4,7 @@
 > [elpandape/warden](https://github.com/elpandape/warden) — a permission grid derived from
 > your policies, explicit denials, and conditional grants.
 
-**Status: `0.10.0` — tenancy, honestly.** A roles screen with the permission grid inside
+**Status: `0.10.1` — tenancy, honestly.** A roles screen with the permission grid inside
 it, derived from your policies; an inspector that says why each cell is the way it is; a builder
 that narrows a grant to the rows it should reach; a permissions screen that says where every
 row of the catalogue came from; a field that hands roles to an account; and a guard that stops a panel starting with a screen
