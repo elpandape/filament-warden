@@ -15,20 +15,35 @@ installed from Packagist into a fresh Laravel 13 + Filament 5 project, and the
 published artifact was checked to carry the whole frozen surface: the sixteen
 promised classes, six config keys and 169 translation key paths in both locales.
 
-What did change is documentation, and one piece of it mattered.
+What changed is the documentation, and two pieces of it were stopping people
+before they got started.
 
 ### Fixed
 
+- **The README never said to run the migrations.** Warden **publishes** its
+  schema rather than loading it from vendor, so a fresh install has no tables at
+  all and the first thing anybody clicked was a missing one. `warden:install
+  --migrate` is now the first step of the installation, with the reason beside
+  it. This was missing from every version, not just this one.
+- **"Create `super-admin` from the roles screen" could not work**, three times
+  over: nothing in this package ever calls warden's `everything()`, so the grid
+  cannot mint a wildcard — a permission over `*` is not a cell; the grid is
+  disabled outright for a protected role; and by that point in the instructions
+  the panel door is already locked against you. The first role now comes from a
+  seeder, and the wildcard is measured to open the loose `panel:` permission.
+- **`canAccessPanel()` is called from four places, not one.** Folding an extra
+  condition into it — email verification was the case that surfaced it — makes
+  `Login` throw the *same* validation exception as a wrong password, and makes
+  both password-reset pages fail silently while still reporting success. The
+  README now says so where people write that override.
+- **Four smaller claims were wrong**: `strictAuthorization()` covers relation
+  managers and Filament's tenancy pages as well as resources; Laravel's policy
+  guessing walks the model's own namespace rather than only looking beside it;
+  the permissions screen's icon falls back to a key, not a shield; and the
+  wildcard cell makes an entity row one switch wider than its policy declares.
 - **The Stability section contradicted itself.** It named five `Catalog\` classes
   as covered and then called everything but four of them internal. The stability
-  section *is* the contract; a contract that disagrees with itself is worse than
-  no contract.
-- **The stated reason for registering the policies was wrong.** Laravel's policy
-  guessing *does* walk vendor namespaces — for `Warden\Models\Role` it tries
-  `ElPandaPe\Policies\RolePolicy`, `ElPandaPe\Warden\Policies\RolePolicy` and
-  `ElPandaPe\Warden\Models\Policies\RolePolicy`. What it never does is look in
-  this package's namespace. The registration was always right; the explanation
-  was not, and somebody would have relied on it.
+  section *is* the contract; one that disagrees with itself is worse than none.
 - **`filament-warden-translations` was a promised extension point with no
   documented command.** The translation keys are covered by semantic versioning
   and the install section showed only two of the three publish tags.
@@ -36,6 +51,19 @@ What did change is documentation, and one piece of it mattered.
   derived permission's edit screen is reachable and its label has no lock on it.
   What is closed is its name, its entity and its rule — the three things that
   connect it to the policy that asks for it.
+
+### Added
+
+- **A README you can follow from nothing to a working panel**: a table of
+  contents, a five-step quick start with the policy, the account model, strict
+  authorization, the two traits and the seeder that lets you back in, and a
+  configuration reference for all six blocks — which are frozen API and had no
+  table of their own.
+- **How to ask warden yourself, and why not to use `$user->can()`.** Warden ships
+  a `gate.register` switch so an application can register its own gate callback;
+  the day one does, `$user->can('some-loose-permission')` starts answering
+  `false` with no error to read, because a loose permission has no policy to
+  answer for it. `Access` goes straight to the resolver. Measured both ways.
 
 ### Not included
 
