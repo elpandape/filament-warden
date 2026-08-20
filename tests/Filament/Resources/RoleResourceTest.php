@@ -109,6 +109,27 @@ test('a role is created with its name and its title', function (): void {
     expect(roleClass()::query()->where('name', 'auditor')->value('title'))->toBe('Auditor');
 });
 
+test('the listing carries the way in, and only for an authority that may create', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    livewire(ListRoles::class)->assertActionHidden('create');
+
+    Warden::allow($user)->to('create', roleClass());
+
+    livewire(ListRoles::class)->assertActionVisible('create');
+});
+
+test('the config that closes creation takes the button with it', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('create', roleClass());
+
+    config()->set('filament-warden.roles.create', false);
+
+    livewire(ListRoles::class)->assertActionHidden('create');
+});
+
 test('the config can close the door on creating roles at all', function (): void {
     $user = signIn();
     Warden::allow($user)->to('create', roleClass());
