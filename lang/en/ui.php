@@ -248,6 +248,7 @@ return [
             'all' => 'all',
             'clear' => 'none',
         ],
+        'mixing' => 'No tenant is active, so this shows every tenant at once — that is what the store answers right now. A row that belongs to another tenant is marked and cannot be changed from here.',
         'wider' => 'This role holds a rule wider than the grid can show, so every cell below is already answered:',
         'legend' => [
             'abstains' => 'the role abstains',

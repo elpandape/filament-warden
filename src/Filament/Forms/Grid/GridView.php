@@ -11,6 +11,7 @@ use ElPandaPe\FilamentWarden\Catalog\Scope;
 use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Conditions\Words;
 use ElPandaPe\FilamentWarden\Grants\RoleState;
+use ElPandaPe\FilamentWarden\Grants\Tenants;
 use ElPandaPe\FilamentWarden\Support\Config;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -121,7 +122,15 @@ final readonly class GridView
     }
 
     /**
-     * The six drawings, each with the sample the reader compares against. It
+     * Whether what is drawn belongs to more than one tenant.
+     */
+    public function mixing(): bool
+    {
+        return Tenants::mixing();
+    }
+
+    /**
+     * The seven drawings, each with the sample the reader compares against. It
      * lives here and not in the template for the same reason everything else
      * does: this is the half that is measured.
      *

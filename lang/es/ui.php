@@ -248,6 +248,7 @@ return [
             'all' => 'todo',
             'clear' => 'nada',
         ],
+        'mixing' => 'No hay ningún tenant activo, así que esto enseña todos a la vez — es lo que el almacén responde ahora mismo. Una fila de otro tenant sale marcada y no se puede cambiar desde aquí.',
         'wider' => 'Este rol tiene una regla más amplia de lo que la rejilla puede enseñar, así que cada celda de abajo ya está contestada:',
         'legend' => [
             'abstains' => 'el rol se abstiene',

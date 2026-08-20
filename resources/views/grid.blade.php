@@ -22,6 +22,10 @@
                     <p class="fw-locked-notice">{{ __('filament-warden::ui.grid.locked') }}</p>
                 @endunless
 
+                @if ($grid->mixing())
+                    <p class="fw-note fw-note-locked">{{ __('filament-warden::ui.grid.mixing') }}</p>
+                @endif
+
                 @if ($grid->wider !== [])
                     <p class="fw-wider">
                         {{ __('filament-warden::ui.grid.wider') }}
