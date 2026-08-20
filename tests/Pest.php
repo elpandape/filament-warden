@@ -133,3 +133,24 @@ function signedIn(): Model
 
     return $user instanceof Model ? $user : makeUser();
 }
+
+/**
+ * Every key path of a nested translation array, dotted and in file order.
+ *
+ * @param  array<string, mixed>  $lines
+ * @return list<string>
+ */
+function flattenKeys(array $lines, string $prefix = ''): array
+{
+    $keys = [];
+
+    foreach ($lines as $key => $value) {
+        $path = $prefix === '' ? (string) $key : $prefix.'.'.$key;
+
+        $keys = is_array($value)
+            ? array_merge($keys, flattenKeys($value, $path))
+            : array_merge($keys, [$path]);
+    }
+
+    return $keys;
+}
