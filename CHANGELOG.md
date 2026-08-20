@@ -35,12 +35,28 @@ Reported from an installation: **there was no way in to either create screen.**
   with `ModelNotFoundException`. The table's action had this guard from `0.4.0`;
   the pages had no action at all until now.
 
+- **The permission screens had the same hole, with one more gate.** Their edit
+  and view pages carry delete now, and the view page carries edit — each with the
+  visibility written by hand, because `permissions.update` lives in
+  `canEdit()` and the orphan rule in `canDelete()`, both off the authorization
+  path. Broken on purpose: a permission two roles held was deleted from its own
+  edit screen, and the edit button showed up with `permissions.update` at
+  `false`. The delete modal carries the table's own warning — the grants go with
+  it by a foreign key, below Eloquent and with no event of their own, so this is
+  the last moment anybody is told.
+- **The probe was the only header action the view page had, behind an early
+  return.** Had edit and delete been added beside it without moving that guard,
+  turning `permissions.probe` off would have taken all three away. It is its own
+  method now.
+
 ### Added
 
 - Header actions on the role screens: delete on the edit page, edit and delete on
   the view page. The edit action needs no guard of its own — the resource leaves
   `canEdit()` alone, so the policy closes it, and a protected role opens with its
   form disabled rather than not opening.
+- Header actions on the permission screens: delete on the edit page, edit and
+  delete on the view page, beside the probe that was already there.
 
 ## [1.0.0] - 2026-08-20
 
