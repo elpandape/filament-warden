@@ -5,6 +5,7 @@ declare(strict_types=1);
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\CreateRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\EditRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ListRoles;
+use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ViewRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
@@ -285,6 +286,59 @@ test('a protected role does not take a condition from the payload either', funct
         ->assertHasNoFormErrors();
 
     expect(Context::resolve()->grantClass()::query()->count())->toBe(2);
+});
+
+test('the edit and view screens carry the actions that belong on them', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $role = makeRole('editor');
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->assertActionVisible('delete');
+
+    livewire(ViewRole::class, ['record' => $role->getKey()])
+        ->assertActionVisible('edit')
+        ->assertActionVisible('delete');
+});
+
+test('a protected role keeps its delete button off its own screens too', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $protected = makeRole('super-admin');
+
+    livewire(EditRole::class, ['record' => $protected->getKey()])
+        ->assertActionHidden('delete');
+
+    livewire(ViewRole::class, ['record' => $protected->getKey()])
+        ->assertActionHidden('delete');
+});
+
+test('a protected role survives the delete action on its own screens, not only the check', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $protected = makeRole('super-admin');
+
+    livewire(EditRole::class, ['record' => $protected->getKey()])
+        ->call('mountAction', 'delete', [])
+        ->call('callMountedAction', []);
+
+    livewire(ViewRole::class, ['record' => $protected->getKey()])
+        ->call('mountAction', 'delete', [])
+        ->call('callMountedAction', []);
+
+    expect(roleClass()::query()->whereKey($protected->getKey())->exists())->toBeTrue();
 });
 
 test('a protected role survives the delete action itself, not only the check', function (): void {
