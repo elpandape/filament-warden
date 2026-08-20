@@ -83,6 +83,27 @@ test('a fresh installation cannot mint a permission nothing consults', function 
     expect(PermissionResource::canCreate())->toBeTrue();
 });
 
+test('the listing carries the way in, and only for an authority that may create', function (): void {
+    config()->set('filament-warden.permissions.create', true);
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+
+    livewire(ListPermissions::class)->assertActionHidden('create');
+
+    Warden::allow($user)->to('create', permissionClass());
+
+    livewire(ListPermissions::class)->assertActionVisible('create');
+});
+
+test('a fresh installation is offered no button to mint what nothing consults', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('create', permissionClass());
+
+    livewire(ListPermissions::class)->assertActionHidden('create');
+});
+
 test('what may be edited follows the rule the installation chose', function (bool|string $rule, bool $loose, bool $name): void {
     config()->set('filament-warden.permissions.update', $rule);
 
