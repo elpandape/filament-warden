@@ -4,9 +4,42 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-Before `1.0.0` the public API may change between minor versions. From `1.0.0`
-on, what is covered is listed under **Stability** in the README and pinned by
+Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
+what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
+
+## [1.0.0] - 2026-08-20
+
+The freeze. **No code changed since `1.0.0-rc.1`** — the candidate went out, was
+installed from Packagist into a fresh Laravel 13 + Filament 5 project, and the
+published artifact was checked to carry the whole frozen surface: the sixteen
+promised classes, six config keys and 169 translation key paths in both locales.
+
+What did change is documentation, and one piece of it mattered.
+
+### Fixed
+
+- **The Stability section contradicted itself.** It named five `Catalog\` classes
+  as covered and then called everything but four of them internal. The stability
+  section *is* the contract; a contract that disagrees with itself is worse than
+  no contract.
+- **The stated reason for registering the policies was wrong.** Laravel's policy
+  guessing *does* walk vendor namespaces — for `Warden\Models\Role` it tries
+  `ElPandaPe\Policies\RolePolicy`, `ElPandaPe\Warden\Policies\RolePolicy` and
+  `ElPandaPe\Warden\Models\Policies\RolePolicy`. What it never does is look in
+  this package's namespace. The registration was always right; the explanation
+  was not, and somebody would have relied on it.
+- **`filament-warden-translations` was a promised extension point with no
+  documented command.** The translation keys are covered by semantic versioning
+  and the install section showed only two of the three publish tags.
+- **"Only loose permissions can be edited" overstated the shipped default.** A
+  derived permission's edit screen is reachable and its label has no lock on it.
+  What is closed is its name, its entity and its rule — the three things that
+  connect it to the policy that asks for it.
+
+### Not included
+
+- No new behaviour. A `1.0.0` that added something would not be a freeze.
 
 ## [1.0.0-rc.1] - 2026-08-19
 
