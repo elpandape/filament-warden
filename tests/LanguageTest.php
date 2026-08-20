@@ -107,3 +107,47 @@ test('no line is declared that nothing reads', function (): void {
         expect($read)->toBeTrue("[{$key}] is declared and nothing reads it");
     }
 });
+
+test('every shape a rule can take has a word, in both languages', function (): void {
+    $shapes = array_map(
+        static fn (ElPandaPe\FilamentWarden\Conditions\Shape $shape): string => $shape->value,
+        ElPandaPe\FilamentWarden\Conditions\Shape::cases(),
+    );
+
+    foreach (['en', 'es'] as $locale) {
+        $declared = [];
+
+        foreach (array_keys(translations($locale)) as $key) {
+            if (str_starts_with($key, 'reach.')) {
+                $declared[] = mb_substr($key, mb_strlen('reach.'));
+            }
+        }
+
+        sort($declared);
+        sort($shapes);
+
+        expect($declared)->toBe($shapes, "[{$locale}] the reach map and the Shape enum disagree");
+    }
+});
+
+test('every stance a cell can take has a word too', function (): void {
+    $stances = array_map(
+        static fn (ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance $stance): string => $stance->value,
+        ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance::cases(),
+    );
+
+    foreach (['en', 'es'] as $locale) {
+        $declared = [];
+
+        foreach (array_keys(translations($locale)) as $key) {
+            if (str_starts_with($key, 'stances.')) {
+                $declared[] = mb_substr($key, mb_strlen('stances.'));
+            }
+        }
+
+        sort($declared);
+        sort($stances);
+
+        expect($declared)->toBe($stances, "[{$locale}] the stance map and the Stance enum disagree");
+    }
+});

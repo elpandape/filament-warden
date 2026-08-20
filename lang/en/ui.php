@@ -101,6 +101,7 @@ return [
         'conditions' => 'With conditions',
         'unreadable' => 'Cannot be read',
         'tangled' => 'More than one rule',
+        'elsewhere' => 'Another tenant',
     ],
 
     'tabs' => [

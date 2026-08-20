@@ -101,6 +101,7 @@ return [
         'conditions' => 'Con condiciones',
         'unreadable' => 'No se puede leer',
         'tangled' => 'Más de una regla',
+        'elsewhere' => 'De otro tenant',
     ],
 
     'tabs' => [
@@ -145,10 +146,10 @@ return [
         ],
         'empty' => 'Pulsa una celda de la rejilla.',
         'title' => 'Por qué',
-        'loading' => 'Preguntando a la tienda…',
+        'loading' => 'Preguntando al almacén…',
         'no_permission' => 'ningún permiso',
         'narrowed' => 'Hay una regla estrechada para esta celda. Con condiciones, la concesión solo responde con un registro delante — y una comprobación de clase, como la que hace un listado, falla cerrada.',
-        'pending' => 'En pantalla lo has puesto en «:stance». Guarda para que la tienda lo diga.',
+        'pending' => 'En pantalla lo has puesto en «:stance». Guarda para que el almacén lo diga.',
     ],
 
     'stances' => [
@@ -238,7 +239,7 @@ return [
     'grid' => [
         'panel' => 'El panel',
         'locked' => 'Este rol está protegido: lo que puede hacer no se toca desde aquí.',
-        'read_description' => 'Lo que este rol puede hacer, tal como lo tiene la tienda hoy. Pulsa una celda para preguntar por qué.',
+        'read_description' => 'Lo que este rol puede hacer, tal como lo tiene el almacén hoy. Pulsa una celda para preguntar por qué.',
         'description' => 'Una fila por entidad y una columna por acción que su Policy declara. Pulsa una celda para ciclarla; con Shift, hacia atrás.',
         'label' => 'Permisos',
         'entity' => 'Entidad',
