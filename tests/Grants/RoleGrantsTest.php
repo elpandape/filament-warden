@@ -591,3 +591,38 @@ test('a title the version before this one wrote is corrected too, and the list o
             ->toBe('Access Reports', "[{$older}] was not corrected");
     }
 });
+
+test('a cell that is both ownership and conditions is shown, said out loud, and never drawn as owned', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    Warden::allow($role)->toOwn(Post::class, 'update')->where('title', '=', 'alpha');
+
+    $state = RoleGrants::of($role, $catalog);
+
+    expect($state->stances[Post::class]['update'])->toBe('granted')
+        ->and($state->narrowings[Post::class]['update']->shape)->toBe(Shape::Unreadable)
+        ->and($state->locked()[Post::class]['update'])->toBeTrue()
+        ->and(RoleGrants::changes($role, $catalog, [], []))->toBeEmpty();
+});
+
+test('a cell that is both ownership and conditions is never written over', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    Warden::allow($role)->toOwn(Post::class, 'update')->where('title', '=', 'alpha');
+
+    $permission = permissionClass()::query()
+        ->withoutGlobalScopes()
+        ->where('name', 'update')
+        ->whereNotNull('options')
+        ->firstOrFail();
+
+    $before = $permission->getAttribute('options');
+
+    RoleGrants::apply($role, $catalog, [], []);
+
+    expect(grantCount())->toBe(1)
+        ->and($permission->refresh()->getAttribute('options'))->toBe($before)
+        ->and($permission->getAttribute('only_owned'))->toBeTrue();
+});

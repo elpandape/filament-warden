@@ -213,3 +213,20 @@ test('every row is neither narrowed nor locked', function (): void {
         ->and(Narrowing::all()->isEditable())->toBeTrue()
         ->and(Narrowing::all()->toPayload())->toBe(['mode' => 'all', 'rules' => []]);
 });
+
+test('a rule that is both ownership and conditions is more reach than one cell can hold', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->toOwn(Comment::class, 'update')->where('body', '=', 'alpha');
+
+    $permission = narrowedPermission();
+
+    expect($permission->getAttribute('only_owned'))->toBeTrue()
+        ->and($permission->getAttribute('options'))->not->toBeNull();
+
+    $narrowing = Narrowing::of($permission);
+
+    expect($narrowing->shape)->toBe(Shape::Unreadable)
+        ->and($narrowing->reason)->toBe('shape')
+        ->and($narrowing->isEditable())->toBeFalse();
+});

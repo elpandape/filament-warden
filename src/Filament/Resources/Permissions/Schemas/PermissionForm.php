@@ -6,6 +6,8 @@ namespace ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Schemas;
 
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Catalog\PermissionName;
+use ElPandaPe\FilamentWarden\Conditions\Columns;
+use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Conditions\Ownership;
 use ElPandaPe\FilamentWarden\Filament\Forms\ConditionBuilder;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
@@ -88,9 +90,14 @@ class PermissionForm
 
                         ConditionBuilder::make('options')
                             ->label(__('filament-warden::ui.resources.permissions.fields.conditions'))
-                            ->helperText(static fn (Get $get): string => self::conditionsHelp($get))
+                            ->helperText(static fn (Get $get, ?Model $record): string => self::conditionsHelp($get, $record))
                             ->entity(static fn (Get $get): ?string => self::model($get))
-                            ->disabled(static fn (?Model $record): bool => $record instanceof Model && ! PermissionResource::mayEditConditions($record))
+                            // Disabled is what keeps `options` out of the saved
+                            // data at all: Filament's `disabled()` also calls
+                            // `saved(false)`, and a component that is not
+                            // dehydrated is forgotten rather than written.
+                            ->disabled(static fn (?Model $record): bool => ($record instanceof Model && ! PermissionResource::mayEditConditions($record))
+                                || ! self::conditionsWritable($record))
                             ->columnSpanFull(),
                     ]),
             ]);
@@ -165,8 +172,23 @@ class PermissionForm
      */
     private static function model(Get $get): ?string
     {
-        $type = $get('entity_type');
+        return self::modelFor($get('entity_type'));
+    }
 
+    /**
+     * The class an entity type points at, or nothing: the wildcard, a loose
+     * permission and a morph alias that no longer resolves all answer the same
+     * way.
+     *
+     * `mixed` and not `?string`, because the two callers hand it two different
+     * untyped things — what the form is holding, and what the row was saved
+     * with — and narrowing the parameter would only move the check somewhere
+     * less honest.
+     *
+     * @return class-string<Model>|null
+     */
+    private static function modelFor(mixed $type): ?string
+    {
         if (! is_string($type) || $type === '*') {
             return null;
         }
@@ -201,11 +223,81 @@ class PermissionForm
             ]);
     }
 
-    private static function conditionsHelp(Get $get): string
+    /**
+     * Whether the rule stored on this row can be handed back to the store.
+     *
+     * The builder writes the rule it could parse and `null` for everything
+     * else, so a rule it cannot read back would be erased by a save that only
+     * touched the title. Three things stop it reading one back — a shape it
+     * refuses to draw, no model to check the columns against, and a column the
+     * table no longer has — and all three are one question: does what is stored
+     * survive the round trip?
+     *
+     * A row with nothing stored answers yes before any of that: writing `null`
+     * over `null` loses nothing, and asking further would close the builder on
+     * rows that have no rule to protect.
+     *
+     * Asked of the row and never of the entity picked on screen, because the
+     * promise is about what is stored. That leaves the reset on `entity_type`
+     * free to clear every rule this screen can read, which is every rule it had
+     * any business clearing. Nothing here reads the store: `Narrowing::of()` is
+     * pure and `Columns::of()` is memoised.
+     */
+    private static function conditionsWritable(?Model $record): bool
     {
-        return self::model($get) === null
-            ? (string) __('filament-warden::ui.conditions.no_model')
-            : (string) __('filament-warden::ui.conditions.warning');
+        // Nothing is stored yet, so there is nothing to lose.
+        if (! $record instanceof Model) {
+            return true;
+        }
+
+        $stored = Narrowing::of($record);
+
+        if (! $stored->isEditable()) {
+            return false;
+        }
+
+        if ($record->getAttribute('options') === null) {
+            return true;
+        }
+
+        $model = self::modelFor($record->getAttribute('entity_type'));
+
+        return $model !== null && Narrowing::fromPayload(
+            $stored->toPayload(),
+            Columns::of($model),
+            Columns::authority(),
+            Ownership::of($model),
+        ) instanceof Narrowing;
+    }
+
+    /**
+     * Why the builder is closed, as the tail of a language key.
+     *
+     * A rule that was read and cannot be written back has no word of its own
+     * yet, so it borrows the one for a shape the builder cannot draw. That
+     * sentence names the wrong cause; a line of its own is a new key, which is a
+     * minor, so it waits.
+     */
+    private static function lockedReason(Model $record): ?string
+    {
+        if (self::conditionsWritable($record)) {
+            return null;
+        }
+
+        return Narrowing::of($record)->reason ?? 'shape';
+    }
+
+    private static function conditionsHelp(Get $get, ?Model $record): string
+    {
+        if (self::model($get) === null) {
+            return (string) __('filament-warden::ui.conditions.no_model');
+        }
+
+        $reason = $record instanceof Model ? self::lockedReason($record) : null;
+
+        return $reason === null
+            ? (string) __('filament-warden::ui.conditions.warning')
+            : (string) __('filament-warden::ui.conditions.locked.'.$reason);
     }
 
     /**

@@ -88,14 +88,21 @@ final readonly class Narrowing
      */
     public static function of(Model $permission): self
     {
-        if ((bool) $permission->getAttribute('only_owned')) {
-            return self::owned();
-        }
-
         $options = $permission->getAttribute('options');
+        $owned = (bool) $permission->getAttribute('only_owned');
 
         if ($options === null) {
-            return self::all();
+            return $owned ? self::owned() : self::all();
+        }
+
+        // Both halves on one row is something warden really writes — `toOwn()`
+        // and then a chained `where()`, which copies `only_owned` onto the twin —
+        // and both are honoured when it resolves: the candidate is filtered on
+        // ownership and then run through the group. A cell draws one reach, so
+        // reading this as plain ownership would drop the condition the next time
+        // anybody saved. It is said out loud and left alone.
+        if ($owned) {
+            return self::unreadable('shape');
         }
 
         $group = ConstraintSerializer::deserialize($options);
