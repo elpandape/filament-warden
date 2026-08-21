@@ -205,7 +205,7 @@ test('the browser is handed the cycle order and the actions a wildcard reaches',
     $alpine = $grid->alpine();
 
     expect($alpine['order'])->toBe(['abstain', 'granted', 'forbidden'])
-        ->and($alpine['manage'])->toBe('manage')
+        ->and($alpine['manage'])->toBe('*')
         ->and($alpine['rows'][Post::class]['actions'])
         ->toBe(['viewAny', 'view', 'create', 'update', 'delete', 'deleteAny'])
         ->and($alpine['rows'][Post::class]['read'])->toBe(['viewAny', 'view']);

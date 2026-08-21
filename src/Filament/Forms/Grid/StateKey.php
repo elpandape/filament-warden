@@ -23,9 +23,11 @@ final class StateKey
     public const string DOOR = 'access';
 
     /**
-     * The extra column every entity row offers, which warden stores as `*`.
+     * The extra column every entity row offers, filed under the very name warden
+     * stores it as. Any word a person could write is a word a policy could
+     * declare as an action, and then one cell on screen would drive two writes.
      */
-    public const string MANAGE = 'manage';
+    public const string MANAGE = '*';
 
     public static function row(Entry $entry): string
     {

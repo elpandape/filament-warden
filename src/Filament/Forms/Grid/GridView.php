@@ -243,7 +243,7 @@ final readonly class GridView
                 label: self::entityLabel($model, $entries),
                 model: $model,
                 cells: $cells,
-                manage: self::cell($key, StateKey::MANAGE, self::translated('filament-warden::ui.grid.manage', StateKey::MANAGE), $state, $narrowings, $wider),
+                manage: self::cell($key, StateKey::MANAGE, self::translated('filament-warden::ui.grid.manage', 'everything'), $state, $narrowings, $wider),
             );
         }
 

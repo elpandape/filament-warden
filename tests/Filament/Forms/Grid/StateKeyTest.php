@@ -37,3 +37,7 @@ test('an action name with a dot stops it too', function (): void {
 
     expect(fn (): string => StateKey::action($entry))->toThrow(LogicException::class);
 });
+
+test('the wildcard column is filed under the name warden stores, which no policy can declare', function (): void {
+    expect(StateKey::MANAGE)->toBe('*');
+});

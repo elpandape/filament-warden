@@ -12,6 +12,7 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\PostResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Vault;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Events\GrantingPermission;
@@ -34,6 +35,20 @@ function gridCatalog(): Catalog
 function grantCount(): int
 {
     return Context::resolve()->grantClass()::query()->count();
+}
+
+/**
+ * The catalogue with a model whose policy declares `manage` itself.
+ *
+ * Declared through `catalog.models` rather than a resource: that is the route
+ * an application uses for a model with a policy and no screen, and it keeps
+ * `VaultPolicy` out of every other catalogue in this file.
+ */
+function vaultCatalog(): Catalog
+{
+    config()->set('filament-warden.catalog.models', [Vault::class]);
+
+    return Catalog::for(Panel::make()->id('scratch'));
 }
 
 test('a cell nobody wrote becomes a grant, and the store answers for it', function (): void {
@@ -106,6 +121,45 @@ test('the wildcard column reaches every action the policy declares', function ()
     expect(Access::granted($user, 'viewAny', Post::class))->toBeTrue()
         ->and(Access::granted($user, 'delete', Post::class))->toBeTrue()
         ->and(RoleGrants::of($role, gridCatalog())->stances[Post::class][StateKey::MANAGE])->toBe('granted');
+});
+
+test('a policy action named manage is a cell of its own, not the wildcard', function (): void {
+    $role = makeRole();
+    $user = makeUser();
+    Warden::assign($role)->to($user);
+
+    RoleGrants::apply($role, vaultCatalog(), [Vault::class => ['manage' => 'granted']]);
+
+    expect(grantCount())->toBe(1)
+        ->and(Access::granted($user, 'manage', Vault::class))->toBeTrue()
+        ->and(Access::granted($user, 'viewAny', Vault::class))->toBeFalse()
+        ->and(RoleGrants::of($role, vaultCatalog())->stances[Vault::class]['manage'])->toBe('granted');
+});
+
+test('the wildcard cell of that same row is a second cell, and reaches the whole row', function (): void {
+    $role = makeRole();
+    $user = makeUser();
+    Warden::assign($role)->to($user);
+
+    RoleGrants::apply($role, vaultCatalog(), [Vault::class => [StateKey::MANAGE => 'granted']]);
+
+    expect(grantCount())->toBe(1)
+        ->and(Access::granted($user, 'manage', Vault::class))->toBeTrue()
+        ->and(Access::granted($user, 'viewAny', Vault::class))->toBeTrue()
+        ->and(RoleGrants::of($role, vaultCatalog())->stances[Vault::class][StateKey::MANAGE])->toBe('granted');
+});
+
+test('the two of them can be written at once, and they are two rows', function (): void {
+    $role = makeRole();
+    $catalog = vaultCatalog();
+
+    RoleGrants::apply($role, $catalog, [Vault::class => ['manage' => 'granted', StateKey::MANAGE => 'forbidden']]);
+
+    $stances = RoleGrants::of($role, $catalog)->stances;
+
+    expect(grantCount())->toBe(2)
+        ->and($stances[Vault::class]['manage'])->toBe('granted')
+        ->and($stances[Vault::class][StateKey::MANAGE])->toBe('forbidden');
 });
 
 test('a door is written with no entity at all', function (): void {

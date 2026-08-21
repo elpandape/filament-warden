@@ -9,6 +9,7 @@ use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\GridHost;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Vault;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Facades\Filament;
@@ -66,6 +67,33 @@ test('saving takes away what the grid stopped saying', function (): void {
         ->call('save');
 
     expect(Access::granted($user, 'viewAny', roleClass()))->toBeFalse();
+});
+
+test('the wildcard cell survives the round trip the browser actually makes', function (): void {
+    $role = makeRole();
+    $user = makeUser();
+    Warden::assign($role)->to($user);
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->set('data.permissions', ['stances' => [roleClass() => [StateKey::MANAGE => 'granted']], 'narrowing' => []])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(Access::granted($user, 'viewAny', roleClass()))->toBeTrue();
+});
+
+test('a star is a segment on the wire, not a wildcard, so one cell can be addressed', function (): void {
+    $role = makeRole();
+    $user = makeUser();
+    Warden::assign($role)->to($user);
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->set('data.permissions.stances.'.roleClass().'.'.StateKey::MANAGE, 'granted')
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(Access::granted($user, 'viewAny', roleClass()))->toBeTrue()
+        ->and(Access::granted($user, 'delete', roleClass()))->toBeTrue();
 });
 
 test('the field renders every tab of the catalogue at once', function (): void {
@@ -142,7 +170,7 @@ test('the cycle order travels to the browser instead of being written there', fu
     $payload = json_decode(is_string($unescaped) ? $unescaped : '{}', true, 512, JSON_THROW_ON_ERROR);
 
     expect($payload['order'])->toBe(['abstain', 'granted', 'forbidden'])
-        ->and($payload['manage'])->toBe('manage');
+        ->and($payload['manage'])->toBe('*');
 });
 
 test('the script carries no stance of its own, so php stays the only authority', function (): void {
@@ -219,8 +247,34 @@ test('the wildcard column is explained too, though no policy declares it', funct
     Warden::allow($role)->toManage(roleClass());
 
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
-        ->call('callSchemaComponentMethod', 'form.permissions', 'explainCell', [roleClass(), 'manage'])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'explainCell', [roleClass(), StateKey::MANAGE])
         ->assertReturned(fn (array $why): bool => $why['verdict'] === 'granted');
+});
+
+test('a policy action named manage is explained as itself, not as the wildcard', function (): void {
+    config()->set('filament-warden.catalog.models', [Vault::class]);
+
+    $role = makeRole();
+
+    Warden::allow($role)->to('manage', Vault::class);
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'explainCell', [Vault::class, 'manage'])
+        ->assertReturned(fn (array $why): bool => $why['verdict'] === 'granted'
+            && $why['cause'] === 'granted-directly');
+});
+
+test('the wildcard cell of that row is explained by the star, which nothing granted', function (): void {
+    config()->set('filament-warden.catalog.models', [Vault::class]);
+
+    $role = makeRole();
+
+    Warden::allow($role)->to('manage', Vault::class);
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'explainCell', [Vault::class, StateKey::MANAGE])
+        ->assertReturned(fn (array $why): bool => $why['verdict'] === 'abstain'
+            && $why['permission'] === null);
 });
 
 test('a door is explained by its own name', function (): void {
