@@ -6,7 +6,7 @@
  * never scans this package's views, so a utility class used only here would not
  * be compiled and the markup would arrive unstyled.
  *
- * Three rules this file obeys, each of them paid for once:
+ * Four rules this file obeys, each of them paid for once:
  *
  *   - The palette variables are the bare `--primary-600` form. `--color-*` is a
  *     Tailwind v4 alias layer that the shipped build tree-shakes away.
@@ -14,6 +14,13 @@
  *     never `rgb(var(--x) / .1)`.
  *   - Dark mode is a `dark` class on the root element, never a media query.
  *     There is not one `prefers-color-scheme` rule in the whole panel theme.
+ *   - Text and marks that carry meaning use `--fw-muted` and nothing fainter.
+ *     Measured against Filament's default `--gray-*`, which is `Color::Zinc`
+ *     (`support/src/Colors/ColorManager.php`): light `--gray-600` is 7.73:1 on
+ *     `--fw-surface` and 7.01:1 on `--fw-raised`; dark `--gray-400` is 6.74:1
+ *     and 5.78:1. The floor is measured against the background the rule is
+ *     painted on — `--gray-500` clears 4.5:1 on the surface and misses it on
+ *     the raised head. A host theme that overrides the palette moves all of it.
  *
  * Nothing here carries `!important`: a stylesheet shipped as a plain asset is
  * unlayered, so it already outranks every rule Filament puts in `@layer`.
@@ -29,8 +36,7 @@
     --fw-accent: var(--primary-600);
     --fw-noted: var(--warning-600);
     --fw-text: var(--gray-950);
-    --fw-muted: var(--gray-500);
-    --fw-ghost: var(--gray-300);
+    --fw-muted: var(--gray-600);
     --fw-line: color-mix(in oklab, var(--gray-950) 10%, transparent);
     --fw-hairline: color-mix(in oklab, var(--gray-950) 5%, transparent);
     --fw-raised: color-mix(in oklab, var(--gray-500) 8%, transparent);
@@ -53,7 +59,6 @@
     --fw-noted: var(--warning-400);
     --fw-text: var(--gray-100);
     --fw-muted: var(--gray-400);
-    --fw-ghost: var(--gray-600);
     --fw-line: color-mix(in oklab, var(--gray-50) 13%, transparent);
     --fw-hairline: color-mix(in oklab, var(--gray-50) 7%, transparent);
     --fw-raised: color-mix(in oklab, var(--gray-50) 6%, transparent);
@@ -96,7 +101,7 @@
 }
 
 .fw-inspector-sub {
-    color: var(--fw-ghost);
+    color: var(--fw-muted);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.6875rem;
     overflow-wrap: anywhere;
@@ -116,7 +121,7 @@
     display: grid;
     gap: 0.375rem;
     padding: 0.625rem;
-    border-inline-start: 3px solid var(--fw-ghost);
+    border-inline-start: 3px solid var(--fw-muted);
     border-radius: 0.375rem;
     background: var(--fw-raised);
 }
@@ -270,7 +275,7 @@
 .fw-action-name,
 .fw-entity-model {
     display: block;
-    color: var(--fw-ghost);
+    color: var(--fw-muted);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.6875rem;
     line-height: 1.3;
@@ -299,7 +304,7 @@
     border: 1px solid var(--fw-line);
     border-radius: 0.375rem;
     background: none;
-    color: var(--fw-ghost);
+    color: var(--fw-muted);
     cursor: pointer;
     /* An empty inline-flex box sits on its own bottom edge, and on the glyph's
        baseline once one is drawn, so the box jumps a pixel on the first click. */
@@ -408,7 +413,7 @@
 /* The policy does not declare this action, so nobody can grant it. */
 .fw-void {
     display: block;
-    color: var(--fw-ghost);
+    color: var(--fw-muted);
 }
 
 /* Row shortcuts ----------------------------------------------------------- */
@@ -587,7 +592,7 @@ tr:hover .fw-shortcuts,
     margin-block-end: 0.4375rem;
     padding: 0.4375rem 0.5rem;
     border: 1px solid var(--fw-line);
-    border-inline-start: 3px solid var(--fw-ghost);
+    border-inline-start: 3px solid var(--fw-muted);
     border-radius: 0 0.375rem 0.375rem 0;
     background: var(--fw-raised);
 }
