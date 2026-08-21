@@ -6,6 +6,7 @@ namespace ElPandaPe\FilamentWarden\Filament\Resources\Roles\Schemas;
 
 use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
+use ElPandaPe\FilamentWarden\Support\Config;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -39,7 +40,8 @@ class RoleForm
                             ->required()
                             ->maxLength(255)
                             ->unique(ignoreRecord: true)
-                            ->disabled(static fn (?Model $record): bool => $record instanceof Model && RoleResource::isProtected($record)),
+                            ->disabled(static fn (?Model $record): bool => $record instanceof Model && RoleResource::isProtected($record))
+                            ->notIn(static fn (?Model $record): array => self::otherProtectedNames($record)),
 
                         TextInput::make('title')
                             ->label(__('filament-warden::ui.resources.roles.fields.title'))
@@ -61,5 +63,46 @@ class RoleForm
                             ->columnSpanFull(),
                     ]),
             ]);
+    }
+
+    /**
+     * The protected names this form refuses: every one but the record's own.
+     *
+     * `roles.protected` matches by name, so the list is a door that locks behind
+     * whoever walks onto it. A role holding one of those names can no longer be
+     * renamed, deleted, or have its grid touched — and nothing was asking on the
+     * way in: the name field is only disabled for a role that is ALREADY
+     * protected, and the create screen has no record to ask about at all. Both
+     * screens share this schema, and validation runs on the server, so one rule
+     * closes both doors. Going the other way — a protected role renaming its way
+     * OFF the list — is the opposite movement and is held in `EditRole`.
+     *
+     * The record's own name is exempt for the same reason `unique()` takes
+     * `ignoreRecord: true`. A protected role has this field disabled, and a
+     * disabled field is still VALIDATED — `isValidatedWhenNotDehydrated` defaults
+     * to true — so refusing its own name outright would stop it saving the title
+     * it is still allowed to change. When that name is the only one listed the
+     * result is `Rule::notIn([])`, which compiles to `not_in:` and parses through
+     * `str_getcsv('')` to a single null parameter: a rule with no opinion, not an
+     * error.
+     *
+     * The sentence a person reads is the framework's `validation.not_in`. One of
+     * this package's own, naming the list and saying what holding that name
+     * costs, would be a new translation key — a MINOR — and waits for 1.1.0.
+     *
+     * @return list<string>
+     */
+    private static function otherProtectedNames(?Model $record): array
+    {
+        $protected = Config::get('roles.protected');
+        $own = $record?->getAttribute('name');
+
+        /** @var list<string> $names */
+        $names = array_values(array_filter(
+            is_array($protected) ? $protected : [],
+            static fn (mixed $name): bool => is_string($name) && $name !== $own,
+        ));
+
+        return $names;
     }
 }

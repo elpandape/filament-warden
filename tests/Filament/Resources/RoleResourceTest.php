@@ -268,6 +268,76 @@ test('the title of a protected role is its own business, and it saves', function
     expect($role->refresh()->getAttribute('title'))->toBe('Quien lo puede todo');
 });
 
+test('a role cannot be renamed onto the protected list', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole('editor');
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->fillForm(['name' => 'super-admin'])
+        ->call('save')
+        ->assertHasFormErrors(['name']);
+
+    expect($role->refresh()->getAttribute('name'))->toBe('editor')
+        ->and(RoleResource::isProtected($role))->toBeFalse();
+});
+
+test('a role cannot be created onto the protected list', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('create', roleClass());
+
+    livewire(CreateRole::class)
+        ->fillForm(['name' => 'super-admin', 'title' => 'Born locked'])
+        ->call('create')
+        ->assertHasFormErrors(['name']);
+
+    expect(roleClass()::query()->where('name', 'super-admin')->exists())->toBeFalse();
+});
+
+test('the refused names are the ones the installation listed, not a literal in the code', function (): void {
+    config()->set('filament-warden.roles.protected', ['owner']);
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole('editor');
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->fillForm(['name' => 'owner'])
+        ->call('save')
+        ->assertHasFormErrors(['name']);
+
+    expect($role->refresh()->getAttribute('name'))->toBe('editor');
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->fillForm(['name' => 'super-admin'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($role->refresh()->getAttribute('name'))->toBe('super-admin')
+        ->and(RoleResource::isProtected($role))->toBeFalse();
+});
+
+test('a protected role keeps its name, whatever the browser sends', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole('super-admin');
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->fillForm(['name' => 'owner'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($role->refresh()->getAttribute('name'))->toBe('super-admin')
+        ->and(RoleResource::isProtected($role))->toBeTrue();
+});
+
 test('a role nobody protected is still operated as before', function (): void {
     $user = signIn();
     Warden::allow($user)->to('viewAny', roleClass());
