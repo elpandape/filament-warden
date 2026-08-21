@@ -12,8 +12,9 @@ what is covered is listed under **Stability** in the README and pinned by
 
 A reading of the whole package after `1.0.1`, not a report from an installation this time. Two
 holes open under tenancy, four places that could rewrite a consumer's own data, a screen that
-only reads and drew itself empty, a name that could unprotect a role, and a join that assumed a
-primary key it does not own.
+only reads and drew itself empty, a name that could unprotect a role, a join that assumed a
+primary key it does not own, and a README that documented two things that do not exist — one of
+them fatal at login.
 
 ### Fixed
 
@@ -31,8 +32,8 @@ primary key it does not own.
   with `scope = NULL` whenever role-grant scoping is turned off. The cell was drawn locked, marked
   as another tenant's, and dropped silently from the diff, even though a save through `disallow()`
   would have deleted the grant outright: the caution was not conservative, it was wrong in both
-  directions.
-  The grid now asks the same question warden asks itself, `writeScope(forRoleGrant: ...)`.
+  directions. The grid now asks the same question warden asks itself,
+  `writeScope(forRoleGrant: ...)`.
 - **A Policy action named `manage` collided with the grid's wildcard cell.** The wildcard column
   that draws warden's `*` permission was filed under the state key `'manage'` — a name an
   application's own Policy is free to declare as an action. Measured with a fixture Policy that
@@ -51,6 +52,11 @@ primary key it does not own.
   protected — since `0.4.0`. The form's coincidentally correct behaviour, which disables the field
   for the same reason it shows the notice, is what hid this for six versions: the two questions
   only happened to agree there.
+- **If you ran `vendor:publish --tag=filament-warden-views` on `1.0.1`, neither fix above reaches
+  you until you reintegrate your copies.** Both live in the published templates —
+  `resources/views/grid.blade.php` and `resources/views/infolists/permission-grid.blade.php` — and
+  a published copy silently keeps the old behaviour of both: the read-only grid still draws itself
+  empty, and every role still claims to be protected.
 - **A permission that was both "only what it owns" and "with these conditions" was drawn as plain
   ownership, and the first save dropped the condition.** Warden writes exactly that row — `toOwn()`
   followed by a chained `where()` copies ownership onto the twin — and honours both halves when it
@@ -109,6 +115,35 @@ primary key it does not own.
   cannot stand up without hand-building warden's schema. What was measured instead: the SQL emitted
   on a stock install is byte-for-byte unchanged, and the two suites already covering these
   predicates in both polarities stay green.
+- **The README documented an API that does not exist, and one recipe was fatal at login.**
+  `FilamentWardenPlugin::make()->guardPages(true)->guardWidgets(true)` named two methods the
+  plugin does not have — it is `final` with exactly four: `make`, `getId`, `register`, `boot` —
+  and the `canAccessPanel()` recipe declared the method on the class and called
+  `parent::canAccessPanel($panel)`, which silently shadows the trait's own method and has no
+  `Authenticatable` ancestor to fall back to: following it as written is a fatal error at login.
+  Both now document the working form — `guard.pages` / `guard.widgets` in config, and
+  `use AccessesPanels { canAccessPanel as wardenCanAccessPanel; }` — and `tests/FrozenTest.php`
+  now pins the plugin's four real methods by name, which is what would have caught the invented
+  ones before they shipped.
+- **Six more claims in the README were wrong.** `sync()`'s warning said the opposite of the
+  danger — it *skips* warden's cache bump, it does not invalidate the cache; the navigation config
+  block showed flat keys the package only ever reads nested; `->tenant(null)` is not a Filament
+  resource API, the real declaration is `protected static bool $isScopedToTenant = false;`; the
+  permissions screen was described as showing the full catalogue when it lists a table a fresh
+  install starts with empty; a table-of-contents anchor pointed at a heading that does not exist,
+  and `### Permission Scope` appeared twice, breaking its own link; and the banner image 404s and
+  was removed.
+- **A documentation rewrite after `1.0.0` had quietly dropped four sections the `1.0.0` CHANGELOG
+  promised the README carries.** The `$user->can()` vs. `Access` comparison, the shallow-merge
+  warning for `roles.protected`, the *account* model's stability note, and `warden:clean` under
+  the audit section are back, and the Stability section now names its four frozen methods instead
+  of promising "methods" without listing any.
+- **`CONTRIBUTING.md` and `SECURITY.md` still said "before `1.0.0`."** Both retired that wording
+  now that the surface they were hedging about has been frozen since `1.0.0`.
+- **`illuminate/console` and `livewire/livewire` were used and never declared.** `src/Console/`
+  imports the first and the grid's Livewire bridge imports the second; both only ever arrived
+  transitively through `filament/filament`. Now declared directly — the lock file's resolved
+  versions did not move.
 
 ### Not included
 
@@ -128,11 +163,9 @@ anything needing a new sentence waits for `1.1.0`.
   Both change what the row means. Closing this would widen the set of rows this screen refuses to
   edit, which is a visible behaviour change a patch must not make unannounced.
 
-The audit behind this release also found `README.md` wrong in several places, including some
-introduced by a rewrite after `1.0.1` shipped. That correction has not landed yet and is not part
-of this tag. Also still open, and scheduled: the record-scoped grant the grid still discards without
-a trace, the roles relation manager for the account screen, every performance memo this audit
-wrote down, and a fresh install's empty permission screen.
+Also still open, and scheduled: the record-scoped grant the grid still discards without a trace,
+the roles relation manager for the account screen, every performance memo this audit wrote down,
+and a fresh install's empty permission screen.
 
 ## [1.0.1] - 2026-08-20
 
