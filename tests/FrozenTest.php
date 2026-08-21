@@ -99,6 +99,11 @@ test('the class names an application writes are frozen', function (): void {
     expect(FilamentWardenPlugin::make()->getId())->toBe('filament-warden');
 });
 
+test('the plugin offers exactly the methods the README names', function (): void {
+    expect(get_class_methods(FilamentWardenPlugin::class))
+        ->toBe(['make', 'getId', 'register', 'boot']);
+});
+
 test('the state a grid field hands to a form is frozen', function (): void {
     $user = signIn();
     Warden::allow($user)->to('viewAny', roleClass());
