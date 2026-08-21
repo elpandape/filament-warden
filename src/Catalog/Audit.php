@@ -178,20 +178,27 @@ final readonly class Audit
      * screen, the console and this agree on the word — and without the global
      * scopes, because a row nobody uses belongs to no tenant.
      *
+     * The correlated column is qualified by the model and not by the configured
+     * table name. The outer query already selects from `$model->getTable()`, so
+     * the table half agreed by accident; the key half is only called `id` until
+     * an installation swaps the model. Taking both off one instance is what
+     * makes them unable to disagree.
+     *
      * @return list<string>
      */
     private static function orphans(): array
     {
         $context = Context::resolve();
         $grants = $context->table('grants');
-        $permissions = $context->table('permissions');
+        $permissionClass = $context->permissionClass();
+        $permissionKey = (new $permissionClass)->getQualifiedKeyName();
 
-        $rows = $context->permissionClass()::query()
+        $rows = $permissionClass::query()
             ->withoutGlobalScopes()
             ->whereNotExists(
                 static fn (\Illuminate\Database\Query\Builder $query): \Illuminate\Database\Query\Builder => $query
                     ->from($grants)
-                    ->whereColumn($grants.'.permission_id', $permissions.'.id'),
+                    ->whereColumn($grants.'.permission_id', $permissionKey),
             )
             ->get();
 
@@ -224,9 +231,10 @@ final readonly class Audit
     {
         $context = Context::resolve();
         $grants = $context->table('grants');
-        $permissions = $context->table('permissions');
+        $permissionClass = $context->permissionClass();
+        $permissionKey = (new $permissionClass)->getQualifiedKeyName();
 
-        $rows = $context->permissionClass()::query()
+        $rows = $permissionClass::query()
             ->withoutGlobalScopes()
             // The catalogue holds classes, never rows: a grant over one record is
             // not a typo.
@@ -234,7 +242,7 @@ final readonly class Audit
             ->whereExists(
                 static fn (\Illuminate\Database\Query\Builder $query): \Illuminate\Database\Query\Builder => $query
                     ->from($grants)
-                    ->whereColumn($grants.'.permission_id', $permissions.'.id'),
+                    ->whereColumn($grants.'.permission_id', $permissionKey),
             )
             ->get();
 

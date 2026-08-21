@@ -151,15 +151,20 @@ class PermissionsTable
      * console agree on what an orphan is — and built against the grants table
      * rather than through `Permission::roles()`, which reaches roles only and
      * welds a tenant predicate no scope removal can strip.
+     *
+     * The permission side is qualified by the model, which is what the listing
+     * selects from: its key is only called `id` until an installation swaps the
+     * model.
      */
     private static function grants(QueryBuilder $query): void
     {
         $context = Context::resolve();
+        $permissionClass = $context->permissionClass();
 
         $query->from($context->table('grants'))
             ->whereColumn(
                 $context->table('grants').'.permission_id',
-                $context->table('permissions').'.id',
+                (new $permissionClass)->getQualifiedKeyName(),
             );
     }
 
