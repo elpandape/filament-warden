@@ -55,16 +55,29 @@ class EditPermission extends EditRecord
     {
         $record = $this->getRecord();
 
-        // A disabled field is not dehydrated, so neither of these two should be
+        // A disabled field is not dehydrated, so none of these four should be
         // in `$data` at all — and the guarantee is not left resting on how
-        // another package derives that flag. What may not be re-pointed is
-        // written back exactly as it already was.
+        // another package derives that flag. What may not be edited is written
+        // back exactly as it already was.
         //
-        // First, because everything below reads `entity_type` as the entity
-        // about to be saved.
+        // The name and the entity go first, because everything below reads
+        // `entity_type` as the entity about to be saved.
         if (! PermissionResource::mayEditName($record)) {
             $data['name'] = $record->getAttribute('name');
             $data['entity_type'] = $record->getAttribute('entity_type');
+        }
+
+        // Ownership and conditions narrow what the row means rather than
+        // re-point it, so they answer their own config switch instead of
+        // `mayEditName()`. Whichever screen greys either field out, the row
+        // still deserves the same server-side floor as the name and the
+        // entity above.
+        if (! PermissionResource::mayEditOwnership($record)) {
+            $data['only_owned'] = $record->getAttribute('only_owned');
+        }
+
+        if (! PermissionResource::mayEditConditions($record)) {
+            $data['options'] = $record->getAttribute('options');
         }
 
         $entityType = $this->nullableText($this->submitted($data, 'entity_type'));

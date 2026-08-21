@@ -152,8 +152,15 @@ class PermissionResource extends Resource
      * the same reason: a grant in another tenant is a person relying on this row
      * whatever tenant is active while somebody edits it.
      *
-     * The question is asked last, so it costs nothing where the config already
-     * answers — a derived row at the shipped `'loose'`, or anything at `'all'`.
+     * The question is asked last, so it is skipped wherever `mayEdit()` already
+     * says no — a derived row under `'loose'`, or anything under `false` or
+     * `'title'` — and it is also skipped under `'all'`, which short-circuits on
+     * its own clause before `Holders::of()` runs. It is NOT skipped for the
+     * shipped default's most common row: a loose permission (no entity) under
+     * the shipped `'loose'` rule, where `mayEdit()` returns `true` and this
+     * clause always reads `grants`. Measured on the edit screen for exactly that
+     * case: 8 extra reads over the 1.0.1 body, one per call site per evaluation
+     * — see 'the lock's grant reads are capped, not promised to cost nothing'.
      */
     public static function mayEditName(Model $record): bool
     {

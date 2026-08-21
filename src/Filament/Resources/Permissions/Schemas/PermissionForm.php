@@ -380,10 +380,14 @@ class PermissionForm
             ->where('name', $name)
             ->where('only_owned', (bool) $get('only_owned'))
             ->whereNull('options')
-            // `where('column', null)` compiles to `= null`, which is never true.
-            // Both halves of the entity are nullable, so each needs its own null
-            // arm or the rule would stop firing for the loose permissions, which
-            // is most of them.
+            // `Query\Builder::where()` already short-circuits a `null` value to
+            // `whereNull()` on its own (`vendor/laravel/framework/…/Builder.php:
+            // 986-991`), for both the two-arg form used here and the three-arg
+            // `=` form, so a plain `where('entity_type', $entityType)` would read
+            // the same rows. The explicit branch is defensive, not corrective:
+            // it says what the query means without leaning on a Laravel internal
+            // a reader of this file has no reason to have memorised, and it is
+            // what the two tests below actually exercise.
             ->when(
                 $entityType === null,
                 static fn (mixed $query): mixed => $query->whereNull('entity_type'),

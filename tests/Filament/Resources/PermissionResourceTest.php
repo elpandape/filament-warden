@@ -591,7 +591,7 @@ test('the save keeps the lock the screen draws', function (): void {
     expect($held->refresh()->getAttribute('name'))->toBe('export');
 });
 
-test('the lock does not multiply what the screen asks the store', function (): void {
+test("the lock's grant reads are capped, not promised to cost nothing", function (): void {
     config()->set('filament-warden.permissions.update', 'loose');
 
     $user = signIn();
@@ -607,7 +607,7 @@ test('the lock does not multiply what the screen asks the store', function (): v
 
     livewire(EditPermission::class, ['record' => $held->getKey()]);
 
-    expect(grantReads())->toBeLessThanOrEqual(12);
+    expect(grantReads())->toBeLessThanOrEqual(16);
 });
 
 test('a row a single holder has says so too, and one nobody has says nothing', function (): void {
