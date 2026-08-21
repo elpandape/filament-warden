@@ -580,6 +580,55 @@ test('a rule pinned to one record is said above the grid', function (): void {
         ->assertSee('This role also holds rules pinned to single records.');
 });
 
+test('a granted and a forbidden record-pinned rule read apart in words', function (): void {
+    $granted = makeRole();
+    $forbidden = makeRole('auditor');
+    $target = makeRole('reviewer');
+
+    Warden::allow($granted)->to('view', $target);
+    Warden::forbid($forbidden)->to('view', $target);
+
+    $grantedHtml = livewire(GridHost::class, ['roleKey' => $granted->getKey()])->html();
+    $forbiddenHtml = livewire(GridHost::class, ['roleKey' => $forbidden->getKey()])->html();
+
+    expect($grantedHtml)
+        ->toContain('>'.__('filament-warden::ui.grid.states.granted').'</span>')
+        ->and($forbiddenHtml)
+        ->toContain('>'.__('filament-warden::ui.grid.states.forbidden').'</span>');
+});
+
+/**
+ * The wider-rule notice's own markup, cut out of the rendered page by its
+ * class. A cell reached by the same wider rule says the identical word in its
+ * own sr-only span (§ box.blade.php), so an unscoped assertion would pass
+ * whether or not this block carried the word itself — this is what forces the
+ * assertion to look only inside `<p class="fw-wider">`.
+ */
+function widerNoticeOf(string $html): string
+{
+    $pattern = '/<p class="fw-wider">.*?<\/p>/s';
+
+    $matches = [];
+
+    return preg_match($pattern, $html, $matches) === 1 ? $matches[0] : '';
+}
+
+test('the wider rule a role holds over everything reads apart in words', function (): void {
+    $granted = makeRole();
+    $forbidden = makeRole('auditor');
+
+    Warden::allow($granted)->everything();
+    Warden::forbid($forbidden)->everything();
+
+    $grantedHtml = livewire(GridHost::class, ['roleKey' => $granted->getKey()])->html();
+    $forbiddenHtml = livewire(GridHost::class, ['roleKey' => $forbidden->getKey()])->html();
+
+    expect(widerNoticeOf($grantedHtml))
+        ->toContain('>'.__('filament-warden::ui.grid.states.granted').'</span>')
+        ->and(widerNoticeOf($forbiddenHtml))
+        ->toContain('>'.__('filament-warden::ui.grid.states.forbidden').'</span>');
+});
+
 test('a grid the application disabled says so, and does not call the role protected', function (): void {
     $role = makeRole();
 

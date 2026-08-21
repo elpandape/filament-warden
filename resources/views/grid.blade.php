@@ -43,6 +43,7 @@
                         {{ __('filament-warden::ui.grid.wider') }}
                         @foreach ($grid->wider as $name => $stance)
                             <span class="fw-box" data-state="{{ $stance }}" aria-hidden="true"></span>
+                            <span class="fw-sr">{{ $states[$stance] }}</span>
                             <code>{{ $name }}</code>
                         @endforeach
                     </p>
@@ -54,6 +55,7 @@
                         @foreach ($grid->records as $pinned)
                             <span class="fw-record">
                                 <span class="fw-box" data-state="{{ $pinned->stance->value }}" aria-hidden="true"></span>
+                                <span class="fw-sr">{{ $states[$pinned->stance->value] }}</span>
                                 <code>{{ $pinned->name }}</code>
                                 <code>{{ $pinned->model }}</code>
                                 <span class="fw-record-id">#{{ $pinned->id }}</span>
