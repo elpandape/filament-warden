@@ -32,9 +32,17 @@ class EditPermission extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            // The delete takes its grants with it below Eloquent, and nothing in
+            // warden bumps the version for a write made through the model layer:
+            // without the hook every check goes on answering the old way,
+            // silently and with no expiry. Void on purpose — whatever `after()`
+            // returns stands in for the action's own result.
             DeleteAction::make()
                 ->modalDescription(static fn (Model $record): string => PermissionsTable::warning($record))
-                ->visible(fn (Model $record): bool => PermissionResource::canDelete($record)),
+                ->visible(fn (Model $record): bool => PermissionResource::canDelete($record))
+                ->after(static function (): void {
+                    Warden::refresh();
+                }),
         ];
     }
 

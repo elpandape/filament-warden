@@ -331,6 +331,79 @@ test('an edit made here reaches the store, which nothing in warden invalidates',
         ->and(Access::granted($holder, 'browse', Post::class))->toBeTrue();
 });
 
+test('deleting a permission from the listing reaches the store, which nothing in warden invalidates', function (): void {
+    config()->set('cache.default', 'array');
+    config()->set('filament-warden.permissions.delete', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('delete', permissionClass());
+
+    $holder = makeUser('Holder');
+    Warden::allow($holder)->to('viewAny', Post::class);
+
+    // Warmed on purpose: the check is answered from the cache from here on, and
+    // only warden's own fluent actions bump the version behind it.
+    expect(Access::granted($holder, 'viewAny', Post::class))->toBeTrue();
+
+    $permission = heldRow();
+
+    livewire(ListPermissions::class)
+        ->call('mountAction', 'delete', [], ['table' => true, 'recordKey' => recordKey($permission)])
+        ->call('callMountedAction', []);
+
+    expect(permissionClass()::query()->withoutGlobalScopes()->whereKey($permission->getKey())->exists())->toBeFalse()
+        ->and(Access::granted($holder, 'viewAny', Post::class))->toBeFalse();
+});
+
+test('deleting a permission from its edit screen reaches the store too', function (): void {
+    config()->set('cache.default', 'array');
+    config()->set('filament-warden.permissions.delete', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+    Warden::allow($user)->to('delete', permissionClass());
+
+    $holder = makeUser('Holder');
+    Warden::allow($holder)->to('viewAny', Post::class);
+
+    expect(Access::granted($holder, 'viewAny', Post::class))->toBeTrue();
+
+    $permission = heldRow();
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->call('mountAction', 'delete', [])
+        ->call('callMountedAction', []);
+
+    expect(permissionClass()::query()->withoutGlobalScopes()->whereKey($permission->getKey())->exists())->toBeFalse()
+        ->and(Access::granted($holder, 'viewAny', Post::class))->toBeFalse();
+});
+
+test('deleting a permission from its view screen reaches the store too', function (): void {
+    config()->set('cache.default', 'array');
+    config()->set('filament-warden.permissions.delete', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+    Warden::allow($user)->to('delete', permissionClass());
+
+    $holder = makeUser('Holder');
+    Warden::allow($holder)->to('viewAny', Post::class);
+
+    expect(Access::granted($holder, 'viewAny', Post::class))->toBeTrue();
+
+    $permission = heldRow();
+
+    livewire(ViewPermission::class, ['record' => $permission->getKey()])
+        ->call('mountAction', 'delete', [])
+        ->call('callMountedAction', []);
+
+    expect(permissionClass()::query()->withoutGlobalScopes()->whereKey($permission->getKey())->exists())->toBeFalse()
+        ->and(Access::granted($holder, 'viewAny', Post::class))->toBeFalse();
+});
+
 test('renaming regenerates a title warden wrote, and leaves one a person wrote', function (): void {
     config()->set('filament-warden.permissions.update', 'all');
 

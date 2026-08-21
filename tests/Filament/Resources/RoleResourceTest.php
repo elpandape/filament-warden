@@ -463,3 +463,79 @@ test('a protected role survives the delete action itself, not only the check', f
     expect(roleClass()::query()->whereKey($protected->getKey())->exists())->toBeTrue()
         ->and(roleClass()::query()->whereKey($plain->getKey())->exists())->toBeFalse();
 });
+
+test('deleting a role from the listing reaches the store, which nothing in warden invalidates', function (): void {
+    config()->set('cache.default', 'array');
+    config()->set('filament-warden.roles.delete', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $role = makeRole('editor');
+    Warden::allow($role)->to('viewAny', roleClass());
+
+    $holder = makeUser('Holder');
+    Warden::assign($role)->to($holder);
+
+    // Warmed on purpose: the check is answered from the cache from here on, and
+    // only warden's own fluent actions bump the version behind it.
+    expect(Access::granted($holder, 'viewAny', roleClass()))->toBeTrue();
+
+    livewire(ListRoles::class)
+        ->call('mountAction', 'delete', [], ['table' => true, 'recordKey' => recordKey($role)])
+        ->call('callMountedAction', []);
+
+    expect(roleClass()::query()->whereKey($role->getKey())->exists())->toBeFalse()
+        ->and(Access::granted($holder, 'viewAny', roleClass()))->toBeFalse();
+});
+
+test('deleting a role from its edit screen reaches the store too', function (): void {
+    config()->set('cache.default', 'array');
+    config()->set('filament-warden.roles.delete', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $role = makeRole('editor');
+    Warden::allow($role)->to('viewAny', roleClass());
+
+    $holder = makeUser('Holder');
+    Warden::assign($role)->to($holder);
+
+    expect(Access::granted($holder, 'viewAny', roleClass()))->toBeTrue();
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->call('mountAction', 'delete', [])
+        ->call('callMountedAction', []);
+
+    expect(roleClass()::query()->whereKey($role->getKey())->exists())->toBeFalse()
+        ->and(Access::granted($holder, 'viewAny', roleClass()))->toBeFalse();
+});
+
+test('deleting a role from its view screen reaches the store too', function (): void {
+    config()->set('cache.default', 'array');
+    config()->set('filament-warden.roles.delete', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $role = makeRole('editor');
+    Warden::allow($role)->to('viewAny', roleClass());
+
+    $holder = makeUser('Holder');
+    Warden::assign($role)->to($holder);
+
+    expect(Access::granted($holder, 'viewAny', roleClass()))->toBeTrue();
+
+    livewire(ViewRole::class, ['record' => $role->getKey()])
+        ->call('mountAction', 'delete', [])
+        ->call('callMountedAction', []);
+
+    expect(roleClass()::query()->whereKey($role->getKey())->exists())->toBeFalse()
+        ->and(Access::granted($holder, 'viewAny', roleClass()))->toBeFalse();
+});

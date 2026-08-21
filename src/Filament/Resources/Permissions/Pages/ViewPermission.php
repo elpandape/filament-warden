@@ -11,6 +11,7 @@ use ElPandaPe\FilamentWarden\Grants\Holders;
 use ElPandaPe\FilamentWarden\Grants\Probe;
 use ElPandaPe\FilamentWarden\Grants\Reach;
 use ElPandaPe\FilamentWarden\Support\Config;
+use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -88,9 +89,17 @@ class ViewPermission extends ViewRecord
             EditAction::make()
                 ->visible(fn (Model $record): bool => PermissionResource::canEdit($record)),
 
+            // The delete takes its grants with it below Eloquent, and nothing in
+            // warden bumps the version for a write made through the model layer:
+            // without the hook every check goes on answering the old way,
+            // silently and with no expiry. Void on purpose — whatever `after()`
+            // returns stands in for the action's own result.
             DeleteAction::make()
                 ->modalDescription(static fn (Model $record): string => PermissionsTable::warning($record))
-                ->visible(fn (Model $record): bool => PermissionResource::canDelete($record)),
+                ->visible(fn (Model $record): bool => PermissionResource::canDelete($record))
+                ->after(static function (): void {
+                    Warden::refresh();
+                }),
 
             ...$this->probe(),
         ];
