@@ -6,9 +6,10 @@ Thanks for considering a contribution.
 
 - **No local PHP or Composer needed.** Everything runs through Docker via `make`.
   If a command in this file is not a `make` target, it is a bug in this file.
-- **The public API is not frozen yet.** Before `1.0.0` it may change between minor
-  versions; anything that breaks a documented signature, config key or behavior still
-  needs a good reason and a CHANGELOG entry.
+- **The public API is frozen from `1.0.0`.** What is covered is listed under **Stability**
+  in the README and pinned by `tests/FrozenTest.php`. Breaking any of it is a major and
+  needs a CHANGELOG entry saying what moved and why; adding a config or translation key
+  is a minor, removing or renaming one is not.
 - **Fail closed.** When a check cannot be decided, the answer is "no". Corrupt data,
   missing attributes and inexpressible conditions must never widen a grant.
 
