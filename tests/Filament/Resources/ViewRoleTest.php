@@ -156,6 +156,29 @@ test('only a role the installation protects is announced as protected', function
         ->assertDontSee('fw-locked-notice', escape: false);
 });
 
+test('a screen that only reads says so, and a protected role still says the other thing', function (): void {
+    $user = signIn();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $plain = makeRole('editor');
+    $protected = makeRole('super-admin');
+
+    livewire(ViewRole::class, ['record' => $plain->getKey()])
+        ->assertSee('fw-read-only-notice', escape: false)
+        ->assertDontSee('fw-locked-notice', escape: false);
+
+    livewire(ViewRole::class, ['record' => $protected->getKey()])
+        ->assertSee('fw-locked-notice', escape: false)
+        ->assertDontSee('fw-read-only-notice', escape: false);
+
+    livewire(EditRole::class, ['record' => $protected->getKey()])
+        ->assertSee('fw-locked-notice', escape: false)
+        ->assertDontSee('fw-read-only-notice', escape: false);
+});
+
 test('the inspector answers here too, because understanding is reading', function (): void {
     $user = signIn();
     $role = makeRole();

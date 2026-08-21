@@ -579,3 +579,20 @@ test('a rule pinned to one record is said above the grid', function (): void {
         ->assertSee('#'.recordKey($other))
         ->assertSee('This role also holds rules pinned to single records.');
 });
+
+test('a grid the application disabled says so, and does not call the role protected', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey(), 'locked' => true])
+        ->assertSee('fw-read-only-notice', escape: false)
+        ->assertSee('its cells select, they do not cycle', escape: false)
+        ->assertDontSee('fw-locked-notice', escape: false);
+});
+
+test('a grid nobody disabled says nothing at all', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertDontSee('fw-read-only-notice', escape: false)
+        ->assertDontSee('fw-locked-notice', escape: false);
+});

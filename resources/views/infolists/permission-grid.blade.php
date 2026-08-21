@@ -14,7 +14,7 @@
 <x-dynamic-component :component="$getEntryWrapperView()" :entry="$entry">
     @include('filament-warden::grid', [
         'grid' => $grid,
-        'interactive' => false,
+        'interactive' => $grid->isInteractive,
         'binding' => $binding,
         'componentKey' => $getKey(),
     ])

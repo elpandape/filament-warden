@@ -31,9 +31,18 @@ final class GridHost extends Component implements HasActions, HasSchemas
 
     public int|string $roleKey = 0;
 
-    public function mount(int|string $roleKey): void
+    /**
+     * Whether the host disables the field, which is the one thing this fixture
+     * exists to vary. A consumer may disable the grid on a role the installation
+     * does not protect, and that render has nothing to do with protection: the
+     * two say different sentences and the fixture has to be able to produce both.
+     */
+    public bool $locked = false;
+
+    public function mount(int|string $roleKey, bool $locked = false): void
     {
         $this->roleKey = $roleKey;
+        $this->locked = $locked;
 
         $this->form->fill();
     }
@@ -41,7 +50,7 @@ final class GridHost extends Component implements HasActions, HasSchemas
     public function form(Schema $schema): Schema
     {
         return $schema
-            ->components([PermissionGrid::make('permissions')])
+            ->components([PermissionGrid::make('permissions')->disabled($this->locked)])
             ->record($this->role())
             ->statePath('data');
     }

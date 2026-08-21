@@ -5,7 +5,9 @@
 @php
     $grid = $getGrid();
     // A locked grid is read, not operated: its cells select, they do not cycle.
-    $interactive = ! $isDisabled();
+    // The field is the only thing that knows it was disabled and it hands the
+    // answer to the view model, so one rule serves both the cells and the notice.
+    $interactive = $grid->isInteractive;
     $binding = '$wire.'.$applyStateBindingModifiers("\$entangle('{$getStatePath()}')");
 @endphp
 

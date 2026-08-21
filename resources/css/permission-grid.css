@@ -345,7 +345,8 @@
     cursor: default;
 }
 
-.fw-locked-notice {
+.fw-locked-notice,
+.fw-read-only-notice {
     margin: 0 0 0.75rem;
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--fw-line);

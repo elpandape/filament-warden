@@ -72,6 +72,14 @@ final class PermissionGrid extends Field
         return State::stances($this->getState());
     }
 
+    /**
+     * The application decides, by disabling the field or not.
+     */
+    protected function gridInteracts(): bool
+    {
+        return ! $this->isDisabled();
+    }
+
     protected function onScreenStance(string $row, string $action): Stance
     {
         return self::stanceIn($this->gridState(), $row, $action);

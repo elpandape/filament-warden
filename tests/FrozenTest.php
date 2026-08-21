@@ -287,6 +287,7 @@ test('the translation keys an application overrides are frozen', function (): vo
         'conditions.locked.elsewhere',
         'grid.panel',
         'grid.locked',
+        'grid.read_only',
         'grid.read_description',
         'grid.description',
         'grid.label',

@@ -22,6 +22,10 @@
                     <p class="fw-locked-notice">{{ __('filament-warden::ui.grid.locked') }}</p>
                 @endif
 
+                @if ($grid->isReadOnly())
+                    <p class="fw-read-only-notice">{{ __('filament-warden::ui.grid.read_only') }}</p>
+                @endif
+
                 @if ($grid->mixing())
                     <p class="fw-note fw-note-locked">{{ __('filament-warden::ui.grid.mixing') }}</p>
                 @endif

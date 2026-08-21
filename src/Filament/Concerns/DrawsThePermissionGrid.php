@@ -44,6 +44,15 @@ trait DrawsThePermissionGrid
     abstract protected function gridState(): array;
 
     /**
+     * Whether the cells this render draws are controls.
+     *
+     * Neither screen can derive this from the other. A field is a control unless
+     * the application disabled it — and only the field knows that — while a
+     * screen that only reads never is, whatever it was handed.
+     */
+    abstract protected function gridInteracts(): bool;
+
+    /**
      * Why one cell is the way it is — asked for, never volunteered.
      *
      * `explain()` costs three to seven queries with no cache and no batching, so
@@ -151,7 +160,13 @@ trait DrawsThePermissionGrid
 
     public function getGrid(): GridView
     {
-        return GridView::for($this->catalog(), $this->storedState(), $this->gridState(), $this->protectedRole());
+        return GridView::for(
+            $this->catalog(),
+            $this->storedState(),
+            $this->gridState(),
+            $this->protectedRole(),
+            $this->gridInteracts(),
+        );
     }
 
     /**

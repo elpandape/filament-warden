@@ -373,3 +373,14 @@ test('the browser is handed every drawable cell, so it can tally the same way', 
         ->and(array_column($cells, 'action'))->toContain('viewAny')
         ->and($cells)->toHaveSameSize(rowFor(tabNamed($grid, 'resources'), Post::class)->drawnCells());
 });
+
+test('a grid is read-only when nothing else already explains why it does not write', function (): void {
+    $catalog = Catalog::for(Panel::make()->id('scratch')->resources([PostResource::class]));
+
+    expect(GridView::for($catalog, new RoleState, [], isProtected: false, isInteractive: false)->isReadOnly())
+        ->toBeTrue()
+        ->and(GridView::for($catalog, new RoleState, [], isProtected: true, isInteractive: false)->isReadOnly())
+        ->toBeFalse()
+        ->and(GridView::for($catalog, new RoleState, [], isProtected: false, isInteractive: true)->isReadOnly())
+        ->toBeFalse();
+});

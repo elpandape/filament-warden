@@ -33,6 +33,7 @@ final readonly class GridView
      * @param  list<RecordGrant>  $records  rules pinned to one row: reported above the grid, never drawn as a cell
      * @param  array{stances: array<string, array<string, string>>, narrowing: array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>}  $stored  the store, in the shape the browser holds it
      * @param  bool  $isProtected  whether the installation protects this role, which is not the same question as whether this screen can edit it
+     * @param  bool  $isInteractive  whether this render's cells are controls, which the component knows and the view model does not
      */
     private function __construct(
         public array $tabs,
@@ -41,6 +42,7 @@ final readonly class GridView
         public array $records,
         public array $stored,
         public bool $isProtected,
+        public bool $isInteractive,
     ) {}
 
     /**
@@ -52,6 +54,7 @@ final readonly class GridView
         RoleState $stored = new RoleState,
         array $state = [],
         bool $isProtected = false,
+        bool $isInteractive = true,
     ): self {
         $narrowings = $stored->narrowings;
         $wider = $stored->wider;
@@ -82,6 +85,7 @@ final readonly class GridView
             records: $stored->records,
             stored: $stored->toPayload(),
             isProtected: $isProtected,
+            isInteractive: $isInteractive,
         );
     }
 
@@ -141,6 +145,24 @@ final readonly class GridView
     public function mixing(): bool
     {
         return Tenants::mixing();
+    }
+
+    /**
+     * Whether this grid needs to be told it does not write.
+     *
+     * A protected role already has a sentence that says more than this one: it
+     * names the cause, and the reader can act on it. The other two ways of
+     * arriving at a grid that is not a control — a field the application
+     * disabled, a screen that only reads — get one sentence between them,
+     * because the package cannot tell them apart honestly and naming a cause it
+     * cannot check is the defect this answer exists to remove.
+     *
+     * The exclusivity lives here and not in the template for the reason every
+     * other rule does: `src/` is the half the coverage gate measures.
+     */
+    public function isReadOnly(): bool
+    {
+        return ! $this->isInteractive && ! $this->isProtected;
     }
 
     /**

@@ -30,4 +30,12 @@ final class PermissionGridEntry extends ViewEntry
     {
         return $this->storedState()->stances;
     }
+
+    /**
+     * Never. An entry is not a control, and there is nothing to ask.
+     */
+    protected function gridInteracts(): bool
+    {
+        return false;
+    }
 }
