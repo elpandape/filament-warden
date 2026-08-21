@@ -36,6 +36,23 @@
                     </p>
                 @endif
 
+                @if ($grid->records !== [])
+                    <p class="fw-records">
+                        {{ __('filament-warden::ui.grid.records') }}
+                        @foreach ($grid->records as $pinned)
+                            <span class="fw-record">
+                                <span class="fw-box" data-state="{{ $pinned->stance->value }}" aria-hidden="true"></span>
+                                <code>{{ $pinned->name }}</code>
+                                <code>{{ $pinned->model }}</code>
+                                <span class="fw-record-id">#{{ $pinned->id }}</span>
+                                @if ($pinned->reach() !== null)
+                                    <span class="fw-record-reach">{{ __('filament-warden::ui.reach.'.$pinned->reach()) }}</span>
+                                @endif
+                            </span>
+                        @endforeach
+                    </p>
+                @endif
+
                 <div class="fw-tabs" role="tablist">
                     @foreach ($grid->tabs as $tab)
                         <button

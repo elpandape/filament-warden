@@ -59,9 +59,7 @@ class PermissionInfolist
                         TextEntry::make('reach')
                             ->label(__('filament-warden::ui.resources.permissions.columns.reach'))
                             ->badge()
-                            ->state(static fn (Model $record): string => (string) __(
-                                'filament-warden::ui.reach.'.Narrowing::of($record)->shape->value,
-                            )),
+                            ->state(static fn (Model $record): string => self::reach($record)),
 
                         TextEntry::make('rule')
                             ->label(__('filament-warden::ui.resources.permissions.fields.conditions'))
@@ -116,6 +114,20 @@ class PermissionInfolist
             (string) __('filament-warden::ui.conditions.and'),
             (string) __('filament-warden::ui.conditions.or'),
         );
+    }
+
+    /**
+     * The same word the listing badges, worked out the same way. Both screens
+     * change together or they disagree about one row: a rule pinned to a record
+     * answers no class check, and no shape of the reach map describes it.
+     */
+    private static function reach(Model $record): string
+    {
+        if ($record->getAttribute('entity_id') !== null) {
+            return (string) __('filament-warden::ui.resources.permissions.entity.record');
+        }
+
+        return (string) __('filament-warden::ui.reach.'.Narrowing::of($record)->shape->value);
     }
 
     private static function catalog(): Catalog

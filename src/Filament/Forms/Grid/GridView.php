@@ -10,6 +10,7 @@ use ElPandaPe\FilamentWarden\Catalog\Origin;
 use ElPandaPe\FilamentWarden\Catalog\Scope;
 use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Conditions\Words;
+use ElPandaPe\FilamentWarden\Grants\RecordGrant;
 use ElPandaPe\FilamentWarden\Grants\RoleState;
 use ElPandaPe\FilamentWarden\Grants\Tenants;
 use ElPandaPe\FilamentWarden\Support\Config;
@@ -29,6 +30,7 @@ final readonly class GridView
      * @param  list<Tab>  $tabs
      * @param  list<ColumnGroup>  $groups
      * @param  array<string, string>  $wider
+     * @param  list<RecordGrant>  $records  rules pinned to one row: reported above the grid, never drawn as a cell
      * @param  array{stances: array<string, array<string, string>>, narrowing: array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>}  $stored  the store, in the shape the browser holds it
      * @param  bool  $isProtected  whether the installation protects this role, which is not the same question as whether this screen can edit it
      */
@@ -36,6 +38,7 @@ final readonly class GridView
         public array $tabs,
         public array $groups,
         public array $wider,
+        public array $records,
         public array $stored,
         public bool $isProtected,
     ) {}
@@ -76,6 +79,7 @@ final readonly class GridView
             tabs: array_values(array_filter($tabs, static fn (Tab $tab): bool => ! $tab->isEmpty())),
             groups: $groups,
             wider: $wider,
+            records: $stored->records,
             stored: $stored->toPayload(),
             isProtected: $isProtected,
         );

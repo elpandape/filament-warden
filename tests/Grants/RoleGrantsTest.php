@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Conditions\Shape;
+use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Grants\RoleState;
@@ -216,6 +217,101 @@ test('a grant over one record is not a cell of the grid', function (): void {
     Warden::allow($role)->to('view', $post);
 
     expect(RoleGrants::of($role, gridCatalog())->stances)->toBeEmpty();
+});
+
+test('a grant over one record is reported instead of discarded', function (): void {
+    $role = makeRole();
+    $post = Post::query()->create(['title' => 'A post']);
+
+    Warden::allow($role)->to('view', $post);
+
+    $records = RoleGrants::of($role, gridCatalog())->records;
+
+    expect($records)->toHaveCount(1)
+        ->and($records[0]->name)->toBe('view')
+        ->and($records[0]->model)->toBe(Post::class)
+        ->and($records[0]->id)->toBe(recordKey($post))
+        ->and($records[0]->stance)->toBe(Stance::Granted)
+        ->and($records[0]->reach())->toBeNull();
+});
+
+test('a record grant is never reported as a rule over every entity', function (): void {
+    $role = makeRole();
+    $post = Post::query()->create(['title' => 'A post']);
+
+    Warden::allow($role)->to('view', $post);
+
+    $state = RoleGrants::of($role, gridCatalog());
+
+    expect($state->wider)->toBeEmpty()
+        ->and($state->records)->toHaveCount(1);
+});
+
+test('a record grant that is a denial is reported as one', function (): void {
+    $role = makeRole();
+    $post = Post::query()->create(['title' => 'A post']);
+
+    Warden::forbid($role)->to('view', $post);
+
+    $records = RoleGrants::of($role, gridCatalog())->records;
+
+    expect($records)->toHaveCount(1)
+        ->and($records[0]->stance)->toBe(Stance::Forbidden);
+});
+
+test('a record grant carries the rule written on it', function (): void {
+    $role = makeRole();
+    $post = Post::query()->create(['title' => 'A post']);
+
+    Warden::allow($role)->to('view', $post)->where('title', '=', 'A post');
+
+    $records = RoleGrants::of($role, gridCatalog())->records;
+
+    expect($records)->toHaveCount(1)
+        ->and($records[0]->narrowing->shape)->toBe(Shape::Conditions)
+        ->and($records[0]->reach())->toBe('conditions');
+});
+
+test('a record grant over a model the panel does not show is left out', function (): void {
+    $role = makeRole();
+    $user = makeUser();
+
+    Warden::allow($role)->to('view', $user);
+
+    expect(RoleGrants::of($role, gridCatalog())->records)->toBeEmpty();
+});
+
+test('a record grant written under another tenant is marked, not offered', function (): void {
+    $role = makeRole();
+    $post = Post::query()->create(['title' => 'A post']);
+
+    Warden::tenant()->onceTo(7, static function () use ($role, $post): void {
+        Warden::allow($role)->to('view', $post);
+    });
+
+    $records = RoleGrants::of($role, gridCatalog())->records;
+
+    expect($records)->toHaveCount(1)
+        ->and($records[0]->narrowing->shape)->toBe(Shape::Elsewhere)
+        ->and($records[0]->reach())->toBe('elsewhere');
+});
+
+test('a wildcard rule carrying a record key is reported by neither list', function (): void {
+    $role = makeRole();
+    $post = Post::query()->create(['title' => 'A post']);
+
+    Warden::allow($role)->to('view', $post);
+
+    permissionClass()::query()
+        ->withoutGlobalScopes()
+        ->whereNotNull('entity_id')
+        ->update(['entity_type' => '*']);
+
+    $state = RoleGrants::of($role, gridCatalog());
+
+    expect($state->wider)->toBeEmpty()
+        ->and($state->records)->toBeEmpty()
+        ->and($state->stances)->toBeEmpty();
 });
 
 test('a role granted everything does not confuse the grid', function (): void {

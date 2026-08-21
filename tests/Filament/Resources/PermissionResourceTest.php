@@ -91,6 +91,18 @@ test('an authority the store trusts sees the catalogue', function (): void {
         ->assertOk();
 });
 
+test('a permission pinned to one record does not badge as reaching every row', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+
+    $post = Post::query()->create(['title' => 'A post']);
+    Warden::allow(makeRole())->to('view', $post);
+
+    livewire(ListPermissions::class)
+        ->assertSee('One record only')
+        ->assertOk();
+});
+
 test('a fresh installation cannot mint a permission nothing consults', function (): void {
     $user = signIn();
     Warden::allow($user)->to('create', permissionClass());

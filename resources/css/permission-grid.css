@@ -506,8 +506,10 @@ tr:hover .fw-shortcuts,
     flex-basis: 100%;
 }
 
-/* A rule the grid cannot hold: it owns no cell, so it is said rather than drawn. */
-.fw-wider {
+/* Two rules the grid cannot hold as cells: one wider than every cell, one
+   narrower than any. Both own no cell, so both are said rather than drawn. */
+.fw-wider,
+.fw-records {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -520,9 +522,25 @@ tr:hover .fw-shortcuts,
     color: var(--fw-muted);
 }
 
-.fw-wider code {
+.fw-wider code,
+.fw-records code,
+.fw-record-id {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.75rem;
+}
+
+/* One pinned rule is several tokens, so it is grouped: without this the name,
+   the model and the key run together into the next entry. */
+.fw-record {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.fw-record-reach {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
 /* The condition builder --------------------------------------------------- */

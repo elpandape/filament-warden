@@ -37,6 +37,7 @@ return [
             'entity' => [
                 'none' => 'None: a loose permission',
                 'any' => 'Any entity',
+                'record' => 'One record only',
             ],
             'columns' => [
                 'title' => 'Title',
@@ -254,6 +255,7 @@ return [
         ],
         'mixing' => 'No tenant is active, so this shows every tenant at once — that is what the store answers right now. A row that belongs to another tenant is marked and cannot be changed from here.',
         'wider' => 'This role holds a rule wider than the grid can show, so every cell below is already answered:',
+        'records' => 'This role also holds rules pinned to single records. They answer no check about the entity as a whole, so they own no cell below — and this screen cannot change them:',
         'legend' => [
             'abstains' => 'the role abstains',
             'granted' => 'granted',

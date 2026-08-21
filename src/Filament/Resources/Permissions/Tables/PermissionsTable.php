@@ -68,9 +68,7 @@ class PermissionsTable
                 TextColumn::make('reach')
                     ->label(__('filament-warden::ui.resources.permissions.columns.reach'))
                     ->badge()
-                    ->state(static fn (Model $record): string => __(
-                        'filament-warden::ui.reach.'.Narrowing::of($record)->shape->value,
-                    )),
+                    ->state(static fn (Model $record): string => self::reach($record)),
             ])
             ->filters([
                 SelectFilter::make('provenance')
@@ -197,6 +195,24 @@ class PermissionsTable
         return $state === '*'
             ? (string) __('filament-warden::ui.resources.permissions.entity.any')
             : Str::headline(Str::plural(class_basename(Str::afterLast($state, '.'))));
+    }
+
+    /**
+     * How far one row reaches, in one word.
+     *
+     * A row pinned to a record is not any of the six shapes: `Narrowing::of()`
+     * reads `options` and `only_owned` and never `entity_id`, so it answered
+     * "Every row" for a rule that answers no check about the class at all. The
+     * word is read literally rather than composed, so the test that fails a key
+     * nothing reads can still see it.
+     */
+    private static function reach(Model $record): string
+    {
+        if ($record->getAttribute('entity_id') !== null) {
+            return (string) __('filament-warden::ui.resources.permissions.entity.record');
+        }
+
+        return (string) __('filament-warden::ui.reach.'.Narrowing::of($record)->shape->value);
     }
 
     private static function text(mixed $value): string

@@ -16,6 +16,10 @@ use ElPandaPe\FilamentWarden\Conditions\Narrowing;
  * `wider` is what the grid cannot hold at all — a rule written over `*`, every
  * entity at once. It owns no cell, so it is reported rather than drawn as one:
  * the role that holds everything must not read as a role that holds nothing.
+ *
+ * `records` is the opposite mistake waiting to happen — a rule narrower than a
+ * cell, pinned to one row. It answers no class check, so it is neither a cell
+ * nor a wider rule: it is reported, and nothing here offers to change it.
  */
 final readonly class RoleState
 {
@@ -23,11 +27,13 @@ final readonly class RoleState
      * @param  array<string, array<string, string>>  $stances
      * @param  array<string, array<string, Narrowing>>  $narrowings
      * @param  array<string, string>  $wider  rules over every entity, keyed by permission name
+     * @param  list<RecordGrant>  $records  rules pinned to one row, which own no cell and cannot be written from here
      */
     public function __construct(
         public array $stances = [],
         public array $narrowings = [],
         public array $wider = [],
+        public array $records = [],
     ) {}
 
     /**

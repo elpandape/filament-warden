@@ -10,6 +10,7 @@ use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Row;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Tab;
+use ElPandaPe\FilamentWarden\Grants\RecordGrant;
 use ElPandaPe\FilamentWarden\Grants\RoleState;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\PostResource;
@@ -223,6 +224,21 @@ test('a role that holds everything does not read as a role that holds nothing', 
         ->and($cell->drawn())->toBe('broader')
         ->and($cell->broader())->toBe('granted')
         ->and($grid->wider)->toBe(['*' => 'granted']);
+});
+
+test('a rule pinned to one record reaches the template and not the browser', function (): void {
+    $record = new RecordGrant('view', Post::class, '5', Stance::Granted, Narrowing::all());
+
+    $grid = GridView::for(
+        Catalog::for(Panel::make()->id('scratch')->resources([PostResource::class])),
+        new RoleState([], [], [], [$record]),
+    );
+
+    expect($grid->records)->toBe([$record])
+        ->and(array_keys($grid->alpine()))->toContain('wider')
+        ->and(array_keys($grid->alpine()))->not->toContain('records')
+        ->and(cellFor(rowFor(tabNamed($grid, 'resources'), Post::class), 'view')->drawn())
+        ->toBe('abstain');
 });
 
 test('the wildcard on a row reaches the cells of that row and no other', function (): void {

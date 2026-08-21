@@ -49,6 +49,25 @@ test('the screen names the permission, where it came from and how far it reaches
         ->assertOk();
 });
 
+test('a permission pinned to one record says so where the reach goes', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+
+    $post = Post::query()->create(['title' => 'A post']);
+    Warden::allow(makeRole())->to('view', $post);
+
+    $pinned = permissionClass()::query()
+        ->withoutGlobalScopes()
+        ->whereNotNull('entity_id')
+        ->firstOrFail();
+
+    livewire(ViewPermission::class, ['record' => $pinned->getKey()])
+        ->assertSee('One record only')
+        ->assertDontSee('Every row')
+        ->assertOk();
+});
+
 test('who holds it arrives as counts, never as a list of names', function (): void {
     $key = readablePermission();
 

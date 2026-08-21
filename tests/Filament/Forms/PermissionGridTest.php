@@ -485,3 +485,15 @@ test('the tally of a role that holds everything lights up, instead of reading ze
         ->assertSee('data-on="true"', escape: false)
         ->assertDontSee('>0</span>', escape: false);
 });
+
+test('a rule pinned to one record is said above the grid', function (): void {
+    $role = makeRole();
+    $other = makeRole('reviewer');
+
+    Warden::allow($role)->to('view', $other);
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('fw-records', escape: false)
+        ->assertSee('#'.recordKey($other))
+        ->assertSee('This role also holds rules pinned to single records.');
+});

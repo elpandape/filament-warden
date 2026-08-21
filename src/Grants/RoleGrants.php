@@ -50,12 +50,38 @@ final class RoleGrants
         /** @var array<string, array<string, list<array{0: Narrowing, 1: bool, 2: int|string|null}>>> $variants */
         $variants = [];
         $wider = [];
+        $records = [];
 
         foreach (self::held($role) as [$permission, $forbidden, $scope]) {
             $type = $permission->getAttribute('entity_type');
             $name = $permission->getAttribute('name');
+            $id = $permission->getAttribute('entity_id');
 
-            if (! is_string($name) || $permission->getAttribute('entity_id') !== null) {
+            // Pinned to one row. It stays ahead of the wildcard branch below on
+            // purpose, and that is the behaviour of v1.0.2 preserved rather than
+            // changed: the guard this replaces dropped every row with an id
+            // before the wildcard branch could see it. Warden never writes a `*`
+            // row with a key on it, and counting one as wider would draw a tick,
+            // and raise a tally, for a rule nobody can produce.
+            //
+            // `is_string($name)` shares this line with `$id !== null` rather than
+            // guarding on its own: `name` is `NOT NULL` in warden's schema, so the
+            // check can never fail on its own — only PHPStan needs it — and a
+            // branch nothing can reach is a branch coverage cannot ask a test to
+            // hit honestly.
+            if (! is_string($name) || $id !== null) {
+                if (is_string($name) && is_string($type) && isset($models[$type])) {
+                    $records[] = new RecordGrant(
+                        name: $name,
+                        model: $models[$type],
+                        id: self::identifier($id),
+                        stance: $forbidden ? Stance::Forbidden : Stance::Granted,
+                        narrowing: self::writable($scope, $forRoleGrant)
+                            ? Narrowing::of($permission)
+                            : Narrowing::elsewhere(),
+                    );
+                }
+
                 continue;
             }
 
@@ -97,7 +123,7 @@ final class RoleGrants
             }
         }
 
-        return new RoleState($stances, $narrowings, $wider);
+        return new RoleState($stances, $narrowings, $wider, $records);
     }
 
     /**
