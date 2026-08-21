@@ -366,10 +366,19 @@ class PermissionForm
      * field on this screen can move it.
      *
      * A twin — the same tuple carrying conditions — is a row of its own and
-     * collides with nothing, so only the plain rows are compared.
+     * collides with nothing, so only the plain rows are compared. That has to
+     * be asked of the record being edited too, and not only of the candidates:
+     * a twin's own name never changes underneath this rule, so a save that
+     * only touches the title still runs it, and a plain sibling of the same
+     * tuple — orphaned by warden's own `reconstrain()`, or still held by
+     * another role — would otherwise read as a collision with itself.
      */
     private static function exists(mixed $name, ?Model $record, Get $get): bool
     {
+        if ($record instanceof Model && $record->getAttribute('options') !== null) {
+            return false;
+        }
+
         $class = Context::resolve()->permissionClass();
 
         $entityType = self::entityType($get);

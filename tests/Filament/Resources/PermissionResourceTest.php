@@ -557,6 +557,30 @@ test('a name another entity already uses does not block a row nobody may rename'
     expect($derived->refresh()->getAttribute('name'))->toBe('viewAny');
 });
 
+test('a twin does not collide with the plain sibling it was narrowed from', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    Warden::allow(makeRole('one'))->to('publish', Post::class);
+    Warden::allow(makeRole('two'))->to('publish', Post::class)->where('title', '=', 'alpha');
+
+    $twin = permissionClass()::query()
+        ->withoutGlobalScopes()
+        ->where('name', 'publish')
+        ->whereNotNull('options')
+        ->firstOrFail();
+
+    livewire(EditPermission::class, ['record' => $twin->getKey()])
+        ->fillForm(['title' => 'Publish a post, narrowed'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($twin->refresh()->getAttribute('title'))->toBe('Publish a post, narrowed');
+});
+
 test('the listing can be narrowed to what somebody holds, and to what nobody does', function (): void {
     $user = signIn();
     Warden::allow($user)->to('viewAny', permissionClass());
