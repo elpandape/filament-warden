@@ -539,3 +539,72 @@ test('deleting a role from its view screen reaches the store too', function (): 
     expect(roleClass()::query()->whereKey($role->getKey())->exists())->toBeFalse()
         ->and(Access::granted($holder, 'viewAny', roleClass()))->toBeFalse();
 });
+
+test('the refusal names the protected list, in words this package wrote', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole('editor');
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->fillForm(['name' => 'super-admin'])
+        ->call('save')
+        ->assertHasFormErrors([
+            'name' => 'roles.protected lists this name. A role holding it cannot be renamed, cannot be deleted, and its grid cannot be edited.',
+        ]);
+
+    expect($role->refresh()->getAttribute('name'))->toBe('editor');
+});
+
+test('the create screen refuses with the same sentence, not a different one', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('create', roleClass());
+
+    livewire(CreateRole::class)
+        ->fillForm(['name' => 'super-admin', 'title' => 'Born locked'])
+        ->call('create')
+        ->assertHasFormErrors([
+            'name' => 'roles.protected lists this name. A role holding it cannot be renamed, cannot be deleted, and its grid cannot be edited.',
+        ]);
+
+    expect(roleClass()::query()->where('name', 'super-admin')->exists())->toBeFalse();
+});
+
+test('a list with several names on it still refuses in one sentence', function (): void {
+    config()->set('filament-warden.roles.protected', ['owner', 'super-admin', 'auditor']);
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole('auditor');
+
+    foreach (['owner', 'super-admin'] as $name) {
+        livewire(EditRole::class, ['record' => $role->getKey()])
+            ->fillForm(['name' => $name])
+            ->call('save')
+            ->assertHasFormErrors([
+                'name' => 'roles.protected lists this name. A role holding it cannot be renamed, cannot be deleted, and its grid cannot be edited.',
+            ]);
+    }
+
+    expect($role->refresh()->getAttribute('name'))->toBe('auditor');
+});
+
+test('a list with nothing left on it refuses nothing and says nothing', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole('super-admin');
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->fillForm(['title' => 'Whoever can do everything'])
+        ->call('save')
+        ->assertHasNoFormErrors()
+        ->assertDontSee('roles.protected lists this name');
+
+    expect($role->refresh()->getAttribute('title'))->toBe('Whoever can do everything');
+});

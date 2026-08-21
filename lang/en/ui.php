@@ -17,6 +17,7 @@ return [
             'fields' => [
                 'name' => 'Name',
                 'name_help' => 'How your code names it. Grants point at it.',
+                'name_protected' => 'roles.protected lists this name. A role holding it cannot be renamed, cannot be deleted, and its grid cannot be edited.',
                 'title_help' => 'What people read on screen.',
                 'title' => 'Title',
             ],

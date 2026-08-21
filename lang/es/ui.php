@@ -17,6 +17,7 @@ return [
             'fields' => [
                 'name' => 'Nombre',
                 'name_help' => 'Como lo nombra tu código. Las concesiones apuntan aquí.',
+                'name_protected' => 'roles.protected incluye este nombre. Un rol que lo tenga no se puede renombrar, no se puede borrar y su rejilla no se puede editar.',
                 'title_help' => 'Lo que la gente lee en pantalla.',
                 'title' => 'Título',
             ],

@@ -41,7 +41,8 @@ class RoleForm
                             ->maxLength(255)
                             ->unique(ignoreRecord: true)
                             ->disabled(static fn (?Model $record): bool => $record instanceof Model && RoleResource::isProtected($record))
-                            ->notIn(static fn (?Model $record): array => self::otherProtectedNames($record)),
+                            ->notIn(static fn (?Model $record): array => self::otherProtectedNames($record))
+                            ->validationMessages(['not_in' => (string) __('filament-warden::ui.resources.roles.fields.name_protected')]),
 
                         TextInput::make('title')
                             ->label(__('filament-warden::ui.resources.roles.fields.title'))
@@ -86,9 +87,12 @@ class RoleForm
      * `str_getcsv('')` to a single null parameter: a rule with no opinion, not an
      * error.
      *
-     * The sentence a person reads is the framework's `validation.not_in`. One of
-     * this package's own, naming the list and saying what holding that name
-     * costs, would be a new translation key — a MINOR — and waits for 1.1.0.
+     * The sentence is this package's own, wired on `not_in` — Filament builds a
+     * `Rule::notIn()` object and Laravel snake-cases its basename to look the
+     * custom message up. It carries no placeholder on purpose: the list it would
+     * interpolate is unbounded, and with only the record's own name on it the
+     * rule compiles to `not_in:` with a single null parameter, passes, and the
+     * sentence is never rendered at all.
      *
      * @return list<string>
      */
