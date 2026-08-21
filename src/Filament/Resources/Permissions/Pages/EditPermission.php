@@ -84,6 +84,22 @@ class EditPermission extends EditRecord
             $data['only_owned'] = $record->getAttribute('only_owned');
         }
 
+        // Half of what closes this builder is not mirrored above:
+        // `PermissionForm::conditionsWritable()` also disables it — for a
+        // corrupt blob, a shape the builder will not draw, or a column the
+        // table dropped — and that predicate is private to the form on
+        // purpose, the same reason `ownable()` below is a private copy
+        // rather than a public one. It is not duplicated here too. Its
+        // ~25 lines of `Narrowing`/`Columns`/`Ownership` reads would not buy
+        // a real floor: `EditRecord::save()` calls `$this->form->getState()`
+        // BEFORE this method ever runs, against a schema rebuilt fresh for
+        // this record on this request, so BOTH clauses of `disabled()` are
+        // re-evaluated ahead of `$data` — no payload, forged or raced, can
+        // carry `options` past a builder `conditionsWritable()` is closing.
+        // Only removing `disabled()` itself could, and that is a mutation,
+        // not a gap a duplicate here would close: it would only be able to
+        // drift silently from the original, trading a provably unreachable
+        // branch for a real one.
         if (! PermissionResource::mayEditConditions($record)) {
             $data['options'] = $record->getAttribute('options');
         }
