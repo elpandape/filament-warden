@@ -371,12 +371,14 @@ Example conditions:
 name = editor OR (scope >= 2 AND title = account.name)
 ```
 
+> ⚠️ **A grant pinned to a single record is not a cell.** Warden filters a check made against a class down to `entity_id is null`, so a rule with a record key on it answers nothing the grid asks — and it is not a wider rule either. The grid lists those rules above the tabs, read-only: this screen shows them, and cannot remove them.
+
 ### Permissions Screen
 
 Lists the `permissions` **table** — the rows warden has actually created — and says where each one came from:
 
 - **Provenance**: derived from a policy, loose, the wildcard, or an entity nothing declares any more
-- **Reach**: every row, only what the account owns, or with conditions
+- **Reach**: every row, only what the account owns, with conditions — or **one record only**, when the row is pinned to a single record
 - **Holders**: how many roles hold it, with denials counted apart
 - **Test bench**: ask warden about a real account, from the screen
 
