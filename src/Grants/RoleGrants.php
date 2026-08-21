@@ -40,6 +40,13 @@ final class RoleGrants
         $models = self::modelsByMorph($catalog);
         $doors = self::doorNames($catalog);
 
+        // Warden picks the scope of a write from the authority, and every write
+        // this class makes has the role as that authority. The read has to ask
+        // the same question: an installation keeping role grants global writes
+        // them at NULL while a tenant is active, and comparing them against the
+        // tenant reads a writable row as somebody else's.
+        $forRoleGrant = $role instanceof (Context::resolve()->roleClass());
+
         /** @var array<string, array<string, list<array{0: Narrowing, 1: bool, 2: int|string|null}>>> $variants */
         $variants = [];
         $wider = [];
@@ -83,7 +90,7 @@ final class RoleGrants
 
         foreach ($variants as $row => $actions) {
             foreach ($actions as $action => $held) {
-                [$stance, $narrowing] = self::resolve($held);
+                [$stance, $narrowing] = self::resolve($held, $forRoleGrant);
 
                 $stances[$row][$action] = $stance->value;
                 $narrowings[$row][$action] = $narrowing;
@@ -177,7 +184,7 @@ final class RoleGrants
      * @param  list<array{0: Narrowing, 1: bool, 2: int|string|null}>  $held
      * @return array{0: Stance, 1: Narrowing}
      */
-    private static function resolve(array $held): array
+    private static function resolve(array $held, bool $forRoleGrant): array
     {
         $forbidden = array_values(array_filter($held, static fn (array $one): bool => $one[1]));
         $chosen = $forbidden === [] ? $held : $forbidden;
@@ -191,19 +198,26 @@ final class RoleGrants
         // A grant that lives at another scope is read — warden answers with it —
         // and cannot be written: a write targets one exact scope, so switching
         // this cell off would delete nothing and report success.
-        return [$stance, self::writable($chosen[0][2]) ? $chosen[0][0] : Narrowing::elsewhere()];
+        return [$stance, self::writable($chosen[0][2], $forRoleGrant) ? $chosen[0][0] : Narrowing::elsewhere()];
     }
 
     /**
      * Whether a row at this scope is one this screen could write.
      *
+     * Asked the way warden asks it. `writeScope()` bare answers the active
+     * tenant even for a grant warden itself would write at NULL, so an
+     * installation keeping role grants global had every one of them judged
+     * somebody else's: drawn locked, marked as another tenant's, and dropped
+     * from the diff — while `disallow()` would have deleted it. The pessimism
+     * was not conservative, it was wrong in both directions.
+     *
      * Compared as text on purpose: warden types a tenant `int|string` while the
      * column is an integer, so a resolver handing back `'5'` must still match a
      * row stamped `5`.
      */
-    private static function writable(int|string|null $scope): bool
+    private static function writable(int|string|null $scope, bool $forRoleGrant): bool
     {
-        $writeScope = app(Tenancy::class)->writeScope();
+        $writeScope = app(Tenancy::class)->writeScope(forRoleGrant: $forRoleGrant);
 
         return $scope === null && $writeScope === null
             ? true

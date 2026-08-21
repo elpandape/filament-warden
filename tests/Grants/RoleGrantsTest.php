@@ -485,6 +485,23 @@ test('a grant of this tenant is writable, and one of no tenant is too when there
         ->toBe(Shape::All);
 });
 
+test('a role grant kept global by configuration is writable under a tenant', function (): void {
+    Warden::tenant()->dontScopeRoleGrants();
+
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    Warden::tenant()->onceTo(7, static function () use ($role, $catalog): void {
+        Warden::allow($role)->to('viewAny', Post::class);
+
+        $state = RoleGrants::of($role, $catalog);
+
+        expect($state->narrowings[Post::class]['viewAny']->shape)->toBe(Shape::All)
+            ->and($state->locked())->toBeEmpty()
+            ->and(RoleGrants::changes($role, $catalog, []))->toHaveCount(1);
+    });
+});
+
 test('a title an older version of this package wrote is corrected, and a persons is not', function (): void {
     $role = makeRole();
     $catalog = gridCatalog();
