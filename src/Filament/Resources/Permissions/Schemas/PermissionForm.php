@@ -152,14 +152,38 @@ class PermissionForm
     }
 
     /**
+     * Why this field is what it is, in three cases and never a fourth.
+     *
      * A derived permission's name is written by the policy method that declares
      * it. Changing it does not break anything loudly — it disconnects the row
      * from the code that asks for it, and nothing says so afterwards.
+     *
+     * A loose row this installation would let anyone edit, and does not, is
+     * closed by a HOLDER: `mayEditName()` refuses a row that is not orphaned,
+     * and re-pointing it would move what every one of them holds without telling
+     * any of them. That is the one case that has to be said out loud, because
+     * the field is greyed and the reason is somebody else's grant.
+     *
+     * Asked as `mayEdit() && ! mayEditName()` and never as `! mayEditName()`
+     * alone: the second is also false when the INSTALLATION closed this whole
+     * class of row — `permissions.update` at `'title'`, or a derived row under
+     * `'loose'` — where no holder is involved and claiming one would be a lie on
+     * a security screen. `mayEdit()` reads config and one attribute and touches
+     * no table, so putting it first also keeps the grant read out of every case
+     * that does not need it.
      */
     private static function nameHelp(?Model $record): string
     {
-        return $record instanceof Model && $record->getAttribute('entity_type') !== null
-            ? (string) __('filament-warden::ui.resources.permissions.fields.name_help_derived')
+        if (! $record instanceof Model) {
+            return (string) __('filament-warden::ui.resources.permissions.fields.name_help_loose');
+        }
+
+        if ($record->getAttribute('entity_type') !== null) {
+            return (string) __('filament-warden::ui.resources.permissions.fields.name_help_derived');
+        }
+
+        return PermissionResource::mayEdit($record) && ! PermissionResource::mayEditName($record)
+            ? (string) __('filament-warden::ui.resources.permissions.fields.name_help_held')
             : (string) __('filament-warden::ui.resources.permissions.fields.name_help_loose');
     }
 

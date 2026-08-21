@@ -159,8 +159,9 @@ class PermissionResource extends Resource
      * shipped default's most common row: a loose permission (no entity) under
      * the shipped `'loose'` rule, where `mayEdit()` returns `true` and this
      * clause always reads `grants`. Measured on the edit screen for exactly that
-     * case: 8 extra reads over the 1.0.1 body, one per call site per evaluation
-     * — see 'the lock's grant reads are capped, not promised to cost nothing'.
+     * case: 8 extra reads over the 1.0.1 body and 3 more since 1.1.0 gave the
+     * name field a sentence of its own, one per call site per evaluation — see
+     * 'the lock's grant reads are capped at 16, two over the 14 measured'.
      */
     public static function mayEditName(Model $record): bool
     {
@@ -217,10 +218,13 @@ class PermissionResource extends Resource
      *
      * Kept apart from `mayEditName()` because the conditions and the ownership
      * hang off this one and they are a different decision: they narrow what the
-     * row means, they do not re-point it. Private, because 1.0.2 is a patch and
-     * a new public static would be a minor.
+     * row means, they do not re-point it. Public since 1.1.0, because the form
+     * needs the two apart to tell a person WHY a field is closed: this one is
+     * the installation's answer about a whole class of row, and the difference
+     * between the two is a holder. Reading config and one attribute, it costs no
+     * query, so asking it first short-circuits the one that does.
      */
-    private static function mayEdit(Model $record): bool
+    public static function mayEdit(Model $record): bool
     {
         $rule = Config::get('permissions.update');
 

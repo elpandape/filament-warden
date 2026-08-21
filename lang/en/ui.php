@@ -54,6 +54,7 @@ return [
                 'name' => 'Name',
                 'name_help_derived' => 'The policy method that declares it writes this. Changing it does not break anything loudly — it disconnects the row from the code that asks for it.',
                 'name_help_loose' => 'You choose it. It is what can() will ask for.',
+                'name_help_held' => 'Somebody holds this row, so its name and entity are locked. Re-pointing it would move what they hold, and nothing would tell them.',
                 'taken' => 'The catalogue already has a permission with this name and entity.',
                 'title' => 'Title',
                 'title_help' => 'Only for reading. Warden writes it when the permission is created, and never again — a rename leaves the old one in place.',

@@ -170,3 +170,57 @@ test('a form with nothing stored yet leaves the builder open', function (): void
 
     expect(Narrowing::of(narrowedRow('publish'))->rules[0]->value)->toBe('alpha');
 });
+
+test('a loose row somebody holds says the holder is what locked its name', function (): void {
+    config()->set('filament-warden.permissions.update', 'loose');
+
+    signInToEditPermissions();
+
+    Warden::allow(makeRole('one'))->to('export');
+
+    livewire(EditPermission::class, ['record' => narrowedRow('export')->getKey()])
+        ->assertFormFieldDisabled('name')
+        ->assertFormFieldDisabled('entity_type')
+        ->assertSee('Somebody holds this row')
+        ->assertDontSee('It is what can() will ask for');
+});
+
+test('a loose row nobody holds keeps the sentence that says the name is yours', function (): void {
+    config()->set('filament-warden.permissions.update', 'loose');
+
+    signInToEditPermissions();
+
+    livewire(EditPermission::class, ['record' => makePermission('archive')->getKey()])
+        ->assertFormFieldEnabled('name')
+        ->assertSee('It is what can() will ask for')
+        ->assertDontSee('Somebody holds this row');
+});
+
+test('a derived row locked by the rule is not told a holder did it', function (): void {
+    config()->set('filament-warden.permissions.update', 'loose');
+    config()->set('filament-warden.catalog.models', [Post::class]);
+
+    signInToEditPermissions();
+
+    $derived = makePermission('publish');
+    $derived->update(['entity_type' => new Post()->getMorphClass()]);
+
+    Warden::allow(makeRole('one'))->to('publish', Post::class);
+
+    livewire(EditPermission::class, ['record' => $derived->getKey()])
+        ->assertFormFieldDisabled('name')
+        ->assertSee('The policy method that declares it writes this')
+        ->assertDontSee('Somebody holds this row');
+});
+
+test('a rule that locks every name says nothing about holders either', function (): void {
+    config()->set('filament-warden.permissions.update', 'title');
+
+    signInToEditPermissions();
+
+    Warden::allow(makeRole('one'))->to('export');
+
+    livewire(EditPermission::class, ['record' => narrowedRow('export')->getKey()])
+        ->assertFormFieldDisabled('name')
+        ->assertDontSee('Somebody holds this row');
+});
