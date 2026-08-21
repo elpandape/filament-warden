@@ -128,9 +128,9 @@ anything needing a new sentence waits for `1.1.0`.
   Both change what the row means. Closing this would widen the set of rows this screen refuses to
   edit, which is a visible behaviour change a patch must not make unannounced.
 
-The audit behind this release also found `README.md` wrong in several places, including some a
-rewrite introduced after `1.0.1` shipped. That correction has not landed yet and is not part of
-this tag. Also still open, and scheduled: the record-scoped grant the grid still discards without
+The audit behind this release also found `README.md` wrong in several places, including some
+introduced by a rewrite after `1.0.1` shipped. That correction has not landed yet and is not part
+of this tag. Also still open, and scheduled: the record-scoped grant the grid still discards without
 a trace, the roles relation manager for the account screen, every performance memo this audit
 wrote down, and a fresh install's empty permission screen.
 
