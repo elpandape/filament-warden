@@ -360,6 +360,24 @@ function grid({ state, grid, interactive }) {
             return (this.state.narrowing?.[row] ?? {})[action] ?? { mode: 'all', rules: [] }
         },
 
+        /**
+         * Which of the three the buttons light.
+         *
+         * A cell this screen may not change shows the store's own word, and
+         * that word is never one of the three offered, so none of them lights:
+         * the store holds a reach this screen does not offer, and painting
+         * "every row" there says the exact opposite of what is stored. A cell
+         * that CAN be changed follows the pending state, because the buttons
+         * are live and must follow the click.
+         *
+         * `narrowing.stored` is read without a guard on purpose: `offered()`
+         * refuses a null payload and a grid with the builder switched off, and
+         * nothing inside that `<template>` is evaluated until it says yes.
+         */
+        reachOf() {
+            return this.narrowing.stored.locked ? this.narrowing.stored.mode : this.modeOf()
+        },
+
         /* The two names the shared half reads. The grid keeps its own, older
            ones so nothing else has to move. */
         get words() {

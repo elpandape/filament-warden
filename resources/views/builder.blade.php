@@ -25,7 +25,7 @@
                 <button
                     type="button"
                     class="fw-mode"
-                    x-bind:data-on="modeOf() === mode ? 'true' : 'false'"
+                    x-bind:data-on="reachOf() === mode ? 'true' : 'false'"
                     x-bind:disabled="! interactive || narrowing.stored.locked || (mode === 'owned' && ! narrowing.ownership.available)"
                     x-on:click="setMode(mode)"
                 >
@@ -41,6 +41,25 @@
         </div>
 
         <p class="fw-note fw-note-locked" x-show="narrowing.stored.locked" x-text="narrowing.stored.note" x-cloak></p>
+
+        {{--
+            The rule as the store has it, written out by PHP.
+
+            Not the shared list of controls: a `<select>` has no option for a
+            column the table no longer has, so the browser would fall back to
+            the first one and a rule stored as `subtitle = alpha` would draw as
+            `id = alpha`. `Rule::text()` prints what is stored.
+
+            It never doubles the pending preview below: that one lives inside
+            the conditions partial, which is drawn only when the cell is NOT
+            locked, and this one only when it is.
+        --}}
+        <code
+            class="fw-preview"
+            x-show="narrowing.stored.locked && narrowing.stored.preview !== ''"
+            x-text="narrowing.stored.preview"
+            x-cloak
+        ></code>
 
         <template x-if="modeOf() === 'conditions' && ! narrowing.stored.locked">
             @include('filament-warden::conditions')

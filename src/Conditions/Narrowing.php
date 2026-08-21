@@ -60,9 +60,21 @@ final readonly class Narrowing
         return new self(Shape::Conditions, $rules);
     }
 
-    public static function unreadable(string $reason): self
+    /**
+     * A reach this screen can read and must not write.
+     *
+     * The rules travel when there are any: a row that is both ownership and
+     * conditions parses perfectly and is refused for what it MEANS, not for
+     * what it says, so throwing the lines away would leave the screen with a
+     * refusal and nothing to show for it. `toGroup()` still answers null for
+     * this shape and `RoleState::toPayload()` still leaves it out, so carrying
+     * them opens no way back to the store.
+     *
+     * @param  list<Rule>  $rules
+     */
+    public static function unreadable(string $reason, array $rules = []): self
     {
-        return new self(Shape::Unreadable, reason: $reason);
+        return new self(Shape::Unreadable, $rules, $reason);
     }
 
     public static function tangled(): self
@@ -95,16 +107,6 @@ final readonly class Narrowing
             return $owned ? self::owned() : self::all();
         }
 
-        // Both halves on one row is something warden really writes — `toOwn()`
-        // and then a chained `where()`, which copies `only_owned` onto the twin —
-        // and both are honoured when it resolves: the candidate is filtered on
-        // ownership and then run through the group. A cell draws one reach, so
-        // reading this as plain ownership would drop the condition the next time
-        // anybody saved. It is said out loud and left alone.
-        if ($owned) {
-            return self::unreadable('shape');
-        }
-
         $group = ConstraintSerializer::deserialize($options);
 
         // Deserialising is total and silent: a corrupt shape answers null without
@@ -120,6 +122,8 @@ final readonly class Narrowing
         foreach ($group->items as [$logic, $constraint]) {
             $rule = Rule::of($logic, $constraint);
 
+            // The lines before this one parsed and are dropped on purpose: half
+            // a rule drawn as a whole rule is a worse lie than drawing none.
             if (! $rule instanceof Rule) {
                 return self::unreadable('shape');
             }
@@ -127,7 +131,26 @@ final readonly class Narrowing
             $rules[] = $rule;
         }
 
-        return $rules === [] ? self::unreadable('empty') : self::conditions($rules);
+        if ($rules === []) {
+            return self::unreadable('empty');
+        }
+
+        // Both halves on one row is something warden really writes — `toOwn()`
+        // and then a chained `where()`, which copies `only_owned` onto the twin —
+        // and both are honoured when it resolves: the candidate is filtered on
+        // ownership and then run through the group. A cell draws one reach, so
+        // reading this as plain ownership would drop the condition the next time
+        // anybody saved. It is said out loud, drawn as it stands, and left alone.
+        //
+        // The lines are carried unnormalised, unlike `conditions()`: `clauses()`
+        // ignores the first line's logic, `toGroup()` refuses this shape and the
+        // diff skips it, so nothing here can ever be written back and there is no
+        // twin identity to keep stable.
+        if ($owned) {
+            return self::unreadable('owned_with_conditions', $rules);
+        }
+
+        return self::conditions($rules);
     }
 
     /**

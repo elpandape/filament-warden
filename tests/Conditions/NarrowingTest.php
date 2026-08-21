@@ -227,6 +227,50 @@ test('a rule that is both ownership and conditions is more reach than one cell c
     $narrowing = Narrowing::of($permission);
 
     expect($narrowing->shape)->toBe(Shape::Unreadable)
-        ->and($narrowing->reason)->toBe('shape')
+        ->and($narrowing->reason)->toBe('owned_with_conditions')
         ->and($narrowing->isEditable())->toBeFalse();
+});
+
+test('a rule that is both ownership and conditions keeps the rule it can read', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->toOwn(Comment::class, 'update')->where('body', '=', 'alpha');
+
+    $narrowing = Narrowing::of(narrowedPermission());
+
+    expect($narrowing->reason)->toBe('owned_with_conditions')
+        ->and($narrowing->shape)->toBe(Shape::Unreadable)
+        ->and($narrowing->isEditable())->toBeFalse()
+        ->and($narrowing->rules)->toHaveCount(1)
+        ->and($narrowing->rules[0]->column)->toBe('body')
+        ->and($narrowing->toGroup())->toBeNull();
+});
+
+test('an owned rule whose conditions cannot be read says that, not the wrong cause', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->toOwn(Comment::class, 'update')->where('body', '=', 'alpha');
+
+    $permission = narrowedPermission();
+    $permission->update(['options' => ['v' => 42, 'g' => ['t' => 'group', 'i' => []]]]);
+
+    $narrowing = Narrowing::of($permission->fresh() ?? $permission);
+
+    expect($narrowing->reason)->toBe('corrupt')
+        ->and($narrowing->shape)->toBe(Shape::Unreadable)
+        ->and($narrowing->rules)->toBeEmpty();
+});
+
+test('an owned rule whose condition group is empty says the group is empty', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->toOwn(Comment::class, 'update')->where('body', '=', 'alpha');
+
+    $permission = narrowedPermission();
+    $permission->update(['options' => ConstraintSerializer::serialize(new Group([]))]);
+
+    $narrowing = Narrowing::of($permission->fresh() ?? $permission);
+
+    expect($narrowing->reason)->toBe('empty')
+        ->and($narrowing->rules)->toBeEmpty();
 });

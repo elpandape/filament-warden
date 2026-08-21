@@ -282,6 +282,7 @@ test('the translation keys an application overrides are frozen', function (): vo
         'conditions.locked.corrupt',
         'conditions.locked.empty',
         'conditions.locked.shape',
+        'conditions.locked.owned_with_conditions',
         'conditions.locked.tangled',
         'conditions.locked.elsewhere',
         'grid.panel',

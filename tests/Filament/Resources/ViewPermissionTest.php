@@ -112,6 +112,20 @@ test('a stored rule is read out as it will be evaluated', function (): void {
         ->assertSee('With conditions');
 });
 
+test('a row that reaches both ways still reads its rule out', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+
+    Warden::allow(makeRole())->toOwn(Post::class, 'update')->where('title', '=', 'alpha');
+
+    $twin = permissionClass()::query()->withoutGlobalScopes()->whereNotNull('options')->firstOrFail();
+
+    livewire(ViewPermission::class, ['record' => $twin->getKey()])
+        ->assertSee('title = alpha')
+        ->assertSee('Cannot be read');
+});
+
 test('the account is searched by whatever column it can be recognised by', function (): void {
     signIn(makeUser('Signed In'));
 

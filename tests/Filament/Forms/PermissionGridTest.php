@@ -437,6 +437,39 @@ test('a rule this screen cannot draw comes back locked, with the reason written'
             && is_string(partOf($narrowing, 'stored')['note']));
 });
 
+test('a locked cell hands the browser the reach the store holds, not every row', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->toOwn(roleClass(), 'update')->where('name', '=', 'editor');
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'narrowingFor', [roleClass(), 'update'])
+        ->assertReturned(fn (array $narrowing): bool => partOf($narrowing, 'stored')['locked'] === true
+            && partOf($narrowing, 'stored')['mode'] === 'unreadable'
+            && partOf($narrowing, 'stored')['preview'] === 'name = editor');
+});
+
+test('the buttons follow the store on a cell nobody may change', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('x-bind:data-on="reachOf() === mode', escape: false)
+        ->assertDontSee('x-bind:data-on="modeOf() === mode', escape: false);
+});
+
+test('which reach lights branches on whether the store may be changed', function (): void {
+    $script = (string) file_get_contents(dirname(__DIR__, 3).'/resources/js/permission-grid.js');
+
+    expect($script)->toContain('return this.narrowing.stored.locked ? this.narrowing.stored.mode : this.modeOf()');
+});
+
+test('a locked cell draws the rule the store holds, read only', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('x-text="narrowing.stored.preview"', escape: false);
+});
+
 test('saving carries the condition the screen drew all the way to the store', function (): void {
     $role = makeRole();
     $user = makeUser();

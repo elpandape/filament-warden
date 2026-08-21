@@ -236,6 +236,7 @@ return [
             'corrupt' => 'Las condiciones guardadas no se pueden leer. Se enseñan como están y se dejan en paz: reescribirlas sustituiría una regla que nadie puede ver.',
             'empty' => 'La regla guardada lleva un grupo de condiciones vacío: solo responde con una fila delante, y entonces siempre.',
             'shape' => 'Las condiciones guardadas usan una forma que este constructor no sabe dibujar: un grupo anidado, o un valor que no es ni texto ni número.',
+            'owned_with_conditions' => 'La regla guardada se limita a lo que la cuenta posee y además lleva condiciones. Una celda dibuja un solo alcance, así que se enseña tal y como está guardada y se deja en paz: leerla solo como propiedad tiraría la condición la próxima vez que alguien guardara.',
             'tangled' => 'Esta celda tiene más de una regla para la misma acción. La rejilla no sabe enseñar eso, así que no la toca.',
             'elsewhere' => 'Esta concesión es de otro tenant, y una escritura apunta a uno solo. Apagarla aquí no borraría nada y aun así diría que sí, así que se deja en paz. Cambia de tenant para tocarla.',
         ],

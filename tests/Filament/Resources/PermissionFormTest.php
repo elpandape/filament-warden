@@ -114,6 +114,18 @@ test('a rule that is both ownership and conditions keeps both halves through a s
 
     livewire(EditPermission::class, ['record' => $permission->getKey()])
         ->assertFormFieldDisabled('options')
+        ->assertFormSet(['options' => [
+            'mode' => 'unreadable',
+            'rules' => [[
+                'logic' => 'and',
+                'kind' => 'value',
+                'column' => 'body',
+                'operator' => '=',
+                'value' => 'alpha',
+                'authority' => '',
+            ]],
+        ]])
+        ->assertSee('is both limited to what the account owns and carries conditions')
         ->fillForm(['title' => 'Moderate a comment'])
         ->call('save')
         ->assertHasNoFormErrors();
