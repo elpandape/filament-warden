@@ -62,7 +62,7 @@ return [
                 'only_owned_help' => 'Warden resolves ownership with ownedVia().',
                 'only_owned_no_model' => 'There is no ownership to resolve where there is no entity.',
                 'conditions' => 'Conditions',
-                'conditions_shared' => 'This row is held :count times over. It is one row and one rule, so editing it here changes the rule for every one of them.',
+                'conditions_shared' => 'Holders of this row: :count. It is one row and one rule, so editing it here changes the rule for everyone who holds it.',
             ],
             'holders' => [
                 'description' => 'Counted, not named. A permission can be held by every account in the installation.',
@@ -76,7 +76,7 @@ return [
             ],
             'delete' => [
                 'nobody' => 'Nobody holds this permission, so nothing goes with it.',
-                'holders' => 'This takes the grants of :roles role(s) and :accounts account(s) with it, in the database and with no trace afterwards: :names.',
+                'holders' => 'Every grant that points at this permission goes with it, in the database and with no trace afterwards — roles: :roles, accounts: :accounts. They are: :names.',
             ],
             'probe' => [
                 'label' => 'Test it',

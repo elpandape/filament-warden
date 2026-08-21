@@ -151,3 +151,22 @@ test('every stance a cell can take has a word too', function (): void {
         expect($declared)->toBe($stances, "[{$locale}] the stance map and the Stance enum disagree");
     }
 });
+
+test('no line fakes a plural with a parenthesis', function (): void {
+    foreach (['en', 'es'] as $locale) {
+        foreach (translations($locale) as $key => $line) {
+            expect($line)->not->toMatch('/\w\(e?s\)/', "[{$locale}] {$key} fakes a plural");
+        }
+    }
+});
+
+test('the two sentences about a class check say it the same way', function (): void {
+    $closings = ['en' => 'fails closed', 'es' => 'falla cerrada'];
+
+    foreach ($closings as $locale => $closing) {
+        $lines = translations($locale);
+
+        expect($lines['conditions.warning'])->toContain($closing)
+            ->and($lines['explain.narrowed'])->toContain($closing);
+    }
+});

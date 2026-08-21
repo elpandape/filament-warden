@@ -332,10 +332,13 @@ class PermissionForm
      * to be said from the FIRST holder and not the second, because one holder is
      * already somebody whose rule is about to move under them.
      *
-     * The sentence is left exactly as 1.0.1 wrote it, plural and all: a wording
-     * of its own would be a new key and therefore a minor, and an installation
-     * that published this file goes on rendering its own copy unchanged. The
-     * singular is 1.1.0.
+     * The sentence names its count after a label — "Holders of this row: 1" —
+     * because it fires from the FIRST holder and a count placed in front of a
+     * noun would have to agree with it. `trans_choice()` would be the other way
+     * out and it is not one: the sibling sentence on the delete modal carries
+     * three counts and Laravel pluralises on one, so both are worded to read
+     * correctly at 0, 1 and 40 instead. Still one key, so an installation that
+     * published `lang/{en,es}/ui.php` keeps its own copy — and its own old plural.
      */
     private static function sharedWarning(?Model $record): ?string
     {

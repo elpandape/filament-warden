@@ -262,7 +262,9 @@ test('the modal says who loses it, because the cascade leaves no trace', functio
     $warning = PermissionsTable::warning(heldRow());
     $title = $role->refresh()->getAttribute('title');
 
-    expect($warning)->toContain('1 role')
+    expect($warning)->toContain('roles: 1')
+        ->and($warning)->toContain('accounts: 0')
+        ->and($warning)->not->toContain('role(s)')
         ->and($warning)->toContain(is_string($title) ? $title : '');
 });
 
@@ -717,7 +719,9 @@ test('a row a single holder has says so too, and one nobody has says nothing', f
     Warden::allow(makeRole('one'))->to('export');
 
     livewire(EditPermission::class, ['record' => heldRow('export')->getKey()])
-        ->assertSee('It is one row and one rule');
+        ->assertSee('Holders of this row: 1')
+        ->assertSee('It is one row and one rule')
+        ->assertDontSee('1 times over');
 
     livewire(EditPermission::class, ['record' => makePermission('unheld')->getKey()])
         ->assertDontSee('It is one row and one rule');

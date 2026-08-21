@@ -62,7 +62,7 @@ return [
                 'only_owned_help' => 'Warden resuelve la propiedad con ownedVia().',
                 'only_owned_no_model' => 'No hay propiedad que resolver donde no hay entidad.',
                 'conditions' => 'Condiciones',
-                'conditions_shared' => 'Esta fila está en poder de :count. Es una fila y una regla, así que editarla aquí cambia la regla para todos ellos.',
+                'conditions_shared' => 'Titulares de esta fila: :count. Es una fila y una regla, así que editarla aquí cambia la regla para quien la tenga.',
             ],
             'holders' => [
                 'description' => 'Contados, no nombrados. Un permiso puede estar en poder de todas las cuentas de la instalación.',
@@ -76,7 +76,7 @@ return [
             ],
             'delete' => [
                 'nobody' => 'Nadie tiene este permiso, así que no se lleva nada por delante.',
-                'holders' => 'Esto se lleva las concesiones de :roles rol(es) y :accounts cuenta(s), en la base de datos y sin rastro después: :names.',
+                'holders' => 'Toda concesión que apunte a este permiso se va con él, en la base de datos y sin rastro después — roles: :roles, cuentas: :accounts. Son: :names.',
             ],
             'probe' => [
                 'label' => 'Probarlo',
@@ -210,7 +210,7 @@ return [
         'add_value' => '+ comparar con un valor',
         'add_column' => '+ comparar con la cuenta',
         'empty' => 'Sin condiciones, esta concesión vuelve a valer para todas las filas.',
-        'warning' => 'Con condiciones, esta concesión solo responde con una fila delante. Una comprobación de clase —la que hace un listado al preguntar viewAny— falla cerrado.',
+        'warning' => 'Con condiciones, esta concesión solo responde con una fila delante. Una comprobación de clase —la que hace un listado al preguntar viewAny— falla cerrada.',
         'no_model' => 'Este permiso no tiene ningún modelo detrás. Una condición aquí quedaría guardada, visible, y no concedería nada nunca.',
         'no_ownership' => 'La tabla :table no tiene la columna :column, que es por donde se resolvería la propiedad.',
         'modes' => [
