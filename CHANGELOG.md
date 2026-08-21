@@ -131,19 +131,45 @@ everything this screen still gets wrong.
   Pest, and the two scripts above ran the real JS logic under Node — but no consuming Filament
   application was available to confirm any of it in Chrome, in light and dark, or with a screen
   reader. Not performed for this release; carried forward as an open checklist.
-- **Two publishing hazards this release creates, not closes.** If you ran
-  `vendor:publish --tag=filament-warden-views` on any earlier version, your copies of
-  `grid.blade.php`, `box.blade.php` and `builder.blade.php` are welded to the pre-`1.1.0` markup and
-  keep every defect this release fixes — the locked-cell highlight, the silent read-only grid, the
-  missing accessible names, all of it — until you reintegrate them. If you ran
-  `vendor:publish --tag=filament-warden-translations`, Laravel's loader puts your published copy
-  **on top of** the package's own, so none of this release's fifteen keys reach you at all: a
-  locked cell's note, the read-only sentence, the name-lock explanations and the seven grid states
-  all render as their raw dotted path (`filament-warden::ui.grid.read_only`, literally) instead of
-  a sentence. Reconcile by diffing your published `lang/vendor/filament-warden/{en,es}/ui.php`
-  against this package's `lang/{en,es}/ui.php` and copying the new keys across — and run
-  `php artisan filament:assets` regardless of either: both the stylesheet and the script changed,
-  and the panel serves whatever it last copied until you do.
+- **What a browser would still find: this release fixes reading the grid, not operating it.** The
+  seven grid states, the ARIA tabs pattern and the record-pinned sr-only text all land this
+  release, but a cell's accessible name changing after a click is never announced on its own:
+  `.fw-box` carries no `aria-pressed`, and nothing about a pending stance reaches the one live
+  region this screen has — `role="status"` is wired to the inspector's verdict only. A
+  screen-reader user who cycles a cell has to leave it and come back to hear what it now says.
+- **Five templates changed, not three, and two of them changed nothing you would notice.**
+  `vendor:publish --tag=filament-warden-views` publishes all of `resources/views`, and this release
+  touches `grid.blade.php`, `box.blade.php`, `builder.blade.php`,
+  `resources/views/forms/permission-grid.blade.php` and
+  `resources/views/infolists/permission-grid.blade.php`. A published copy of the first three is
+  welded to the pre-`1.1.0` markup and keeps every defect this release fixes — the locked-cell
+  highlight, the silent read-only grid, the missing accessible names — until reintegrated. The
+  other two only moved a decision the field and the entry already made (`gridInteracts()`) into
+  `$grid->isInteractive`, the same value the old inline expression computed in both callers: a
+  stale copy of *those two specifically* behaves identically and reintegrating them buys nothing.
+- **A stale published translation file is a narrower hazard than it looks.**
+  `vendor:publish --tag=filament-warden-translations` does layer your copy on top of the package's
+  own, but through Laravel's real merge — `FileLoader::loadNamespaceOverrides()` calls
+  `array_replace_recursive($packageLines, $publishedCopy)`, a recursive merge, not a wholesale
+  replacement. Measured: a stale override freezes only the individual paths it declares, and every
+  other key, including untouched siblings inside a partially-overridden block, still arrives from
+  the package — this release's fifteen new keys among them. Even a genuine miss would not show a
+  raw dotted path: `GridView::translated()` falls back to a readable label. The hazard that is
+  real, and worth reconciling: if you published before this release, your copy still serves
+  whatever text it declared for `resources.permissions.delete.holders` and
+  `resources.permissions.fields.conditions_shared` — the two sentences `1.1.0` reworded, including
+  the "1 times over" plural this release exists to fix. Diff just those two keys against
+  `lang/{en,es}/ui.php`.
+- **Run `php artisan filament:assets` regardless of either hazard above — skipping it is not a
+  quiet downgrade.** Both `resources/js/permission-grid.js` and `resources/css/permission-grid.css`
+  changed, and neither change degrades gracefully. Against the old script, `stateOf()`,
+  `reachedMark()`, `markOf()`, `reachOf()`, `stepTab()` and `edgeTab()` do not exist — confirmed
+  against the file as it stood at `v1.0.2` — so every `x-text`/`x-bind` in the new markup that calls
+  one throws in Alpine, on every cell and every condition-builder mode button; arrow-key and
+  Home/End navigation on the tabs throws too, since `stepTab()`/`edgeTab()` call the equally
+  missing `openTab()` internally. Against the old stylesheet there is no `.fw-sr` rule — also
+  confirmed absent at `v1.0.2` — so the four screen-reader-only spans this release adds render as
+  ordinary text inside each cell's 1.5rem box, and the grid's layout breaks open.
 
 ## [1.0.2] - 2026-08-21
 
