@@ -172,6 +172,36 @@ test('deletion follows the rule the installation chose', function (bool|string $
     'always' => ['all', true, true],
 ]);
 
+test('a role held under another tenant is not offered for deletion', function (): void {
+    $role = makeRole();
+    $free = makeRole('unheld');
+
+    Warden::tenant()->onceTo(7, static function () use ($role): void {
+        Warden::assign($role)->to(makeUser('Holder'));
+    });
+
+    config()->set('filament-warden.roles.delete', 'unassigned');
+
+    $held = Warden::tenant()->onceTo(8, static fn (): bool => RoleResource::isDeletable($role));
+    $unheld = Warden::tenant()->onceTo(8, static fn (): bool => RoleResource::isDeletable($free));
+
+    expect($held)->toBeFalse()
+        ->and($unheld)->toBeTrue();
+});
+
+test('and a strict installation with no tenant active sees that assignment too', function (): void {
+    $role = makeRole();
+
+    Warden::tenant()->onceTo(7, static function () use ($role): void {
+        Warden::assign($role)->to(makeUser('Holder'));
+    });
+
+    config()->set('filament-warden.roles.delete', 'unassigned');
+    config()->set('warden.scope.null_behavior', 'strict');
+
+    expect(RoleResource::isDeletable($role))->toBeFalse();
+});
+
 test('a protected role cannot be renamed from the form', function (): void {
     $user = signIn();
     Warden::allow($user)->to('viewAny', roleClass());

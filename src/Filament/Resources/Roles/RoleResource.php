@@ -130,6 +130,26 @@ class RoleResource extends Resource
         return is_array($protected) && is_string($name) && in_array($name, $protected, true);
     }
 
+    /**
+     * Whether this role may go — a decision about a DELETE, and therefore a read
+     * of every tenant's rows.
+     *
+     * The assignment rows follow the role down through a foreign key, and THE
+     * CASCADE IS BLIND TO THE SCOPE, as is `$record->delete()` itself. Read
+     * through warden's tenant scope, an assignment stamped with another tenant is
+     * invisible, so a role somebody still holds reads as unassigned and the screen
+     * offers the delete button. Measured: held under tenant 7, it read as deletable
+     * from tenant 8, and from no tenant at all under
+     * `warden.scope.null_behavior => 'strict'`.
+     *
+     * The criterion, and it is NOT "strip the scopes off every assigned_roles
+     * query": a read that DECIDES a delete reads wide, because the cascade does.
+     * A read that REPORTS what exists under the active tenant keeps its scope,
+     * because reading wide there would show an assignment `retract()` cannot
+     * remove — a silent no-op from the wrong scope. The other two readers of this
+     * table, `Grants\Reach::restricted()` and `Grants\Assignment::assignments()`,
+     * are of the second kind and keep their scopes on purpose.
+     */
     public static function isDeletable(Model $record): bool
     {
         if (self::isProtected($record)) {
@@ -147,6 +167,7 @@ class RoleResource extends Resource
         }
 
         return ! Context::resolve()->assignedRoleClass()::query()
+            ->withoutGlobalScopes()
             ->where('role_id', $record->getKey())
             ->exists();
     }
