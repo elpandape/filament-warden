@@ -97,7 +97,10 @@ them fatal at login.
   row gained the new one instantly. Re-pointing a row now needs the installation to allow editing
   every permission, or that nobody holds the row yet; narrowing its conditions or its ownership,
   which does not change what the row means to a holder, still only needs the ordinary edit
-  permission. The shared-row warning now fires from a single holder instead of two.
+  permission. The shared-row warning now fires from a single holder instead of two. The lock costs
+  reads to ask: an edit-screen render of the shipped default's most common row — a loose permission
+  with no entity, under `'loose'` — measured at 11 grant reads against 3 before this release, one
+  `Holders::of()` call per field it now guards.
 - **Changing a permission's entity left a stale ownership flag behind.** "Only what it owns" only
   makes sense against the model it was checked on; moving a derived permission to a different
   entity now clears that flag along with the reset it already did to its conditions.
