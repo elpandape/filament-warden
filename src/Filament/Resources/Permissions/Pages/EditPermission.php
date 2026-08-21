@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages;
 
 use ElPandaPe\FilamentWarden\Catalog\PermissionName;
+use ElPandaPe\FilamentWarden\Conditions\Ownership;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Tables\PermissionsTable;
 use ElPandaPe\Warden\Facades\Warden;
@@ -13,6 +14,7 @@ use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 
 class EditPermission extends EditRecord
 {
@@ -53,6 +55,31 @@ class EditPermission extends EditRecord
     {
         $record = $this->getRecord();
 
+        // A disabled field is not dehydrated, so neither of these two should be
+        // in `$data` at all — and the guarantee is not left resting on how
+        // another package derives that flag. What may not be re-pointed is
+        // written back exactly as it already was.
+        //
+        // First, because everything below reads `entity_type` as the entity
+        // about to be saved.
+        if (! PermissionResource::mayEditName($record)) {
+            $data['name'] = $record->getAttribute('name');
+            $data['entity_type'] = $record->getAttribute('entity_type');
+        }
+
+        $entityType = $this->nullableText($this->submitted($data, 'entity_type'));
+
+        // The toggle greys itself out where ownership cannot resolve, and a
+        // greyed-out field sends nothing at all — so the `true` written for the
+        // entity before this one would simply stay.
+        //
+        // Only when the entity moved. Giving up an ownership the row already
+        // carried would widen what it grants, and nobody asked for that by
+        // opening this screen.
+        if ($entityType !== $record->getAttribute('entity_type') && ! $this->ownable($entityType)) {
+            $data['only_owned'] = false;
+        }
+
         $was = PermissionTitle::generate(
             $this->text($record->getAttribute('name')),
             $this->nullableText($record->getAttribute('entity_type')),
@@ -70,7 +97,7 @@ class EditPermission extends EditRecord
         // warden's generator has no way to know that `widget:` means anything.
         $data['title'] = PermissionName::title($name) ?? PermissionTitle::generate(
             $name,
-            $this->nullableText($this->submitted($data, 'entity_type')),
+            $entityType,
             null,
             (bool) $this->submitted($data, 'only_owned'),
         );
@@ -121,5 +148,35 @@ class EditPermission extends EditRecord
         return array_key_exists($key, $data)
             ? $data[$key]
             : $this->getRecord()->getAttribute($key);
+    }
+
+    /**
+     * Whether "only what it owns" can be resolved for an entity at all.
+     *
+     * The same question `PermissionForm` asks to grey the toggle out, asked
+     * again here because a greyed-out toggle sends nothing and the stored value
+     * would otherwise outlive the entity it was resolved against. §6.20: an
+     * `only_owned` over an attribute that is not a column does not fail closed,
+     * it emits invalid SQL and throws when the query runs.
+     *
+     * A private copy on purpose: making the form's own predicate public would be
+     * new API surface and 1.0.2 is a patch. It is the fifth copy of the
+     * morph-to-class idiom in this package — `Reach`, `Probe`, `Holders`,
+     * `PermissionForm` and here — and folding the five into one reader is a
+     * 1.1.0 item. Until then the two that must agree are held to account
+     * together by 'switching the entity gives up an ownership it cannot
+     * resolve', which asserts the screen and the column in one test.
+     */
+    private function ownable(?string $entityType): bool
+    {
+        if ($entityType === null) {
+            return false;
+        }
+
+        // Warden's wildcard and a morph alias that no longer resolves both land
+        // here as a string that is not a model class, which is the same answer.
+        $model = Relation::getMorphedModel($entityType) ?? $entityType;
+
+        return is_subclass_of($model, Model::class) && Ownership::of($model)->available;
     }
 }

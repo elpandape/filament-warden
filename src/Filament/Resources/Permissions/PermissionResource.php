@@ -138,26 +138,40 @@ class PermissionResource extends Resource
     }
 
     /**
-     * What the name is: `false` nothing, `'title'` only the label, `'loose'` the
-     * permissions with no model behind them, `'all'` everything — including the
-     * name of a derived one, which is what disconnects it from its policy.
+     * Whether the row may be re-pointed — its name and its entity, the two
+     * halves of what it answers to.
+     *
+     * A row somebody holds is a rule somebody is relying on, and moving it moves
+     * what they hold without touching a grant of theirs: nothing is revoked,
+     * nothing is written to `grants`, and the check they used to pass answers
+     * something else from then on. Only an installation that opened the
+     * catalogue whole does that; `'loose'` goes on minting and editing the rows
+     * nobody holds yet.
+     *
+     * The holders are counted across every tenant, like the delete rule and for
+     * the same reason: a grant in another tenant is a person relying on this row
+     * whatever tenant is active while somebody edits it.
+     *
+     * The question is asked last, so it costs nothing where the config already
+     * answers — a derived row at the shipped `'loose'`, or anything at `'all'`.
      */
     public static function mayEditName(Model $record): bool
     {
-        $rule = Config::get('permissions.update');
+        if (! self::mayEdit($record)) {
+            return false;
+        }
 
-        return $rule === 'all'
-            || ($rule === 'loose' && $record->getAttribute('entity_type') === null);
+        return Config::get('permissions.update') === 'all' || Holders::of($record)->isOrphaned();
     }
 
     public static function mayEditConditions(Model $record): bool
     {
-        return Config::enabled('permissions.constraints') && self::mayEditName($record);
+        return Config::enabled('permissions.constraints') && self::mayEdit($record);
     }
 
     public static function mayEditOwnership(Model $record): bool
     {
-        return Config::enabled('permissions.only_owned') && self::mayEditName($record);
+        return Config::enabled('permissions.only_owned') && self::mayEdit($record);
     }
 
     public static function form(Schema $schema): Schema
@@ -186,5 +200,24 @@ class PermissionResource extends Resource
             'view' => ViewPermission::route('/{record}'),
             'edit' => EditPermission::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * What the config alone says: `false` nothing, `'title'` only the label,
+     * `'loose'` the permissions with no model behind them, `'all'` everything —
+     * including the name of a derived one, which is what disconnects it from its
+     * policy.
+     *
+     * Kept apart from `mayEditName()` because the conditions and the ownership
+     * hang off this one and they are a different decision: they narrow what the
+     * row means, they do not re-point it. Private, because 1.0.2 is a patch and
+     * a new public static would be a minor.
+     */
+    private static function mayEdit(Model $record): bool
+    {
+        $rule = Config::get('permissions.update');
+
+        return $rule === 'all'
+            || ($rule === 'loose' && $record->getAttribute('entity_type') === null);
     }
 }

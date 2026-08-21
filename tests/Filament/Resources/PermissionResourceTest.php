@@ -16,6 +16,7 @@ use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
@@ -28,6 +29,23 @@ function heldRow(string $name = 'viewAny'): Model
         ->where('name', $name)
         ->orderByDesc('id')
         ->firstOrFail();
+}
+
+function grantReads(): int
+{
+    $table = new (Context::resolve()->grantClass())()->getTable();
+    $reads = 0;
+
+    // Larastan types each entry as `array{query: string, bindings: array,
+    // time: float|null}`, so at `level: max` a defensive `is_array()` /
+    // `is_string()` around it is dead code the analyser refuses to pass.
+    foreach (DB::getQueryLog() as $entry) {
+        if (str_contains($entry['query'], $table)) {
+            $reads++;
+        }
+    }
+
+    return $reads;
 }
 
 test('the resource points at the configured permission model, never at a guessed one', function (): void {
@@ -359,6 +377,113 @@ test('the catalogue cannot take the same permission twice', function (): void {
         ->assertHasFormErrors(['name']);
 });
 
+test('the same name over another entity is another permission', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    makePermission('view')->update(['entity_type' => new Post()->getMorphClass()]);
+
+    $mine = makePermission('browse');
+    $mine->update(['entity_type' => new Comment()->getMorphClass()]);
+
+    livewire(EditPermission::class, ['record' => $mine->getKey()])
+        ->fillForm(['name' => 'view'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($mine->refresh()->getAttribute('name'))->toBe('view');
+});
+
+test('the same name over the same entity is the one already there', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    makePermission('view')->update(['entity_type' => new Post()->getMorphClass()]);
+
+    $mine = makePermission('browse');
+    $mine->update(['entity_type' => new Post()->getMorphClass()]);
+
+    livewire(EditPermission::class, ['record' => $mine->getKey()])
+        ->fillForm(['name' => 'view'])
+        ->call('save')
+        ->assertHasFormErrors(['name']);
+
+    expect($mine->refresh()->getAttribute('name'))->toBe('browse');
+});
+
+test('a permission pinned to one record is not the one pinned to another', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    makePermission('view')->update([
+        'entity_type' => new Post()->getMorphClass(),
+        'entity_id' => 1,
+    ]);
+
+    $mine = makePermission('browse');
+    $mine->update([
+        'entity_type' => new Post()->getMorphClass(),
+        'entity_id' => 2,
+    ]);
+
+    livewire(EditPermission::class, ['record' => $mine->getKey()])
+        ->fillForm(['name' => 'view'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($mine->refresh()->getAttribute('name'))->toBe('view');
+});
+
+test('an ownership of its own makes it another permission too', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    makePermission('view')->update([
+        'entity_type' => new Comment()->getMorphClass(),
+        'only_owned' => true,
+    ]);
+
+    $mine = makePermission('browse');
+    $mine->update(['entity_type' => new Comment()->getMorphClass()]);
+
+    livewire(EditPermission::class, ['record' => $mine->getKey()])
+        ->fillForm(['name' => 'view'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($mine->refresh()->getAttribute('name'))->toBe('view');
+});
+
+test('a name another entity already uses does not block a row nobody may rename', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    Warden::allow(makeRole())->to('viewAny', Post::class);
+
+    $derived = heldRow('viewAny');
+
+    expect(PermissionResource::mayEditName($derived))->toBeFalse();
+
+    livewire(EditPermission::class, ['record' => $derived->getKey()])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($derived->refresh()->getAttribute('name'))->toBe('viewAny');
+});
+
 test('the listing can be narrowed to what somebody holds, and to what nobody does', function (): void {
     $user = signIn();
     Warden::allow($user)->to('viewAny', permissionClass());
@@ -418,6 +543,89 @@ test('a shared row says so, and a fresh form has nobody to warn about', function
     livewire(CreatePermission::class)->assertDontSee('It is one row and one rule');
 });
 
+test('a loose installation may not re-point a row somebody holds', function (): void {
+    config()->set('filament-warden.permissions.update', 'loose');
+
+    Warden::allow(makeRole('one'))->to('export');
+
+    expect(PermissionResource::mayEditName(heldRow('export')))->toBeFalse()
+        ->and(PermissionResource::mayEditName(makePermission('archive')))->toBeTrue();
+
+    config()->set('filament-warden.permissions.update', 'all');
+
+    expect(PermissionResource::mayEditName(heldRow('export')))->toBeTrue();
+
+    config()->set('filament-warden.permissions.update', 'title');
+
+    expect(PermissionResource::mayEditName(makePermission('purge')))->toBeFalse();
+});
+
+test('the lock leaves the conditions and the ownership where they were', function (): void {
+    config()->set('filament-warden.permissions.update', 'loose');
+
+    Warden::allow(makeRole('one'))->to('export');
+
+    $held = heldRow('export');
+
+    expect(PermissionResource::mayEditName($held))->toBeFalse()
+        ->and(PermissionResource::mayEditConditions($held))->toBeTrue()
+        ->and(PermissionResource::mayEditOwnership($held))->toBeTrue();
+});
+
+test('the save keeps the lock the screen draws', function (): void {
+    config()->set('filament-warden.permissions.update', 'loose');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    Warden::allow(makeRole('one'))->to('export');
+
+    $held = heldRow('export');
+
+    livewire(EditPermission::class, ['record' => $held->getKey()])
+        ->fillForm(['name' => 'exfiltrate'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($held->refresh()->getAttribute('name'))->toBe('export');
+});
+
+test('the lock does not multiply what the screen asks the store', function (): void {
+    config()->set('filament-warden.permissions.update', 'loose');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    Warden::allow(makeRole('one'))->to('export');
+
+    $held = heldRow('export');
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    livewire(EditPermission::class, ['record' => $held->getKey()]);
+
+    expect(grantReads())->toBeLessThanOrEqual(12);
+});
+
+test('a row a single holder has says so too, and one nobody has says nothing', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    Warden::allow(makeRole('one'))->to('export');
+
+    livewire(EditPermission::class, ['record' => heldRow('export')->getKey()])
+        ->assertSee('It is one row and one rule');
+
+    livewire(EditPermission::class, ['record' => makePermission('unheld')->getKey()])
+        ->assertDontSee('It is one row and one rule');
+});
+
 test('ownership is offered where it could resolve, and refused where it could not', function (): void {
     config()->set('filament-warden.permissions.update', 'all');
 
@@ -436,6 +644,80 @@ test('ownership is offered where it could resolve, and refused where it could no
 
     livewire(EditPermission::class, ['record' => $notOwned->getKey()])
         ->assertSee('has no user_id column');
+});
+
+test('switching the entity gives up an ownership it cannot resolve', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+    config()->set('filament-warden.catalog.models', [Post::class]);
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $permission = makePermission('view');
+    $permission->update(['entity_type' => new Comment()->getMorphClass()]);
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->fillForm(['only_owned' => true])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($permission->refresh()->getAttribute('only_owned'))->toBeTruthy();
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->fillForm(['entity_type' => new Post()->getMorphClass()])
+        ->assertFormSet(['only_owned' => false])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($permission->refresh()->getAttribute('only_owned'))->toBeFalsy();
+});
+
+test('an ownership survives a move to an entity that can still resolve it', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+    config()->set('filament-warden.catalog.models', [Post::class]);
+
+    Warden::ownedVia(Post::class, 'title');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $permission = makePermission('view');
+    $permission->update([
+        'entity_type' => new Comment()->getMorphClass(),
+        'only_owned' => true,
+    ]);
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->fillForm([
+            'entity_type' => new Post()->getMorphClass(),
+            'only_owned' => true,
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($permission->refresh()->getAttribute('only_owned'))->toBeTruthy();
+});
+
+test('an ownership the row already carried is left where it is', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $permission = makePermission('view');
+    $permission->update([
+        'entity_type' => new Post()->getMorphClass(),
+        'only_owned' => true,
+    ]);
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($permission->refresh()->getAttribute('only_owned'))->toBeTruthy();
 });
 
 test('a permission created here is asked for straight away, cache and all', function (): void {

@@ -54,8 +54,15 @@ class PermissionForm
                             // There is no unique index on this table, so `unique()`
                             // on one column would not describe the row: a permission
                             // is the tuple, and two identical ones are creatable.
-                            ->rule(static fn (?Model $record): callable => static function (string $attribute, mixed $value, callable $fail) use ($record): void {
-                                if (self::exists($value, $record)) {
+                            //
+                            // `$get` and `$record` are injected by PARAMETER NAME,
+                            // not by type: `Component::resolveDefault…ByName()` is
+                            // consulted first and answers both, while the by-type
+                            // path hands back the record for anything typed as a
+                            // model and would leave `Get` to the container. Rename
+                            // either and this closure stops resolving.
+                            ->rule(static fn (?Model $record, Get $get): callable => static function (string $attribute, mixed $value, callable $fail) use ($record, $get): void {
+                                if (self::exists($value, $record, $get)) {
                                     $fail(__('filament-warden::ui.resources.permissions.fields.taken'));
                                 }
                             }),
@@ -72,9 +79,16 @@ class PermissionForm
                             ->options(static fn (?Model $record): array => self::entities($record))
                             ->live()
                             ->disabled(static fn (?Model $record): bool => $record instanceof Model && ! PermissionResource::mayEditName($record))
-                            // The conditions named columns of another table. Kept,
-                            // they would be a rule that cannot be true.
-                            ->afterStateUpdated(static fn (callable $set): mixed => $set('options', ['mode' => 'all', 'rules' => []]))
+                            // The conditions named columns of another table, and the
+                            // ownership was resolved against a column this entity may
+                            // not have. Kept, either would be a rule that cannot be
+                            // true — and an `only_owned` over an attribute that is not
+                            // a column does not fail closed: it emits invalid SQL and
+                            // throws when the query runs.
+                            ->afterStateUpdated(static function (callable $set): void {
+                                $set('options', ['mode' => 'all', 'rules' => []]);
+                                $set('only_owned', false);
+                            })
                             ->columnSpanFull(),
                     ]),
 
@@ -165,6 +179,17 @@ class PermissionForm
         // A name this package minted has a title only this package can read back.
         return PermissionName::title($name)
             ?? PermissionTitle::generate($name, is_string($type) ? $type : null, null, (bool) $get('only_owned'));
+    }
+
+    /**
+     * The entity the form is holding right now: what is about to be saved, not
+     * what the row was drawn from.
+     */
+    private static function entityType(Get $get): ?string
+    {
+        $type = $get('entity_type');
+
+        return is_string($type) ? $type : null;
     }
 
     /**
@@ -301,9 +326,16 @@ class PermissionForm
     }
 
     /**
-     * A permission carrying conditions is a shared row: two roles that hold it
-     * point at the same one, and editing it here moves the rule for both. That
-     * is right for a catalogue — the row IS the rule — and it has to be said.
+     * A permission is a shared row: every role and every account holding it
+     * points at the same one, and editing it here moves the rule for all of them
+     * at once. That is right for a catalogue — the row IS the rule — and it has
+     * to be said from the FIRST holder and not the second, because one holder is
+     * already somebody whose rule is about to move under them.
+     *
+     * The sentence is left exactly as 1.0.1 wrote it, plural and all: a wording
+     * of its own would be a new key and therefore a minor, and an installation
+     * that published this file goes on rendering its own copy unchanged. The
+     * singular is 1.1.0.
      */
     private static function sharedWarning(?Model $record): ?string
     {
@@ -311,26 +343,58 @@ class PermissionForm
             return null;
         }
 
-        $holders = Holders::of($record);
+        $total = Holders::of($record)->total();
 
-        return $holders->total() > 1
-            ? (string) __('filament-warden::ui.resources.permissions.fields.conditions_shared', ['count' => $holders->total()])
+        return $total > 0
+            ? (string) __('filament-warden::ui.resources.permissions.fields.conditions_shared', ['count' => $total])
             : null;
     }
 
     /**
-     * Whether the tuple is already in the catalogue. A permission is
-     * (action, entity, ownership), not a name.
+     * Whether the tuple is already in the catalogue.
+     *
+     * A permission is (action, entity, record, ownership) — four columns with no
+     * unique index behind them, so two rows agreeing on all four are creatable
+     * and nothing short of all four describes one. Since 0.6.0 the sentence this
+     * rule fires has promised "this name and entity"; the query compared the
+     * name and stopped there, so the same action over two different models could
+     * not coexist and a derived row could not be saved at all while a sibling
+     * shared its name.
+     *
+     * The entity and the ownership are read from the form, because they are what
+     * is about to be saved; the record's key is read from the row, because no
+     * field on this screen can move it.
+     *
+     * A twin — the same tuple carrying conditions — is a row of its own and
+     * collides with nothing, so only the plain rows are compared.
      */
-    private static function exists(mixed $name, ?Model $record): bool
+    private static function exists(mixed $name, ?Model $record, Get $get): bool
     {
         $class = Context::resolve()->permissionClass();
+
+        $entityType = self::entityType($get);
+        $entityId = $record?->getAttribute('entity_id');
 
         return is_string($name) && $class::query()
             ->withoutGlobalScopes()
             ->where('name', $name)
-            ->when($record instanceof Model, static fn (mixed $query): mixed => $query->whereKeyNot($record?->getKey()))
+            ->where('only_owned', (bool) $get('only_owned'))
             ->whereNull('options')
+            // `where('column', null)` compiles to `= null`, which is never true.
+            // Both halves of the entity are nullable, so each needs its own null
+            // arm or the rule would stop firing for the loose permissions, which
+            // is most of them.
+            ->when(
+                $entityType === null,
+                static fn (mixed $query): mixed => $query->whereNull('entity_type'),
+                static fn (mixed $query): mixed => $query->where('entity_type', $entityType),
+            )
+            ->when(
+                $entityId === null,
+                static fn (mixed $query): mixed => $query->whereNull('entity_id'),
+                static fn (mixed $query): mixed => $query->where('entity_id', $entityId),
+            )
+            ->when($record instanceof Model, static fn (mixed $query): mixed => $query->whereKeyNot($record?->getKey()))
             ->exists();
     }
 }
