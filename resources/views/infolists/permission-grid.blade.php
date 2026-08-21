@@ -3,11 +3,19 @@
     render one, unlike a field. And the component name is the blade-component
     form, not the view path.
 --}}
+@php
+    $grid = $getGrid();
+    // A literal and not a live binding, because nothing here writes back. It is
+    // still the whole payload: alpine re-derives every cell from it on boot, so
+    // an empty object drew an empty grid over a correct one.
+    $binding = \Illuminate\Support\Js::from($grid->stored);
+@endphp
+
 <x-dynamic-component :component="$getEntryWrapperView()" :entry="$entry">
     @include('filament-warden::grid', [
-        'grid' => $getGrid(),
+        'grid' => $grid,
         'interactive' => false,
-        'binding' => '{}',
+        'binding' => $binding,
         'componentKey' => $getKey(),
     ])
 </x-dynamic-component>

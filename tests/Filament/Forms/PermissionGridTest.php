@@ -8,7 +8,10 @@ use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\ForeignGridHost;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\GridHost;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Vault;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Facades\Warden;
@@ -104,6 +107,19 @@ test('the field renders every tab of the catalogue at once', function (): void {
         ->assertSee('data-fw-action="viewAny"', escape: false)
         ->assertSee('data-fw-action="'.StateKey::MANAGE.'"', escape: false)
         ->assertSee('data-fw-action="'.StateKey::DOOR.'"', escape: false);
+});
+
+test('the grid hung on a record that is not a role asks it nothing about protection', function (): void {
+    $post = Post::query()->create(['title' => 'A post']);
+    $stranger = makeUser('super-admin');
+
+    livewire(ForeignGridHost::class, ['recordClass' => Post::class, 'recordKey' => $post->getKey()])
+        ->assertSee('fw-grid', escape: false)
+        ->assertDontSee('fw-locked-notice', escape: false);
+
+    livewire(ForeignGridHost::class, ['recordClass' => User::class, 'recordKey' => $stranger->getKey()])
+        ->assertSee('fw-grid', escape: false)
+        ->assertDontSee('fw-locked-notice', escape: false);
 });
 
 test('a cell the policy does not declare renders as a dot and not as a control', function (): void {

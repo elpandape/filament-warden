@@ -56,9 +56,12 @@ final readonly class Cell
     }
 
     /**
-     * What the server draws without javascript, which is also what the browser
-     * starts from: the stance the role wrote, or the dashed mark of a rule this
-     * cell never asked for.
+     * What the server draws without javascript: the stance the role wrote, or
+     * the dashed mark of a rule this cell never asked for.
+     *
+     * The browser reaches the same answer, but it does not read it here — it
+     * re-derives it from `RoleState::toPayload()`, which is why a screen that
+     * handed over an empty payload drew empty boxes over correct ones.
      */
     public function drawn(): string
     {

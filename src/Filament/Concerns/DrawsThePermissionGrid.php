@@ -14,10 +14,12 @@ use ElPandaPe\FilamentWarden\Conditions\Ownership;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
+use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Grants\Explanation;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Grants\RoleState;
 use ElPandaPe\FilamentWarden\Support\Config;
+use ElPandaPe\Warden\Context;
 use Filament\Facades\Filament;
 use Filament\Panel;
 use Filament\Support\Components\Attributes\ExposedLivewireMethod;
@@ -136,7 +138,7 @@ trait DrawsThePermissionGrid
 
     public function getGrid(): GridView
     {
-        return GridView::for($this->catalog(), $this->storedState(), $this->gridState());
+        return GridView::for($this->catalog(), $this->storedState(), $this->gridState(), $this->protectedRole());
     }
 
     /**
@@ -225,5 +227,30 @@ trait DrawsThePermissionGrid
         $line = __($key, $replace);
 
         return is_string($line) ? $line : $key;
+    }
+
+    /**
+     * Whether the installation protects the role on screen.
+     *
+     * Not the same question as whether this screen can change it. On the form
+     * the two coincide, because the field is disabled for exactly this reason;
+     * on a screen that changes nothing they never coincide, and reading one off
+     * the other announced every role as protected.
+     *
+     * The class check is not ceremony. This trait is shared by the two names an
+     * application is invited to write — `PermissionGrid` and
+     * `PermissionGridEntry` — and either may be handed any record at all.
+     * `roles.protected` matches by `name`, so on a record of some other class
+     * the question is either wrong or fatal: wrong for one that happens to have
+     * a column called `name`, fatal under `Model::shouldBeStrict()` for one that
+     * does not. It is asked only of a role, and of the configured class rather
+     * than the shipped one, which is how warden asks it everywhere else.
+     */
+    private function protectedRole(): bool
+    {
+        $role = $this->getRecord();
+        $roleClass = Context::resolve()->roleClass();
+
+        return $role instanceof $roleClass && RoleResource::isProtected($role);
     }
 }

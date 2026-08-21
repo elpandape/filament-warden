@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Filament\Forms;
 
-use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Filament\Concerns\DrawsThePermissionGrid;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\State;
@@ -40,12 +39,9 @@ final class PermissionGrid extends Field
         $this->validatedWhenNotDehydrated(false);
 
         $this->afterStateHydrated(static function (self $component): void {
-            $stored = $component->storedState();
-
-            $component->state([
-                'stances' => $stored->stances,
-                'narrowing' => self::payloadOf($stored->narrowings),
-            ]);
+            // The same payload the screen that only reads renders as a literal:
+            // one shape, and one place it is worked out.
+            $component->state($component->storedState()->toPayload());
         });
 
         $this->saveRelationshipsUsing(static function (self $component): void {
@@ -79,32 +75,6 @@ final class PermissionGrid extends Field
     protected function onScreenStance(string $row, string $action): Stance
     {
         return self::stanceIn($this->gridState(), $row, $action);
-    }
-
-    /**
-     * A cell that is not in the map reaches every row, so only the narrowed ones
-     * travel: this whole map goes to the browser on every render.
-     *
-     * And only the ones this screen can draw. A rule it cannot is drawn from the
-     * server once and never touched again — putting it in the state would offer
-     * the browser something to edit that nothing would accept back.
-     *
-     * @param  array<string, array<string, Narrowing>>  $narrowings
-     * @return array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>
-     */
-    private static function payloadOf(array $narrowings): array
-    {
-        $payload = [];
-
-        foreach ($narrowings as $row => $actions) {
-            foreach ($actions as $action => $narrowing) {
-                if ($narrowing->isNarrowed() && $narrowing->isEditable()) {
-                    $payload[$row][$action] = $narrowing->toPayload();
-                }
-            }
-        }
-
-        return $payload;
     }
 
     /**

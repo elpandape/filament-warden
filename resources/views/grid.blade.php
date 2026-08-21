@@ -18,9 +18,9 @@
 >
     <div class="fw-layout">
         <div class="fw-main">
-                @unless ($interactive)
+                @if ($grid->isProtected)
                     <p class="fw-locked-notice">{{ __('filament-warden::ui.grid.locked') }}</p>
-                @endunless
+                @endif
 
                 @if ($grid->mixing())
                     <p class="fw-note fw-note-locked">{{ __('filament-warden::ui.grid.mixing') }}</p>

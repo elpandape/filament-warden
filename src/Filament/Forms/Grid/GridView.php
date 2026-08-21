@@ -29,19 +29,27 @@ final readonly class GridView
      * @param  list<Tab>  $tabs
      * @param  list<ColumnGroup>  $groups
      * @param  array<string, string>  $wider
+     * @param  array{stances: array<string, array<string, string>>, narrowing: array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>}  $stored  the store, in the shape the browser holds it
+     * @param  bool  $isProtected  whether the installation protects this role, which is not the same question as whether this screen can edit it
      */
     private function __construct(
         public array $tabs,
         public array $groups,
         public array $wider,
+        public array $stored,
+        public bool $isProtected,
     ) {}
 
     /**
      * @param  RoleState  $stored  what the store has, which is what locks a cell
      * @param  array<string, array<string, string>>  $state  what is on screen, keyed row => action
      */
-    public static function for(Catalog $catalog, RoleState $stored = new RoleState, array $state = []): self
-    {
+    public static function for(
+        Catalog $catalog,
+        RoleState $stored = new RoleState,
+        array $state = [],
+        bool $isProtected = false,
+    ): self {
         $narrowings = $stored->narrowings;
         $wider = $stored->wider;
 
@@ -68,6 +76,8 @@ final readonly class GridView
             tabs: array_values(array_filter($tabs, static fn (Tab $tab): bool => ! $tab->isEmpty())),
             groups: $groups,
             wider: $wider,
+            stored: $stored->toPayload(),
+            isProtected: $isProtected,
         );
     }
 

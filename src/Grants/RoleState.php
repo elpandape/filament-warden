@@ -52,6 +52,37 @@ final readonly class RoleState
     }
 
     /**
+     * The store, in the shape the browser holds it.
+     *
+     * Both screens hand alpine this and nothing else: the form as a live binding
+     * it writes back, the screen that only reads as a literal. It has to be the
+     * whole thing either way, because every cell is re-derived from it the
+     * moment alpine boots — a screen that handed over an empty object drew an
+     * empty grid over a correct one and tallied zero.
+     *
+     * Only the narrowed cells travel: one that is not in the map reaches every
+     * row. And only the ones a screen can draw — a rule it cannot is drawn from
+     * the server once and never touched again, because putting it here would
+     * offer the browser something to edit that nothing would accept back.
+     *
+     * @return array{stances: array<string, array<string, string>>, narrowing: array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>}
+     */
+    public function toPayload(): array
+    {
+        $narrowing = [];
+
+        foreach ($this->narrowings as $row => $actions) {
+            foreach ($actions as $action => $narrowed) {
+                if ($narrowed->isNarrowed() && $narrowed->isEditable()) {
+                    $narrowing[$row][$action] = $narrowed->toPayload();
+                }
+            }
+        }
+
+        return ['stances' => $this->stances, 'narrowing' => $narrowing];
+    }
+
+    /**
      * @param  callable(Narrowing): bool  $answers
      * @return array<string, array<string, bool>>
      */
