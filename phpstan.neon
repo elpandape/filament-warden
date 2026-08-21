@@ -13,3 +13,8 @@ parameters:
     level: max
 
     reportUnmatchedIgnoredErrors: true
+
+    # The dev container is `--rm`, so the default result cache under the system temp
+    # directory is thrown away on every run and every analysis starts cold. Resolved
+    # relative to this file, so it lands in the bind mount and survives: 11.9s -> 1.6s.
+    tmpDir: .cache/phpstan

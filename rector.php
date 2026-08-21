@@ -17,8 +17,10 @@ return RectorConfig::configure()
     ->withSets([
         PestSetList::CODING_STYLE,
     ])
+    // Under `/tmp` the cache died with the `--rm` container and every run was a cold
+    // one; in the bind mount it survives, and a dry run drops from 13.5s to 1.3s.
     ->withCache(
-        cacheDirectory: '/tmp/rector-filament-warden',
+        cacheDirectory: __DIR__.'/.cache/rector',
         cacheClass: FileCacheStorage::class,
     )
     ->withPaths([
