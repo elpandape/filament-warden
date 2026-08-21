@@ -90,6 +90,18 @@ final readonly class GridView
     }
 
     /**
+     * A stable id for one field's tabs and the panels they open.
+     *
+     * The component key is absolute — `form.permissions` — so it is already
+     * unique on the page, and it carries a dot, which is an id nobody escapes
+     * correctly the first time they write a selector for it.
+     */
+    public static function domId(string $componentKey): string
+    {
+        return 'fw-'.Str::of($componentKey)->replaceMatches('/[^A-Za-z0-9]+/', '-')->lower()->toString();
+    }
+
+    /**
      * What the browser needs and nothing more: the cycle order, which actions a
      * granted wildcard reaches on each row, and which rows belong to each tab.
      *
@@ -102,6 +114,7 @@ final readonly class GridView
      *     rows: array<string, array{actions: list<string>, read: list<string>, cells: list<array{action: string, name: string|null}>}>,
      *     tabs: list<array{key: string, rows: list<string>}>,
      *     wider: array<string, string>,
+     *     states: array<string, string>,
      *     operators: list<string>,
      *     authority: string,
      *     joiners: array{and: string, or: string},
@@ -133,6 +146,7 @@ final readonly class GridView
                 'rows' => array_map(static fn (Row $row): string => $row->key, $tab->rows),
             ], $this->tabs),
             'wider' => $this->wider,
+            'states' => $this->states(),
             'explain' => Config::enabled('grid.explain'),
             'constraints' => Config::enabled('grid.constraints'),
             ...Words::all(),
@@ -183,6 +197,37 @@ final readonly class GridView
             ['state' => 'granted', 'broader' => null, 'void' => false, 'noted' => true, 'locked' => false, 'label' => $this->line('narrowed')],
             ['state' => 'granted', 'broader' => null, 'void' => false, 'noted' => false, 'locked' => true, 'label' => $this->line('locked')],
         ];
+    }
+
+    /**
+     * The word each drawing says out loud, which is not the word the legend
+     * prints beside its sample. A legend line is a caption with a subject in it
+     * — "the role abstains" — and this one is read after the cell's own name and
+     * after the row and column headers, so it has to survive being said in a
+     * list. Two of the seven happen to coincide today; welding them would mean a
+     * change to a caption silently changed a control's name.
+     *
+     * The first three keys are `Stance::order()`, and in that order on purpose:
+     * the script indexes this map by what a cell ANSWERS, and what a cell
+     * answers is a stance value. Composing the name in javascript instead would
+     * put the three stance names back into the one file whose whole point is
+     * that it carries none.
+     *
+     * @return array<string, string>
+     */
+    public function states(): array
+    {
+        $states = [];
+
+        foreach (Stance::order() as $stance) {
+            $states[$stance] = $this->state($stance);
+        }
+
+        foreach (['broader', 'narrowed', 'locked', 'undeclared'] as $mark) {
+            $states[$mark] = $this->state($mark);
+        }
+
+        return $states;
     }
 
     /**
@@ -426,6 +471,11 @@ final readonly class GridView
     private static function humanize(string $value): string
     {
         return Str::headline($value);
+    }
+
+    private function state(string $key): string
+    {
+        return self::translated('filament-warden::ui.grid.states.'.$key, $key);
     }
 
     private function line(string $key): string

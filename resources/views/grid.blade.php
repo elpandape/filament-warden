@@ -6,6 +6,14 @@
     already worked out: `$interactive` says whether the cells are controls, and
     `$grid` is the whole view model.
 --}}
+@php
+    // Worked out once: a matrix includes the cell partial once per cell, and
+    // each word is a translator lookup. The id is the component's own key,
+    // which is absolute — `form.permissions` — and therefore already unique on
+    // the page, which is what a tab and its panel need to point at each other.
+    $states = $grid->states();
+    $ids = \ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView::domId($componentKey);
+@endphp
 <div
     x-load
     x-load-src="{{ \Filament\Support\Facades\FilamentAsset::getAlpineComponentSrc('permission-grid', 'elpandape/filament-warden') }}"
@@ -57,15 +65,34 @@
                     </p>
                 @endif
 
-                <div class="fw-tabs" role="tablist">
+                {{--
+                    A tablist is ONE tab stop and the arrows walk it: that is the
+                    pattern, and it is also the only way the panel below is
+                    reachable without tabbing past every tab first. Without
+                    javascript the tabs never switched anyway — the click handler
+                    is `x-on:click` — so the roving tabindex takes nothing away.
+                --}}
+                <div
+                    class="fw-tabs"
+                    role="tablist"
+                    x-on:keydown.arrow-right.prevent="stepTab($el, 1)"
+                    x-on:keydown.arrow-left.prevent="stepTab($el, -1)"
+                    x-on:keydown.home.prevent="edgeTab($el, false)"
+                    x-on:keydown.end.prevent="edgeTab($el, true)"
+                >
                     @foreach ($grid->tabs as $tab)
                         <button
                             type="button"
                             role="tab"
                             class="fw-tab"
+                            id="{{ $ids }}-tab-{{ $tab->key }}"
+                            data-fw-tab="{{ $tab->key }}"
+                            aria-controls="{{ $ids }}-panel-{{ $tab->key }}"
                             x-on:click="tab = @js($tab->key)"
                             x-bind:aria-selected="tab === @js($tab->key) ? 'true' : 'false'"
+                            x-bind:tabindex="tab === @js($tab->key) ? 0 : -1"
                             aria-selected="{{ $loop->first ? 'true' : 'false' }}"
+                            tabindex="{{ $loop->first ? '0' : '-1' }}"
                         >
                             {{ $tab->label }}
                             <span
@@ -79,7 +106,14 @@
                 </div>
 
                 @foreach ($grid->tabs as $tab)
-                    <div class="fw-panel" role="tabpanel" x-show="tab === @js($tab->key)" @unless ($loop->first) x-cloak @endunless>
+                    <div
+                        class="fw-panel"
+                        role="tabpanel"
+                        id="{{ $ids }}-panel-{{ $tab->key }}"
+                        aria-labelledby="{{ $ids }}-tab-{{ $tab->key }}"
+                        x-show="tab === @js($tab->key)"
+                        @unless ($loop->first) x-cloak @endunless
+                    >
                         @if ($tab->matrix)
                             <div class="fw-scroll">
                                 <table class="fw-table">
@@ -121,9 +155,9 @@
                                                 @foreach ($row->allCells() as $cell)
                                                     <td class="fw-cell">
                                                         @if ($cell->declared)
-                                                            @include('filament-warden::box', ['cell' => $cell, 'label' => $row->label.' · '.$cell->label, 'interactive' => $interactive])
+                                                            @include('filament-warden::box', ['cell' => $cell, 'label' => $row->label.' · '.$cell->label, 'interactive' => $interactive, 'states' => $states])
                                                         @else
-                                                            <span class="fw-void" title="{{ __('filament-warden::ui.grid.undeclared') }}">·</span>
+                                                            <span class="fw-void" title="{{ __('filament-warden::ui.grid.undeclared') }}"><span aria-hidden="true">·</span><span class="fw-sr">{{ $states['undeclared'] }}</span></span>
                                                         @endif
                                                     </td>
                                                 @endforeach
@@ -137,7 +171,7 @@
                                 @foreach ($tab->rows as $row)
                                     @foreach ($row->cells as $cell)
                                         <li class="fw-door">
-                                            @include('filament-warden::box', ['cell' => $cell, 'label' => $row->label, 'interactive' => $interactive])
+                                            @include('filament-warden::box', ['cell' => $cell, 'label' => $row->label, 'interactive' => $interactive, 'states' => $states])
                                             <span class="fw-door-text">
                                                 <span class="fw-entity-name">{{ $row->label }}</span>
                                                 <span class="fw-action-name">{{ $cell->entry?->name }}</span>
@@ -180,6 +214,20 @@
             </div>
 
             <div class="fw-inspector-body">
+                {{--
+                    Empty from the first paint on purpose: a live region added to
+                    the page at the same moment its content appears is not
+                    announced by NVDA or JAWS. What makes it reliable is that the
+                    element is already here and only its TEXT changes — which is
+                    also why it carries the failure sentence itself instead of
+                    leaving it to the paragraph below, whose announcement would
+                    depend on a `display` toggle. It says the verdict and not the
+                    whole panel, so a keystroke in the condition builder stays
+                    silent. `why` is already null or a real answer by the time it
+                    is read: `select()` normalises the empty payload.
+                --}}
+                <p class="fw-sr" role="status" x-text="failed ? @js(__('filament-warden::ui.explain.failed')) : (why ? why.summary : '')"></p>
+
                 <p class="fw-inspector-empty" x-show="! selected">{{ __('filament-warden::ui.explain.empty') }}</p>
                 <p class="fw-inspector-empty" x-show="selected && loading" x-cloak>{{ __('filament-warden::ui.explain.loading') }}</p>
                 <p class="fw-inspector-empty fw-inspector-failed" x-show="selected && failed && ! loading" x-cloak>{{ __('filament-warden::ui.explain.failed') }}</p>

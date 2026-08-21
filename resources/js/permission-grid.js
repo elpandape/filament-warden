@@ -338,6 +338,25 @@ function grid({ state, grid, interactive }) {
             return drawn === 'broader' ? this.reached(row, action, name) : drawn
         },
 
+        /**
+         * The three words a cell says to a screen reader, and the only thing the
+         * browser does with them: index a map php filled in, the same way it
+         * indexes the cycle. `answers()` returns a stance value and `states` is
+         * keyed by one, so nothing here has to know what a stance is called —
+         * which is a rule with a test behind it, not a preference.
+         */
+        stateOf(row, action, name) {
+            return this.grid.states[this.answers(row, action, name)]
+        },
+
+        reachedMark(row, action, name) {
+            return this.drawn(row, action, name) === 'broader' ? this.grid.states.broader : ''
+        },
+
+        markOf(row, action) {
+            return this.narrowedAt(row, action) ? this.grid.states.narrowed : ''
+        },
+
         write(row, action, stance) {
             const held = { ...(this.state.stances?.[row] ?? {}) }
 
@@ -348,6 +367,44 @@ function grid({ state, grid, interactive }) {
             }
 
             this.state = { ...this.state, stances: this.replace(this.state.stances, row, held) }
+        },
+
+        /* ── The tabs, from the keyboard ────────────────────────────────── */
+
+        /**
+         * The arrows select and move focus together, which is what a tablist
+         * does when its panels are cheap to show — and these are: every panel is
+         * already in the DOM and `x-show` only toggles display.
+         *
+         * The rendered buttons are the list, not `grid.tabs`: the handler is on
+         * the tablist and a keydown there needs a focused element inside it, and
+         * the only elements inside it ARE these buttons. So there is no empty
+         * list to guard against and no lookup that can miss — a guard here would
+         * be a branch nothing can reach and no javascript gate can measure. Even
+         * a `tab` that matched nothing lands at -1 and steps to the first
+         * button rather than at anything undefined.
+         */
+        stepTab(list, step) {
+            const buttons = Array.from(list.querySelectorAll('[role="tab"]'))
+            const at = buttons.findIndex((button) => button.dataset.fwTab === this.tab)
+
+            this.openTab(buttons[(at + step + buttons.length) % buttons.length])
+        },
+
+        edgeTab(list, last) {
+            const buttons = Array.from(list.querySelectorAll('[role="tab"]'))
+
+            this.openTab(buttons[last ? buttons.length - 1 : 0])
+        },
+
+        /**
+         * Selecting and focusing are one move: the roving tabindex has to land on
+         * the element that is now the tab stop, or the next Tab press leaves from
+         * somewhere the eye is not.
+         */
+        openTab(button) {
+            this.tab = button.dataset.fwTab
+            button.focus()
         },
 
         /* ── How far a cell reaches ─────────────────────────────────────── */

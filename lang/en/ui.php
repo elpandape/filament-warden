@@ -269,6 +269,15 @@ return [
             'narrowed' => 'the rule is narrowed',
             'locked' => 'the rule cannot be changed here',
         ],
+        'states' => [
+            'abstain' => 'no rule',
+            'granted' => 'granted',
+            'forbidden' => 'forbidden',
+            'broader' => 'reached by a broader rule',
+            'narrowed' => 'narrowed',
+            'locked' => 'not changeable here',
+            'undeclared' => 'not declared',
+        ],
         'shift' => 'Hold shift to walk the cycle backwards.',
     ],
 ];

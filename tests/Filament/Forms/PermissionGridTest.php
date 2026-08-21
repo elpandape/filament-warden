@@ -596,3 +596,115 @@ test('a grid nobody disabled says nothing at all', function (): void {
         ->assertDontSee('fw-read-only-notice', escape: false)
         ->assertDontSee('fw-locked-notice', escape: false);
 });
+
+/**
+ * One cell's markup, picked out of the rendered grid by the two attributes that
+ * identify it. The accessible name of a button is computed from what is INSIDE
+ * it, so an assertion about that name has to look inside one button and never at
+ * the page: the same word is on the legend, on six other cells and in a tooltip.
+ */
+function boxOf(string $html, string $row, string $action): string
+{
+    $pattern = '/<button[^>]*data-fw-row="'.preg_quote($row, '/')
+        .'"[^>]*data-fw-action="'.preg_quote($action, '/').'".*?<\/button>/s';
+
+    $matches = [];
+
+    return preg_match($pattern, $html, $matches) === 1 ? $matches[0] : '';
+}
+
+test('a cell says its state out loud, not only in a data attribute', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', roleClass());
+    Warden::forbid($role)->to('delete', roleClass());
+
+    $html = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
+
+    expect(boxOf($html, roleClass(), 'viewAny'))
+        ->toContain('>'.__('filament-warden::ui.grid.states.granted').'</span>')
+        ->and(boxOf($html, roleClass(), 'delete'))
+        ->toContain('>'.__('filament-warden::ui.grid.states.forbidden').'</span>')
+        ->and(boxOf($html, roleClass(), 'create'))
+        ->toContain('>'.__('filament-warden::ui.grid.states.abstain').'</span>');
+});
+
+test('a cell nobody wrote says the wider rule that answers for it', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->toManage(roleClass());
+
+    $html = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
+
+    expect(boxOf($html, roleClass(), 'viewAny'))
+        ->toContain('>'.__('filament-warden::ui.grid.states.granted').'</span>')
+        ->toContain('>'.__('filament-warden::ui.grid.states.broader').'</span>')
+        ->and(boxOf($html, roleClass(), StateKey::MANAGE))
+        ->not->toContain('>'.__('filament-warden::ui.grid.states.broader').'</span>');
+});
+
+test('a narrowed cell and a locked one each say which', function (): void {
+    $narrowed = makeRole('narrowed');
+
+    Warden::allow($narrowed)->to('update', roleClass())->where('name', 'editor');
+
+    $tangled = makeRole('tangled');
+
+    Warden::allow($tangled)->to('update', roleClass())->where('name', 'editor');
+    Warden::allow($tangled)->to('update', roleClass());
+
+    $one = livewire(GridHost::class, ['roleKey' => $narrowed->getKey()])->html();
+    $two = livewire(GridHost::class, ['roleKey' => $tangled->getKey()])->html();
+
+    expect(boxOf($one, roleClass(), 'update'))
+        ->toContain('>'.__('filament-warden::ui.grid.states.narrowed').'</span>')
+        ->not->toContain('>'.__('filament-warden::ui.grid.states.locked').'</span>')
+        ->and(boxOf($two, roleClass(), 'update'))
+        ->toContain('>'.__('filament-warden::ui.grid.states.locked').'</span>')
+        ->not->toContain('>'.__('filament-warden::ui.grid.states.narrowed').'</span>');
+});
+
+test('an undeclared cell says so instead of reading as a dot', function (): void {
+    config()->set('filament-warden.catalog.models', [ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Tag::class]);
+
+    $role = makeRole();
+
+    $html = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
+
+    expect($html)->toContain(
+        '<span aria-hidden="true">·</span><span class="fw-sr">'
+        .__('filament-warden::ui.grid.states.undeclared').'</span>',
+    );
+});
+
+test('every tab names the panel it opens, and only the open one is a tab stop', function (): void {
+    $role = makeRole();
+
+    $html = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
+
+    $tabs = [];
+    preg_match_all('/<button[^>]*role="tab".*?<\/button>/s', $html, $tabs);
+
+    $stops = array_filter($tabs[0], static fn (string $tab): bool => str_contains($tab, 'tabindex="0"'));
+
+    expect(count($tabs[0]))->toBeGreaterThan(1)
+        ->and($stops)->toHaveCount(1)
+        ->and($tabs[0][0])
+        ->toContain('id="fw-form-permissions-tab-resources"')
+        ->toContain('aria-controls="fw-form-permissions-panel-resources"')
+        ->toContain('data-fw-tab="resources"')
+        ->and($html)
+        ->toContain('id="fw-form-permissions-panel-resources"')
+        ->toContain('aria-labelledby="fw-form-permissions-tab-resources"')
+        ->toContain('x-on:keydown.arrow-right.prevent="stepTab($el, 1)"')
+        ->toContain('x-on:keydown.arrow-left.prevent="stepTab($el, -1)"')
+        ->toContain('x-on:keydown.home.prevent="edgeTab($el, false)"')
+        ->toContain('x-on:keydown.end.prevent="edgeTab($el, true)"');
+});
+
+test('the inspector has a place to speak from before it has anything to say', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('<p class="fw-sr" role="status" x-text="failed ?', escape: false);
+});

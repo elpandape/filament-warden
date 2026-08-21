@@ -269,6 +269,15 @@ return [
             'narrowed' => 'la regla está estrechada',
             'locked' => 'la regla no se cambia desde aquí',
         ],
+        'states' => [
+            'abstain' => 'sin regla',
+            'granted' => 'concedido',
+            'forbidden' => 'prohibido',
+            'broader' => 'lo alcanza una regla más amplia',
+            'narrowed' => 'estrechada',
+            'locked' => 'no se cambia desde aquí',
+            'undeclared' => 'no declarada',
+        ],
         'shift' => 'Con Shift el ciclo va hacia atrás.',
     ],
 ];

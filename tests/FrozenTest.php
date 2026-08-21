@@ -307,6 +307,13 @@ test('the translation keys an application overrides are frozen', function (): vo
         'grid.legend.undeclared',
         'grid.legend.narrowed',
         'grid.legend.locked',
+        'grid.states.abstain',
+        'grid.states.granted',
+        'grid.states.forbidden',
+        'grid.states.broader',
+        'grid.states.narrowed',
+        'grid.states.locked',
+        'grid.states.undeclared',
         'grid.shift',
     ];
 
