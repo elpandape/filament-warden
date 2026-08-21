@@ -8,6 +8,143 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [1.1.0] - 2026-08-21
+
+`1.0.2` stopped the screen writing the wrong thing to the database. This release stops it *saying*
+the wrong thing on screen. The headline is not the accessibility work below — it is that a locked
+cell highlighted "Every row," the exact opposite of the reach its own store held, because the
+server had already computed the right word and the browser threw it away.
+
+### Fixed
+
+- **A locked cell highlighted "Every row" — the opposite of the reach actually stored.**
+  `DrawsThePermissionGrid::stored()` already computed the true word for a cell the grid cannot let
+  you edit (`unreadable`, `tangled`, `elsewhere`), but the template only ever read two of its four
+  fields — the highlight itself was driven by the pending click state, which `RoleState::toPayload()`
+  never populates for a locked narrowing at all, so it fell back to its default of "Every row"
+  every time. A role with a tangled or unreadable rule told the reader the opposite of what was
+  stored, on every render, not only a cold one. The grid now reads the store's own word and lights none
+  of the three buttons for a locked cell. A row that is both "only what it owns" **and** carries
+  conditions gets its own sentence instead of borrowing the generic "cannot draw this shape"
+  reason, and its stored rule is shown read-only underneath.
+- **The inspector on a role that does not exist yet explained nothing, and a failed request left it
+  stuck open forever with no sentence.** `explainCell()` and `narrowingFor()` both answered `[]`
+  for unrelated reasons — no policy for the panel's own resource, a role with no `id` yet, the
+  condition builder switched off by config — and `[]` is truthy in the browser, so the template's
+  `why &&` guard let it through: `CreateRole` showed an inspector with a title and an empty body,
+  because nothing closed it. A rejected request left `loading` on `true` with no way out. The
+  inspector now answers a real sentence for the one case a person actually sees — a role that has
+  not been saved — every other guard moved out of the template and into the Alpine model, and a
+  failed request always resolves to a sentence, never a stuck spinner.
+- **A CRITICAL was found in review after the fix above first shipped, and it is worth repeating as
+  the release's own lesson: comparing an object read off Alpine's reactive state is never a valid
+  identity check.** The sequencing guard compared `this.selected !== asked`, an object against the
+  raw object it was assigned from — but Alpine wraps `x-data` with `@vue/reactivity`, whose `get`
+  trap returns a new Proxy on every read of an object-valued property, and a Proxy is never `===`
+  its target. The guard was true on every read, including the first, uncontested one: every cell
+  click stuck on "Asking the store…" forever, regressing behaviour that worked before this release.
+  None of 640 Pest tests caught it — the PHP tests never touch Alpine, and the JS tests assert the
+  guard's *text* is present in the file, not that it behaves. Measured by installing the real
+  `@vue/reactivity@~3.5.40` Alpine pins and running the actual guard logic: broken on a single
+  uncontested click, fixed against five scenarios including two genuine races. The guard now
+  compares a primitive counter, never an object.
+- **A grid that could not be operated — a `->disabled()` field, or the read-only screen — accepted
+  clicks and said nothing.** A protected role already had its own notice; a plain `->disabled()`
+  field and `ViewRole`'s read-only render had none. Both now share one sentence — "This grid cannot
+  be changed from here: its cells select, they do not cycle." — drawn whenever
+  `GridView::isReadOnly()` is true, which a protected role's own stronger notice still takes
+  precedence over.
+  **If you composed `DrawsThePermissionGrid` into a class of your own, this release is a fatal on
+  upgrade.** The trait gained an abstract method, `gridInteracts(): bool`, so both classes that use
+  it can say whether the grid in front of them writes. It is not one of the frozen traits —
+  implement it (`return false;` if your screen does not write) or the upgrade throws.
+- **A grant pinned to a single record was invisible everywhere except a warning that it existed.**
+  The permission screen's Reach column already knew a row was pinned to one record but drew it the
+  same as any other narrowed row, and the role's own grid — which cannot draw a record-pinned grant
+  as a cell — said nothing about which rules those were. Closes the item `1.0.2` left open ("the
+  record-scoped grant the grid still discards without a trace"): the permission screen now says
+  "One record only" instead of guessing at a shape, and the role's grid lists every record-pinned
+  rule it holds, by name, above the tabs, with the reach each one carries — read-only, because this
+  screen still cannot change them.
+- **A rename refused onto a protected name explained nothing — Laravel's own validation message,
+  not this package's.** `Rule::notIn([])` never renders a message when the list of other protected
+  names is empty, which it always is for a role editing only its own title, so the refusal fell
+  through to the framework's generic wording. Closes the item `1.0.2` left open ("a sentence of our
+  own for a protected name"): the role form now writes its own sentence naming `roles.protected`.
+- **A permission's name and entity being locked because somebody already holds the row was never
+  explained — the fields just went grey.** `PermissionResource::mayEdit()` — promoted from
+  `private` to `public`, unchanged otherwise — now backs a helper text that tells a configuration
+  decision (`update` is not `'all'`) apart from a holder-based one, and states the holder reason
+  only when a holder is the actual cause. Cost, measured: three more `grants` reads per render of
+  the field that already had the highest cap on the screen — 14 (up from 11 before this release)
+  against a cap raised to 16.
+- **Two English sentences read like a template with the blanks still showing.**
+  `resources.permissions.delete.holders` and `resources.permissions.fields.conditions_shared` both
+  leaned on `:roles`/`:accounts`/`:count` in a way that read as generated rather than written — with
+  a single holder the shared-row warning said "held 1 times over." Closes the item `1.0.2` left
+  open ("the plural of the shared-row warning"): both are rewritten to read naturally at every
+  count, by rewording rather than pluralising.
+- **`falla cerrado` disagreed with its own subject.** `conditions.warning`'s Spanish text paired a
+  masculine ending with the feminine `Una comprobación de clase`; corrected to `falla cerrada`,
+  matching how the identical fact is already phrased elsewhere in the same file.
+- **Six declarations read `--fw-ghost` at roughly 1.34–1.48:1 against its background — below even
+  WCAG's lowest text threshold, nowhere near AA's 4.5:1.** All six now read `--fw-muted`, and
+  `--fw-muted` itself moved in light mode from `--gray-500` to `--gray-600`. Measured, recomputed
+  independently through Filament's own OKLCH palette: 7.01–7.73:1 against both backgrounds it
+  appears on (dark mode was already 5.78–6.74:1 and is unchanged). The now-unused `--fw-ghost`
+  token is deleted from both palettes.
+
+### Added
+
+- **Every cell drew one of seven states as a single character or a colour, with nothing a screen
+  reader could announce that told them apart.** All seven — no rule, granted, forbidden, reached by
+  a broader rule, narrowed, not changeable here, not declared — now carry their own word, attached
+  to the cell's accessible name instead of left in a `title` attribute or a colour alone.
+- **The tab strip had no keyboard behaviour beyond Tab-to-next.** Tabs now expose
+  `role="tablist"`, roving `tabindex`, matching `id`/`aria-controls`/`aria-labelledby` pairs between
+  each tab and its panel, and arrow-key navigation between them — the standard ARIA tabs pattern,
+  wired by hand, since this package ships no JS framework beyond Alpine.
+
+### Not included
+
+A patch cannot add a key, but a minor can: fifteen new lines land in `lang/en/ui.php` and
+`lang/es/ui.php` this release (169 → 184, both locales identical) — and they do not close
+everything this screen still gets wrong.
+
+- **The round-trip identity guard.** A stored condition value of the string `"2"` still returns as
+  the integer `2`, and a rule whose first line is `or` still returns as `and`. Closing this widens
+  the set of rows this screen refuses to edit, which is a visible behaviour change a minor should
+  announce on its own — `v1.2.0`.
+- **Two contrast remainders, left in on purpose so this release does not read as a clean AA claim.**
+  An empty cell's `--fw-line` border sits at roughly 1.27:1 against its background — WCAG 1.4.11
+  territory (3:1, UI component boundaries), not 1.4.3, and raising it is a visual decision this
+  release does not make. A "reached by a broader rule" tick is drawn at `opacity: 0.62` over its
+  colour on purpose — the hollow mark is meant to read as quieter than a written one.
+- **This package's JS has no gate.** None of the six `make ci` gates touch
+  `resources/js/permission-grid.js`. The only executable evidence its logic behaves as documented
+  is two scripts run by hand against the real `@vue/reactivity` package Alpine pins —
+  `verify/verify-select-sequencing.mjs` and `verify/verify-reach-of.mjs` — which is how the
+  CRITICAL above was actually confirmed, not guessed at. Whether to add Node as a seventh gate (the
+  Docker image behind `make ci` is `php:8.5-cli-alpine`, which has neither Node nor npm) is a
+  decision for whoever maintains this package next; this release does not make it for them.
+- **Nobody opened a browser.** Every fix above was verified by a real HTTP/Livewire round trip in
+  Pest, and the two scripts above ran the real JS logic under Node — but no consuming Filament
+  application was available to confirm any of it in Chrome, in light and dark, or with a screen
+  reader. Not performed for this release; carried forward as an open checklist.
+- **Two publishing hazards this release creates, not closes.** If you ran
+  `vendor:publish --tag=filament-warden-views` on any earlier version, your copies of
+  `grid.blade.php`, `box.blade.php` and `builder.blade.php` are welded to the pre-`1.1.0` markup and
+  keep every defect this release fixes — the locked-cell highlight, the silent read-only grid, the
+  missing accessible names, all of it — until you reintegrate them. If you ran
+  `vendor:publish --tag=filament-warden-translations`, Laravel's loader puts your published copy
+  **on top of** the package's own, so none of this release's fifteen keys reach you at all: a
+  locked cell's note, the read-only sentence, the name-lock explanations and the seven grid states
+  all render as their raw dotted path (`filament-warden::ui.grid.read_only`, literally) instead of
+  a sentence. Reconcile by diffing your published `lang/vendor/filament-warden/{en,es}/ui.php`
+  against this package's `lang/{en,es}/ui.php` and copying the new keys across — and run
+  `php artisan filament:assets` regardless of either: both the stylesheet and the script changed,
+  and the panel serves whatever it last copied until you do.
+
 ## [1.0.2] - 2026-08-21
 
 A reading of the whole package after `1.0.1`, not a report from an installation this time. Two

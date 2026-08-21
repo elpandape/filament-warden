@@ -201,6 +201,12 @@ $role->save();
 Warden::allow($role)->everything();
 ```
 
+> ⚠️ **This is also your only way back.** The grid can hand out every action it finds on every
+> entity it knows about, one row at a time, but never the wildcard *over* the wildcard —
+> `entity_type = '*'`, the one permission `everything()` writes — because that row answers no check
+> the grid asks and draws no cell (nothing in this package calls `everything()`). Keep this seeder:
+> it is what you run again if a role ever locks you out of the panel itself.
+
 ```bash
 # Assign the role to your user
 php artisan filament-warden:assign super-admin "App\Models\User:1"
@@ -346,6 +352,15 @@ The roles screen shows a grid where:
 **Shortcuts:**
 - 🖱️ **Normal click** → Cycle forward
 - ⇧ **Shift + click** → Cycle backward (useful for quick denials)
+- ⌨️ **Arrow keys** move between tabs; every cell and tab carries a name a screen reader can
+  announce on its own, not one shared word for all seven states.
+
+> 🚫 **A grid that cannot be operated says so.** From `v1.1.0`, a protected role's grid, a field
+> your application called `->disabled()` on, and the read-only screen (`ViewRole`) all print one
+> sentence above the table — "This grid cannot be changed from here: its cells select, they do not
+> cycle." — instead of silently accepting clicks that never save or, on the read-only screen,
+> saying nothing at all. A protected role keeps its own stronger notice naming `roles.protected`;
+> the other two share this one, because neither route lets the package know *why* it cannot write.
 
 ### Permission Inspector
 
@@ -370,6 +385,14 @@ Example conditions:
 ```
 name = editor OR (scope >= 2 AND title = account.name)
 ```
+
+> 🔒 **A locked cell lights none of the three.** From `v1.1.0`, a cell the grid cannot let you set
+> — more than one rule for the same action, a condition it cannot parse, or a grant that belongs to
+> another tenant — draws its actual reach and highlights none of "Every row", "Only owned" or "With
+> conditions", instead of defaulting to "Every row" as it did before. The inspector names which of
+> the three it is and, when there is a stored rule, shows it read-only underneath the note. A row
+> that is both "only what it owns" **and** carries conditions is drawn the same way: read-only, with
+> its stored rule shown, never silently narrowed to plain ownership.
 
 > ⚠️ **A grant pinned to a single record is not a cell.** Warden filters a check made against a class down to `entity_id is null`, so a rule with a record key on it answers nothing the grid asks — and it is not a wider rule either. The grid lists those rules above the tabs, read-only: this screen shows them, and cannot remove them.
 
