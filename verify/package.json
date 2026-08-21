@@ -1,0 +1,9 @@
+{
+  "name": "filament-warden-js-verification",
+  "private": true,
+  "description": "Manual semantic verification for resources/js/permission-grid.js. Not part of `make ci` — see the header comment in each .mjs file and AGENTS.md §6.27.",
+  "type": "module",
+  "devDependencies": {
+    "@vue/reactivity": "~3.5.40"
+  }
+}

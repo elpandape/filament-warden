@@ -1,4 +1,5 @@
 /vendor
+/verify/node_modules
 /.cache
 /.idea
 /.phpunit.cache
