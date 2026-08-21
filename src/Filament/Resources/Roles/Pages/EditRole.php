@@ -33,4 +33,33 @@ class EditRole extends EditRecord
                 ->visible(fn (Model $record): bool => RoleResource::canDelete($record)),
         ];
     }
+
+    /**
+     * The name of a protected role is put back from the record, always.
+     *
+     * Filament already drops it: `disabled()` also calls `saved(false)`, so the
+     * field is not dehydrated and the key never arrives — measured, the forged
+     * payload does not reach the store today. The check stays anyway, and
+     * Filament's own source says to write it: the comment inside `disabled()`
+     * spells out that the client can be made to send the field regardless, and
+     * that authorization belongs in `mutateFormDataBeforeSave()`. Which name a
+     * role carries is the whole of `roles.protected` — renaming it off the list
+     * unprotects the role on the spot — so a guarantee about who can unlock the
+     * most powerful role in the installation does not rest on how another
+     * package derives a flag. It is the same reasoning as the `! isDisabled()`
+     * check inside `PermissionGrid`.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        $record = $this->getRecord();
+
+        if (RoleResource::isProtected($record)) {
+            $data['name'] = $record->getAttribute('name');
+        }
+
+        return $data;
+    }
 }
