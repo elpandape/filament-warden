@@ -55,6 +55,10 @@ trait DrawsThePermissionGrid
      * the payload also carries the stance on screen when the two disagree. The
      * pending state arrives with this very call, before the method runs.
      *
+     * An empty array is not an answer. It means the question could not be asked
+     * of this grid at all — the inspector is switched off, or the cell is not in
+     * the catalogue — and no rendered cell ever receives one.
+     *
      * @return array<string, string|null>
      */
     #[ExposedLivewireMethod]
@@ -65,11 +69,20 @@ trait DrawsThePermissionGrid
             return [];
         }
 
-        $role = $this->getRecord();
         $entry = $this->catalogEntryFor($row, $action);
 
-        if (! $role instanceof Model || ! $entry instanceof Entry) {
+        // The two used to be one guard, and `[]` meant either. Split, because
+        // only one of them is a state a person can see: a cell that is not in
+        // this catalogue is nobody's click, while a role that has not been
+        // saved is the first screen a new admin opens.
+        if (! $entry instanceof Entry) {
             return [];
+        }
+
+        $role = $this->getRecord();
+
+        if (! $role instanceof Model) {
+            return Explanation::unsaved()->toPayload();
         }
 
         $stored = $this->storedState();

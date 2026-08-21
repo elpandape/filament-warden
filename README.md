@@ -617,11 +617,12 @@ Two different kinds of thing are in that list, and both matter for the same reas
 
 `Grants\`, `Conditions\`, `Filament\Guard`, `Filament\Forms\Grid\` and everything in `Catalog\` other than the classes named above are this package's insides. They move without warning.
 
-Three consequences worth saying out loud, because each one is a place the line is easy to cross by accident:
+Four consequences worth saying out loud, because each one is a place the line is easy to cross by accident:
 
 - **A published view is welded to those insides.** `filament-warden-views` is a real escape hatch and you are welcome to it, but your copy calls `$getGrid()` and walks a `GridView`, its tabs, rows and cells — all internal. Expect to re-merge it on a minor. If you want markup that keeps working, wrap the field rather than forking its view.
 - **The screens are not an extension point.** `RoleResource`, `PermissionResource` and their pages are left non-final so you can experiment, not because subclassing them is supported. They change whenever the screens change.
 - **`whereCan()` is warden's, not ours.** Its answer can disagree with the panel's, and it never consults the Gate or a policy.
+- **The inspector's bridge is not an API.** `explainCell()` and `narrowingFor()` are exposed to the browser so the field's own script can ask them one cell at a time. What they answer is internal and it moves: from `1.1.0`, an empty array back from `explainCell()` means only *this grid cannot be asked that* — the inspector is switched off, or the cell is not in the catalogue. A record that has not been saved yet now gets a real explanation instead. If you call either method from your own component, read the answer, do not assume its shape.
 
 #### Not frozen: the word *account*
 

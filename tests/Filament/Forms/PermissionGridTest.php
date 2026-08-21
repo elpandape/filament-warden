@@ -5,6 +5,7 @@ declare(strict_types=1);
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
+use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\CreateRole;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
@@ -312,6 +313,20 @@ test('a cell that is not on the grid is not explained', function (): void {
         ->assertReturned([]);
 });
 
+test('a role being created explains its cells instead of answering nothing', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('create', roleClass());
+
+    livewire(CreateRole::class)
+        ->call('callSchemaComponentMethod', 'form.permissions', 'explainCell', [roleClass(), 'viewAny'])
+        ->assertReturned(fn (array $why): bool => $why['verdict'] === 'abstain'
+            && $why['cause'] === null
+            && is_string($why['summary'])
+            && $why['summary'] !== ''
+            && array_keys($why) === ['verdict', 'cause', 'summary', 'permission', 'role', 'narrowed', 'pending']);
+});
+
 test('the inspector is on the screen, waiting to be asked', function (): void {
     $role = makeRole();
 
@@ -321,11 +336,43 @@ test('the inspector is on the screen, waiting to be asked', function (): void {
         ->assertSee('x-on:click="pick(', escape: false);
 });
 
+test('the inspector carries a sentence for an answer that never came', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('x-show="selected && failed && ! loading"', escape: false)
+        ->assertSee('The answer never arrived');
+});
+
+test('a verdict with no cause behind it shows no empty slot where one would go', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('x-show="why.cause"', escape: false);
+});
+
 test('the script asks the server for the answer and composes none of it', function (): void {
     $script = (string) file_get_contents(dirname(__DIR__, 3).'/resources/js/permission-grid.js');
 
     expect($script)->toContain("callSchemaComponentMethod(this.grid.key, 'explainCell'")
         ->and($script)->not->toContain('Granted by');
+});
+
+test('an answer that arrives late is not painted onto the cell that replaced it', function (): void {
+    $script = (string) file_get_contents(dirname(__DIR__, 3).'/resources/js/permission-grid.js');
+
+    expect($script)->toContain('const asked = {')
+        ->and($script)->toContain('if (this.selected !== asked) {')
+        ->and(mb_substr_count($script, 'if (this.selected === asked) {'))->toBe(2)
+        ->and($script)->toContain('} catch {')
+        ->and($script)->toContain('this.failed = true');
+});
+
+test('a grid with its inspector closed asks the server nothing at all', function (): void {
+    $script = (string) file_get_contents(dirname(__DIR__, 3).'/resources/js/permission-grid.js');
+
+    expect($script)->toContain('if (! this.grid.explain && ! this.grid.constraints) {')
+        ->and($script)->toContain('return this.grid.constraints');
 });
 
 test('the browser is told what a condition on this cell could be built from', function (): void {

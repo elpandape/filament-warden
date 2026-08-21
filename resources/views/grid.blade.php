@@ -178,12 +178,13 @@
             <div class="fw-inspector-body">
                 <p class="fw-inspector-empty" x-show="! selected">{{ __('filament-warden::ui.explain.empty') }}</p>
                 <p class="fw-inspector-empty" x-show="selected && loading" x-cloak>{{ __('filament-warden::ui.explain.loading') }}</p>
+                <p class="fw-inspector-empty fw-inspector-failed" x-show="selected && failed && ! loading" x-cloak>{{ __('filament-warden::ui.explain.failed') }}</p>
 
                 <template x-if="why && ! loading && grid.explain">
                     <div>
                         <div class="fw-why" x-bind:data-verdict="why.verdict">
                             <span x-text="why.summary"></span>
-                            <code class="fw-why-cause" x-text="why.cause"></code>
+                            <code class="fw-why-cause" x-show="why.cause" x-text="why.cause"></code>
                         </div>
                         <p class="fw-note" x-show="why.narrowed" x-text="why.narrowed" x-cloak></p>
                         <p class="fw-note fw-note-pending" x-show="why.pending" x-text="why.pending" x-cloak></p>

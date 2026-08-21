@@ -29,7 +29,7 @@ final readonly class Explanation
 {
     public function __construct(
         public Stance $verdict,
-        public Cause $cause,
+        public ?Cause $cause,
         public string $summary,
         public ?string $permission = null,
         public ?string $role = null,
@@ -89,13 +89,35 @@ final readonly class Explanation
     }
 
     /**
+     * The answer on a screen where the role does not exist yet.
+     *
+     * `explain()` reads the store, and on a create form there is nothing in it
+     * to read: every cell abstains because none has been saved, not because
+     * warden looked and found nothing. Answering `[]` here was not silence —
+     * `[]` is truthy in the browser, and the template drew its verdict box with
+     * three undefined values in it, on the first screen a new admin opens.
+     *
+     * There is no cause, and none is invented. The raw case is printed beside
+     * the sentence so somebody can trace a verdict that does not add up; a
+     * borrowed one would be a false trail, which is worse than an empty slot.
+     */
+    public static function unsaved(): self
+    {
+        return new self(
+            verdict: Stance::Abstain,
+            cause: null,
+            summary: self::line('filament-warden::ui.explain.unsaved'),
+        );
+    }
+
+    /**
      * @return array<string, string|null>
      */
     public function toPayload(): array
     {
         return [
             'verdict' => $this->verdict->value,
-            'cause' => $this->cause->value,
+            'cause' => $this->cause?->value,
             'summary' => $this->summary,
             'permission' => $this->permission,
             'role' => $this->role,

@@ -9,8 +9,14 @@
     Everything here is drawn by the browser, because what it draws is unsaved.
     The words all arrive from PHP; the only rule this file's script decides is
     the clause cut, and `Narrowing::clauses()` is its authority.
+
+    Whether the installation offers a builder at all is `offered()`'s first
+    question, not this file's. A gate written here reads a value the browser is
+    holding: with the builder switched off the payload is `[]`, every property
+    read off it is `undefined`, and `undefined !== null` passes — so the only
+    thing that stopped a TypeError was which operand came first.
 --}}
-<template x-if="grid.constraints && offered()">
+<template x-if="offered()">
     <div class="fw-builder">
         <div class="fw-field-label">{{ __('filament-warden::ui.conditions.scope') }}</div>
 

@@ -147,6 +147,8 @@ function grid({ state, grid, interactive }) {
 
         loading: false,
 
+        failed: false,
+
         /**
          * Cycling and selecting at once: the person who changes a cell is the one
          * who wants to know what it meant.
@@ -160,11 +162,28 @@ function grid({ state, grid, interactive }) {
          * Both answers are worked out on the server, one cell at a time, and
          * arrive already written: nothing here composes a sentence. They are
          * asked for together because they are one question about one cell.
+         *
+         * Three things guard the assignment, and each is a state the screen
+         * would otherwise show falsely. The call is not made at all when neither
+         * half of the inspector is on the page: the panel is gated by config and
+         * the click handler was not, so every click cost two round trips into
+         * markup that was never rendered. The answer is dropped when the cell
+         * that asked is no longer the selected one, so a slow reply cannot land
+         * under its successor's title. And a rejected call says so — before this
+         * there was a header over an empty body and no sentence anywhere in the
+         * package to put in it.
          */
         async select(row, action, label, name) {
-            this.selected = { row, action, title: label, subtitle: name ?? row }
+            if (! this.grid.explain && ! this.grid.constraints) {
+                return
+            }
+
+            const asked = { row, action, title: label, subtitle: name ?? row }
+
+            this.selected = asked
             this.why = null
             this.narrowing = null
+            this.failed = false
             this.loading = true
 
             try {
@@ -173,10 +192,23 @@ function grid({ state, grid, interactive }) {
                     this.$wire.callSchemaComponentMethod(this.grid.key, 'narrowingFor', { row, action }),
                 ])
 
-                this.why = why
+                if (this.selected !== asked) {
+                    return
+                }
+
+                // `[]` is the server saying it was asked nothing this grid can
+                // answer, and it is truthy here. Left as it came, the template's
+                // `why &&` passed it and drew a verdict box of undefineds.
+                this.why = why && why.verdict ? why : null
                 this.narrowing = narrowing
+            } catch {
+                if (this.selected === asked) {
+                    this.failed = true
+                }
             } finally {
-                this.loading = false
+                if (this.selected === asked) {
+                    this.loading = false
+                }
             }
         },
 
@@ -335,9 +367,17 @@ function grid({ state, grid, interactive }) {
          * The builder is offered on a cell that says something and whose row has
          * a model behind it: a permission with no model and conditions on it is
          * created, shown, and grants nothing ever.
+         *
+         * The config check is the first clause and it lives here rather than in
+         * the template. With the builder switched off `narrowing` is `[]`, and
+         * `[].model` is `undefined`, which is `!== null` — so every clause below
+         * would pass and `narrowing.stored.locked` in the markup would throw. The
+         * only thing that stopped it was the order of two operands inside an
+         * `x-if`, which is not a guard.
          */
         offered() {
-            return this.selected !== null
+            return this.grid.constraints
+                && this.selected !== null
                 && this.narrowing !== null
                 && this.narrowing.model !== null
                 && this.narrowing.stored !== null

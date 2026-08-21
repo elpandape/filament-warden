@@ -116,6 +116,12 @@
     color: var(--fw-muted);
 }
 
+/* A failure is not the same silence as "click a cell": it takes the same colour
+   as a denial, which the token already resolves per theme. */
+.fw-inspector-failed {
+    color: var(--fw-no);
+}
+
 /* The verdict is the first thing read, so it carries the colour. */
 .fw-why {
     display: grid;

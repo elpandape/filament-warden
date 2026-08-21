@@ -178,3 +178,18 @@ test('a permission with no title is named by its name', function (): void {
 
     expect(why($role, 'viewAny')->permission)->toBe('viewAny');
 });
+
+test('a role that does not exist yet is explained, not answered with nothing', function (): void {
+    $explanation = Explanation::unsaved();
+
+    expect($explanation->verdict)->toBe(Stance::Abstain)
+        ->and($explanation->cause)->toBeNull()
+        ->and($explanation->summary)->toContain('has not been saved')
+        ->and($explanation->permission)->toBeNull()
+        ->and($explanation->role)->toBeNull()
+        ->and($explanation->narrowed)->toBeNull()
+        ->and($explanation->pending)->toBeNull()
+        ->and(array_keys($explanation->toPayload()))
+        ->toBe(['verdict', 'cause', 'summary', 'permission', 'role', 'narrowed', 'pending'])
+        ->and($explanation->toPayload()['cause'])->toBeNull();
+});
