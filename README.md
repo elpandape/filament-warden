@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/elpandape/filament-warden/main/art/banner.png" alt="Filament Warden" width="800">
-</p>
-
 <h1 align="center">Filament Warden</h1>
 
 <p align="center">
@@ -30,16 +26,19 @@
     - [Policies](#policies)
     - [Lock the Panel](#lock-the-panel)
     - [Lock Pages & Widgets](#lock-pages--widgets)
-    - [Assign Roles](#assign-roles)
+    - [Assign Roles to Users](#assign-roles-to-users)
+    - [Query Permissions Manually](#query-permissions-manually)
+    - [Permission Names](#permission-names)
 - [🖥️ The Screens](#-the-screens)
     - [The Permission Grid](#the-permission-grid)
     - [Permission Inspector](#permission-inspector)
+    - [Cell Reach](#cell-reach)
     - [Permissions Screen](#permissions-screen)
 - [🛡️ Security](#️-security)
     - [The Guard](#the-guard)
     - [Audit](#audit)
 - [🔧 Advanced](#-advanced)
-    - [Permission Scope](#permission-scope)
+    - [How Far a Permission Reaches](#how-far-a-permission-reaches)
     - [Multi-tenancy](#multi-tenancy)
     - [Catalog](#catalog)
 - [⚙️ Configuration Reference](#️-configuration-reference)
@@ -246,16 +245,36 @@ use ElPandaPe\FilamentWarden\Concerns\AccessesPanels;
 final class User extends Authenticatable implements FilamentUser
 {
     use AccessesPanels;
-
-    // Optional: add custom conditions
-    public function canAccessPanel(Panel $panel): bool
-    {
-        return $this->isActive() && parent::canAccessPanel($panel);
-    }
 }
 ```
 
-> ⚠️ **Caution:** `canAccessPanel()` is called from 4 different places. Don't use conditions the user is supposed to "resolve" (like email verification) — use Filament's own `->emailVerification()` for that.
+An installation that already stores another name maps it in the config instead of renaming rows:
+
+```php
+'guard' => [
+    'panel' => ['admin' => 'viewAdminPanel'],
+],
+```
+
+To add a condition of your own, **alias the trait's method rather than replacing it**. `AccessesPanels` is a trait: declaring `canAccessPanel()` on the class silently overrides the trait's copy, and there is no `parent::canAccessPanel()` to fall back to — `Authenticatable` has no such method, so that call is a fatal error at login.
+
+```php
+use AccessesPanels {
+    canAccessPanel as wardenCanAccessPanel;
+}
+
+public function canAccessPanel(Panel $panel): bool
+{
+    return $this->isActive() && $this->wardenCanAccessPanel($panel);
+}
+```
+
+**Be careful what you fold in here.** Filament calls `canAccessPanel()` from four places and only one of them is the middleware that answers with a 403:
+
+- `Login` throws the *same* validation exception as a wrong password, so the account is told its credentials do not match;
+- both password-reset pages fail **silently** — no link is sent, and the screen still says one was.
+
+For a condition the account is supposed to *resolve* rather than simply fail, that is a dead end with no way to read it. Email verification, for instance, belongs in Filament's own `->emailVerification()`, which lets them in and then routes them to the prompt.
 
 ### Lock Pages & Widgets
 
@@ -276,7 +295,7 @@ use ElPandaPe\FilamentWarden\Filament\Forms\RoleAssignment;
 RoleAssignment::make('roles')->columnSpanFull(),
 ```
 
-> 🚫 **Don't use `CheckboxList::make('roles')->relationship(...)`**. `sync()` silently invalidates warden's cache. `RoleAssignment` uses warden's native API.
+> 🚫 **Don't use `CheckboxList::make('roles')->relationship(...)`**. That saves through `sync()`, and `sync()`, `attach()` and `detach()` all **skip** warden's cache bump — only warden's own actions make it. A role handed out that way goes on answering the old way, silently and with no expiry. `RoleAssignment` writes through warden's fluent API instead.
 
 ### Query Permissions Manually
 
@@ -293,7 +312,15 @@ Access::grantedToCurrentUser('viewAny', Invoice::class);
 Access::granted($otherUser, 'view', $invoice);
 ```
 
-> 💡 **Use `Access` instead of `$user->can()`**. If you disable `warden.gate.register`, `$user->can()` will silently return `false` for loose permissions.
+**Use this rather than `$user->can()`.** The two agree until they do not:
+
+| | `$user->can('export-reports')` | `Access::grantedToCurrentUser(…)` |
+|---|---|---|
+| not granted | `false` | `false` |
+| granted | `true` | `true` |
+| granted, with `warden.gate.register` off | **`false`** | `true` |
+
+That last row is why `Access` exists. Warden ships that switch so an application can register its own gate callback, and the day one does, every `$user->can('export-reports')` starts answering `false` with no error to read — a loose permission has no policy to answer for it, so if warden's hook is gone there is nobody left. `Access` goes straight to the resolver, and picks the account up through `Filament::auth()`, which is not necessarily the default guard.
 
 ### Permission Names
 
@@ -329,11 +356,11 @@ Click any cell to see:
 
 > 🔍 The inspector is queried on demand (not automatically) to avoid hundreds of queries.
 
-### Permission Scope
+### Cell Reach
 
 Each cell can reach:
 
-| Scope | Description |
+| Reach | Description |
 |---|---|
 | **Every row** | Permission applies globally |
 | **Only owned** | Restricted to records where `user_id` matches |
@@ -346,11 +373,14 @@ name = editor OR (scope >= 2 AND title = account.name)
 
 ### Permissions Screen
 
-Shows the full catalog with additional info:
-- **Origin**: Derived from policy, loose, wildcard, or obsolete?
-- **Scope**: Global, owned, or conditional?
-- **Holders**: Count of who has it (with denials counted separately)
-- **Test bench**: Verify permissions in real time
+Lists the `permissions` **table** — the rows warden has actually created — and says where each one came from:
+
+- **Provenance**: derived from a policy, loose, the wildcard, or an entity nothing declares any more
+- **Reach**: every row, only what the account owns, or with conditions
+- **Holders**: how many roles hold it, with denials counted apart
+- **Test bench**: ask warden about a real account, from the screen
+
+> ℹ️ **On a fresh install this screen is empty, and that is correct.** Warden creates a permission row the first time something is granted, so nothing exists until you hand something out. The roles screen is the one that shows the whole catalogue derived from your policies, row or no row.
 
 ---
 
@@ -358,14 +388,19 @@ Shows the full catalog with additional info:
 
 ### The Guard
 
-From v0.8.0, the panel **refuses to boot** if it detects unprotected pages or widgets. This prevents custom screens from being accidentally left open.
+From v0.8.0, the panel **refuses to boot** if it finds an unguarded page or widget. That is what stops a custom screen from being left open to everyone by accident.
+
+It is on by default, and **the plugin takes no options**: `FilamentWardenPlugin` accepts `make()`, `getId()`, `register()` and `boot()`, and nothing else. The switches are config keys, one per kind:
 
 ```php
-// In your PanelProvider — already enabled by default
-FilamentWardenPlugin::make()
-    ->guardPages(true)    // default: true
-    ->guardWidgets(true); // default: true
+// config/filament-warden.php
+'guard' => [
+    'pages'   => true,   // refuse to start on an unguarded page
+    'widgets' => true,   // refuse to start on an unguarded widget
+],
 ```
+
+Turn one off only to get the panel up while you close the screens — `php artisan filament-warden:audit` lists what is still open without stopping anything.
 
 ### Audit
 
@@ -377,19 +412,20 @@ php artisan filament-warden:audit
 php artisan filament-warden:audit --check
 ```
 
-Detects:
-1. 📺 Unguarded screens
-2. 📄 Resources without policies
-3. 🗑️ Permissions with no grants
-4. 👻 Grants for non-existent actions
-5. 📦 Undeclared entities
-6. 🔗 Models only accessible via relation managers
+It writes nothing, and reports six things:
+
+- **screens nobody guards** — the same finding the guard throws on, which is how it reaches CI at all: no artisan command ever starts a panel;
+- **resources whose model has no policy** — the case Filament fails open on, told apart from a policy that declares nothing and from a resource pointing at a class that does not exist;
+- **permissions no grant points at** — `php artisan warden:clean` is what removes them, and `--dry-run` shows the list first;
+- **grants for actions nothing declares any more** — a renamed policy method, a typo in a seeder, a screen that was deleted: the silent mistake warden has no way to detect;
+- **whole entity types nothing declares** — a morph alias that moved, reported apart because the fix is the opposite one;
+- **models only a relation manager reaches**, with the `catalog.models` line that settles it.
 
 ---
 
 ## 🔧 Advanced
 
-### Permission Scope
+### How Far a Permission Reaches
 
 To see *how many rows* a user can view:
 
@@ -408,7 +444,11 @@ class Document extends Model
 
 Warden supports multi-tenancy through a `scope` column on its tables. **It does not know about `Filament::getTenant()`** — you must create a `TenantResolver` in your application.
 
-This package's resources declare `->tenant(null)` to avoid conflicts with Filament's global scope.
+This package's resources declare `protected static bool $isScopedToTenant = false;`, so Filament's tenancy never reaches warden's own models. Without it, a panel with `->tenant()` puts a global scope on the `Role` and `Permission` **models** — not on the resources — and that scope demands a relationship named after your tenant class: `Role::query()->count()` then throws `LogicException` for the whole request, warden's internals included.
+
+It is written as the property and **never** through `scopeToTenant(false)`, which is static and would un-scope every resource of *your* application — a cross-tenant leak this package would have caused.
+
+**Deleting a role looks across every tenant.** From `v1.0.2`, `roles.delete => 'unassigned'` counts assignments with warden's tenant scope lifted. A role held only under a tenant you are not currently in would otherwise read as unassigned, and deleting it takes that tenant's `assigned_roles` and `grants` rows with it through the foreign key — which never looked at `scope`, and neither does `$record->delete()`.
 
 ### Catalog
 
@@ -448,24 +488,32 @@ foreach ($entries as $entry) {
 
 ```php
 'permissions' => [
-    'create'      => false,        // true | false
+    'create'      => false,        // manual creation of permissions
     'update'      => 'loose',      // false | 'title' | 'loose' | 'all'
     'delete'      => 'orphaned',   // false | 'orphaned' | 'all'
-    'constraints' => true,         // Condition builder
-    'only_owned'  => true,         // Ownership checkbox
-    'probe'       => true,         // Test bench
+    'constraints' => true,         // the condition builder
+    'only_owned'  => true,         // the ownership checkbox
+    'probe'       => true,         // the test bench, built on explain()
 ],
 ```
+
+**A row somebody holds cannot be re-pointed.** From `v1.0.2`, the name and the entity of a permission that at least one role already holds are locked on its edit screen, and put back on the server if the payload says otherwise — at every setting of `update` except `'all'`. Moving them moves what those holders hold without revoking anything and without writing a single row to `grants`: the check they used to pass simply starts answering something else. `'loose'` still mints and edits the rows nobody holds yet, and the conditions and the ownership checkbox stay editable wherever they were before — those narrow what a row means, they do not re-point it.
 
 ### Roles (roles screen)
 
 ```php
 'roles' => [
-    'create'     => true,              // true | false
-    'delete'     => 'unassigned',      // false | 'unassigned' | 'all'
-    'protected'  => ['super-admin'],  // Immutable role names
+    'create'    => true,             // true | false
+    'delete'    => 'unassigned',     // false | 'unassigned' | 'all'
+    'protected' => ['super-admin'],  // names that cannot be taken, renamed onto, or deleted
 ],
 ```
+
+A protected role keeps its name and its grid: both are shown, neither can be edited, and it cannot be deleted. Its title is left editable — nothing resolves by it.
+
+**From `v1.0.2` a role cannot arrive at a protected name either.** Creating a role called `super-admin`, or renaming an ordinary one onto it, is refused by the form — before `1.0.2` both succeeded and the role was born protected, which is a way of minting an unremovable role by typing. The role that already carries the name keeps it: only the *arrival* is closed. The refusal currently uses the framework's own validation wording; a sentence saying which list the name is on is coming in `v1.1.0`.
+
+> ⚠️ **The merge is shallow, on purpose.** Declaring `roles.protected => []` in your published config genuinely unprotects every role. A recursive merge would blend lists by index and silently keep `'super-admin'` in there — so it is not used, and a test holds that line.
 
 ### Guard
 
@@ -486,17 +534,36 @@ foreach ($entries as $entry) {
 ],
 ```
 
+### Catalog
+
+```php
+'catalog' => [
+    'models' => [],   // models with a policy and no resource
+    'custom' => [],   // loose permissions, as name => scope
+    'scopes' => [
+        'read'         => ['viewAny', 'view'],
+        'write'        => ['create', 'update'],
+        'withdraw'     => ['delete', 'deleteAny', 'restore', 'restoreAny'],
+        'irreversible' => ['forceDelete', 'forceDeleteAny'],
+    ],
+],
+```
+
 ### Navigation
 
 ```php
 'navigation' => [
-    'group'             => null,
-    'roles.slug'        => 'roles',
-    'permissions.slug'  => 'permissions',
-    'roles.icon'        => null,  // Default: shield
-    'permissions.icon'  => null,  // Default: key
-    'roles.sort'        => null,
-    'permissions.sort'  => null,
+    'group' => null,           // falls back to this package's own translated group
+    'roles' => [
+        'slug' => 'roles',     // what the URL says
+        'icon' => null,        // falls back to a shield
+        'sort' => null,        // navigation order
+    ],
+    'permissions' => [
+        'slug' => 'permissions',
+        'icon' => null,        // falls back to a key
+        'sort' => null,
+    ],
 ],
 ```
 
@@ -519,30 +586,44 @@ There's already a well-known permissions plugin for Filament, and for most proje
 
 ## 📦 Stability
 
-From `v1.0.0`, everything below is covered by **SemVer**. Changing any of these requires a **major release**:
+From `v1.0.0`, everything below is covered by **SemVer**: changing any of it is a **major release**. `tests/FrozenTest.php` is what says so — it fails when one of them moves.
+
+Two different kinds of thing are in that list, and both matter for the same reason.
+
+**The names are rows in your database.** A permission called `page:App\Filament\Pages\Settings` was granted to a role a year ago. Renaming the prefix does not fail: the row stays, stays grantable, and opens nothing.
+
+**The keys are lines in your application** — a published config, an overridden translation, a command in a deploy script. Removing one is silent here and loud there.
 
 ### ✅ Frozen (SemVer)
 
 | Category | Items |
 |---|---|
-| Permission prefixes | `page:`, `widget:`, `panel:` and `PermissionName` |
-| Plugin | `FilamentWardenPlugin`, its ID `filament-warden`, and methods |
-| Fields | `PermissionGrid`, `PermissionGridEntry`, `ConditionBuilder`, `RoleAssignment` |
+| Permission prefixes | `page:`, `widget:`, `panel:` and `PermissionName`, which mints them and reads them back |
+| Plugin | `FilamentWardenPlugin`, its ID `filament-warden`, and its four methods: `make()`, `getId()`, `register()`, `boot()` |
+| Fields | `PermissionGrid`, `PermissionGridEntry`, `ConditionBuilder`, `RoleAssignment`, and the `{stances, narrowing}` state envelope a form receives |
 | Traits | `AuthorizesPageAccess`, `AuthorizesWidgetView`, `AccessesPanels` |
 | Authorization | `WardenPolicy`, `Access` |
-| Catalog | `Catalog::for()`, `Entry`, `key()`, `Origin`, `Scope` |
+| Catalog | `Catalog::for()`, `Entry` and its `key()`, `Origin`, `Scope` |
 | Guard | `PanelIsOpen` |
-| Config | All keys in `config/filament-warden.php` |
-| Translations | All key paths in `lang/*/ui.php` |
-| Commands | `filament-warden:assign` and `filament-warden:audit` |
+| Config | Every key of `config/filament-warden.php` — the test pins the six top-level blocks, and the promise covers the keys inside them too |
+| Translations | Every key path of `lang/*/ui.php`, in both locales |
+| Commands | `filament-warden:assign` and `filament-warden:audit`, with their arguments |
+
+**Adding a translation key or a config key is a minor, not a major**: nothing you wrote stops working. Only removing or renaming one is a break.
 
 ### ⚠️ Not frozen (may change in any release)
 
-- Internal classes: `Grants\`, `Conditions\`, `Filament\Guard`, `Filament\Forms\Grid\`
-- Published views (require re-merge on every update)
-- Resources: `RoleResource`, `PermissionResource` and their pages
+`Grants\`, `Conditions\`, `Filament\Guard`, `Filament\Forms\Grid\` and everything in `Catalog\` other than the classes named above are this package's insides. They move without warning.
 
-> 📌 **Note on published views:** When publishing views with `--tag=filament-warden-views`, your copy calls internal methods like `$getGrid()`. Expect to re-integrate changes on every minor update.
+Three consequences worth saying out loud, because each one is a place the line is easy to cross by accident:
+
+- **A published view is welded to those insides.** `filament-warden-views` is a real escape hatch and you are welcome to it, but your copy calls `$getGrid()` and walks a `GridView`, its tabs, rows and cells — all internal. Expect to re-merge it on a minor. If you want markup that keeps working, wrap the field rather than forking its view.
+- **The screens are not an extension point.** `RoleResource`, `PermissionResource` and their pages are left non-final so you can experiment, not because subclassing them is supported. They change whenever the screens change.
+- **`whereCan()` is warden's, not ours.** Its answer can disagree with the panel's, and it never consults the Gate or a policy.
+
+#### Not frozen: the word *account*
+
+The condition builder offers the signed-in account's columns as `account.id` and the like. That word is a placeholder for whatever an application calls its user model, and it may change. Nothing is stored under it — it is a label on a screen.
 
 ---
 
