@@ -487,3 +487,77 @@ test('renaming a door regenerates its title the same way', function (): void {
 
     expect($door->refresh()->getAttribute('title'))->toBe('View Summary');
 });
+
+test('a derived permission keeps its title when only loose ones may be edited', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    Warden::allow(makeRole())->to('publish', Post::class);
+
+    $permission = heldRow('publish');
+
+    expect($permission->getAttribute('title'))->toBe('Publish posts')
+        ->and(PermissionResource::mayEditName($permission))->toBeFalse();
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($permission->refresh()->getAttribute('title'))->toBe('Publish posts');
+});
+
+test('a derived permission keeps every field the form would not let the browser send', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    Warden::allow(makeRole())->to('publish', Post::class);
+
+    $permission = heldRow('publish');
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->fillForm([
+            'name' => 'destroy',
+            'entity_type' => null,
+            'only_owned' => true,
+            'options' => [
+                'mode' => 'conditions',
+                'rules' => [['logic' => 'and', 'kind' => 'value', 'column' => 'title', 'operator' => '=', 'value' => 'x']],
+            ],
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $permission->refresh();
+
+    expect($permission->getAttribute('name'))->toBe('publish')
+        ->and($permission->getAttribute('entity_type'))->toBe(new Post()->getMorphClass())
+        ->and($permission->getAttribute('only_owned'))->toBeFalsy()
+        ->and($permission->getAttribute('options'))->toBeNull()
+        ->and($permission->getAttribute('title'))->toBe('Publish posts');
+});
+
+test('a permission repointed at nothing loses the entity from its title', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    Warden::allow(makeRole())->to('publish', Post::class);
+
+    $permission = heldRow('publish');
+
+    expect($permission->getAttribute('title'))->toBe('Publish posts');
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->fillForm(['entity_type' => null])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $permission->refresh();
+
+    expect($permission->getAttribute('entity_type'))->toBeNull()
+        ->and($permission->getAttribute('title'))->toBe('Publish');
+});

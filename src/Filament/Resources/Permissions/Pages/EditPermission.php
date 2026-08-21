@@ -64,15 +64,15 @@ class EditPermission extends EditRecord
             return $data;
         }
 
-        $name = $this->text($data['name'] ?? null);
+        $name = $this->text($this->submitted($data, 'name'));
 
         // A name this package minted has a title only this package can read back:
         // warden's generator has no way to know that `widget:` means anything.
         $data['title'] = PermissionName::title($name) ?? PermissionTitle::generate(
             $name,
-            $this->nullableText($data['entity_type'] ?? null),
+            $this->nullableText($this->submitted($data, 'entity_type')),
             null,
-            (bool) ($data['only_owned'] ?? false),
+            (bool) $this->submitted($data, 'only_owned'),
         );
 
         return $data;
@@ -98,5 +98,28 @@ class EditPermission extends EditRecord
     private function nullableText(mixed $value): ?string
     {
         return is_string($value) ? $value : null;
+    }
+
+    /**
+     * What is being saved for a key, whether or not the form handed it over.
+     *
+     * A disabled field is not dehydrated — `disabled()` also calls `saved(false)`
+     * — so Filament forgets its state path entirely and the key arrives ABSENT,
+     * not null. At the shipped `permissions.update => 'loose'` that is every
+     * field of a derived row but the title, and `$data['name'] ?? null` turned
+     * the whole title into the empty string on a save that touched nothing.
+     *
+     * `array_key_exists`, and NOT `$data[$key] ?? $record->getAttribute($key)`:
+     * absent and null are different answers here. Where the field is editable,
+     * null is a person clearing the entity — the blank option — and the
+     * coalescing form would quietly put the old entity straight back.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function submitted(array $data, string $key): mixed
+    {
+        return array_key_exists($key, $data)
+            ? $data[$key]
+            : $this->getRecord()->getAttribute($key);
     }
 }
