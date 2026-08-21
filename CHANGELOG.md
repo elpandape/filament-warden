@@ -8,6 +8,132 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [1.0.2] - 2026-08-21
+
+A reading of the whole package after `1.0.1`, not a report from an installation this time. Two
+holes open under tenancy, four places that could rewrite a consumer's own data, a screen that
+only reads and drew itself empty, a name that could unprotect a role, and a join that assumed a
+primary key it does not own.
+
+### Fixed
+
+- **A role held only under another tenant could still be deleted from this one.**
+  `RoleResource::isDeletable()` read `assigned_roles` through warden's own tenant scope, but the
+  foreign-key cascade that removes those rows on delete does not filter by scope at all —
+  `$record->delete()` skips it the same way. Measured: a role assigned only under tenant 7 read as
+  unassigned from tenant 8, and also with no tenant active under `scope.null_behavior => 'strict'`;
+  from either vantage point the delete button opened, and going through it took every tenant's
+  assignments and grants with it. The check now reads across every tenant before it answers, the
+  same rule `Holders::of()` and the audit command already followed for the mirror case.
+- **A role-grant kept deliberately global by `scope.role_grants => false` was locked as if it
+  belonged to somebody else's tenant.** The grid compared a stored grant's scope against a bare
+  `writeScope()`, which always answers the active tenant — but warden itself writes a role's grant
+  with `scope = NULL` whenever role-grant scoping is turned off. The cell was drawn locked, marked
+  as another tenant's, and dropped silently from the diff, even though a save through `disallow()`
+  would have deleted the grant outright: the caution was not conservative, it was wrong in both
+  directions.
+  The grid now asks the same question warden asks itself, `writeScope(forRoleGrant: ...)`.
+- **A Policy action named `manage` collided with the grid's wildcard cell.** The wildcard column
+  that draws warden's `*` permission was filed under the state key `'manage'` — a name an
+  application's own Policy is free to declare as an action. Measured with a fixture Policy that
+  does: granting that one cell wrote two grants at once, and left `viewAny` granted on that row
+  with nobody asking for it. The wildcard now files under `*`, the one name warden itself reserves
+  and no Policy method can be called.
+- **A role's read-only screen drew the grid correctly and then blanked it.** The infolist handed
+  Alpine the literal `'{}'` as its state, and the script re-derives every cell and every tab's
+  tally from that object the instant it boots — so the HTML the server rendered was right and what
+  the browser showed a moment later was empty, tallying zero. It survived two minor versions
+  because the one test on this screen asserted what the server drew, never what it handed to the
+  browser. The read-only grid and the form now share one payload builder, and a test compares the
+  two screens against each other rather than each against its own private expectation.
+- **Every role, not only a protected one, announced itself as protected on its read-only screen.**
+  The notice was gated on the render being read-only rather than on the role actually being
+  protected — since `0.4.0`. The form's coincidentally correct behaviour, which disables the field
+  for the same reason it shows the notice, is what hid this for six versions: the two questions
+  only happened to agree there.
+- **A permission that was both "only what it owns" and "with these conditions" was drawn as plain
+  ownership, and the first save dropped the condition.** Warden writes exactly that row — `toOwn()`
+  followed by a chained `where()` copies ownership onto the twin — and honours both halves when it
+  resolves. The screen read ownership first and stopped before it ever looked at the conditions,
+  which made the cell editable; saving it then rewrote the row with bare ownership. It now reads as
+  a reach this screen cannot draw: shown, explained, excluded from the diff. Broken on purpose to
+  see it — with the old order back, saving a grid that touched nothing else deleted the condition
+  and left the count at zero.
+- **A stored rule the permission form cannot read back was erased by a save that only touched the
+  title.** The condition builder writes the rule it could parse and clears the field for everything
+  else, so a corrupt blob, a rule naming a column the table no longer has, and a rule on a
+  permission with no model behind it were all replaced with SQL `NULL` by any save of that screen —
+  and a cleared rule is the one shape that fails open, so what vanished was a restriction, silently.
+  The builder is now closed for those rows and says why.
+- **Saving a derived permission under the shipped `'loose'` default could wipe its title.** `name`
+  and `entity_type` are disabled for a derived row, and Filament drops a disabled field from the
+  saved data entirely rather than sending it as empty — so the title-regeneration code read the
+  absence as an empty string and wrote an empty title. Opening a permission like `Publish posts`
+  and saving without touching anything left the title blank. The rename code now tells "absent"
+  apart from "cleared on purpose" and falls back to the record only for the first.
+- **A role could be renamed onto a name the installation protects.** Nothing stopped a rename that
+  landed exactly on `super-admin`, or any other name in `roles.protected` — the field only locks a
+  role that is *already* protected, and the create screen has no record to ask. Renaming onto the
+  list is now refused, on both the create and the edit form.
+- **A protected role's name could still reach the database if the disabled field was bypassed.**
+  `disabled()` keeps a forged rename out of the browser, but the guarantee needs to hold even if it
+  is not — the edit page now restores the stored name from the record whenever the role should not
+  have been able to move.
+- **Two permissions differing only by model, or only by ownership, could not both be named the
+  same thing, and a derived row could be blocked from saving by a namesake it shares nothing else
+  with.** The uniqueness check compared the name alone; a permission is the tuple `(name,
+  entity_type, entity_id, only_owned)`. The field the validation failed on was disabled, so there
+  was nothing the person looking at the screen could do about it. The check now compares the full
+  tuple.
+- **Renaming a permission's name or entity moved what its holders already have, silently and with
+  no revocation.** Nothing stopped renaming a loose permission that somebody already held — a
+  rename from `widget:AccountWidget` to `page:Billing`, say — and every existing holder of the old
+  row gained the new one instantly. Re-pointing a row now needs the installation to allow editing
+  every permission, or that nobody holds the row yet; narrowing its conditions or its ownership,
+  which does not change what the row means to a holder, still only needs the ordinary edit
+  permission. The shared-row warning now fires from a single holder instead of two.
+- **Changing a permission's entity left a stale ownership flag behind.** "Only what it owns" only
+  makes sense against the model it was checked on; moving a derived permission to a different
+  entity now clears that flag along with the reset it already did to its conditions.
+- **Deleting a role or a permission from its own screen left every check still answering the old
+  way.** Warden only bumps its cache version from its own six fluent actions — a plain delete,
+  which is what every delete button in this package does, left warden's cache oblivious. Measured:
+  with the cache warm, deleting an assigned role through its edit screen cascaded the assignment
+  away in the database while the check kept answering the old way. All six delete actions — both
+  listings and the four record pages — now refresh warden's cache once the delete completes.
+- **A join on the permissions table assumed its primary key was called `id`.** Three places
+  building a correlated column concatenated `.id` onto the configured table name by hand, next to
+  code that already asked the model for its own key. All three now ask the model, the same way. This
+  is a consistency change and it ships without a test of its own — reaching the failure needs an
+  installation that swaps the permission model *and* renames its primary key, which this suite
+  cannot stand up without hand-building warden's schema. What was measured instead: the SQL emitted
+  on a stock install is byte-for-byte unchanged, and the two suites already covering these
+  predicates in both polarities stay green.
+
+### Not included
+
+A patch cannot add a key: `config/filament-warden.php` and `lang/*/ui.php` are frozen whole, so
+anything needing a new sentence waits for `1.1.0`.
+
+- **The plural of the shared-row warning.** It now fires from one holder instead of two, but the
+  sentence is untouched, so with a single holder English reads "held 1 times over".
+- **A sentence of our own for a protected name.** Renaming a role onto a protected name is refused,
+  and the message comes from Laravel's own validation, not a sentence this package wrote.
+- **The dedicated word for a rule this screen can read but not write back exactly, and for a row
+  carrying both ownership and conditions.** Both borrow the reason already used for "a shape this
+  screen cannot draw," which names the wrong cause for either one.
+- **Two shapes a save can still rewrite without asking**, because the guard added this release asks
+  whether a stored rule can be *parsed*, not whether it comes back byte-identical: a value stored as
+  the string `"2"` returns as the integer `2`, and a rule whose first line is `or` returns as `and`.
+  Both change what the row means. Closing this would widen the set of rows this screen refuses to
+  edit, which is a visible behaviour change a patch must not make unannounced.
+
+The audit behind this release also found `README.md` wrong in several places, including some a
+rewrite introduced after `1.0.1` shipped. That correction has not landed yet and is not part of
+this tag. Also still open, and scheduled: the record-scoped grant the grid still discards without
+a trace, the roles relation manager for the account screen, every performance memo this audit
+wrote down, and a fresh install's empty permission screen.
+
 ## [1.0.1] - 2026-08-20
 
 Reported from an installation: **there was no way in to either create screen.**
@@ -119,7 +245,7 @@ before they got started.
 
 - No new behaviour. A `1.0.0` that added something would not be a freeze.
 
-## [1.0.0-rc.1] - 2026-08-19
+## [1.0.0-rc.1] - 2026-08-20
 
 A release candidate. Nothing new: this is where the package stops moving and
 says what can be relied on.
