@@ -361,18 +361,20 @@ test('the script asks the server for the answer and composes none of it', functi
 test('an answer that arrives late is not painted onto the cell that replaced it', function (): void {
     $script = (string) file_get_contents(dirname(__DIR__, 3).'/resources/js/permission-grid.js');
 
-    expect($script)->toContain('const asked = {')
-        ->and($script)->toContain('if (this.selected !== asked) {')
-        ->and(mb_substr_count($script, 'if (this.selected === asked) {'))->toBe(2)
+    expect($script)->toContain('const token = (this.asked ?? 0) + 1')
+        ->and($script)->toContain('if (this.asked !== token) {')
+        ->and(mb_substr_count($script, 'if (this.asked === token) {'))->toBe(2)
         ->and($script)->toContain('} catch {')
-        ->and($script)->toContain('this.failed = true');
+        ->and($script)->toContain('this.failed = true')
+        ->and($script)->not->toContain('this.selected !== asked')
+        ->and($script)->not->toContain('this.selected === asked');
 });
 
 test('a grid with its inspector closed asks the server nothing at all', function (): void {
     $script = (string) file_get_contents(dirname(__DIR__, 3).'/resources/js/permission-grid.js');
 
     expect($script)->toContain('if (! this.grid.explain && ! this.grid.constraints) {')
-        ->and($script)->toContain('return this.grid.constraints');
+        ->and($script)->toContain("if (! this.grid.explain && ! this.grid.constraints) {\n                return\n            }");
 });
 
 test('the browser is told what a condition on this cell could be built from', function (): void {

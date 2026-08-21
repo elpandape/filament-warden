@@ -149,6 +149,15 @@ function grid({ state, grid, interactive }) {
 
         failed: false,
 
+        // A plain counter, never an object. Alpine's reactivity (`@vue/reactivity`,
+        // which it pins) wraps every object-valued property in a Proxy on each
+        // read, and a Proxy is never `===` its raw target — so comparing
+        // `this.selected` back against the object assigned to it is always
+        // false-negative, on the very first uncontested click, with no race
+        // anywhere near it. A number is never wrapped, so its identity survives
+        // the round trip through reactive state.
+        asked: 0,
+
         /**
          * Cycling and selecting at once: the person who changes a cell is the one
          * who wants to know what it meant.
@@ -167,24 +176,33 @@ function grid({ state, grid, interactive }) {
          * would otherwise show falsely. The call is not made at all when neither
          * half of the inspector is on the page: the panel is gated by config and
          * the click handler was not, so every click cost two round trips into
-         * markup that was never rendered. The answer is dropped when the cell
-         * that asked is no longer the selected one, so a slow reply cannot land
-         * under its successor's title. And a rejected call says so — before this
-         * there was a header over an empty body and no sentence anywhere in the
-         * package to put in it.
+         * markup that was never rendered. The answer is dropped when a faster
+         * click already replaced it — tracked by a token, not by comparing
+         * `this.selected` to the object this call wrote: Alpine's reactivity
+         * hands back a fresh Proxy on every read of an object property, and a
+         * Proxy is never `===` its raw target, so an object-identity guard here
+         * discards every reply, uncontested or not. And a rejected call says so
+         * — before this there was a header over an empty body and no sentence
+         * anywhere in the package to put in it.
          */
         async select(row, action, label, name) {
             if (! this.grid.explain && ! this.grid.constraints) {
                 return
             }
 
-            const asked = { row, action, title: label, subtitle: name ?? row }
-
-            this.selected = asked
+            this.selected = { row, action, title: label, subtitle: name ?? row }
             this.why = null
             this.narrowing = null
             this.failed = false
             this.loading = true
+
+            // The sequencing token. `this.selected` still names the cell on
+            // screen, but it stopped being what proves a reply is still wanted:
+            // it is an object, and Alpine reads it back through a reactive Proxy
+            // that is never `===` the raw value this method just assigned. A
+            // number is not wrapped, so it is what the three guards below compare.
+            const token = (this.asked ?? 0) + 1
+            this.asked = token
 
             try {
                 const [why, narrowing] = await Promise.all([
@@ -192,7 +210,7 @@ function grid({ state, grid, interactive }) {
                     this.$wire.callSchemaComponentMethod(this.grid.key, 'narrowingFor', { row, action }),
                 ])
 
-                if (this.selected !== asked) {
+                if (this.asked !== token) {
                     return
                 }
 
@@ -202,11 +220,11 @@ function grid({ state, grid, interactive }) {
                 this.why = why && why.verdict ? why : null
                 this.narrowing = narrowing
             } catch {
-                if (this.selected === asked) {
+                if (this.asked === token) {
                     this.failed = true
                 }
             } finally {
-                if (this.selected === asked) {
+                if (this.asked === token) {
                     this.loading = false
                 }
             }
