@@ -11,6 +11,17 @@ use ElPandaPe\Warden\Facades\Warden;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * `apply()`'s own `isElsewhere()` guard is not the only thing standing between
+ * an uncheck and a deleted row: `RetractsRoles::from()` filters on the exact
+ * write scope (§6.24), so a role held ONLY globally already survives a retract
+ * issued from inside a tenant, gate or no gate. Measured by removing just the
+ * `apply()` clause: every test in this file, including the one named for this
+ * exact scenario, stayed green. The clause only does real work when a role is
+ * held BOTH globally and at the active scope, where warden's own filter would
+ * otherwise delete the local row while the checkbox — reading a still-present
+ * global row — reports nothing changed.
+ */
 pest()->extend(TestCase::class);
 
 /**
@@ -312,6 +323,22 @@ test('unticking a role this screen cannot retract deletes nothing and says so', 
     });
 
     expect(Context::resolve()->assignedRoleClass()::query()->withoutGlobalScopes()->count())->toBe(1);
+});
+
+test('unticking a role held both globally and here leaves the local row too', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+    Warden::assign($role)->to($account);
+
+    Warden::tenant()->onceTo(5, function () use ($account, $role): void {
+        Warden::assign($role)->to($account);
+
+        Assignment::apply($account, []);
+    });
+
+    expect(Context::resolve()->assignedRoleClass()::query()->withoutGlobalScopes()->count())->toBe(2);
 });
 
 test('the screen says why it will not hand that role back', function (): void {
