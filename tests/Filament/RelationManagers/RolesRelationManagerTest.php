@@ -441,23 +441,65 @@ test('canViewForRecord() closes with the packaged Policy, not a guess at an unre
  * the second swallows `ActionNotResolvableException` and calls that success,
  * so it cannot tell "absent" from "unresolvable".
  *
- * Both closures repeat `! isReadOnly()` on top of `->visible()` — "the two
- * things, not one" the brief for this task asks for — but measured the same
- * way Task 2 measured `retractAction()`'s `self::offered()` repeat: a thrown
- * exception planted at the top of each closure, mounted and called on
- * `ViewRole::class`, never surfaced. `isDisabled()` (fed by the SAME
- * `->visible()` closure) already blocks `mountAction()`/`callMountedAction()`
- * before either closure runs, so the repeated line cannot be shown to
- * discriminate through this screen's own wiring — kept as defence in depth
- * regardless, documented in place on each action.
+ * The hidden/visible tests and the write tests are DELIBERATELY separate —
+ * CORRECTED from an earlier draft that chained both onto one `$test` per
+ * case, `assertTableActionHidden()` first and the write check after. That
+ * chain cannot discriminate: `assertTableActionHidden()` halts the test on
+ * its own failure before the write assertion is ever reached, so a broken
+ * `->visible()` alone always reddens the SAME line regardless of whether the
+ * closure's own repeated check would also have caught it. Measured directly,
+ * three ways, once per action (`assignAction()`/`retractAction()`), against
+ * the write-only tests below with NO `assertTableActionHidden()` in front of
+ * them:
+ *
+ *   1. `! $this->isReadOnly()` removed from `->visible()` ONLY, the closure's
+ *      own copy left in place — the write-only test STAYED GREEN. The
+ *      closure caught it alone.
+ *   2. Restored, then `! $this->isReadOnly() &&` removed from the closure
+ *      ONLY, `->visible()` left in place — the write-only test STAYED GREEN
+ *      too. `isDisabled()`, fed by `->visible()`, caught it alone, the same
+ *      mechanism Task 2 measured for the restricted-role case.
+ *   3. Both removed together — the write-only test WENT RED: the write
+ *      happened. Restored.
+ *
+ * So both copies are real, independently sufficient protection — not the
+ * "cannot be shown to discriminate" an earlier draft of this file claimed.
+ * The mechanism that makes the closure's copy matter beyond a hypothetical:
+ * `Action::call()` (`vendor/filament/actions/src/Action.php:675-684`) performs
+ * no `isDisabled()`/`isVisible()` check of its own — that gate lives only in
+ * `mountAction()`/`callMountedAction()`. Anything that reaches `->call()` by
+ * another route bypasses `->visible()` entirely, and the closure's own check
+ * is the only thing left standing.
  *
  * The record resolves fine on `ViewRole` in every test below — the account
  * still holds the role, `Assignment::of($account)` still finds it, nothing
  * here relies on Task 2's OTHER finding (a role that cannot resolve throws
- * before the closure for an unrelated reason). What closes these four cases
- * is `isReadOnly()` alone, and Step 4 below breaks exactly that to prove it.
+ * before the closure for an unrelated reason). What closes these cases is
+ * `isReadOnly()` alone.
  */
-test('on ViewRecord the assign action is hidden and a raw call writes nothing', function (): void {
+test('on ViewRecord the assign action is hidden', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+
+    livewire(RolesRelationManager::class, [
+        'ownerRecord' => $account,
+        'pageClass' => ViewRole::class,
+    ])->assertTableActionHidden('assign');
+});
+
+test('off ViewRecord the assign action is visible', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+
+    livewire(RolesRelationManager::class, [
+        'ownerRecord' => $account,
+        'pageClass' => EditRole::class,
+    ])->assertTableActionVisible('assign');
+});
+
+test('a raw call to the assign action on ViewRecord writes nothing', function (): void {
     signInAsRoleManager();
 
     $account = makeUser();
@@ -467,8 +509,6 @@ test('on ViewRecord the assign action is hidden and a raw call writes nothing', 
         'ownerRecord' => $account,
         'pageClass' => ViewRole::class,
     ]);
-
-    $test->assertTableActionHidden('assign');
 
     $test->call('mountAction', 'assign', [], ['table' => true]);
     $test->set('mountedActions.0.data.role', recordKey($role));
@@ -477,7 +517,7 @@ test('on ViewRecord the assign action is hidden and a raw call writes nothing', 
     expect(Assignment::of($account))->toBeEmpty();
 });
 
-test('off ViewRecord the assign action is visible and a raw call writes one row', function (): void {
+test('a raw call to the assign action off ViewRecord writes one row', function (): void {
     signInAsRoleManager();
 
     $account = makeUser();
@@ -488,8 +528,6 @@ test('off ViewRecord the assign action is visible and a raw call writes one row'
         'pageClass' => EditRole::class,
     ]);
 
-    $test->assertTableActionVisible('assign');
-
     $test->call('mountAction', 'assign', [], ['table' => true]);
     $test->set('mountedActions.0.data.role', recordKey($role));
     $test->call('callMountedAction', []);
@@ -497,7 +535,35 @@ test('off ViewRecord the assign action is visible and a raw call writes one row'
     expect(Assignment::of($account))->toBe([heldKey($role)]);
 });
 
-test('on ViewRecord the retract action is hidden and a raw call writes nothing', function (): void {
+test('on ViewRecord the retract action is hidden', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::assign($role)->to($account);
+
+    livewire(RolesRelationManager::class, [
+        'ownerRecord' => $account,
+        'pageClass' => ViewRole::class,
+    ])->assertTableActionHidden('retract', $role);
+});
+
+test('off ViewRecord the retract action is visible', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::assign($role)->to($account);
+
+    livewire(RolesRelationManager::class, [
+        'ownerRecord' => $account,
+        'pageClass' => EditRole::class,
+    ])->assertTableActionVisible('retract', $role);
+});
+
+test('a raw call to the retract action on ViewRecord writes nothing', function (): void {
     signInAsRoleManager();
 
     $account = makeUser();
@@ -510,15 +576,13 @@ test('on ViewRecord the retract action is hidden and a raw call writes nothing',
         'pageClass' => ViewRole::class,
     ]);
 
-    $test->assertTableActionHidden('retract', $role);
-
     $test->call('mountAction', 'retract', [], ['table' => true, 'recordKey' => recordKey($role)]);
     $test->call('callMountedAction', []);
 
     expect(Assignment::of($account))->toBe([heldKey($role)]);
 });
 
-test('off ViewRecord the retract action is visible and a raw call retracts it', function (): void {
+test('a raw call to the retract action off ViewRecord retracts it', function (): void {
     signInAsRoleManager();
 
     $account = makeUser();
@@ -530,8 +594,6 @@ test('off ViewRecord the retract action is visible and a raw call retracts it', 
         'ownerRecord' => $account,
         'pageClass' => EditRole::class,
     ]);
-
-    $test->assertTableActionVisible('retract', $role);
 
     $test->call('mountAction', 'retract', [], ['table' => true, 'recordKey' => recordKey($role)]);
     $test->call('callMountedAction', []);

@@ -225,14 +225,19 @@ class RolesRelationManager extends RelationManager
             ->action(function (array $data) use ($account): void {
                 $role = $data['role'] ?? null;
 
-                // Repeated here and not only in the `->visible()` above: on
-                // `ViewRecord`, `isDisabled()` already blocks a raw
-                // `mountAction`/`callMountedAction` call the same way it does
-                // for a restricted role (`retractAction()`'s docblock), so
-                // this line is defence in depth rather than the layer a test
-                // can discriminate — see Step 4's breakage in
-                // `RolesRelationManagerTest.php` for what was actually
-                // measured.
+                // Repeated here and not only in the `->visible()` above —
+                // CORRECTED: an earlier version of this comment claimed the
+                // repeat could not be shown to discriminate. Measured in
+                // `RolesRelationManagerTest.php`'s three-way breakage (see its
+                // docblock): with `->visible()`'s own `isReadOnly()` check
+                // removed and this line intact, a raw
+                // `mountAction`/`callMountedAction` call on `ViewRecord` still
+                // wrote nothing — this line caught it alone. `Action::call()`
+                // itself checks neither `isDisabled()` nor `isVisible()`
+                // (`vendor/filament/actions/src/Action.php:675-684`; that gate
+                // lives only in `mountAction()`/`callMountedAction()`), so
+                // anything reaching `->call()` by another route has only this
+                // line standing between it and the write.
                 $isOffered = ! $this->isReadOnly() && (is_int($role) || is_string($role));
 
                 if (! $isOffered) {
@@ -303,6 +308,12 @@ class RolesRelationManager extends RelationManager
      * screen, and is pinned in `AssignmentTest.php` rather than here, is a
      * plain call bypassing Livewire entirely — `Assignment::take()` on a role
      * never held answers `false`.
+     *
+     * `isReadOnly()` is a SEPARATE story from everything above, about
+     * `ViewRecord` rather than a restricted or vanished role, and it does NOT
+     * end the same way: the closure's own `! $this->isReadOnly()` copy below
+     * IS independently sufficient, measured — see its own inline comment and
+     * `RolesRelationManagerTest.php`'s three-way breakage.
      */
     private function retractAction(Model $account): Action
     {
@@ -316,16 +327,18 @@ class RolesRelationManager extends RelationManager
                 $key = $record->getKey();
 
                 // `! $this->isReadOnly()` is repeated here and not only in
-                // `->visible()` above, the same "two things, not one" the
-                // class docblock's `ViewRecord` paragraph names — even though,
-                // measured the same way as the restricted-role and gone-role
-                // cases already documented there, this specific line cannot
-                // be shown to discriminate through this screen's own wiring:
-                // `isDisabled()` already blocks a raw
-                // `mountAction`/`callMountedAction` call on `ViewRecord`
-                // before this closure runs at all. Kept as defence in depth
-                // against a future edit to `->visible()` that this line does
-                // not depend on.
+                // `->visible()` above — CORRECTED: an earlier version of this
+                // comment claimed the repeat could not be shown to
+                // discriminate. Measured in `RolesRelationManagerTest.php`'s
+                // three-way breakage (see its docblock): with `->visible()`'s
+                // own `isReadOnly()` check removed and this line intact, a
+                // raw `mountAction`/`callMountedAction` call on `ViewRecord`
+                // still wrote nothing — this line caught it alone.
+                // `Action::call()` itself checks neither `isDisabled()` nor
+                // `isVisible()` (`vendor/filament/actions/src/Action.php:675-684`;
+                // that gate lives only in `mountAction()`/`callMountedAction()`),
+                // so anything reaching `->call()` by another route has only
+                // this line standing between it and the write.
                 $written = ! $this->isReadOnly()
                     && (is_int($key) || is_string($key))
                     && Assignment::take($account, $key);

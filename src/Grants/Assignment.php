@@ -261,12 +261,16 @@ final class Assignment
      * every cached check at that scope for nothing changed. `isHeld()` is what
      * stops that, and its own docblock has the measurement.
      *
-     * This `offers()` check is the sole server-side authorization for handing
-     * a role out through this class: `RolesRelationManager`'s header action
-     * has no `->visible()` of its own (the Blueprint plan ruled one out; the
-     * `Select`'s `disableOptionWhen()` is UX, not a guard), so removing this
-     * check on the grounds that "the screen already checks" would open the
-     * write to anyone who can reach the action, whatever value they submit.
+     * This `offers()` check is the sole server-side authorization for WHICH
+     * role gets handed out through this class — CORRECTED, an earlier version
+     * of this paragraph said the header action has no `->visible()` at all,
+     * which stopped being true once it gained one gating `isReadOnly()`
+     * (`RolesRelationManager.php`). That `->visible()` decides only whether
+     * the button exists on the page at all; it says nothing about which role
+     * was submitted, on any page. The `Select`'s `disableOptionWhen()` is UX
+     * for that question, not a guard, so removing this check on the grounds
+     * that "the screen already checks" would open the write to anyone who can
+     * reach the action, whatever value they submit.
      *
      * Returns whether it actually wrote something: `offers()` alone does not
      * exclude a role already held, so a caller that reports success on the
