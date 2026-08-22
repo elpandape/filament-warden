@@ -387,3 +387,132 @@ test('the elsewhere check is capped at 8, three over the 5 measured', function (
 
     expect($reads)->toBeLessThanOrEqual(8);
 });
+
+test('give() hands a role out and the store answers for it straight away', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    expect(Access::granted($account, 'viewAny', Post::class))->toBeFalse();
+
+    Assignment::give($account, roleKey($role));
+
+    expect(Access::granted($account, 'viewAny', Post::class))->toBeTrue()
+        ->and(assignmentCount())->toBe(1);
+});
+
+test('give() writes nothing for a role already held', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::assign($role)->to($account);
+
+    Assignment::give($account, roleKey($role));
+
+    expect(assignmentCount())->toBe(1);
+});
+
+test('give() writes nothing for a role this account may not hand out', function (): void {
+    signIn();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Assignment::give($account, roleKey($role));
+
+    expect(assignmentCount())->toBe(0);
+});
+
+test('give() writes nothing for a value that names no role', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+
+    Assignment::give($account, 9999);
+
+    expect(assignmentCount())->toBe(0);
+});
+
+test('take() takes a role back and the store stops answering', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::allow($role)->to('viewAny', Post::class);
+    Warden::assign($role)->to($account);
+
+    expect(Access::granted($account, 'viewAny', Post::class))->toBeTrue();
+
+    Assignment::take($account, roleKey($role));
+
+    expect(Access::granted($account, 'viewAny', Post::class))->toBeFalse()
+        ->and(assignmentCount())->toBe(0);
+});
+
+test('take() leaves a restricted assignment alone', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+    $post = Post::query()->create(['title' => 'A post']);
+
+    Warden::assign($role)->on($post)->to($account);
+
+    Assignment::take($account, roleKey($role));
+
+    expect(assignmentCount())->toBe(1);
+});
+
+/**
+ * The whole reason `give()`/`take()` exist: `apply()` re-derives its answer for
+ * every role in the catalogue on every call, none of it memoised, so a screen
+ * built for a 200-role installation would pay for all 200 on a single click.
+ * Measured over a 21-role catalogue, `apply()` reads `assigned_roles` 47 times
+ * reaching the same state `give()` reaches in 6. The cap on `give()` is set a
+ * few over the measured 6, and the comparison itself — not a hardcoded number
+ * for `apply()` — is what proves the saving, so a change to either side still
+ * has to keep `give()` cheaper.
+ */
+test('give() reads assigned_roles far fewer times than apply() reaching the same state', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+
+    for ($i = 0; $i < 20; $i++) {
+        makeRole('role-'.$i);
+    }
+
+    $role = makeRole('editor');
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    Assignment::give($account, roleKey($role));
+
+    $giveReads = assignedRoleReads();
+    DB::disableQueryLog();
+
+    expect(assignmentCount())->toBe(1);
+
+    Assignment::take($account, roleKey($role));
+
+    expect(assignmentCount())->toBe(0);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    Assignment::apply($account, [roleKey($role)]);
+
+    $applyReads = assignedRoleReads();
+    DB::disableQueryLog();
+
+    expect(assignmentCount())->toBe(1)
+        ->and($giveReads)->toBeLessThanOrEqual(10)
+        ->and($applyReads)->toBeGreaterThan($giveReads);
+});

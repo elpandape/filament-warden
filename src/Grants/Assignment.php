@@ -217,6 +217,59 @@ final class Assignment
     }
 
     /**
+     * Hands one role to an account — the entry point a row or header action
+     * reaches for, never `apply()`.
+     *
+     * `apply()` is a set diff over the WHOLE catalogue: `byKey()` plus
+     * `mayHandOut()`/`isRestricted()`/`isElsewhere()` per role, none memoised.
+     * That is the right shape for `RoleAssignment`'s `CheckboxList`, which hands
+     * over the entire wanted state and has no way to say what changed. A row
+     * action already knows exactly which role it touched, so paying for every
+     * other role in the catalogue on every click would defeat the reason this
+     * screen exists — the 200-role installation a `CheckboxList` cannot serve.
+     * `offers()` is checked once, and only a role already offered but not yet
+     * held is written: the header action's `Select` lists the whole catalogue
+     * unfiltered, and a role already held is still "offered" by that check, so
+     * writing again here would insert a second `assigned_roles` row — `NULL` in
+     * `restricted_to_type`/`restricted_to_id` is never equal to itself, so
+     * nothing in the schema would stop it.
+     */
+    public static function give(Model $account, int|string $role): void
+    {
+        if (! self::offers($account, $role) || self::isHeld($account, $role)) {
+            return;
+        }
+
+        $model = self::role($role);
+
+        if ($model instanceof Model) {
+            Warden::assign($model)->to($account);
+        }
+    }
+
+    /**
+     * Takes one role back from an account — the entry point a row action
+     * reaches for, never `apply()`. See `give()` for the cost this avoids.
+     *
+     * No "already gone" guard is needed the way `give()` needs one against a
+     * duplicate row: a `retract()->from()` that matches nothing deletes nothing,
+     * and the row action this calls from only ever names a role the table
+     * itself already scoped to what the account holds.
+     */
+    public static function take(Model $account, int|string $role): void
+    {
+        if (! self::offers($account, $role)) {
+            return;
+        }
+
+        $model = self::role($role);
+
+        if ($model instanceof Model) {
+            Warden::retract($model)->from($account);
+        }
+    }
+
+    /**
      * One role by key, or nothing when the key names none.
      */
     public static function role(int|string $key): ?Model
@@ -228,6 +281,15 @@ final class Assignment
         }
 
         return null;
+    }
+
+    /**
+     * Whether the account already holds this role, compared as text: a key
+     * arriving from a `Select` is a string even where the column is not.
+     */
+    private static function isHeld(Model $account, int|string $role): bool
+    {
+        return array_any(self::of($account), fn (int|string $key): bool => (string) $key === (string) $role);
     }
 
     /**

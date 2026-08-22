@@ -185,6 +185,22 @@ return [
             'protected' => 'No puedes editar este rol, así que tampoco puedes repartirlo.',
             'restricted' => 'Esta cuenta tiene este rol en un contexto. Quitarlo desde aquí se llevaría todos los contextos, así que se deja en paz.',
             'elsewhere' => 'Esta cuenta tiene este rol fuera del tenant en el que estás. Quitárselo desde aquí no borraría nada y aun así diría que sí, así que se deja en paz. Cambia de tenant para tocarlo.',
+            'held' => [
+                'column' => 'Cómo se tiene',
+                'here' => 'Aquí',
+                'elsewhere' => 'En otro sitio',
+                'restricted' => 'Restringido',
+            ],
+            'assign' => [
+                'label' => 'Asignar rol',
+                'heading' => 'Asignar un rol',
+                'field' => 'Rol',
+                'notified' => 'El rol se ha repartido.',
+            ],
+            'retract' => [
+                'label' => 'Retirar',
+                'notified' => 'El rol se ha retirado.',
+            ],
         ],
     ],
 
