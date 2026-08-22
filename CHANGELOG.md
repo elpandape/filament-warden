@@ -42,6 +42,18 @@ release adds the other half: a relation manager a consuming application attaches
   accepted rather than worked around: this table draws no row link at all now, where the leaked
   `edit` action gave it one. That link was undocumented, untested and unmentioned anywhere in this
   file, so nothing shipped is being taken away — it existed only within this unreleased branch.
+- **The same fix above silently swapped a translated label for an untranslated one.** The
+  `if ($relatedResource = …)` block in `makeTable()` that leaked `edit`/`delete` did two MORE
+  things: `$table->modelLabel($relatedResource::getModelLabel())` and the plural sibling, which
+  read this package's own translated `ui.resources.roles.model`/`.models` through `RoleResource`.
+  Setting `$relatedResource` to `null` switched those off too, and nothing fell back to them:
+  Filament's own `get_model_label()` (`Support/helpers.php:55-60`) — a bare
+  `Str::plural(kebab(class_basename($model)))` — is always English and always lowercase regardless
+  of the application's locale. `HasEmptyState::getEmptyStateHeading()` reads exactly that label for
+  "No :model", the state every new account is in, not an edge case: measured before this fix,
+  `No roles`; the translated string is `Roles`. Fixed by setting `->modelLabel()`/
+  `->pluralModelLabel()` explicitly in `table()` from `RoleResource::getModelLabel()`/
+  `::getPluralModelLabel()` — the same keys, read once, never duplicated.
 - **The "held as" badge's `restricted`/`elsewhere` distinction was pinned by nothing that could see
   the two swap.** The two tests that already built exactly those scenarios asserted only that the
   retract action was hidden, which reads the same either way `heldAs()` answers, and
