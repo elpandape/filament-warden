@@ -312,6 +312,22 @@ test('a role assigned in this very tenant is offered as usual', function (): voi
     });
 });
 
+test('a string tenant id still matches a row scoped as an integer', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::tenant()->onceTo(5, function () use ($account, $role): void {
+        Warden::assign($role)->to($account);
+    });
+
+    Warden::tenant()->onceTo('5', function () use ($account, $role): void {
+        expect(Assignment::isElsewhere($account, roleKey($role)))->toBeFalse()
+            ->and(Assignment::offers($account, roleKey($role)))->toBeTrue();
+    });
+});
+
 test('unticking a role this screen cannot retract deletes nothing and says so', function (): void {
     signInAsHandOut();
 

@@ -172,7 +172,7 @@ final class Assignment
 
         foreach (self::assignments($account) as $assignment) {
             if ($assignment->getAttribute('role_id') === $role
-                && $assignment->getAttribute('scope') !== $scope) {
+                && ! self::sameScope($assignment->getAttribute('scope'), $scope)) {
                 return true;
             }
         }
@@ -228,6 +228,21 @@ final class Assignment
         }
 
         return null;
+    }
+
+    /**
+     * Compared as text on purpose, mirroring `RoleGrants::writable()`: warden
+     * types a tenant `int|string` while `assigned_roles.scope` is an uncast
+     * integer column, so a resolver handing back `'5'` still has to match a
+     * row stamped `5`.
+     */
+    private static function sameScope(mixed $rowScope, int|string|null $writeScope): bool
+    {
+        $rowScope = is_int($rowScope) || is_string($rowScope) ? $rowScope : null;
+
+        return $rowScope === null && $writeScope === null
+            ? true
+            : (string) $rowScope === (string) $writeScope;
     }
 
     /**
