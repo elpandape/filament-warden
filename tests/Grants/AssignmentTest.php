@@ -9,6 +9,7 @@ use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 pest()->extend(TestCase::class);
 
@@ -38,6 +39,24 @@ function roleKey(Model $role): int|string
 function assignmentCount(): int
 {
     return Context::resolve()->assignedRoleClass()::query()->count();
+}
+
+/**
+ * `assignments()` does not memoise, so every call — one per role, from
+ * `isRestricted()` and again from `isElsewhere()` — is its own query.
+ */
+function assignedRoleReads(): int
+{
+    $table = Context::resolve()->table('assigned_roles');
+    $reads = 0;
+
+    foreach (DB::getQueryLog() as $entry) {
+        if (str_contains($entry['query'], $table)) {
+            $reads++;
+        }
+    }
+
+    return $reads;
 }
 
 test('every role there is can be offered, named the way a person reads it', function (): void {
@@ -253,4 +272,75 @@ test('a state that is not a list is read as nothing held', function (): void {
     Assignment::apply($account, 'nope');
 
     expect(assignmentCount())->toBe(0);
+});
+
+test('a role assigned outside this tenant cannot be handed back from here', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+    Warden::assign($role)->to($account);
+
+    Warden::tenant()->onceTo(5, function () use ($account, $role): void {
+        expect(Assignment::isElsewhere($account, roleKey($role)))->toBeTrue()
+            ->and(Assignment::offers($account, roleKey($role)))->toBeFalse();
+    });
+});
+
+test('a role assigned in this very tenant is offered as usual', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+
+    Warden::tenant()->onceTo(5, function () use ($account): void {
+        $role = makeRole('editor');
+        Warden::assign($role)->to($account);
+
+        expect(Assignment::isElsewhere($account, roleKey($role)))->toBeFalse()
+            ->and(Assignment::offers($account, roleKey($role)))->toBeTrue();
+    });
+});
+
+test('unticking a role this screen cannot retract deletes nothing and says so', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    Warden::assign(makeRole('editor'))->to($account);
+
+    Warden::tenant()->onceTo(5, function () use ($account): void {
+        Assignment::apply($account, []);
+    });
+
+    expect(Context::resolve()->assignedRoleClass()::query()->withoutGlobalScopes()->count())->toBe(1);
+});
+
+test('the screen says why it will not hand that role back', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+    Warden::assign($role)->to($account);
+
+    Warden::tenant()->onceTo(5, function () use ($account, $role): void {
+        expect(Assignment::descriptions($account)[roleKey($role)] ?? null)
+            ->toBe(__('filament-warden::ui.relations.roles.elsewhere'));
+    });
+});
+
+test('the elsewhere check is capped at 8, three over the 5 measured', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    Warden::assign(makeRole('editor'))->to($account);
+    Warden::assign(makeRole('author'))->to($account);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    Assignment::descriptions($account);
+
+    $reads = assignedRoleReads();
+    DB::disableQueryLog();
+
+    expect($reads)->toBeLessThanOrEqual(8);
 });

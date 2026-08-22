@@ -314,6 +314,7 @@ test('the translation keys an application overrides are frozen', function (): vo
         'relations.roles.help',
         'relations.roles.protected',
         'relations.roles.restricted',
+        'relations.roles.elsewhere',
         'console.audit.open',
         'console.audit.unpoliced',
         'console.audit.orphans',

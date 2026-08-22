@@ -184,6 +184,7 @@ return [
             'help' => 'Lo que esta cuenta es. Un rol reparte lo que digan sus permisos en cuanto se da.',
             'protected' => 'No puedes editar este rol, así que tampoco puedes repartirlo.',
             'restricted' => 'Esta cuenta tiene este rol en un contexto. Quitarlo desde aquí se llevaría todos los contextos, así que se deja en paz.',
+            'elsewhere' => 'Esta cuenta tiene este rol fuera del tenant en el que estás. Quitárselo desde aquí no borraría nada y aun así diría que sí, así que se deja en paz. Cambia de tenant para tocarlo.',
         ],
     ],
 

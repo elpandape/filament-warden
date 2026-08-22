@@ -7,6 +7,7 @@ namespace ElPandaPe\FilamentWarden\Grants;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
+use ElPandaPe\Warden\Tenancy\Tenancy;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -65,6 +66,7 @@ final class Assignment
             $reason = match (true) {
                 ! self::mayHandOut($role) => 'protected',
                 self::isRestricted($account, $key) => 'restricted',
+                self::isElsewhere($account, $key) => 'elsewhere',
                 default => null,
             };
 
@@ -127,7 +129,10 @@ final class Assignment
 
         $role = self::role($value);
 
-        return $role instanceof Model && self::mayHandOut($role) && ! self::isRestricted($account, $value);
+        return $role instanceof Model
+            && self::mayHandOut($role)
+            && ! self::isRestricted($account, $value)
+            && ! self::isElsewhere($account, $value);
     }
 
     /**
@@ -141,6 +146,33 @@ final class Assignment
         foreach (self::assignments($account) as $assignment) {
             if ($assignment->getAttribute('role_id') === $role
                 && $assignment->getAttribute('restricted_to_type') !== null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * An assignment written at a scope this screen cannot delete.
+     *
+     * `retract()->from()` filters on `Tenancy::writeScope()` exactly and only
+     * bumps the cache when it deleted something: unticking a global assignment
+     * from inside a tenant removes nothing, reports success, and comes back
+     * ticked on reload. Measured. So it is shown, marked and left alone — the
+     * same answer the grid gives a grant from another tenant.
+     *
+     * A role held both globally and here answers true as well, and that is
+     * right: retracting would leave the global row behind and the box would come
+     * back ticked anyway.
+     */
+    public static function isElsewhere(Model $account, int|string $role): bool
+    {
+        $scope = app(Tenancy::class)->writeScope();
+
+        foreach (self::assignments($account) as $assignment) {
+            if ($assignment->getAttribute('role_id') === $role
+                && $assignment->getAttribute('scope') !== $scope) {
                 return true;
             }
         }
@@ -164,7 +196,9 @@ final class Assignment
 
         DB::transaction(static function () use ($account, $wanted, $held): void {
             foreach (self::byKey() as $key => $role) {
-                if (! self::mayHandOut($role) || self::isRestricted($account, $key)) {
+                if (! self::mayHandOut($role)
+                    || self::isRestricted($account, $key)
+                    || self::isElsewhere($account, $key)) {
                     continue;
                 }
 
