@@ -33,7 +33,7 @@ installation of this package, on any version, since the screen it lives on shipp
   is as old as the field itself. `git log --follow` puts the first version of
   `condition-builder.blade.php`, bare `$entangle` and all, at the commit that shipped it —
   first released in `0.6.0`.
-- **Why no gate caught it, across five minor versions.** `PermissionGridTest.php:195` already
+- **Why no gate caught it.** `PermissionGridTest.php:195` already
   asserts `->assertSee('$wire.$entangle(', escape: false)` for the grid — the exact string
   this defect was missing. Nothing in the suite made the equivalent assertion for the builder:
   `grep -rn "condition-builder\|entangle" tests/` returned only the grid's own lines. The package
