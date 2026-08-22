@@ -844,6 +844,7 @@ test('a rule the browser really changed is written as the browser sent it', func
         ]],
     ]);
 
+    /** @var array{g: array{i: list<array{0: string, 1: array<string, mixed>}>}} $after */
     $after = permissionClass()::query()->withoutGlobalScopes()
         ->whereNotNull('options')->orderByDesc('id')->firstOrFail()->getAttribute('options');
 
@@ -864,6 +865,7 @@ test('a numeric string keeps being a string when only the stance moves', functio
         ]],
     ]);
 
+    /** @var array{g: array{i: list<array{0: string, 1: array<string, mixed>}>}} $after */
     $after = permissionClass()::query()->withoutGlobalScopes()
         ->whereNotNull('options')->orderByDesc('id')->firstOrFail()->getAttribute('options');
 
