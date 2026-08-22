@@ -141,3 +141,22 @@ test('an assignment narrowed to a context is drawn locked too, and never written
 
     expect(assignedCount())->toBe(1);
 });
+
+test('an assignment held elsewhere is drawn locked too, and never written over', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('update', roleClass());
+
+    $account = makeUser('Holder');
+    $role = makeRole('editor');
+
+    Warden::assign($role)->to($account);
+
+    Warden::tenant()->onceTo(5, function () use ($account): void {
+        livewire(AccountHost::class, ['accountKey' => $account->getKey()])
+            ->assertSee('outside the tenant you are in')
+            ->fillForm(['roles' => []])
+            ->call('save');
+    });
+
+    expect(assignedCount())->toBe(1);
+});
