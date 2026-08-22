@@ -796,6 +796,23 @@ test("a permission's card reads its holders once per record, capped at 5 over th
     expect(grantReads())->toBeLessThanOrEqual(5);
 });
 
+test('the listing asks anyFor() per row and not the full Holders, capped at 20 over the 17 measured', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+
+    for ($index = 0; $index < 10; $index++) {
+        Warden::allow(makeRole("role-{$index}"))->to("action-{$index}");
+    }
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    livewire(ListPermissions::class);
+
+    expect(count(DB::getQueryLog()))->toBeLessThanOrEqual(20);
+});
+
 test('a row a single holder has says so too, and one nobody has says nothing', function (): void {
     config()->set('filament-warden.permissions.update', 'all');
 
