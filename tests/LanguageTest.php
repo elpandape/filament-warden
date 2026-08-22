@@ -152,6 +152,31 @@ test('every stance a cell can take has a word too', function (): void {
     }
 });
 
+test('every reason the builder can be locked with has a sentence, in both languages', function (): void {
+    $form = (string) file_get_contents(dirname(__DIR__).'/src/Filament/Resources/Permissions/Schemas/PermissionForm.php');
+    $narrowing = (string) file_get_contents(dirname(__DIR__).'/src/Conditions/Narrowing.php');
+
+    preg_match_all("/return '([a-z_]+)';/", $form, $returned);
+    preg_match_all("/\\?\\? '([a-z_]+)'/", $form, $fallback);
+    preg_match_all("/unreadable\('([a-z_]+)'/", $narrowing, $unreadable);
+    preg_match_all("/reason: '([a-z_]+)'/", $narrowing, $named);
+
+    $reasons = array_values(array_unique([
+        ...$returned[1], ...$fallback[1], ...$unreadable[1], ...$named[1],
+    ]));
+
+    sort($reasons);
+
+    foreach (['en', 'es'] as $locale) {
+        /** @var array<string, array<string, array<string, string>>> $lines */
+        $lines = require dirname(__DIR__)."/lang/{$locale}/ui.php";
+        $keys = array_keys($lines['conditions']['locked']);
+        sort($keys);
+
+        expect($keys)->toBe($reasons, "the {$locale} locked reasons and the ones the code can produce have drifted");
+    }
+});
+
 test('no line fakes a plural with a parenthesis', function (): void {
     foreach (['en', 'es'] as $locale) {
         foreach (translations($locale) as $key => $line) {

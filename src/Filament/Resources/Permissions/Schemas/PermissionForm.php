@@ -12,6 +12,8 @@ use ElPandaPe\FilamentWarden\Conditions\Ownership;
 use ElPandaPe\FilamentWarden\Filament\Forms\ConditionBuilder;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
 use ElPandaPe\FilamentWarden\Grants\Holders;
+use ElPandaPe\Warden\Constraints\ConstraintSerializer;
+use ElPandaPe\Warden\Constraints\Group;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Support\Titles\PermissionTitle;
 use Filament\Facades\Filament;
@@ -273,67 +275,114 @@ class PermissionForm
     }
 
     /**
-     * Whether the rule stored on this row can be handed back to the store.
+     * Whether this screen may write the rule the row already has.
      *
-     * The builder writes the rule it could parse and `null` for everything
-     * else, so a rule it cannot read back would be erased by a save that only
-     * touched the title. Three things stop it reading one back — a shape it
-     * refuses to draw, no model to check the columns against, and a column the
-     * table no longer has — and all three are one question: does what is stored
-     * survive the round trip?
-     *
-     * A row with nothing stored answers yes before any of that: writing `null`
-     * over `null` loses nothing, and asking further would close the builder on
-     * rows that have no rule to protect.
-     *
-     * Asked of the row and never of the entity picked on screen, because the
-     * promise is about what is stored. That leaves the reset on `entity_type`
-     * free to clear every rule this screen can read, which is every rule it had
-     * any business clearing. Nothing here reads the store: `Narrowing::of()` is
-     * pure and `Columns::of()` is memoised.
+     * Kept as its own reading of `lockedReason()` because the two `disabled()`
+     * callbacks want a boolean and the hint wants a sentence, and they must never
+     * be able to disagree.
      */
     private static function conditionsWritable(?Model $record): bool
     {
-        // Nothing is stored yet, so there is nothing to lose.
+        return self::lockedReason($record) === null;
+    }
+
+    /**
+     * Why the builder is closed, as the tail of a language key — or null.
+     *
+     * The question is not whether the stored rule can be READ. It is whether what
+     * is stored survives being read and written back unchanged: a value stored as
+     * the string `'2'` comes back as the integer `2`, and an `or` on the first
+     * line comes back as `and`, because `Narrowing::conditions()` normalises it.
+     * Both change what the row means and both stop it matching its own twin, and
+     * a save that only touched the title would do it without a word.
+     *
+     * Nothing here reads the store: `Narrowing::of()` is pure and `Columns::of()`
+     * is memoised.
+     */
+    private static function lockedReason(?Model $record): ?string
+    {
         if (! $record instanceof Model) {
-            return true;
+            return null;
         }
 
         $stored = Narrowing::of($record);
 
+        // A shape this screen refuses to draw already carries its own word.
         if (! $stored->isEditable()) {
-            return false;
+            return $stored->reason ?? 'shape';
         }
 
+        // Nothing stored, nothing to lose: writing null over null keeps no rule
+        // from anybody, and asking further would close the builder on every plain
+        // row in the catalogue.
         if ($record->getAttribute('options') === null) {
-            return true;
+            return null;
         }
 
         $model = self::modelFor($record->getAttribute('entity_type'));
 
-        return $model !== null && Narrowing::fromPayload(
+        if ($model === null) {
+            return 'model';
+        }
+
+        $rebuilt = Narrowing::fromPayload(
             $stored->toPayload(),
             Columns::of($model),
             Columns::authority(),
             Ownership::of($model),
-        ) instanceof Narrowing;
-    }
+        );
 
-    /**
-     * Why the builder is closed, as the tail of a language key.
-     *
-     * A rule that was read and cannot be written back has no word of its own
-     * yet, so it borrows the one for a shape the builder cannot draw. That
-     * sentence names the wrong cause; a line of its own is a new key, which is a
-     * minor, so it waits.
-     */
-    private static function lockedReason(Model $record): ?string
-    {
-        if (self::conditionsWritable($record)) {
+        if (! $rebuilt instanceof Narrowing) {
+            return 'column';
+        }
+
+        $group = $rebuilt->toGroup();
+
+        // A statement of its own, not folded into a ternary: the parity test in
+        // `LanguageTest` finds a reason by matching a plain return of a string
+        // literal on one line, and a ternary wrapped around the multi-line call
+        // above it would never put that text on a line by itself.
+        if ($group instanceof Group && self::sameRule(
+            ConstraintSerializer::serialize($group),
+            $record->getAttribute('options'),
+        )) {
             return null;
         }
 
-        return Narrowing::of($record)->reason ?? 'shape';
+        return 'rewrite';
+    }
+
+    /**
+     * The comparison warden makes when it decides whether two rows are the same
+     * twin, written a second time because `GrantsPermissions::optionsMatch()` is
+     * private.
+     *
+     * It has to be that comparison and not a plain `===`: engines may hand the
+     * JSON object keys back in another order, and warden accepts that as the same
+     * rule. Ordering the maps and leaving the lists alone is what makes this the
+     * same question — a reordered list IS a different rule.
+     *
+     * This is the second rule in the package written in two places; the first is
+     * the clause cut (`Narrowing::clauses()` and its copy in the script).
+     */
+    private static function sameRule(mixed $rebuilt, mixed $stored): bool
+    {
+        return self::ordered($rebuilt) === self::ordered($stored);
+    }
+
+    private static function ordered(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        $ordered = array_map(self::ordered(...), $value);
+
+        if (! array_is_list($ordered)) {
+            ksort($ordered);
+        }
+
+        return $ordered;
     }
 
     private static function conditionsHelp(Get $get, ?Model $record): string
@@ -342,7 +391,7 @@ class PermissionForm
             return (string) __('filament-warden::ui.conditions.no_model');
         }
 
-        $reason = $record instanceof Model ? self::lockedReason($record) : null;
+        $reason = self::lockedReason($record);
 
         return $reason === null
             ? (string) __('filament-warden::ui.conditions.warning')

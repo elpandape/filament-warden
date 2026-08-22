@@ -44,6 +44,27 @@ function grantReads(): int
     return $reads;
 }
 
+/**
+ * A row carrying a raw `options` blob written straight onto the column, past
+ * `ConstraintSerializer` and past `ConditionBuilder` entirely: what the tests
+ * in this file need to read is a shape the builder itself would never write —
+ * a value that changes type on the way back, or a column the table dropped —
+ * and the fluent API has no way to ask for either on purpose.
+ *
+ * @param  class-string<Model>  $model
+ * @param  array<string, mixed>  $options
+ */
+function permissionWithOptions(string $model, array $options): Model
+{
+    $permission = makePermission();
+    $permission->update([
+        'entity_type' => new $model()->getMorphClass(),
+        'options' => $options,
+    ]);
+
+    return $permission;
+}
+
 test('the resource points at the configured permission model, never at a guessed one', function (): void {
     expect(PermissionResource::getModel())->toBe(permissionClass());
 });
@@ -990,4 +1011,72 @@ test('a permission repointed at nothing loses the entity from its title', functi
 
     expect($permission->getAttribute('entity_type'))->toBeNull()
         ->and($permission->getAttribute('title'))->toBe('Publish');
+});
+
+test('a condition whose value would come back as another type is not editable', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $permission = permissionWithOptions(Post::class, [
+        'v' => 1,
+        'g' => ['t' => 'group', 'i' => [['and', ['t' => 'value', 'c' => 'id', 'o' => '=', 'v' => '2']]]],
+    ]);
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->assertSee(__('filament-warden::ui.conditions.locked.rewrite'));
+});
+
+test('a title-only save leaves a rule the screen cannot write back exactly as it was', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $permission = permissionWithOptions(Post::class, [
+        'v' => 1,
+        'g' => ['t' => 'group', 'i' => [['and', ['t' => 'value', 'c' => 'id', 'o' => '=', 'v' => '2']]]],
+    ]);
+
+    $before = $permission->getAttribute('options');
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->fillForm(['title' => 'Renamed'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($permission->fresh()?->getAttribute('options'))->toBe($before);
+});
+
+test('a rule warden itself wrote stays editable', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    Warden::allow(makeRole('editor'))->to('view', Post::class)->where('id', '=', 2);
+
+    $permission = permissionClass()::query()
+        ->withoutGlobalScopes()
+        ->whereNotNull('options')
+        ->orderByDesc('id')
+        ->firstOrFail();
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->assertDontSee(__('filament-warden::ui.conditions.locked.rewrite'));
+});
+
+test('a rule naming a column the table no longer has says which cause it is', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $permission = permissionWithOptions(Post::class, [
+        'v' => 1,
+        'g' => ['t' => 'group', 'i' => [['and', ['t' => 'value', 'c' => 'gone', 'o' => '=', 'v' => 'x']]]],
+    ]);
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->assertSee(__('filament-warden::ui.conditions.locked.column'))
+        ->assertDontSee(__('filament-warden::ui.conditions.locked.shape'));
 });

@@ -66,7 +66,8 @@ test('a stored rule naming a column the table no longer has is left alone too', 
 
     livewire(EditPermission::class, ['record' => $permission->getKey()])
         ->assertFormFieldDisabled('options')
-        ->assertSee('a shape this builder cannot draw')
+        ->assertSee('name a column this table no longer has')
+        ->assertDontSee('a shape this builder cannot draw')
         ->fillForm(['title' => 'Publish a post'])
         ->call('save')
         ->assertHasNoFormErrors();
