@@ -84,6 +84,15 @@ from warden's own fluent API.
 
 ### Not included
 
+- **The same round-trip hazard this release closes on the permission form is still live on the
+  role grid, and nothing here fixes it.** `RoleGrants::changes()` decides whether a cell moved by
+  comparing `Narrowing::is()`, which compares `toPayload()` — pushing every value through
+  `Value::text()`, with `Narrowing::conditions()`'s own first-line normalisation already applied —
+  the exact distinctions the new guard exists to catch. An untouched cell is correctly left out of
+  the diff, but the moment somebody flips that cell's stance, `RoleGrants::write()` calls `narrow()`
+  and re-applies the *cast* value and the *normalised* logic instead of what is actually stored: a
+  `'true'` held against a column the model does not cast to boolean, which never matches today,
+  would then match every row. Same hazard, other screen. Deferred, not fixed here.
 - **The `Catalog` and `Holders` memo, and with it the query budget of these screens.** Deferred to
   `1.5.0`. This release makes a measured cost *worse*, on purpose, and caps it with a test instead
   of fixing it: `Assignment::descriptions()` now asks two things per role instead of one, 5 reads
