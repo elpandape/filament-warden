@@ -34,6 +34,13 @@ use Illuminate\Support\Facades\Gate;
  * land informational: a row clamped to one record (the catalogue holds classes,
  * never rows), the wildcard, and a name that is not a string. Only the first two
  * can be written by a test; the third is unreachable, because `name` is `NOT NULL`.
+ *
+ * "The wildcard" is two independent terms in `Audit::orphans()` — `$name === '*'`
+ * and `$type === '*'` — and they skip two different shapes: `everything()` sets
+ * both at once, but the grid's MANAGE column mints only the first half (a `*`
+ * name on a real model), and `to($name, '*')` writes only the second half (a
+ * real name on the wildcard entity type). A row with both cannot tell either
+ * term apart from the disjunction; the tests below each write only one half.
  */
 pest()->extend(TestCase::class);
 
@@ -137,6 +144,28 @@ test('the widest rule in the store is not a red build when nobody holds it', fun
         ->and(audit(true))->toBe(0);
 });
 
+test('the wildcard name on a real model is not a red build either', function (): void {
+    $permission = Warden::permission(['name' => '*', 'entity_type' => new Post()->getMorphClass()]);
+    $permission->save();
+
+    $audit = Audit::run();
+
+    expect($audit->forgotten)->toBeEmpty()
+        ->and($audit->orphans)->not->toBeEmpty()
+        ->and(audit(true))->toBe(0);
+});
+
+test('the wildcard entity type on a real action is not a red build either', function (): void {
+    $permission = Warden::permission(['name' => 'viewAny', 'entity_type' => '*']);
+    $permission->save();
+
+    $audit = Audit::run();
+
+    expect($audit->forgotten)->toBeEmpty()
+        ->and($audit->orphans)->not->toBeEmpty()
+        ->and(audit(true))->toBe(0);
+});
+
 test('a name one panel declares is not undeclared because another panel does not', function (): void {
     $post = new Post();
     $tag = new Tag();
@@ -168,6 +197,27 @@ test('the informational list is printed, and it does not answer nothing to repor
     expect(auditOutput())->toContain('Permissions no grant points at.')
         ->toContain('viewAny on warden.role')
         ->not->toContain('Nothing to report.');
+});
+
+test('the informational bucket prints as INFO, never as WARN', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', roleClass());
+    Warden::disallow($role)->to('viewAny', roleClass());
+
+    audit();
+
+    expect(auditOutput())->toContain('INFO')
+        ->not->toContain('WARN');
+});
+
+test('a red bucket prints as WARN, never as INFO', function (): void {
+    makePermission('nobody-holds-this');
+
+    audit();
+
+    expect(auditOutput())->toContain('WARN')
+        ->not->toContain('INFO');
 });
 
 test('a run with nothing at all still answers nothing to report', function (): void {

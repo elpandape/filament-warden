@@ -133,6 +133,22 @@ test('the catalogue row the cell minted survives, and the audit does not go red 
         ->and($audit->orphans)->toContain('viewAny on '.Post::class);
 });
 
+test('the wildcard row the MANAGE cell mints survives, and the audit does not go red on it', function (): void {
+    $role = makeRole();
+    $panel = Panel::make()->id('scratch')->resources([PostResource::class]);
+    $catalog = Catalog::for($panel);
+
+    RoleGrants::apply($role, $catalog, [Post::class => [StateKey::MANAGE => 'granted']]);
+    RoleGrants::apply($role, $catalog, []);
+
+    $audit = Audit::of([$panel]);
+
+    expect(grantCount())->toBe(0)
+        ->and(permissionCount())->toBe(1)
+        ->and($audit->forgotten)->toBeEmpty()
+        ->and($audit->orphans)->toContain('* on '.Post::class);
+});
+
 test('shift reaches a denial in one step, and that is a single write', function (): void {
     $role = makeRole();
     $user = makeUser();
