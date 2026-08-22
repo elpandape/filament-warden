@@ -175,3 +175,57 @@ function latestPermission(?string $name = null): Model
         ->orderByDesc('id')
         ->firstOrFail();
 }
+
+/**
+ * Every key path of a config array, dotted and in file order, with the shape of what it holds.
+ *
+ * Deliberately not `flattenKeys()`, and the difference is the whole point. That helper recurses
+ * into any array, so a key whose value is an empty array yields no entry at all and drops out of
+ * the promise in silence, while a key whose value is a list explodes into `.0` and `.1` entries
+ * that pin values instead of paths — and loses the list's own path on the way. On the packaged
+ * config that is eight of the twenty-seven leaves gone and eleven value entries invented, and the
+ * eight are `roles.protected`, `guard.panel`, `catalog.models`, `catalog.custom` and the four
+ * scope buckets. Those are the blocks §6.1 warns about, and the buckets are the only keys that
+ * feed `Scope`. One test in `FrozenTest` asserts that difference rather than trusting this note.
+ * `Arr::dot()` is a half fix: it keeps the empty array and still explodes the list.
+ *
+ * The stop rule is one predicate: descend only into a non-empty array with string keys, because
+ * `array_is_list()` answers true for the empty array and one branch covers both cases. It encodes
+ * "string keys are our schema, integer keys are the application's data". The day a default ships
+ * a non-empty `guard.panel`, this walks into it and the pin grows an entry — which goes red, and
+ * is meant to.
+ *
+ * @param  array<string, mixed>  $values
+ * @return array<string, string> path => `scalar`, `list` or `empty`
+ */
+function configPaths(array $values, string $prefix = ''): array
+{
+    $paths = [];
+
+    foreach ($values as $key => $value) {
+        $path = $prefix === '' ? (string) $key : $prefix.'.'.$key;
+
+        if (! is_array($value)) {
+            $paths[$path] = 'scalar';
+
+            continue;
+        }
+
+        if ($value === []) {
+            $paths[$path] = 'empty';
+
+            continue;
+        }
+
+        if (array_is_list($value)) {
+            $paths[$path] = 'list';
+
+            continue;
+        }
+
+        /** @var array<string, mixed> $value */
+        $paths = array_merge($paths, configPaths($value, $path));
+    }
+
+    return $paths;
+}

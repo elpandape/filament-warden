@@ -635,11 +635,11 @@ Two different kinds of thing are in that list, and both matter for the same reas
 | Authorization | `WardenPolicy`, `Access` |
 | Catalog | `Catalog::for()`, `Entry` and its `key()`, `Origin`, `Scope` |
 | Guard | `PanelIsOpen` |
-| Config | Every key of `config/filament-warden.php` — the test pins the six top-level blocks, and the promise covers the keys inside them too |
+| Config | Every key path of `config/filament-warden.php` — all 27 of them, each pinned with the shape it holds. The pin stops at a key whose value is a list or an empty array: what goes inside those is your data, not our schema |
 | Translations | Every key path of `lang/*/ui.php`, in both locales |
 | Commands | `filament-warden:assign` and `filament-warden:audit`, with their arguments |
 
-**Adding a translation key or a config key is a minor, not a major**: nothing you wrote stops working. Only removing or renaming one is a break.
+**Adding a translation key or a config key is a minor, not a major**: nothing you wrote stops working. Only removing or renaming one is a break. Both pins list every path and compare in order, so on our side an addition also turns the build red — deliberately, so that a new key is a line somebody typed on purpose rather than a diff nobody read.
 
 ### ⚠️ Not frozen (may change in any release)
 

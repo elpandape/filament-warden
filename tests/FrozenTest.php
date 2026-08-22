@@ -32,7 +32,15 @@ use function Pest\Livewire\livewire;
  *
  * The keys are lines in somebody else's application: a published config, an
  * overridden translation, a command in a deploy script. Removing one is silent
- * on our side and loud on theirs.
+ * on our side and loud on theirs. Adding one is a minor for them and a line
+ * here somebody has to type: both key pins compare with `toBe()`, so a new key
+ * goes red until it is written down on purpose.
+ *
+ * The config pin names key paths and the shape each one holds, and it stops at a
+ * list and at an empty array: what goes inside those is the application's data,
+ * not this package's schema. That is why it does not reuse `flattenKeys()`, and
+ * why one test here compares the two — reusing it would drop eight of the
+ * twenty-seven paths without a word.
  *
  * Nothing else is promised. `Grants\`, `Conditions\`, `Filament\Guard`,
  * `Filament\Forms\Grid\` and the rest of `Catalog\` are this package's insides
@@ -127,6 +135,62 @@ test('the config keys an application publishes are frozen', function (): void {
 
     expect(array_keys($config))
         ->toBe(['permissions', 'navigation', 'roles', 'grid', 'guard', 'catalog']);
+});
+
+test('every config key path is frozen, and so is the shape it holds', function (): void {
+    /** @var array<string, mixed> $config */
+    $config = require dirname(__DIR__).'/config/filament-warden.php';
+
+    expect(configPaths($config))->toBe([
+        'permissions.create' => 'scalar',
+        'permissions.update' => 'scalar',
+        'permissions.delete' => 'scalar',
+        'permissions.constraints' => 'scalar',
+        'permissions.only_owned' => 'scalar',
+        'permissions.probe' => 'scalar',
+        'navigation.group' => 'scalar',
+        'navigation.roles.slug' => 'scalar',
+        'navigation.roles.icon' => 'scalar',
+        'navigation.roles.sort' => 'scalar',
+        'navigation.permissions.slug' => 'scalar',
+        'navigation.permissions.icon' => 'scalar',
+        'navigation.permissions.sort' => 'scalar',
+        'roles.create' => 'scalar',
+        'roles.delete' => 'scalar',
+        'roles.protected' => 'list',
+        'grid.explain' => 'scalar',
+        'grid.constraints' => 'scalar',
+        'guard.panel' => 'empty',
+        'guard.pages' => 'scalar',
+        'guard.widgets' => 'scalar',
+        'catalog.models' => 'empty',
+        'catalog.custom' => 'empty',
+        'catalog.scopes.read' => 'list',
+        'catalog.scopes.write' => 'list',
+        'catalog.scopes.withdraw' => 'list',
+        'catalog.scopes.irreversible' => 'list',
+    ]);
+});
+
+test('the config pin names a key that holds a list or an empty array, and never what is inside it', function (): void {
+    /** @var array<string, mixed> $config */
+    $config = require dirname(__DIR__).'/config/filament-warden.php';
+
+    $pinned = array_keys(configPaths($config));
+    $recursed = flattenKeys($config);
+
+    expect(array_values(array_diff($pinned, $recursed)))->toBe([
+        'roles.protected',
+        'guard.panel',
+        'catalog.models',
+        'catalog.custom',
+        'catalog.scopes.read',
+        'catalog.scopes.write',
+        'catalog.scopes.withdraw',
+        'catalog.scopes.irreversible',
+    ])
+        ->and($recursed)->toContain('catalog.scopes.write.0')
+        ->and($pinned)->not->toContain('catalog.scopes.write.0');
 });
 
 test('the translation keys an application overrides are frozen', function (): void {
