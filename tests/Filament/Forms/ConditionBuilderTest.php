@@ -15,6 +15,16 @@ use ElPandaPe\Warden\Facades\Warden;
 
 use function Pest\Livewire\livewire;
 
+/**
+ * Two templates start the same `wardenPermissionGrid(...)` component the same
+ * way, and only `permission-grid.blade.php` composed its `state:` binding
+ * through `$wire.`; `condition-builder.blade.php` entangled bare. A bare
+ * `$entangle(...)` is not a magic Alpine's `x-data` resolves on its own — only
+ * `$wire.$entangle(...)` is — so the whole `x-data` expression threw before
+ * Alpine could construct it: zero rule lines, seven console errors, on every
+ * browser, since the field shipped. `PermissionGridTest.php:195` already
+ * pinned the grid's half of this; nothing pinned the builder's.
+ */
 pest()->extend(TestCase::class);
 
 function builderFor(?string $entity): ConditionBuilder
@@ -148,6 +158,13 @@ test('a row with no conditions opens on every row', function (): void {
 
     livewire(ConditionHost::class, ['permissionKey' => $permission->getKey(), 'entity' => Post::class])
         ->assertSet('data.options.mode', 'all');
+});
+
+test('the state travels to the browser wire-scoped, exactly as the grid does', function (): void {
+    $permission = makePermission('update');
+
+    livewire(ConditionHost::class, ['permissionKey' => $permission->getKey(), 'entity' => Post::class])
+        ->assertSee('$wire.$entangle(', escape: false);
 });
 
 test('saving writes the group through the serializer, never by hand', function (): void {
