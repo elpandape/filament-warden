@@ -206,7 +206,7 @@ test('an explicit denial comes back as a denial', function (): void {
 
     livewire(ViewPermission::class, ['record' => $row->getKey()])
         ->callAction('probe', ['account' => $holder->getKey()])
-        ->assertNotified('forbidden');
+        ->assertNotified(__('filament-warden::ui.stances.forbidden'));
 });
 
 test('a grant comes back as a grant, which is the word a denial has to differ from', function (): void {
@@ -219,7 +219,7 @@ test('a grant comes back as a grant, which is the word a denial has to differ fr
 
     livewire(ViewPermission::class, ['record' => latestPermission('viewAny')->getKey()])
         ->callAction('probe', ['account' => $holder->getKey()])
-        ->assertNotified('granted');
+        ->assertNotified(__('filament-warden::ui.stances.granted'));
 });
 
 test('a row nobody holds comes back as abstaining, which is neither of the two', function (): void {
@@ -231,7 +231,7 @@ test('a row nobody holds comes back as abstaining, which is neither of the two',
 
     livewire(ViewPermission::class, ['record' => makePermission('export-reports')->getKey()])
         ->callAction('probe', ['account' => $holder->getKey()])
-        ->assertNotified('abstains');
+        ->assertNotified(__('filament-warden::ui.stances.abstain'));
 });
 
 test('an account nobody could name is nobody at all', function (): void {
