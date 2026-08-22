@@ -10,6 +10,7 @@ use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Facades\Warden;
+use Filament\Facades\Filament;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Database\Eloquent\Model;
 
@@ -385,18 +386,20 @@ test('the name column is searchable and sortable', function (): void {
 });
 
 /**
- * CORRECTED, against a Step 7 breakage that predicted a fatal and did not get
- * one. Removing `$relationship` outright left every test in this file green,
- * `stan` clean. The reason: `getRelationship()`'s lazy closure, installed by
- * the base `makeTable()`, is overwritten by `->relationship(null)` in
- * `table()` before it is ever evaluated, and the one branch of
- * `canViewForRecord()` that would call `getRelationshipName()` is exactly the
- * one `$relatedResource` skips. `$relationship` is kept anyway (documented in
- * its own docblock) as the contract Filament expects, not because this class
- * is measured to need it. `Post` stands in for the owner record here on
- * purpose — it declares no `roles()` method at all, so the assertion would
- * fail loudly, not silently, if any code path here ever reached for the
- * account's own relation instead of `Assignment::of()`.
+ * Removing `$relationship` outright leaves every test in this file green,
+ * `stan` clean — re-measured after `$relatedResource` moved to `null` for
+ * B1/B2 (its own docblock), because that change was flagged as exactly the
+ * kind of thing that could put `getRelationshipName()` back in play. It did
+ * not: `getRelationship()`'s lazy closure, installed by the base
+ * `makeTable()`, is still overwritten by `->relationship(null)` in `table()`
+ * before it is ever evaluated, and `canViewForRecord()` is now overridden
+ * directly below and never reaches the base branch that would call
+ * `getRelationshipName()` either way. `$relationship` is kept anyway
+ * (documented in its own docblock) as the contract Filament expects, not
+ * because this class is measured to need it. `Post` stands in for the owner
+ * record here on purpose — it declares no `roles()` method at all, so the
+ * assertion would fail loudly, not silently, if any code path here ever
+ * reached for the account's own relation instead of `Assignment::of()`.
  */
 test('an owner record with no roles() relation of its own still renders', function (): void {
     signInAsRoleManager();
@@ -412,14 +415,16 @@ test('an owner record with no roles() relation of its own still renders', functi
 });
 
 /**
- * `$relatedResource` — not `$relationship`, and this is the one that carries
- * the actual security property — is unpinned without this. `canViewForRecord()`
- * takes its `$relatedResource::canAccess()` branch and never touches
- * `$ownerRecord`'s own relation at all, so this passes even for `Post`, which
- * declares no `roles()` method: `RolePolicy` is what decided it, not a guess
- * at an unrelated model's relation. Without `$relatedResource`, the fallback
- * branch runs `$ownerRecord->roles()`, and `Post` has no such method — a
- * `BadMethodCallException`, confirmed by removing the property and running
+ * The overridden `canViewForRecord()` — not `$relationship`, and this is the
+ * one that carries the actual security property — is unpinned without this.
+ * Since B1/B2 forced `$relatedResource` to `null`, the override returns
+ * `RoleResource::canAccess()` directly instead of relying on the base
+ * class's own `$relatedResource` branch to do it, so this passes even for
+ * `Post`, which declares no `roles()` method: `RolePolicy` is what decided
+ * it, not a guess at an unrelated model's relation. Removing the override
+ * falls to the base implementation's `null`-`$relatedResource` branch, which
+ * runs `$ownerRecord->roles()` — `Post` has no such method — a
+ * `BadMethodCallException`, confirmed by removing the override and running
  * this exact assertion.
  */
 test('canViewForRecord() closes with the packaged Policy, not a guess at an unrelated relation', function (): void {
@@ -428,6 +433,82 @@ test('canViewForRecord() closes with the packaged Policy, not a guess at an unre
     $post = Post::query()->create(['title' => 'Not an authority']);
 
     expect(RolesRelationManager::canViewForRecord($post, EditRole::class))->toBeTrue();
+});
+
+/**
+ * B1 of the v1.4.0 whole-branch review. With `$relatedResource` pointed at
+ * `RoleResource::class`, `InteractsWithRelationshipTable::makeTable()` ran
+ * `RoleResource::configureTable($table)` — `RolesTable::configure()` —
+ * before `table()` below ever set `recordActions([retract])`, and that
+ * registers `RolesTable`'s own `EditAction`/`DeleteAction` into the table's
+ * `$flatActions` cache. `recordActions()` replaces the array a render walks
+ * but never touches that cache (`HasRecordActions.php:32-42` — no
+ * `removeCachedActions()` call, unlike `headerActions()`), and
+ * `resolveTableAction()` resolves a mounted action by name straight off it
+ * (`InteractsWithActions.php:649`). Measured against that exact source:
+ * `getFlatActions()` on a mounted instance returned
+ * `edit, delete, assign, retract`, and a raw `mountAction`/`callMountedAction`
+ * call reached the leaked `edit` to rename a role signed in with only
+ * `viewAny`/`update`, and the leaked `delete` to remove one signed in with
+ * `delete` and `roles.delete => 'all'` — neither action this screen shows or
+ * intends to serve. `$relatedResource = null` (its own docblock) stops
+ * `configureTable()` from ever running, so nothing but `assign`/`retract` is
+ * ever cached.
+ */
+test('the flat action list is exactly assign and retract, never the edit/delete RolesTable would leak in', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+
+    /** @var RolesRelationManager $manager */
+    $manager = livewire(RolesRelationManager::class, [
+        'ownerRecord' => $account,
+        'pageClass' => EditRole::class,
+    ])->instance();
+
+    $names = array_keys($manager->getTable()->getFlatActions());
+    sort($names);
+
+    expect($names)->toBe(['assign', 'retract']);
+});
+
+/**
+ * B2 of the v1.4.0 whole-branch review, closed by the same `null` as the test
+ * above. The leaked `RoleResource::configureTable()` call also left this
+ * table without `->hasCustomRecordUrl()`, so `InteractsWithRelationshipTable
+ * ::makeTable()` installed its own default `recordUrl` closure
+ * (`InteractsWithRelationshipTable.php:146-181`), which walks the leaked
+ * `edit`/`view` actions for a URL and reaches
+ * `RelationManager::getDefaultActionUrl()` → `RoleResource::getUrl('edit', …)`.
+ * On the `bare` panel fixture (AGENTS.md §6.3 / `BarePanelProvider`: no
+ * plugin, so `RoleResource` is never attached there) that measured throwing
+ * `Route [filament.bare.resources.roles.edit] not defined` as soon as the
+ * table had one row — a panel this package's own guard and Policies still
+ * protect (`RolePolicy` is registered by the service provider, not by the
+ * panel's plugin), so this table has every right to render there. With
+ * `$relatedResource = null`, `configureTable()` never runs, so no `edit`/
+ * `view` action exists for that closure to find — it returns `null`, and the
+ * table draws no row link at all rather than reaching for a route that does
+ * not exist.
+ */
+test('a panel without RoleResource attached still renders the table', function (): void {
+    Filament::setCurrentPanel(Filament::getPanel('bare'));
+    Filament::bootCurrentPanel();
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $account = makeUser();
+    $role = makeRole('editor');
+    Warden::assign($role)->to($account);
+
+    livewire(RolesRelationManager::class, [
+        'ownerRecord' => $account,
+        'pageClass' => EditRole::class,
+    ])
+        ->assertCountTableRecords(1)
+        ->assertOk();
 });
 
 /**

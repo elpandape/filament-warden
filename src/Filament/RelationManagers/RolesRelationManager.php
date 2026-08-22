@@ -48,48 +48,96 @@ class RolesRelationManager extends RelationManager
     /**
      * `InteractsWithRelationshipTable::getRelationshipName()` falls back to
      * `static::getRelatedResource()::getParentResourceRegistration()` when
-     * this is unset — `null::getParentResourceRegistration()` with no
-     * `$relatedResource` either, a fatal error and not a `null` a `??` could
-     * catch (`InteractsWithRelationshipTable.php:63-70`). CORRECTED against
-     * this exact class, though: with `$relatedResource` declared below,
-     * `getRelationshipName()` is never actually called anywhere in this
-     * class's own render or action path — measured by removing this property
-     * outright: all fourteen tests in `RolesRelationManagerTest.php`,
-     * including the ones that render the full table and run both actions,
-     * stayed green, and `stan` stayed clean too. `getRelationship()`'s lazy
-     * closure, set by the base `makeTable()`, is overwritten by
-     * `->relationship(null)` in `table()` below before it is ever evaluated,
-     * and `canViewForRecord()`'s branch that would call it is the one
-     * `$relatedResource` skips on its own (§ below) — `getTitle()`, overridden
-     * further down for an unrelated reason, plays no part in this: its own
-     * base implementation would fall to `getRelationshipTitle()`, which
-     * returns at the SAME `$relatedResource` check before it could ever reach
-     * `getRelationshipName()` either.
-     *
-     * Kept anyway, but not because a silent fallback would be safe if some
-     * future subclass relied on it — it would not: the behaviour it would
-     * reactivate is `getRelationship()` → `$ownerRecord->roles()`, warden's
-     * `MorphToMany` with `applyPivotTenancy()` welded on, which is precisely
-     * what `->relationship(null)` exists to avoid (§ below again). The real
-     * reason is plainer: this is the property Filament's own scaffold expects
-     * declared, and the documented contract of the base class this extends.
+     * this is unset — a fatal, not a `null` a `??` could catch
+     * (`InteractsWithRelationshipTable.php:63-70`). Load-bearing again as of
+     * this docblock, corrected from an earlier claim that it was not:
+     * `$relatedResource` below used to route every caller of
+     * `getRelationshipName()` around this property entirely (`canViewForRecord()`
+     * took a different branch, `getTitle()` is overridden below regardless).
+     * With `$relatedResource` now `null`, `canViewForRecord()` is overridden
+     * directly instead and still never reaches `getRelationshipName()` — but
+     * `getRelationship()`'s lazy closure, installed by the base `makeTable()`,
+     * is still overwritten by `->relationship(null)` in `table()` below
+     * before Livewire ever evaluates it, and no other caller in this class's
+     * own render or action path reaches for it either. Re-measured against
+     * this exact source: removing this property leaves every test in
+     * `RolesRelationManagerTest.php` green and `stan` clean, the same result
+     * as before `$relatedResource` changed. Kept anyway, for the reason that
+     * was always the real one: this is the property Filament's own scaffold
+     * expects declared, and the documented contract of the base class this
+     * extends.
      */
     protected static string $relationship = 'roles';
 
     /**
-     * With this declared, `canViewForRecord()` answers
-     * `RoleResource::canAccess()` and never runs the account model's own
-     * `roles()` relation to guess a class (`RelationManager.php:287-292`). The
-     * tab closes with this package's own `RolePolicy`, registered by
-     * `FilamentWardenServiceProvider`, and never depends on how a consuming
-     * application happens to have named that relation.
+     * `null`, not `RoleResource::class` — B1/B2 of the v1.4.0 whole-branch
+     * review, both closed by the same line.
      *
-     * Pinned — removing this raises `BadMethodCallException` calling
-     * `$post->roles()` on a `Post` fixture in
-     * `RolesRelationManagerTest.php`'s "canViewForRecord() closes with the
-     * packaged Policy" test, confirmed by deleting this line and running it.
+     * `InteractsWithRelationshipTable::makeTable()` calls
+     * `$relatedResource::configureTable($table)` whenever this is set
+     * (`InteractsWithRelationshipTable.php:184-189`), which runs
+     * `RolesTable::configure()` and registers ITS `EditAction` and
+     * `DeleteAction` into this table — actions this class never lists in
+     * `table()` below, which sets only `assign`/`retract`. `recordActions()`
+     * resets `$recordActions`, the array a render walks, but NOT
+     * `$flatActions`, the array `resolveTableAction()` resolves a mounted
+     * action's NAME against (`HasRecordActions.php:32-42` has no
+     * `removeCachedActions()` call; `headerActions()` does). Measured on the
+     * class as it stood with `$relatedResource = RoleResource::class`:
+     * `getFlatActions()` on a mounted instance returned
+     * `edit, delete, assign, retract` — two actions this screen never shows
+     * and never intends to serve, reachable anyway through a raw
+     * `mountAction`/`callMountedAction` call (B1). The leaked `edit` opens
+     * `RoleResource::form()` — the permission grid — on a path that bypasses
+     * `EditRole::mutateFormDataBeforeSave()`, so the protected-role rename
+     * guard AGENTS.md §6.24 built into that page is not on this one.
+     *
+     * The same setting also installs a default `recordUrl` closure
+     * (`InteractsWithRelationshipTable.php:146-181`) that walks the leaked
+     * `edit`/`view` actions looking for a URL, which reaches
+     * `RelationManager::getDefaultActionUrl()` →
+     * `RoleResource::getUrl('edit', …)`. On a panel that never registered
+     * `RoleResource` — `->roles(false)`, or simply a panel this package's
+     * plugin was never attached to — that throws
+     * `Route [filament.{panel}.resources.roles.edit] not defined` as soon as
+     * the table has one row, measured the same way (B2).
+     *
+     * With this `null`, neither leak exists: `configureTable()` never runs,
+     * so `flatActions` holds only `assign` and `retract`, and the default
+     * `recordUrl` closure finds no `edit`/`view` action to build a URL from
+     * and returns `null` — this table draws no row link at all, a
+     * capability this branch never released (see the CHANGELOG entry for
+     * this fix). What `$relatedResource` used to buy for free —
+     * `canViewForRecord()` answering `RoleResource::canAccess()` instead of
+     * guessing at the account model's own relation — is bought back below by
+     * overriding that method directly.
      */
-    protected static ?string $relatedResource = RoleResource::class;
+    protected static ?string $relatedResource = null;
+
+    /**
+     * Closes with this package's own `RolePolicy`, registered by
+     * `FilamentWardenServiceProvider`, and never with a guess at the account
+     * model's own relation — the job `$relatedResource` used to do for free
+     * before B1/B2 (its own docblock above) forced it to `null`.
+     *
+     * The base implementation's `null`-`$relatedResource` branch would do
+     * `$ownerRecord->{static::getRelationshipName()}()->getQuery()->getModel()`
+     * (`RelationManager.php:296`) — reachable on this account for real, since
+     * `$relationship` is still `'roles'` — but that is still the wrong
+     * question: it asks what an arbitrary consuming application named its
+     * relation, not what this package's own Policy says. Overriding here
+     * skips that branch entirely rather than relying on it to guess right.
+     *
+     * Pinned — `RolesRelationManagerTest.php`'s "canViewForRecord() closes
+     * with the packaged Policy" test calls this directly against a `Post`
+     * fixture, which declares no `roles()` method at all: removing this
+     * override throws `BadMethodCallException` reaching the base branch,
+     * confirmed by deleting it and running that exact test.
+     */
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        return RoleResource::canAccess();
+    }
 
     /**
      * Not `$title`: it is a static property and would be evaluated before
