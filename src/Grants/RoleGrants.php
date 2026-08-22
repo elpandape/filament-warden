@@ -151,11 +151,14 @@ final class RoleGrants
         }
 
         // One transaction for the whole grid: each write bumps the cache version
-        // on its own, and the trait registers one more after the commit.
-        DB::transaction(static function () use ($role, $changes): void {
-            foreach ($changes as $change) {
-                self::write($role, $change);
-            }
+        // on its own, and the trait registers one more after the commit. Opened
+        // on warden's own connection, not the default one: `Context::resolve()`
+        // is where every write in this class already asks, and a transaction on
+        // the wrong connection would wrap queries that never run on it, leaving
+        // the ones that matter to commit one at a time as they go.
+        DB::connection(Context::resolve()->connection())->transaction(static function () use ($role, $changes): void {
+            self::revoke($role, $changes);
+            self::grant($role, $changes);
         });
     }
 
@@ -293,7 +296,8 @@ final class RoleGrants
     }
 
     /**
-     * Every step takes away whatever was there before it writes.
+     * Every step takes away whatever was there before it writes, for every
+     * change in the batch at once.
      *
      * `forbidden` is part of the unique key on grants, so granted and forbidden
      * coexist as two rows: allowing without revoking the forbid leaves both, and
@@ -304,28 +308,115 @@ final class RoleGrants
      * hard on `only_owned` — so both are needed; and `to()` is the one that also
      * takes the grants of every twin sharing the name.
      *
-     * Editing with a fresh `allow()->to()->where()` instead of this would leave
-     * the previous twin's grant standing: the old condition would go on
-     * authorizing and nothing would say so. Measured.
+     * Grouped by entity rather than run once per changed cell: warden's own
+     * `to()`/`toOwn()` accept a list of names and resolve it with one
+     * `whereIn()` lookup and, when there is anything to remove, one `delete()`
+     * — so four warden calls clear an entire entity's worth of changed cells
+     * instead of four calls PER cell. This is the one place grouping is free:
+     * revoking never creates a twin, so there is no `reconstrain()` to confuse
+     * by handing it more than one permission at a time.
+     *
+     * @param  list<Change>  $changes
      */
-    private static function write(Model $role, Change $change): void
+    private static function revoke(Model $role, array $changes): void
     {
-        Warden::disallow($role)->to($change->name, $change->entity);
-        Warden::unforbid($role)->to($change->name, $change->entity);
+        /** @var array<string, list<string>> $byEntity */
+        $byEntity = [];
 
-        if ($change->entity !== null) {
-            Warden::disallow($role)->toOwn($change->entity, $change->name);
-            Warden::unforbid($role)->toOwn($change->entity, $change->name);
+        foreach ($changes as $change) {
+            $byEntity[$change->entity ?? ''][] = $change->name;
         }
 
-        if ($change->to === Stance::Abstain) {
-            return;
+        foreach ($byEntity as $key => $names) {
+            $entity = $key === '' ? null : $key;
+
+            Warden::disallow($role)->to($names, $entity);
+            Warden::unforbid($role)->to($names, $entity);
+
+            if ($entity !== null) {
+                Warden::disallow($role)->toOwn($entity, $names);
+                Warden::unforbid($role)->toOwn($entity, $names);
+            }
+        }
+    }
+
+    /**
+     * Every change that is not abstaining, written in up to two passes.
+     *
+     * The honest promise is not "one write for the whole grid": it is that the
+     * five warden calls a changed cell used to cost — four revokes plus one
+     * grant, all now measured, none guessed — become UP TO five per GROUP
+     * instead of per cell. A cell narrowed to `Shape::All` costs nothing past
+     * `to()`/`toOwn()` itself, so every such cell that shares (entity, stance)
+     * is asked for in one call. A cell narrowed any other way — `Shape::Owned`,
+     * `Shape::Conditions` — still runs alone, through `narrow()`, exactly as
+     * before: `where()`'s `reconstrain()` re-points EVERY permission in the
+     * chain's `lastGranted` at the same twin, and two different cells asking
+     * for two different conditions must never share one.
+     *
+     * Grouping a grant changes more than its query count: warden fires one
+     * `GrantingPermission`/`ForbiddingPermission` event per call, carrying
+     * every name in it, not one event per name. An application listening for
+     * that event to veto a single cell now vetoes the whole group its cell
+     * happened to land in — that is observable behaviour a consumer can
+     * depend on, and it did not exist before this version.
+     *
+     * @param  list<Change>  $changes
+     */
+    private static function grant(Model $role, array $changes): void
+    {
+        /** @var array<string, list<Change>> $granted */
+        $granted = [];
+
+        /** @var array<string, list<Change>> $forbidden */
+        $forbidden = [];
+
+        foreach ($changes as $change) {
+            if (! $change->to->isWritten()) {
+                continue;
+            }
+
+            if ($change->narrowing->shape !== Shape::All) {
+                self::narrow(
+                    $change->to === Stance::Granted ? Warden::allow($role) : Warden::forbid($role),
+                    $change,
+                );
+
+                continue;
+            }
+
+            if ($change->to === Stance::Granted) {
+                $granted[$change->entity ?? ''][] = $change;
+            } else {
+                $forbidden[$change->entity ?? ''][] = $change;
+            }
         }
 
-        self::narrow(
-            $change->to === Stance::Granted ? Warden::allow($role) : Warden::forbid($role),
-            $change,
-        );
+        self::grantGroup(static fn (): GrantsPermissions => Warden::allow($role), $granted);
+        self::grantGroup(static fn (): GrantsPermissions => Warden::forbid($role), $forbidden);
+    }
+
+    /**
+     * One `to()` call per entity, for cells that share it with nothing left to
+     * narrow. `settleTitle()` still runs once per name: it is a catalogue
+     * concern, not a grant one, and grouping the write must not skip it for
+     * any name that was in the group.
+     *
+     * @param  callable(): GrantsPermissions  $chain
+     * @param  array<string, list<Change>>  $byEntity
+     */
+    private static function grantGroup(callable $chain, array $byEntity): void
+    {
+        foreach ($byEntity as $key => $group) {
+            $entity = $key === '' ? null : $key;
+            $names = array_map(static fn (Change $one): string => $one->name, $group);
+
+            $chain()->to($names, $entity);
+
+            foreach ($group as $one) {
+                self::settleTitle($one);
+            }
+        }
     }
 
     /**

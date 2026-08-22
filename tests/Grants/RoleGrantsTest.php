@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Composer\InstalledVersions;
 use ElPandaPe\FilamentWarden\Catalog\Audit;
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Conditions\Shape;
@@ -22,6 +23,7 @@ use ElPandaPe\Warden\Events\PermissionGranted;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 
@@ -897,4 +899,144 @@ test('a decimal string keeps being a string when only the stance moves', functio
     expect($after['g']['i'][0][1]['v'])->toBe('2.5')
         ->and(grantCount())->toBe(1)
         ->and(RoleGrants::of($role, gridCatalog())->stances[Post::class]['viewAny'])->toBe('forbidden');
+});
+
+test('a fresh owned grant leaves one row, not more', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    Warden::ownedVia(Post::class, 'title');
+
+    RoleGrants::apply($role, $catalog, [Post::class => ['update' => 'granted']], [
+        Post::class => ['update' => ['mode' => 'owned', 'rules' => []]],
+    ]);
+
+    expect(grantCount())->toBe(1)
+        ->and(RoleGrants::of($role, $catalog)->narrowings[Post::class]['update']->shape)->toBe(Shape::Owned);
+});
+
+test('a granted owned cell turned to forbidden leaves one row, not two', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    Warden::ownedVia(Post::class, 'title');
+    $narrowings = [Post::class => ['update' => ['mode' => 'owned', 'rules' => []]]];
+
+    RoleGrants::apply($role, $catalog, [Post::class => ['update' => 'granted']], $narrowings);
+    RoleGrants::apply($role, $catalog, [Post::class => ['update' => 'forbidden']], $narrowings);
+
+    expect(grantCount())->toBe(1)
+        ->and(RoleGrants::of($role, $catalog)->stances[Post::class]['update'])->toBe('forbidden');
+});
+
+test('a forbidden owned cell turned back to granted leaves one row too', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    Warden::ownedVia(Post::class, 'title');
+    $narrowings = [Post::class => ['update' => ['mode' => 'owned', 'rules' => []]]];
+
+    RoleGrants::apply($role, $catalog, [Post::class => ['update' => 'forbidden']], $narrowings);
+    RoleGrants::apply($role, $catalog, [Post::class => ['update' => 'granted']], $narrowings);
+
+    expect(grantCount())->toBe(1)
+        ->and(RoleGrants::of($role, $catalog)->stances[Post::class]['update'])->toBe('granted');
+});
+
+test('an owned cell returned to abstaining leaves nothing behind', function (string $from): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    Warden::ownedVia(Post::class, 'title');
+
+    RoleGrants::apply($role, $catalog, [Post::class => ['update' => $from]], [
+        Post::class => ['update' => ['mode' => 'owned', 'rules' => []]],
+    ]);
+    RoleGrants::apply($role, $catalog, []);
+
+    expect(grantCount())->toBe(0);
+})->with(['granted', 'forbidden']);
+
+test('three cells on the same entity land in the group their own stance owns, not each others', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    RoleGrants::apply($role, $catalog, [Post::class => [
+        'viewAny' => 'granted',
+        'view' => 'granted',
+        'update' => 'forbidden',
+    ]]);
+
+    $stances = RoleGrants::of($role, $catalog)->stances[Post::class];
+
+    expect(grantCount())->toBe(3)
+        ->and($stances['viewAny'])->toBe('granted')
+        ->and($stances['view'])->toBe('granted')
+        ->and($stances['update'])->toBe('forbidden');
+});
+
+test('writing five cells sharing an entity and stance is capped at 28, twenty-five measured grouped', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    RoleGrants::apply($role, $catalog, [Post::class => [
+        'viewAny' => 'granted',
+        'view' => 'granted',
+        'create' => 'granted',
+        'update' => 'granted',
+        'delete' => 'granted',
+    ]]);
+
+    $reads = count(DB::getQueryLog());
+    DB::disableQueryLog();
+
+    expect($reads)->toBeLessThanOrEqual(28)
+        ->and(grantCount())->toBe(5);
+});
+
+test('writing one cell alone still costs what grouping cannot shrink, capped at 12, nine measured', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    RoleGrants::apply($role, $catalog, [Post::class => ['viewAny' => 'granted']]);
+
+    $reads = count(DB::getQueryLog());
+    DB::disableQueryLog();
+
+    expect($reads)->toBeLessThanOrEqual(12);
+});
+
+test('the transaction opens on warden own connection, not the default one', function (): void {
+    config()->set('database.connections.warden_write', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
+    ]);
+    config()->set('warden.connection', 'warden_write');
+    Context::resolve()->setConnection('warden_write');
+
+    $installPath = InstalledVersions::getInstallPath('elpandape/warden');
+
+    /** @var Migration $migration */
+    $migration = require $installPath.'/database/migrations/create_warden_tables.php.stub';
+    $migration->up(); // @phpstan-ignore method.notFound
+
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    Event::listen(PermissionGranted::class, static function (): void {
+        throw new RuntimeException('interrupted mid-grant, on purpose');
+    });
+
+    expect(static function () use ($role, $catalog): void {
+        RoleGrants::apply($role, $catalog, [Post::class => ['viewAny' => 'granted']]);
+    })->toThrow(RuntimeException::class)
+        ->and(grantCount())->toBe(0);
 });

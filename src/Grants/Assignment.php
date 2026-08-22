@@ -219,7 +219,11 @@ final class Assignment
         $wanted = is_array($wanted) ? array_values($wanted) : [];
         $held = self::of($account);
 
-        DB::transaction(static function () use ($account, $wanted, $held): void {
+        // Opened on warden's own connection, not the default one: every write
+        // this loop makes goes through `Context::resolve()` already, and a
+        // transaction on the wrong connection wraps queries that never run on
+        // it while the ones that matter commit one at a time as they go.
+        DB::connection(Context::resolve()->connection())->transaction(static function () use ($account, $wanted, $held): void {
             foreach (self::byKey() as $key => $role) {
                 if (! self::mayHandOut($role)
                     || self::isRestricted($account, $key)
