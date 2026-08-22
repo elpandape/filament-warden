@@ -8,7 +8,7 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
-## [1.2.0] - 2026-08-21
+## [1.2.0] - 2026-08-22
 
 `1.0.2` stopped the screen writing the wrong thing to the database. `1.1.0` stopped it *saying*
 the wrong thing on screen. This release stops **the build** saying the wrong thing. The headline
