@@ -19,8 +19,14 @@ use Throwable;
  * model's table does not change inside a request.
  *
  * Asked of the model's own connection and not of the `Schema::` facade, which
- * would resolve the default one; and through `getColumns()` rather than
- * `getColumnListing()`, which pays the same query to throw the types away.
+ * would resolve the default one.
+ *
+ * Kept as `getColumns()` rather than switched to `getColumnListing()`, but not
+ * for the types: the schema's own types never decide anything here — sqlite has
+ * no boolean type at all, and an uncast postgres `boolean` column still comes
+ * back as `1` — so the boolean question goes to the model's casts instead, and
+ * `getColumns()` stays only because it is the call that answers with the column
+ * list this class needs.
  */
 final class Columns
 {
