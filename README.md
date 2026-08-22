@@ -541,7 +541,7 @@ foreach ($entries as $entry) {
 
 A protected role keeps its name and its grid: both are shown, neither can be edited, and it cannot be deleted. Its title is left editable — nothing resolves by it.
 
-**From `v1.0.2` a role cannot arrive at a protected name either.** Creating a role called `super-admin`, or renaming an ordinary one onto it, is refused by the form — before `1.0.2` both succeeded and the role was born protected, which is a way of minting an unremovable role by typing. The role that already carries the name keeps it: only the *arrival* is closed. The refusal currently uses the framework's own validation wording; a sentence saying which list the name is on is coming in `v1.1.0`.
+**From `v1.0.2` a role cannot arrive at a protected name either.** Creating a role called `super-admin`, or renaming an ordinary one onto it, is refused by the form — before `1.0.2` both succeeded and the role was born protected, which is a way of minting an unremovable role by typing. The role that already carries the name keeps it: only the *arrival* is closed. From `v1.1.0` the refusal names which list the name is on, instead of the framework's generic validation wording.
 
 > ⚠️ **The merge is shallow, on purpose.** Declaring `roles.protected => []` in your published config genuinely unprotects every role. A recursive merge would blend lists by index and silently keep `'super-admin'` in there — so it is not used, and a test holds that line.
 
