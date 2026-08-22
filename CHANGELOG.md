@@ -8,6 +8,63 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [1.4.0] - 2026-08-22
+
+`1.3.0` closed this hazard on the permission form and said, in its own release note, that it was
+still live on the grid. This release closes it there — and, unlike `1.3.0`, **it takes nothing
+away**: no cell becomes uneditable, no new lock sentence, no new key. Say that plainly, because
+anyone who read the `1.3.0` note is expecting the opposite.
+
+### Fixed
+
+- **Flipping a grid cell's stance — grant to forbid, or back — could silently rewrite a condition
+  the click never touched, changing what it matched.** A rule stored as the string `'true'`, which
+  warden compares with `===` and so never matches a row, could come back as the boolean `true`,
+  which matches every row — on a click that only meant to change one cell's stance, not its
+  condition. `RoleGrants::changes()` decided both **whether** a cell moved and **what** to write
+  from the same comparison, `Narrowing::is()`, which compares `toPayload()` — and a payload carries
+  every value as text, the same distinction `1.3.0` already drew for the permission form. So the
+  diff correctly read an untouched condition as unchanged, and then wrote it back anyway from the
+  browser's own rules, already cast through `Value::cast()`. Fixed by asking the two questions of
+  two different things: `$moved = ! $stored->is($wanted)` still decides *whether*, computed once;
+  what gets written is `$wanted` only when `$moved` is true, and the row already in the store,
+  untouched, otherwise. Covers all three value shapes a condition can hold: an integer string
+  (`'2'` → `2`), a decimal string (`'2.5'` → `2.5`), and a boolean string (`'true'`/`'false'` →
+  `true`/`false`). Verified by breaking the fix itself, in both directions, each mutation committed
+  first and reverted with a named `git checkout`: reverting to always write the browser's rules
+  reddened exactly the two tests that assert preservation and never the one that asserts a real
+  edit is written as sent; always writing the stored row instead reddened that control test, plus
+  four pre-existing tests nobody had to add — every one of them a cell with no prior condition at
+  all, where the stored side defaults to "every row" and would have overwritten the operator's
+  first-ever rule with it.
+- **Why this one locks nothing, unlike `1.3.0`.** The permission form edits the row a condition
+  lives in, so a round trip that does not come back byte-identical has to be refused — that release
+  drew a lock and a sentence for it. The grid never edits a row: a stance change points the grant at
+  a twin, either the one already stored or a freshly written one, so it is enough to point at the
+  right one.
+
+### Not included
+
+- **A rule whose first line reads `or` still comes back as `and` on rewrite, and this release does
+  not touch that.** It is a different, lighter hazard: `Group::passes()`
+  (`vendor/elpandape/warden/src/Constraints/Group.php:34-35`) ignores the first item's own logic on
+  every evaluation, so the normalisation never changes what the rule matches. What it does change
+  is the twin's identity — the old row is left holding no grants and surfaces in
+  `filament-warden:audit`'s informational bucket, the same bucket a turned-off cell already lands
+  in. Not an authorization defect.
+- **The relation manager for handing roles out from the account screen, deferred by `1.3.0` to
+  `1.4.0`, moves again — to `v1.5.0`.** This release took the number instead; it was never part of
+  the original five-tag spec. The `Catalog`/`Holders` memo `1.3.0` deferred to `1.5.0` moves with
+  the rest of that tag, "Que no cueste", to `v1.6.0`.
+- **Two minors `1.3.0` left open are still open — checked, not assumed, and neither is closed
+  here.** `conditions.locked.model` still has no test proving the sentence is ever actually shown
+  on screen. `RoleGrants::writable()` still has no test for a string-typed tenant id, the same
+  systemic gap `1.3.0` closed on `Assignment`'s side of the identical comparison.
+- **Nobody opened a browser.** This release changes no visible surface — no new key, no new lock —
+  so there was nothing new to see; the fix is verified end to end through Pest's database layer
+  only. A stance flip on a string-valued condition, watched through a real browser, is pending, not
+  seen.
+
 ## [1.3.1] - 2026-08-22
 
 Found by opening a browser, not by the suite: the condition builder has never worked in any
