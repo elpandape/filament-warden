@@ -30,8 +30,10 @@ using the grid.
   combines cannot tell the old, buggy gate from the fixed one; only checking *which* six does.
   Verified by breaking the fix itself, both ways: putting the old term back into the new gate
   turned `--check` red again on an ordinary saved cell while the pre-existing "red build" test
-  stayed green, and taking the new term back out collapsed the only test in the suite that can
-  drive `--check` to a nonzero exit code.
+  stayed green, and taking the new term back out reddened four named tests — three of them
+  asserting `isClean()` directly, and the one test in `AuditCommandTest` that drives `--check`
+  itself to a nonzero exit code through `forgotten` (a second such test exists, over an unpoliced
+  resource, and is untouched by this term).
 - **A permission that is genuinely undeclared but pinned to a single record can no longer turn the
   build red, and that is a real reduction in what CI catches, decided on purpose.** Whether a
   permission is "declared" is a question asked of the catalogue, which is keyed by class; a
@@ -39,14 +41,17 @@ using the grid.
   informational bucket alongside a permission on the wildcard (which really is unused, and
   `warden:clean` really will delete it — the informational bucket says so rather than staying
   silent) and, unreachably in practice since a permission's name is `NOT NULL`, a non-string name.
-- **The Stability table's promise that every config key path is frozen was not true for eight of
-  them.** The helper backing that pin recurses into any array, so a key whose value is an empty
-  array produced no entry at all (`guard.panel`, `catalog.models`, `catalog.custom`) and a key
-  whose value is a list exploded into per-index entries instead of naming the key itself
-  (`roles.protected`, and the four `catalog.scopes.*` buckets that feed `Scope`) — removing any of
-  those eight was silently uncaught. A new pin stops descending at exactly a list or an empty array
+- **The Stability table's promise that every config key path is frozen was not true for any of
+  them — the pin only ever named the six top-level blocks, so all 27 inner paths were
+  unpinned.** The obvious fix is reusing `flattenKeys()`, the helper the translation pins already
+  use, but it recurses into any array: a key whose value is an empty array produces no entry at
+  all (`guard.panel`, `catalog.models`, `catalog.custom`) and a key whose value is a list explodes
+  into per-index entries instead of naming the key itself (`roles.protected`, and the four
+  `catalog.scopes.*` buckets that feed `Scope`) — that fix would have closed 19 of the 27 and
+  silently missed the same eight. A new pin stops descending at exactly a list or an empty array
   and names all 27 leaves by path and by shape (19 scalar, 3 empty, 5 list). Measured by deleting
-  each of the eight in turn and confirming the pin goes red where it previously did not.
+  each of the 27 in turn: the new pin goes red on every one, including the eight `flattenKeys()`
+  alone would still miss.
 
 ### Added
 
