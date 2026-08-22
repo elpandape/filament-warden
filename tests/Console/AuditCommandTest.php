@@ -64,9 +64,8 @@ test('the flag is what turns a finding into a red build', function (): void {
 
     expect(Audit::run()->forgotten)->not->toBeEmpty()
         ->and(audit())->toBe(0)
-        ->and(audit(true))->toBe(1);
-
-    expect(auditOutput())->toContain('Permissions nothing declares');
+        ->and(audit(true))->toBe(1)
+        ->and(auditOutput())->toContain('Permissions nothing declares');
 });
 
 test('a permission somebody holds is in neither list', function (): void {
