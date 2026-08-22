@@ -21,6 +21,13 @@ use function Pest\Livewire\livewire;
  * asks the same question warden asks when it decides two rows are the same
  * twin, so a drift between the two comparisons shows up as a real
  * disagreement rather than a re-statement of the copy's own source.
+ *
+ * `'two chains warden treats as the same twin are read as the same rule
+ * here'` simulates what an engine may hand back on read: the same rule, its
+ * maps reordered at every level, with the items list left exactly where it
+ * was — warden compares maps order-insensitively and lists
+ * order-sensitively, and the mutation has to respect both halves of that to
+ * pin the right thing.
  */
 pest()->extend(TestCase::class);
 
@@ -251,9 +258,6 @@ test('two chains warden treats as the same twin are read as the same rule here',
 
     $permission = latestPermission('view');
 
-    // What an engine may hand back on read: the same rule, its maps reordered
-    // at every level. The items list stays exactly where it was: warden
-    // compares lists order-sensitively and maps order-insensitively.
     $permission->update(['options' => [
         'g' => [
             'i' => [['and', ['v' => 2, 'o' => '=', 'c' => 'id', 't' => 'value']]],
