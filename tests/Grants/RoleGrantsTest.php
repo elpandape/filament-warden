@@ -592,6 +592,22 @@ test('an application that vetoes the grant is answered, not argued with', functi
     expect(grantCount())->toBe(0);
 });
 
+test('a veto scoped to one name in the list kills every name grouped with it', function (): void {
+    config()->set('warden.cancellable_events', true);
+
+    Event::listen(GrantingPermission::class, static fn (GrantingPermission $event): bool => ! in_array('view', $event->permissions, true));
+
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    RoleGrants::apply($role, $catalog, [Post::class => [
+        'viewAny' => 'granted',
+        'view' => 'granted',
+    ]]);
+
+    expect(grantCount())->toBe(0);
+});
+
 test('the whole grid is written inside one transaction', function (): void {
     $levels = [];
     $outside = DB::transactionLevel();

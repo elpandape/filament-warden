@@ -2,15 +2,19 @@
 
 declare(strict_types=1);
 
+use Composer\InstalledVersions;
 use ElPandaPe\FilamentWarden\Grants\Assignment;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Checks\Resolvers\CacheKeyVersioner;
 use ElPandaPe\Warden\Context;
+use ElPandaPe\Warden\Events\RoleAssigned;
 use ElPandaPe\Warden\Facades\Warden;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 
 /**
  * `apply()`'s own `isElsewhere()` guard is not the only thing standing between
@@ -651,4 +655,34 @@ test('byKey() answers every option-disabling check from one roles read', functio
 
     expect($keys)->toHaveCount(5)
         ->and($reads)->toBeLessThanOrEqual(2);
+});
+
+test('the apply() transaction opens on warden own connection, not the default one', function (): void {
+    config()->set('database.connections.warden_write', [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
+    ]);
+    config()->set('warden.connection', 'warden_write');
+    Context::resolve()->setConnection('warden_write');
+
+    $installPath = InstalledVersions::getInstallPath('elpandape/warden');
+
+    /** @var Migration $migration */
+    $migration = require $installPath.'/database/migrations/create_warden_tables.php.stub';
+    $migration->up(); // @phpstan-ignore method.notFound
+
+    signInAsHandOut();
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Event::listen(RoleAssigned::class, static function (): void {
+        throw new RuntimeException('interrupted mid-assign, on purpose');
+    });
+
+    expect(static function () use ($account, $role): void {
+        Assignment::apply($account, [roleKey($role)]);
+    })->toThrow(RuntimeException::class)
+        ->and(assignmentCount())->toBe(0);
 });
