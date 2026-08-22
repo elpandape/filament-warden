@@ -10,6 +10,7 @@ use Carbon\Laravel\ServiceProvider as CarbonServiceProvider;
 use Composer\InstalledVersions;
 use ElPandaPe\FilamentWarden\Conditions\Columns;
 use ElPandaPe\FilamentWarden\FilamentWardenServiceProvider;
+use ElPandaPe\FilamentWarden\Grants\Assignment;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Providers\BarePanelProvider;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Providers\LaxPanelProvider;
@@ -60,6 +61,10 @@ abstract class TestCase extends ApplicationTestCase
         // Nothing in Laravel caches a column listing, so the package does it itself.
         // A suite raises a different schema for every case and would read the one before.
         Columns::forget();
+
+        // Same reason, same shape: a suite creates a different set of roles for every
+        // test case and would otherwise read the catalogue one test built before this one.
+        Assignment::forget();
 
         // No request has been through the panel's middleware here, so nothing has told
         // Filament which panel it is serving. Without this every resource resolves against

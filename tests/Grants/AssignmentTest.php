@@ -6,6 +6,7 @@ use ElPandaPe\FilamentWarden\Grants\Assignment;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
+use ElPandaPe\Warden\Checks\Resolvers\CacheKeyVersioner;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Illuminate\Database\Eloquent\Model;
@@ -63,6 +64,28 @@ function assignedRoleReads(): int
 
     foreach (DB::getQueryLog() as $entry) {
         if (str_contains($entry['query'], $table)) {
+            $reads++;
+        }
+    }
+
+    return $reads;
+}
+
+/**
+ * Quoted, and not a bare `str_contains($query, $table)` the way
+ * `assignedRoleReads()` above gets away with: `roles` is a literal substring
+ * of `assigned_roles`, so an unquoted check here would count every assignment
+ * statement as a roles one too. Measured catching itself: an early draft of
+ * this file's cost test used the unquoted form and reported 407 "roles" reads
+ * against a 200-role catalogue where the real number, once memoised, is 2.
+ */
+function roleTableReads(): int
+{
+    $table = Context::resolve()->table('roles');
+    $reads = 0;
+
+    foreach (DB::getQueryLog() as $entry) {
+        if (str_contains($entry['query'], '"'.$table.'"')) {
             $reads++;
         }
     }
@@ -404,6 +427,16 @@ test('give() hands a role out and the store answers for it straight away', funct
         ->and(assignmentCount())->toBe(1);
 });
 
+/**
+ * NOT a guard against a duplicate row — corrected from an earlier draft that
+ * said so. `AssignsRoles::to()` writes through `firstOrCreate()`, and
+ * `Query\Builder::where()` redirects a `null` search value to `whereNull()`,
+ * so the existing unrestricted row is FOUND, never duplicated: this exact
+ * count assertion stays green with `isHeld()` deleted from `give()`'s guard.
+ * The real saving is the next test down: `to()` calls `bumpCacheVersion()`
+ * unconditionally, found row or new one, and `isHeld()` is what keeps a
+ * `give()` on an already-held role from paying for that with nothing to show.
+ */
 test('give() writes nothing for a role already held', function (): void {
     signInAsHandOut();
 
@@ -415,6 +448,22 @@ test('give() writes nothing for a role already held', function (): void {
     Assignment::give($account, roleKey($role));
 
     expect(assignmentCount())->toBe(1);
+});
+
+test('give() does not bump the cache version for a role already held', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::assign($role)->to($account);
+
+    $versioner = app(CacheKeyVersioner::class);
+    $before = $versioner->segment();
+
+    Assignment::give($account, roleKey($role));
+
+    expect($versioner->segment())->toBe($before);
 });
 
 test('give() writes nothing for a role this account may not hand out', function (): void {
@@ -469,6 +518,19 @@ test('take() leaves a restricted assignment alone', function (): void {
     expect(assignmentCount())->toBe(1);
 });
 
+test('take() leaves a role alone this account may not hand out', function (): void {
+    signIn();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::assign($role)->to($account);
+
+    Assignment::take($account, roleKey($role));
+
+    expect(assignmentCount())->toBe(1);
+});
+
 /**
  * The whole reason `give()`/`take()` exist: `apply()` re-derives its answer for
  * every role in the catalogue on every call, none of it memoised, so a screen
@@ -515,4 +577,43 @@ test('give() reads assigned_roles far fewer times than apply() reaching the same
     expect(assignmentCount())->toBe(1)
         ->and($giveReads)->toBeLessThanOrEqual(10)
         ->and($applyReads)->toBeGreaterThan($giveReads);
+});
+
+/**
+ * The cost the earlier ruling that created `give()`/`take()` was supposed to
+ * settle, come back through a different door: `Select::disableOptionWhen()`
+ * evaluates its closure once per option with no memo of its own
+ * (`CanDisableOptions::isOptionDisabled()`), so opening the assign modal on a
+ * 200-role installation called `Assignment::offers()` 200 times, and every one
+ * of those, unmemoised, cost its own `roles` table read through `byKey()`.
+ * Measured mounting the real modal against 200 roles: 202 `roles` reads before
+ * `byKey()` was memoised, 2 after — the two that remain are `options()`'s own
+ * first read and the table's separate pagination count query, neither of
+ * which scales with the catalogue. The cap here is a smaller, exact version of
+ * the same shape: `options()` once plus `offers()` per option costs exactly
+ * one `roles` read, however many options there are.
+ */
+test('byKey() answers every option-disabling check from one roles read', function (): void {
+    signInAsHandOut();
+
+    for ($i = 0; $i < 5; $i++) {
+        makeRole('role-'.$i);
+    }
+
+    $account = makeUser();
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    $keys = array_keys(Assignment::options());
+
+    foreach ($keys as $key) {
+        Assignment::offers($account, $key);
+    }
+
+    $reads = roleTableReads();
+    DB::disableQueryLog();
+
+    expect($keys)->toHaveCount(5)
+        ->and($reads)->toBeLessThanOrEqual(2);
 });

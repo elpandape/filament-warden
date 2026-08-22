@@ -185,8 +185,8 @@ return [
             'protected' => 'You cannot edit this role, so you cannot hand it out either.',
             'restricted' => 'This account holds this role in a context. Taking it back from here would take every context with it, so it is left alone.',
             'elsewhere' => 'This account holds this role outside the tenant you are in. Taking it back from here would delete nothing and still report success, so it is left alone. Switch tenant to change it.',
+            'held_column' => 'Held as',
             'held' => [
-                'column' => 'Held as',
                 'here' => 'Here',
                 'elsewhere' => 'Elsewhere',
                 'restricted' => 'Restricted',

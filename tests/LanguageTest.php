@@ -177,6 +177,46 @@ test('every reason the builder can be locked with has a sentence, in both langua
     }
 });
 
+/**
+ * `relations.roles.held.*` is composed by concatenation —
+ * `__('…relations.roles.held.'.$state)` in `RolesRelationManager::heldAs()`
+ * — which `no line is declared that nothing reads` above cannot see: that
+ * test only checks a key is referenced by some prefix in the source, not that
+ * the SET of values a `match` can actually produce lines up with the SET of
+ * keys declared under it. Renaming `'here'` to anything else inside `heldAs()`
+ * alone would print a raw translation key to a person with every other test
+ * in this file still green. `held_column` is deliberately NOT in this block —
+ * it names the table column, not a state the badge can be in, and mixing it
+ * in here would make this exact map-vs-set comparison fail for an unrelated
+ * reason.
+ */
+test('every way a role can be held has a word, in both languages', function (): void {
+    $manager = (string) file_get_contents(dirname(__DIR__).'/src/Filament/RelationManagers/RolesRelationManager.php');
+
+    // Isolated to `heldAs()`'s own body: the same file's `color()` closure a
+    // few lines below carries its own `'restricted' => 'warning'` arms, and a
+    // pattern reading the whole file would fold colour names into the count.
+    preg_match('/private static function heldAs\(.*?\n    \}/s', $manager, $body);
+    preg_match_all("/=> '([a-z]+)'/", $body[0] ?? '', $matches);
+
+    $states = array_values(array_unique($matches[1]));
+    sort($states);
+
+    foreach (['en', 'es'] as $locale) {
+        $declared = [];
+
+        foreach (array_keys(translations($locale)) as $key) {
+            if (str_starts_with($key, 'relations.roles.held.')) {
+                $declared[] = mb_substr($key, mb_strlen('relations.roles.held.'));
+            }
+        }
+
+        sort($declared);
+
+        expect($declared)->toBe($states, "[{$locale}] the held-as map and heldAs() have drifted");
+    }
+});
+
 test('no line fakes a plural with a parenthesis', function (): void {
     foreach (['en', 'es'] as $locale) {
         foreach (translations($locale) as $key => $line) {

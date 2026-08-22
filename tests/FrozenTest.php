@@ -316,7 +316,7 @@ test('the translation keys an application overrides are frozen', function (): vo
         'relations.roles.protected',
         'relations.roles.restricted',
         'relations.roles.elsewhere',
-        'relations.roles.held.column',
+        'relations.roles.held_column',
         'relations.roles.held.here',
         'relations.roles.held.elsewhere',
         'relations.roles.held.restricted',

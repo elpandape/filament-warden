@@ -51,19 +51,28 @@ class RolesRelationManager extends RelationManager
      * this is unset — `null::getParentResourceRegistration()` with no
      * `$relatedResource` either, a fatal error and not a `null` a `??` could
      * catch (`InteractsWithRelationshipTable.php:63-70`). CORRECTED against
-     * this exact class, though: with `$relatedResource` declared below AND
-     * `getTitle()` overridden further down, `getRelationshipName()` is never
-     * actually called anywhere in this class's own render or action path —
-     * measured by removing this property outright: all twelve tests in
-     * `RolesRelationManagerTest.php`, including the ones that render the full
-     * table and run both actions, stayed green, and `stan` stayed clean too.
-     * `getRelationship()`'s lazy closure, set by the base `makeTable()`, is
-     * overwritten by `->relationship(null)` in `table()` below before it is
-     * ever evaluated, and `canViewForRecord()`'s branch that would call it is
-     * the one `$relatedResource` skips (§ below). Kept anyway: it is the
-     * contract `RelationManager` documents, a subclass — this one is
-     * deliberately not `final` — may lean on inherited behaviour this class
-     * does not exercise, and Filament's own scaffold expects it declared.
+     * this exact class, though: with `$relatedResource` declared below,
+     * `getRelationshipName()` is never actually called anywhere in this
+     * class's own render or action path — measured by removing this property
+     * outright: all fourteen tests in `RolesRelationManagerTest.php`,
+     * including the ones that render the full table and run both actions,
+     * stayed green, and `stan` stayed clean too. `getRelationship()`'s lazy
+     * closure, set by the base `makeTable()`, is overwritten by
+     * `->relationship(null)` in `table()` below before it is ever evaluated,
+     * and `canViewForRecord()`'s branch that would call it is the one
+     * `$relatedResource` skips on its own (§ below) — `getTitle()`, overridden
+     * further down for an unrelated reason, plays no part in this: its own
+     * base implementation would fall to `getRelationshipTitle()`, which
+     * returns at the SAME `$relatedResource` check before it could ever reach
+     * `getRelationshipName()` either.
+     *
+     * Kept anyway, but not because a silent fallback would be safe if some
+     * future subclass relied on it — it would not: the behaviour it would
+     * reactivate is `getRelationship()` → `$ownerRecord->roles()`, warden's
+     * `MorphToMany` with `applyPivotTenancy()` welded on, which is precisely
+     * what `->relationship(null)` exists to avoid (§ below again). The real
+     * reason is plainer: this is the property Filament's own scaffold expects
+     * declared, and the documented contract of the base class this extends.
      */
     protected static string $relationship = 'roles';
 
@@ -74,6 +83,11 @@ class RolesRelationManager extends RelationManager
      * tab closes with this package's own `RolePolicy`, registered by
      * `FilamentWardenServiceProvider`, and never depends on how a consuming
      * application happens to have named that relation.
+     *
+     * Pinned — removing this raises `BadMethodCallException` calling
+     * `$post->roles()` on a `Post` fixture in
+     * `RolesRelationManagerTest.php`'s "canViewForRecord() closes with the
+     * packaged Policy" test, confirmed by deleting this line and running it.
      */
     protected static ?string $relatedResource = RoleResource::class;
 
@@ -119,7 +133,7 @@ class RolesRelationManager extends RelationManager
                 // have, and the error would surface on click, not on build
                 // (AGENTS.md §6.17).
                 TextColumn::make('held_as')
-                    ->label(__('filament-warden::ui.relations.roles.held.column'))
+                    ->label(__('filament-warden::ui.relations.roles.held_column'))
                     ->badge()
                     ->state(static fn (Model $record): string => self::heldAs($account, $record))
                     ->formatStateUsing(static fn (string $state): string => __('filament-warden::ui.relations.roles.held.'.$state))
@@ -164,17 +178,35 @@ class RolesRelationManager extends RelationManager
     /**
      * The header action: pick a role, hand it out.
      *
-     * Closed with `->visible()` and never `->authorize()`, which resolves
-     * through `Gate::check()` and is invisible to `strictAuthorization()`
-     * (AGENTS.md §6.2, §6.18). "Asigning" and "retracting" are not abilities any
-     * policy declares — they are the compound judgement `Assignment::offers()`
-     * already makes — so a policy has nothing to be asked here.
+     * NOT closed with `->visible()` — CORRECTED, an earlier docblock here
+     * claimed one that was never written. There is no single record to check
+     * at this level the way `retractAction()` has one: this button always
+     * opens the modal, and the tab itself is already closed by
+     * `canViewForRecord()` (§ the class docblock) before this action is ever
+     * reachable at all. What actually closes each OPTION inside the modal is
+     * two layers: `disableOptionWhen()`, which is UX only — a crafted
+     * non-option value still clears the `Select`'s own validation, proved in
+     * `RolesRelationManagerTest.php` — and `Assignment::give()`'s own
+     * `offers()` re-check, which is the real, sole server-side guard and must
+     * not be removed on the grounds that this screen already checks. Never
+     * `->authorize()` either, which resolves through `Gate::check()` and is
+     * invisible to `strictAuthorization()` (AGENTS.md §6.2, §6.18): "assigning"
+     * and "retracting" are not abilities any policy declares — they are the
+     * compound judgement `Assignment::offers()` already makes — so a policy
+     * has nothing to be asked here.
      *
      * The `Select` has no `->descriptions()`: unlike `CheckboxList`, which
      * `RoleAssignment` uses and which does carry that method, `Select` does not
      * implement `Concerns\HasDescriptions` at all — calling it would be a fatal
      * error, not a missing hint. `disableOptionWhen()` is what this screen has,
      * and what it had to rest on.
+     *
+     * The notification only fires when `give()` reports it actually wrote
+     * something: `offers()` does not exclude a role the account already
+     * holds, so without this check selecting an already-held role would
+     * report success for a no-op — the "reports success while writing
+     * nothing" shape this package built `Shape::Elsewhere` to stop drawing
+     * elsewhere in the product.
      */
     private function assignAction(Model $account): Action
     {
@@ -202,7 +234,9 @@ class RolesRelationManager extends RelationManager
                 // field does (AGENTS.md §6.11, §6.18), so the guarantee over
                 // who may hand out a role cannot rest on how the `Select` was
                 // drawn.
-                Assignment::give($account, $role);
+                if (! Assignment::give($account, $role)) {
+                    return;
+                }
 
                 Notification::make()
                     ->title(__('filament-warden::ui.relations.roles.assign.notified'))

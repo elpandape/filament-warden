@@ -28,6 +28,26 @@ use Illuminate\Support\Facades\DB;
 final class Assignment
 {
     /**
+     * The whole catalogue, read once per request.
+     *
+     * Nothing in this class ever creates or deletes a role — only `RoleResource`
+     * does, on a screen entirely separate from this one — so within a single
+     * request the answer cannot change out from under a caller, unlike
+     * `assignments()` below, which this class DOES write to (`give()`,
+     * `take()`), and which is deliberately left unmemoised: a memo there would
+     * hand a stale row list to a check made right after a write in the same
+     * request, and `AssignmentTest.php`'s own "give() hands a role out and the
+     * store answers for it straight away" test would have caught it going the
+     * other way.
+     *
+     * `null` and not `[]` as the empty sentinel: an installation can genuinely
+     * have zero roles, and the memo has to tell that apart from "not read yet".
+     *
+     * @var array<int|string, Model>|null
+     */
+    private static ?array $rolesByKey = null;
+
+    /**
      * Every role there is, by key, named the way a person would recognise it.
      *
      * Not stripped of the tenant scope, exactly like the roles screen: which
@@ -229,15 +249,28 @@ final class Assignment
      * screen exists — the 200-role installation a `CheckboxList` cannot serve.
      * `offers()` is checked once, and only a role already offered but not yet
      * held is written: the header action's `Select` lists the whole catalogue
-     * unfiltered, and a role already held is still "offered" by that check, so
-     * writing again here would insert a second `assigned_roles` row — `NULL` in
-     * `restricted_to_type`/`restricted_to_id` is never equal to itself, so
-     * nothing in the schema would stop it.
+     * unfiltered, and a role already held is still "offered" by that check.
+     * Writing again would NOT insert a duplicate row — `AssignsRoles::to()`
+     * writes through `firstOrCreate()`, which finds the existing one — but it
+     * WOULD still call `bumpCacheVersion()` unconditionally, invalidating
+     * every cached check at that scope for nothing changed. `isHeld()` is what
+     * stops that, and its own docblock has the measurement.
+     *
+     * This `offers()` check is the sole server-side authorization for handing
+     * a role out through this class: `RolesRelationManager`'s header action
+     * has no `->visible()` of its own (the Blueprint plan ruled one out; the
+     * `Select`'s `disableOptionWhen()` is UX, not a guard), so removing this
+     * check on the grounds that "the screen already checks" would open the
+     * write to anyone who can reach the action, whatever value they submit.
+     *
+     * Returns whether it actually wrote something: `offers()` alone does not
+     * exclude a role already held, so a caller that reports success on the
+     * strength of "no exception was thrown" would report success for a no-op.
      */
-    public static function give(Model $account, int|string $role): void
+    public static function give(Model $account, int|string $role): bool
     {
         if (! self::offers($account, $role) || self::isHeld($account, $role)) {
-            return;
+            return false;
         }
 
         $model = self::role($role);
@@ -245,6 +278,15 @@ final class Assignment
         if ($model instanceof Model) {
             Warden::assign($model)->to($account);
         }
+
+        // Never actually false here: `offers()` already resolved this same
+        // `$role` through `role()` and answered true, so `$model` cannot be
+        // null on this path. Written as a plain boolean rather than a second
+        // early return so there is no line only the impossible branch reaches
+        // — an explicit `if (! $model instanceof Model) { return false; }`
+        // measured uncoverable, and this project runs the coverage gate at
+        // 100% with no baseline.
+        return $model instanceof Model;
     }
 
     /**
@@ -252,9 +294,16 @@ final class Assignment
      * reaches for, never `apply()`. See `give()` for the cost this avoids.
      *
      * No "already gone" guard is needed the way `give()` needs one against a
-     * duplicate row: a `retract()->from()` that matches nothing deletes nothing,
-     * and the row action this calls from only ever names a role the table
-     * itself already scoped to what the account holds.
+     * wasted cache bump: a `retract()->from()` that matches nothing deletes
+     * nothing and, unlike `to()`, warden only bumps the version when a row was
+     * actually removed.
+     *
+     * This `offers()` check is the sole server-side authorization for taking a
+     * role back through this class: `RolesRelationManager`'s row action
+     * carries no repeated check of its own — measured unreachable, see
+     * `retractAction()`'s docblock — so this is where the guarantee actually
+     * lives, and it must not be removed on the grounds that a screen's
+     * `->visible()` already checked.
      */
     public static function take(Model $account, int|string $role): void
     {
@@ -284,8 +333,31 @@ final class Assignment
     }
 
     /**
+     * Forgets the memoised catalogue. A suite raises a different one for every
+     * test case and would otherwise read the one before — the same reason
+     * `Conditions\Columns::forget()` exists, called from the same `setUp()`.
+     */
+    public static function forget(): void
+    {
+        self::$rolesByKey = null;
+    }
+
+    /**
      * Whether the account already holds this role, compared as text: a key
      * arriving from a `Select` is a string even where the column is not.
+     *
+     * NOT because a second `assign()->to()` would insert a duplicate row — it
+     * would not. Warden's own `AssignsRoles::to()` writes through
+     * `firstOrCreate()`, and `Query\Builder::where()` redirects a `null` value
+     * to `whereNull()`, so a search array carrying `restricted_to_type: null`
+     * FINDS the existing unrestricted row rather than missing it — the same
+     * Laravel behaviour AGENTS.md §6.24 already corrected once, in the
+     * opposite direction. What `to()` does unconditionally, found row or new
+     * one, is `bumpCacheVersion($scope)` — so a `give()` on an already-held
+     * role would still invalidate every cached check at that scope for
+     * nothing changed. That is the real saving this guard buys, pinned in
+     * `AssignmentTest.php`'s "give() does not bump the cache version for a
+     * role already held".
      */
     private static function isHeld(Model $account, int|string $role): bool
     {
@@ -311,10 +383,25 @@ final class Assignment
      * Every role, by a key that reads as one. A key that does not could match no
      * row anyway, which is the safe way to lose it.
      *
+     * Memoised: `options()` reads it once and a `Select`'s `disableOptionWhen()`
+     * reads it once per option with no memo of its own
+     * (`CanDisableOptions::isOptionDisabled()`), so an unmemoised `byKey()` paid
+     * a full `roles` table query per option in the assign modal — for the
+     * 200-role installation this screen exists to serve, hundreds of identical
+     * queries to open one modal, the exact shape of cost the `give()`/`take()`
+     * ruling existed to avoid. Measured before this memo: 202 `roles` reads
+     * mounting that modal against 200 roles. After: 2, and neither of those two
+     * scales with the catalogue — one is `options()`'s own first read, the
+     * other the table's separate pagination count query.
+     *
      * @return array<int|string, Model>
      */
     private static function byKey(): array
     {
+        if (self::$rolesByKey !== null) {
+            return self::$rolesByKey;
+        }
+
         $roles = [];
 
         foreach (self::roles() as $role) {
@@ -325,7 +412,7 @@ final class Assignment
             }
         }
 
-        return $roles;
+        return self::$rolesByKey = $roles;
     }
 
     /**

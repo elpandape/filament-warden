@@ -191,13 +191,58 @@ test('assigning through the header action writes one row the store honours at on
         ->mountTableAction('assign')
         ->setTableActionData(['role' => recordKey($role)])
         ->callMountedTableAction()
-        ->assertHasNoTableActionErrors();
+        ->assertHasNoTableActionErrors()
+        ->assertNotified();
 
     expect(Assignment::of($account))->toBe([heldKey($role)])
         ->and(Access::granted($account, 'viewAny', Post::class))->toBeTrue();
 });
 
-test('assigning a role nobody may hand out through the header action writes nothing', function (): void {
+/**
+ * `Assignment::offers()` does not exclude a role already held — only
+ * `isHeld()` does, inside `give()` — so without checking `give()`'s return
+ * value here the screen would report success for a write that never
+ * happened. Confirmed by reverting the `if (! Assignment::give(...))` guard
+ * to an unconditional call: this test's `assertNotNotified()` went red while
+ * every other test in this file stayed green, which is what "reachable"
+ * means here and "the retract side is not" (see `retractAction()`'s
+ * docblock) does not.
+ */
+test('assigning a role the account already holds notifies nothing', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::assign($role)->to($account);
+
+    livewire(RolesRelationManager::class, [
+        'ownerRecord' => $account,
+        'pageClass' => EditRole::class,
+    ])
+        ->mountTableAction('assign')
+        ->setTableActionData(['role' => recordKey($role)])
+        ->callMountedTableAction()
+        ->assertHasNoTableActionErrors()
+        ->assertNotNotified();
+
+    expect(Assignment::of($account))->toBe([heldKey($role)]);
+});
+
+/**
+ * NOT a test of `give()`'s own guard — corrected from an earlier draft that
+ * named it as one. `disableOptionWhen()` is exactly `! Assignment::offers()`,
+ * so any value that fails `give()`'s check is also a value the `Select`'s
+ * `in:` rule already rejects (`Select::getInValidationRuleValues()` restricts
+ * to `getEnabledOptions()`, computed fresh at validation time from the same
+ * closure): no value can clear the form and still reach `give()`'s guard by
+ * this route. Confirmed by deleting `give()`'s `! self::offers(...)` clause —
+ * this test stayed green, because the form never let the value through in the
+ * first place. `Assignment::give() writes nothing for a role this account may
+ * not hand out` in `AssignmentTest.php` calls `give()` directly and is what
+ * actually pins that guard.
+ */
+test('the in: rule keeps an unofferable role out of the header action form', function (): void {
     signIn();
     Warden::allow(signedIn())->to('viewAny', roleClass());
 
@@ -210,7 +255,8 @@ test('assigning a role nobody may hand out through the header action writes noth
     ])
         ->mountTableAction('assign')
         ->setTableActionData(['role' => recordKey($role)])
-        ->callMountedTableAction();
+        ->callMountedTableAction()
+        ->assertHasTableActionErrors();
 
     expect(Assignment::of($account))->toBeEmpty();
 });
@@ -323,4 +369,23 @@ test('an owner record with no roles() relation of its own still renders', functi
     ])
         ->assertCountTableRecords(0)
         ->assertOk();
+});
+
+/**
+ * `$relatedResource` — not `$relationship`, and this is the one that carries
+ * the actual security property — is unpinned without this. `canViewForRecord()`
+ * takes its `$relatedResource::canAccess()` branch and never touches
+ * `$ownerRecord`'s own relation at all, so this passes even for `Post`, which
+ * declares no `roles()` method: `RolePolicy` is what decided it, not a guess
+ * at an unrelated model's relation. Without `$relatedResource`, the fallback
+ * branch runs `$ownerRecord->roles()`, and `Post` has no such method — a
+ * `BadMethodCallException`, confirmed by removing the property and running
+ * this exact assertion.
+ */
+test('canViewForRecord() closes with the packaged Policy, not a guess at an unrelated relation', function (): void {
+    signInAsRoleManager();
+
+    $post = Post::query()->create(['title' => 'Not an authority']);
+
+    expect(RolesRelationManager::canViewForRecord($post, EditRole::class))->toBeTrue();
 });
