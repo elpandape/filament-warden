@@ -52,12 +52,22 @@ included* below.
 
 ### Not included
 
-- **One capability does go, narrowly.** Before this release, flipping a stance would normalise a
-  mis-typed stored value as a side effect — the very repair `1.3.0` already refused to make from
-  the permission form, on purpose, because it only ever widened what a rule matched. That accidental
-  path is closed: since `1.3.0` locked those rows on the permission form and this release stops the
-  grid from touching them either, no screen in the package can still rewrite such a row. Only
-  warden's own fluent API can.
+- **One capability does go, narrowly — and only for a stance-only flip.** Before this release,
+  flipping a stance with the condition payload otherwise byte-identical would normalise a mis-typed
+  stored value as a side effect — the very repair `1.3.0` already refused to make from the
+  permission form, on purpose, because it only ever widened what a rule matched. That accidental
+  path is closed for exactly that case: since `1.3.0` locked those rows on the permission form and
+  this release stops a bare stance flip from touching them either, no click that changes nothing
+  but the stance can still rewrite such a row. Warden's own fluent API can. So can this screen, one
+  other way — see the next bullet.
+- **Editing any other line of the same cell still re-casts a mis-typed line it never touched.**
+  `RoleGrants::changes()` decides whether a cell moved once, for the whole cell, not per line: the
+  moment a person adds a rule, drops one, or edits a different column in a multi-line condition,
+  `$wanted` is rebuilt in full from the browser's payload through `Narrowing::fromPayload()` →
+  `Value::cast()`, and the untouched-but-mistyped line is re-cast right along with the one that
+  changed. Same silent retyping this release exists to stop, reached through a different door: an
+  edit instead of a bare flip. Pre-existing, not introduced here, and deferred — per-line
+  conservation inside one cell is a design question this release does not answer.
 - **A rule whose first line reads `or` still comes back as `and` on rewrite, and this release does
   not touch that.** It is a different, lighter hazard: `Group::passes()`
   (`vendor/elpandape/warden/src/Constraints/Group.php:34-35`) ignores the first item's own logic on
