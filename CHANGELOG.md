@@ -48,7 +48,8 @@ from warden's own fluent API.
   that value, sourced from one place (`Conditions\Words::all()`) so neither can drift from the
   other. Wiring the inspector's half (`DrawsThePermissionGrid::narrowingFor()`) was outside this
   fix's own file list; without it, the cell inspector would have shipped calling `.includes()` on
-  `undefined` for every role's condition, breaking the screen the warning exists to serve.
+  `undefined` the moment any rule row compared a column against the literal `'true'` or `'false'`,
+  breaking that row of the screen the warning exists to serve.
 - **Unticking a role assigned outside the tenant you were viewing from deleted nothing, reported
   success, and came back ticked on reload.** `Assignment::of()` reads under warden's tenant scope,
   which with a tenant active answers *global or this tenant* — so a globally assigned role shows as
@@ -69,24 +70,26 @@ from warden's own fluent API.
 
 ### Added
 
-- **An eighth `make ci` gate, `helpers`.** A duplicate name among the suite's 64 unnamespaced global
+- **An eighth `make ci` gate, `helpers`.** A duplicate name among the suite's unnamespaced global
   test helpers is a fatal at PHP's load phase, confirmed by deliberately declaring one:
   `Cannot redeclare function stylesheet() (previously declared in /app/tests/PackageTest.php:24)`,
   thrown before a single test runs. No test inside Pest can catch a failure that happens before
   Pest starts, so this check runs on the host, outside Docker, as a `grep`/`sort`/`uniq -d` pass
-  over `tests/*.php` — not PHP execution, so it does not need the container.
+  over `tests/*.php` — not PHP execution, so it does not need the container. (Not counted here on
+  purpose: the tally moves every time anybody adds one — `1.2.0`'s own entry below already dates
+  its count to the tree it measured, and two tasks inside this very release added a helper each.)
 - **Five new keys** (`en` and `es`; the flattened translation list moves `185 → 190`, both locales
   identical): `conditions.boolean`, `conditions.locked.model`, `conditions.locked.column`,
   `conditions.locked.rewrite`, `relations.roles.elsewhere`.
 
 ### Not included
 
-- **The `Catalog` and `Holders` memo, and with it the query budget of these screens** — the tag
-  "Que no cueste," today `1.5.0`. This release makes a measured cost *worse*, on purpose, and caps
-  it with a test instead of fixing it: `Assignment::descriptions()` now asks two things per role
-  instead of one, 5 reads measured for two held roles against a ceiling of 8.
-- **The relation manager for handing roles out from the account screen** — the tag "Repartir desde
-  la cuenta," today `1.4.0`. `RoleAssignment`'s own checkbox field is what this release touched.
+- **The `Catalog` and `Holders` memo, and with it the query budget of these screens.** Deferred to
+  `1.5.0`. This release makes a measured cost *worse*, on purpose, and caps it with a test instead
+  of fixing it: `Assignment::descriptions()` now asks two things per role instead of one, 5 reads
+  measured for two held roles against a ceiling of 8.
+- **The relation manager for handing roles out from the account screen.** Deferred to `1.4.0`.
+  `RoleAssignment`'s own checkbox field is what this release touched.
 - **`conditions.locked.model` has no test asserting it is ever actually displayed.**
   `PermissionForm::conditionsHelp()`'s earlier `no_model` guard checks the *live form's* current
   `entity_type` before `lockedReason()` ever runs, so that branch is reachable today only through
