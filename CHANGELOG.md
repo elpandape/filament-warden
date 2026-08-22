@@ -8,6 +8,49 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [1.3.1] - 2026-08-22
+
+Found by opening a browser, not by the suite: the condition builder has never worked in any
+installation of this package, on any version, since the screen it lives on shipped.
+
+### Fixed
+
+- **The condition builder drew nothing, in every browser, on every version since `0.6.0`.**
+  Opening a permission with a stored condition — or any permission with a model behind it at
+  all — drew zero rule lines and threw seven console errors, the last of which killed the whole
+  Alpine component before it could construct itself: `$entangle is not defined`, then `clauses`,
+  `interactive`, `source`, `rules`, `preview`. Two templates start the same
+  `wardenPermissionGrid(...)` component the same way. `grid.blade.php` composes its binding as
+  `$wire.$entangle('{path}')` — the form Livewire still supports for reaching a component's own
+  state from inside `x-data` — and `condition-builder.blade.php` entangled bare:
+  `$entangle('{path}')`, with no `$wire.` in front of it. A bare `$entangle(...)` is not a magic
+  Alpine resolves on its own; it is a directive Livewire's own `wire:` bindings register, invisible
+  to a plain `x-data` expression. `condition-builder.blade.php` now composes the same `$binding`
+  the grid does, the same shape, so the two templates read alike. Confirmed against a real
+  installation, both before the fix (`localhost/admin/security/permissions/{id}/edit`, zero rule
+  lines, seven console errors) and after (rules drawn, no errors), and reproduced by downgrading
+  that same installation to `1.2.0`: identical failure — **this is not a `1.3.0` regression**, it
+  is as old as the field itself. `git log --follow` puts the first version of
+  `condition-builder.blade.php`, bare `$entangle` and all, at the commit that shipped it —
+  first released in `0.6.0`.
+- **Why no gate caught it, across five minor versions.** `PermissionGridTest.php:195` already
+  asserts `->assertSee('$wire.$entangle(', escape: false)` for the grid — the exact string
+  this defect was missing. Nothing in the suite made the equivalent assertion for the builder:
+  `grep -rn "condition-builder\|entangle" tests/` returned only the grid's own lines. The package
+  had already written the correct check once and never pointed it at the second screen that needed
+  it. A new test, `ConditionBuilderTest.php`'s *"the state travels to the browser wire-scoped,
+  exactly as the grid does"*, pins the builder's half the same way; it mounts the field through a
+  real Livewire round trip (`ConditionHost`, the same pattern `GridHost` already uses for the
+  grid) and asserts the rendered `x-data` carries `$wire.$entangle(`. Verified red against the
+  unfixed template before this fix landed: `assertStringContainsString` failed, reporting the
+  bare-entangled `x-data` markup with no `$wire.$entangle(` anywhere in it.
+- **The consequence for `1.3.0` specifically: its own boolean-misfit warning could not be seen at
+  all.** That release added `x-show="booleanMisfit(rule)"` to warn when a condition compares
+  `true`/`false` against a column the model does not cast to boolean (see `1.3.0`'s own entry
+  above) — Alpine markup, inside the same component this defect kept from ever mounting. The PHP
+  side of that guarantee was real and tested; the half a person was meant to see in a browser
+  never rendered, on any installation, until this release.
+
 ## [1.3.0] - 2026-08-22
 
 `1.0.2` stopped the screen *writing* the wrong thing. `1.1.0` stopped it *saying* the wrong thing.
