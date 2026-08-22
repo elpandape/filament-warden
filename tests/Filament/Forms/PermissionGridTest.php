@@ -424,11 +424,17 @@ test('the browser is told what a condition on this cell could be built from', fu
 
 test('the cell inspector gets the same boolean list a condition may compare, never undefined', function (): void {
     $role = makeRole();
+    $door = 'page:'.Reports::class;
 
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
         ->call('callSchemaComponentMethod', 'form.permissions', 'narrowingFor', [roleClass(), 'update'])
         ->assertReturned(fn (array $narrowing): bool => array_key_exists('booleans', $narrowing)
             && is_array($narrowing['booleans']));
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'narrowingFor', [$door, StateKey::DOOR])
+        ->assertReturned(fn (array $narrowing): bool => array_key_exists('booleans', $narrowing)
+            && $narrowing['booleans'] === []);
 });
 
 test('a door has no model, so it is told why it can hold no condition', function (): void {
