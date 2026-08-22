@@ -72,6 +72,7 @@ test('a model that casts nothing to boolean answers with an empty list', functio
 test('the columns and the booleans of one model cost one look at the schema', function (): void {
     Columns::forget();
 
+    DB::flushQueryLog();
     DB::enableQueryLog();
     Columns::of(Post::class);
     Columns::booleans(Post::class);
