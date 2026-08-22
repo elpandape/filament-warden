@@ -14,6 +14,14 @@ use Illuminate\Database\Eloquent\Model;
 
 use function Pest\Livewire\livewire;
 
+/**
+ * `PermissionForm::sameRule()`/`ordered()` is a second copy of warden's own
+ * `ElPandaPe\Warden\Actions\GrantsPermissions::optionsMatch()`/`normalizedOptions()`
+ * — private there, so copied here rather than reused. The twin-reuse pin below
+ * asks the same question warden asks when it decides two rows are the same
+ * twin, so a drift between the two comparisons shows up as a real
+ * disagreement rather than a re-statement of the copy's own source.
+ */
 pest()->extend(TestCase::class);
 
 function signInToEditPermissions(): void
@@ -232,4 +240,35 @@ test('a rule that locks every name says nothing about holders either', function 
     livewire(EditPermission::class, ['record' => narrowedRow('export')->getKey()])
         ->assertFormFieldDisabled('name')
         ->assertDontSee('Somebody holds this row');
+});
+
+test('two chains warden treats as the same twin are read as the same rule here', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    Warden::allow(makeRole('one'))->to('view', Post::class)->where('id', '=', 2);
+
+    $permission = latestPermission('view');
+
+    // What an engine may hand back on read: the same rule, its maps reordered
+    // at every level. The items list stays exactly where it was: warden
+    // compares lists order-sensitively and maps order-insensitively.
+    $permission->update(['options' => [
+        'g' => [
+            'i' => [['and', ['v' => 2, 'o' => '=', 'c' => 'id', 't' => 'value']]],
+            't' => 'group',
+        ],
+        'v' => 1,
+    ]]);
+
+    Warden::allow(makeRole('two'))->to('view', Post::class)->where('id', '=', 2);
+
+    expect(permissionClass()::query()->withoutGlobalScopes()
+        ->where('name', 'view')
+        ->where('entity_type', new Post()->getMorphClass())
+        ->count())->toBe(1);
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->assertDontSee(__('filament-warden::ui.conditions.locked.rewrite'));
 });
