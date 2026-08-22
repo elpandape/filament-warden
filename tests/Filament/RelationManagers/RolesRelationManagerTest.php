@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Filament\RelationManagers\RolesRelationManager;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\EditRole;
+use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ViewRole;
 use ElPandaPe\FilamentWarden\Grants\Assignment;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
@@ -427,4 +428,113 @@ test('canViewForRecord() closes with the packaged Policy, not a guess at an unre
     $post = Post::query()->create(['title' => 'Not an authority']);
 
     expect(RolesRelationManager::canViewForRecord($post, EditRole::class))->toBeTrue();
+});
+
+/**
+ * `ViewRecord`'s gate, and it is a DIFFERENT one from every other test above:
+ * `isReadOnly()`, not `Assignment::offers()`. `->call('mountAction', …, ['table'
+ * => true, 'recordKey' => …])` then `->call('callMountedAction', [])` are used
+ * throughout, never `callAction()` — §6.16 measured that `callAction()`'s test
+ * helper checks visibility BEFORE calling, so a test written with it proves the
+ * button is hidden and never that the server refuses. `assertTableActionHidden()`
+ * is used for the same reason `assertTableActionDoesNotExist()` is not (§6.23):
+ * the second swallows `ActionNotResolvableException` and calls that success,
+ * so it cannot tell "absent" from "unresolvable".
+ *
+ * Both closures repeat `! isReadOnly()` on top of `->visible()` — "the two
+ * things, not one" the brief for this task asks for — but measured the same
+ * way Task 2 measured `retractAction()`'s `self::offered()` repeat: a thrown
+ * exception planted at the top of each closure, mounted and called on
+ * `ViewRole::class`, never surfaced. `isDisabled()` (fed by the SAME
+ * `->visible()` closure) already blocks `mountAction()`/`callMountedAction()`
+ * before either closure runs, so the repeated line cannot be shown to
+ * discriminate through this screen's own wiring — kept as defence in depth
+ * regardless, documented in place on each action.
+ *
+ * The record resolves fine on `ViewRole` in every test below — the account
+ * still holds the role, `Assignment::of($account)` still finds it, nothing
+ * here relies on Task 2's OTHER finding (a role that cannot resolve throws
+ * before the closure for an unrelated reason). What closes these four cases
+ * is `isReadOnly()` alone, and Step 4 below breaks exactly that to prove it.
+ */
+test('on ViewRecord the assign action is hidden and a raw call writes nothing', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    $test = livewire(RolesRelationManager::class, [
+        'ownerRecord' => $account,
+        'pageClass' => ViewRole::class,
+    ]);
+
+    $test->assertTableActionHidden('assign');
+
+    $test->call('mountAction', 'assign', [], ['table' => true]);
+    $test->set('mountedActions.0.data.role', recordKey($role));
+    $test->call('callMountedAction', []);
+
+    expect(Assignment::of($account))->toBeEmpty();
+});
+
+test('off ViewRecord the assign action is visible and a raw call writes one row', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    $test = livewire(RolesRelationManager::class, [
+        'ownerRecord' => $account,
+        'pageClass' => EditRole::class,
+    ]);
+
+    $test->assertTableActionVisible('assign');
+
+    $test->call('mountAction', 'assign', [], ['table' => true]);
+    $test->set('mountedActions.0.data.role', recordKey($role));
+    $test->call('callMountedAction', []);
+
+    expect(Assignment::of($account))->toBe([heldKey($role)]);
+});
+
+test('on ViewRecord the retract action is hidden and a raw call writes nothing', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::assign($role)->to($account);
+
+    $test = livewire(RolesRelationManager::class, [
+        'ownerRecord' => $account,
+        'pageClass' => ViewRole::class,
+    ]);
+
+    $test->assertTableActionHidden('retract', $role);
+
+    $test->call('mountAction', 'retract', [], ['table' => true, 'recordKey' => recordKey($role)]);
+    $test->call('callMountedAction', []);
+
+    expect(Assignment::of($account))->toBe([heldKey($role)]);
+});
+
+test('off ViewRecord the retract action is visible and a raw call retracts it', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::assign($role)->to($account);
+
+    $test = livewire(RolesRelationManager::class, [
+        'ownerRecord' => $account,
+        'pageClass' => EditRole::class,
+    ]);
+
+    $test->assertTableActionVisible('retract', $role);
+
+    $test->call('mountAction', 'retract', [], ['table' => true, 'recordKey' => recordKey($role)]);
+    $test->call('callMountedAction', []);
+
+    expect(Assignment::of($account))->toBeEmpty();
 });

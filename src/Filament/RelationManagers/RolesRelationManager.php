@@ -168,7 +168,7 @@ class RolesRelationManager extends RelationManager
         };
     }
 
-    private static function offered(Model $account, Model $record): bool
+    private function offered(Model $account, Model $record): bool
     {
         $key = $record->getKey();
 
@@ -178,20 +178,19 @@ class RolesRelationManager extends RelationManager
     /**
      * The header action: pick a role, hand it out.
      *
-     * NOT closed with `->visible()` — CORRECTED, an earlier docblock here
-     * claimed one that was never written. There is no single record to check
-     * at this level the way `retractAction()` has one: this button always
-     * opens the modal, and the tab itself is already closed by
-     * `canViewForRecord()` (§ the class docblock) before this action is ever
-     * reachable at all. What actually closes each OPTION inside the modal is
-     * two layers: `disableOptionWhen()`, which is UX only — a crafted
-     * non-option value still clears the `Select`'s own validation, proved in
-     * `RolesRelationManagerTest.php` — and `Assignment::give()`'s own
-     * `offers()` re-check, which is the real, sole server-side guard and must
-     * not be removed on the grounds that this screen already checks. Never
-     * `->authorize()` either, which resolves through `Gate::check()` and is
-     * invisible to `strictAuthorization()` (AGENTS.md §6.2, §6.18): "assigning"
-     * and "retracting" are not abilities any policy declares — they are the
+     * `->visible()` closes the WHOLE button on `ViewRecord` only — there is
+     * no single record to check at this level the way `retractAction()` has
+     * one, so `isReadOnly()` is the only thing it checks. Everything else the
+     * earlier docblock here said still holds: this button opens the modal
+     * whenever the tab itself is open (already closed by `canViewForRecord()`,
+     * § the class docblock), and what closes each OPTION inside the modal is
+     * two SEPARATE layers — `disableOptionWhen()`, which is UX only, and
+     * `Assignment::give()`'s own `offers()` re-check, the real, sole
+     * server-side guard for WHICH role, and must not be removed on the
+     * grounds that this screen already checks. Never `->authorize()` either,
+     * which resolves through `Gate::check()` and is invisible to
+     * `strictAuthorization()` (AGENTS.md §6.2, §6.18): "assigning" and
+     * "retracting" are not abilities any policy declares — they are the
      * compound judgement `Assignment::offers()` already makes — so a policy
      * has nothing to be asked here.
      *
@@ -214,6 +213,7 @@ class RolesRelationManager extends RelationManager
             ->label(__('filament-warden::ui.relations.roles.assign.label'))
             ->icon(Heroicon::OutlinedUserPlus)
             ->modalHeading(__('filament-warden::ui.relations.roles.assign.heading'))
+            ->visible(fn (): bool => ! $this->isReadOnly())
             ->schema([
                 Select::make('role')
                     ->label(__('filament-warden::ui.relations.roles.assign.field'))
@@ -225,7 +225,17 @@ class RolesRelationManager extends RelationManager
             ->action(function (array $data) use ($account): void {
                 $role = $data['role'] ?? null;
 
-                if (! is_int($role) && ! is_string($role)) {
+                // Repeated here and not only in the `->visible()` above: on
+                // `ViewRecord`, `isDisabled()` already blocks a raw
+                // `mountAction`/`callMountedAction` call the same way it does
+                // for a restricted role (`retractAction()`'s docblock), so
+                // this line is defence in depth rather than the layer a test
+                // can discriminate — see Step 4's breakage in
+                // `RolesRelationManagerTest.php` for what was actually
+                // measured.
+                $isOffered = ! $this->isReadOnly() && (is_int($role) || is_string($role));
+
+                if (! $isOffered) {
                     return;
                 }
 
@@ -263,7 +273,7 @@ class RolesRelationManager extends RelationManager
      * offered role, THEN restricting the assignment before calling it: the
      * closure body never ran (a thrown exception inside it never surfaced),
      * because `callMountedAction()` had already returned `null` at its own
-     * `isDisabled()` check. A copy of `self::offered()` inside this closure
+     * `isDisabled()` check. A copy of `$this->offered()` inside this closure
      * would be unreachable dead code, in permanent tension with this project's
      * 100% line coverage gate. `Assignment::take()` is what actually keeps the
      * guarantee off the button: it re-checks `offers()` itself
@@ -301,10 +311,24 @@ class RolesRelationManager extends RelationManager
             ->icon(Heroicon::OutlinedUserMinus)
             ->color('danger')
             ->requiresConfirmation()
-            ->visible(static fn (Model $record): bool => self::offered($account, $record))
+            ->visible(fn (Model $record): bool => ! $this->isReadOnly() && $this->offered($account, $record))
             ->action(function (Model $record) use ($account): void {
                 $key = $record->getKey();
-                $written = (is_int($key) || is_string($key)) && Assignment::take($account, $key);
+
+                // `! $this->isReadOnly()` is repeated here and not only in
+                // `->visible()` above, the same "two things, not one" the
+                // class docblock's `ViewRecord` paragraph names — even though,
+                // measured the same way as the restricted-role and gone-role
+                // cases already documented there, this specific line cannot
+                // be shown to discriminate through this screen's own wiring:
+                // `isDisabled()` already blocks a raw
+                // `mountAction`/`callMountedAction` call on `ViewRecord`
+                // before this closure runs at all. Kept as defence in depth
+                // against a future edit to `->visible()` that this line does
+                // not depend on.
+                $written = ! $this->isReadOnly()
+                    && (is_int($key) || is_string($key))
+                    && Assignment::take($account, $key);
 
                 if ($written) {
                     Notification::make()
