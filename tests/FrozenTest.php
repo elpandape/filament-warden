@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Catalog\Entry;
 use ElPandaPe\FilamentWarden\Catalog\Origin;
 use ElPandaPe\FilamentWarden\Catalog\PermissionName;
@@ -111,6 +112,11 @@ test('the class names an application writes are frozen', function (): void {
 test('the plugin offers exactly the methods the README names', function (): void {
     expect(get_class_methods(FilamentWardenPlugin::class))
         ->toBe(['make', 'getId', 'register', 'boot', 'roles', 'permissions']);
+});
+
+test("the catalogue's public methods are exactly these, forget among them", function (): void {
+    expect(get_class_methods(Catalog::class))
+        ->toBe(['for', 'relationManagers', 'resourceClasses', 'pageClasses', 'widgetClasses', 'forget']);
 });
 
 test('the state a grid field hands to a form is frozen', function (): void {

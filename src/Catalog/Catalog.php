@@ -25,24 +25,40 @@ use Throwable;
  * Built on demand and not at boot. `Plugin::register()` runs mid-chain, when a
  * panel may still be missing half its components, and `Plugin::boot()` never runs
  * at all outside an HTTP request.
+ *
+ * `for()` is memoised per panel id, the same shape `Conditions\Columns` already
+ * uses for a model's schema: a single private `read()` fills a static array, and
+ * `forget()` empties it. What earns the memo here is the same thing that earns it
+ * there — every call reflects a Policy afresh (`Abilities::of()`, in turn
+ * `Gate::getPolicyFor()`, which the container resolves with no cache of its own,
+ * §6.9) and walks a panel's resources, pages and widgets besides, and none of
+ * that changes while the process serving it keeps running.
+ *
+ * Safe under Octane for the same reason `Columns` is: a panel's resources,
+ * pages, widgets and Policies come from code loaded once at boot, and
+ * `catalog.models` / `catalog.custom` come from config loaded once at boot —
+ * neither is request state. What WOULD invalidate it, named rather than waved
+ * away: an application that calls `config(['filament-warden.catalog...' => …])`
+ * mid-worker — which nothing in this package does, and which is already an
+ * Octane anti-pattern the framework itself warns against, config being meant to
+ * answer the same way for the life of a worker — or code that edits a
+ * `Panel`'s resource list on an object already handed to `for()`, which
+ * `Panel`'s own fluent methods return `static` for and this package never holds
+ * a reference to past the call. Neither claim was exercised on a live Octane
+ * worker; both were checked by reading `PanelRegistry::register()` and
+ * `Panel`'s fluent setters, not by running one.
  */
-final readonly class Catalog
+final class Catalog
 {
+    /** @var array<string, array{panel: Panel, catalog: self}> */
+    private static array $memo = [];
+
     /** @param  list<Entry>  $entries */
-    private function __construct(public array $entries) {}
+    private function __construct(public readonly array $entries) {}
 
     public static function for(Panel $panel): self
     {
-        return new self(self::deduplicate([
-            self::panelEntry($panel),
-            ...self::fromResources($panel),
-            ...self::fromRelations($panel),
-            ...self::fromOwnModels(),
-            ...self::fromDeclaredModels(),
-            ...self::fromPages($panel),
-            ...self::fromWidgets($panel),
-            ...self::fromCustom(),
-        ]));
+        return self::read($panel);
     }
 
     /**
@@ -129,6 +145,54 @@ final readonly class Catalog
         $classes = array_values(array_unique($widgets));
 
         return $classes;
+    }
+
+    /**
+     * A panel's resources, pages and widgets do not change while a process is
+     * running: this IS the schema, not its data. What changes it between one
+     * moment and the next is a suite — a fixture panel rebuilt with a different
+     * resource list for the next test case — the same reason `Columns::forget()`
+     * exists, called from the same `TestCase::setUp()`.
+     */
+    public static function forget(): void
+    {
+        self::$memo = [];
+    }
+
+    /**
+     * Keyed by panel id and not by the panel object: it is the id a caller
+     * actually has (`Filament::getCurrentPanel()`, a route parameter), never the
+     * object, and `PanelRegistry::register()` keys its own array by id the same
+     * way. But an id alone can lie — this very suite builds a fresh
+     * `Panel::make()->id('scratch')` in dozens of tests — so the stored panel is
+     * compared with `===` on every read: a second object sharing an old id is
+     * never served the first one's catalogue. A memo that could hand back the
+     * wrong panel's rows would not be a slow screen, it would be a permission
+     * grid answering for someone else's panel.
+     */
+    private static function read(Panel $panel): self
+    {
+        $id = $panel->getId();
+        $cached = self::$memo[$id] ?? null;
+
+        if ($cached !== null && $cached['panel'] === $panel) {
+            return $cached['catalog'];
+        }
+
+        $catalog = new self(self::deduplicate([
+            self::panelEntry($panel),
+            ...self::fromResources($panel),
+            ...self::fromRelations($panel),
+            ...self::fromOwnModels(),
+            ...self::fromDeclaredModels(),
+            ...self::fromPages($panel),
+            ...self::fromWidgets($panel),
+            ...self::fromCustom(),
+        ]));
+
+        self::$memo[$id] = ['panel' => $panel, 'catalog' => $catalog];
+
+        return $catalog;
     }
 
     private static function panelEntry(Panel $panel): Entry

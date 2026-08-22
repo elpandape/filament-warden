@@ -12,10 +12,24 @@ use Illuminate\Auth\Access\HandlesAuthorization;
  * The three things a catalogue must not mistake for actions are here on purpose:
  * the gate hook, the public helpers the trait leaves behind, and a static of the
  * policy's own.
+ *
+ * `$instantiations` counts how many times the container has built this class,
+ * which is the only honest measure of how many times something reflected it:
+ * `Gate::getPolicyFor()` resolves through the container fresh on every call, with
+ * no cache of its own (§6.9), so a policy's own constructor is the one place a
+ * suite can watch the reflection path run without inventing a counter that lives
+ * in `src/` for no reason other than being watched.
  */
 final class PostPolicy
 {
     use HandlesAuthorization;
+
+    public static int $instantiations = 0;
+
+    public function __construct()
+    {
+        self::$instantiations++;
+    }
 
     public static function label(): string
     {

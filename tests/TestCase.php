@@ -8,6 +8,7 @@ use BladeUI\Heroicons\BladeHeroiconsServiceProvider;
 use BladeUI\Icons\BladeIconsServiceProvider;
 use Carbon\Laravel\ServiceProvider as CarbonServiceProvider;
 use Composer\InstalledVersions;
+use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Conditions\Columns;
 use ElPandaPe\FilamentWarden\FilamentWardenServiceProvider;
 use ElPandaPe\FilamentWarden\Grants\Assignment;
@@ -65,6 +66,10 @@ abstract class TestCase extends ApplicationTestCase
         // Same reason, same shape: a suite creates a different set of roles for every
         // test case and would otherwise read the catalogue one test built before this one.
         Assignment::forget();
+
+        // Same reason again: a suite rebuilds a scratch panel with a different resource
+        // list for every test case, and every one of them uses the same 'scratch' id.
+        Catalog::forget();
 
         // No request has been through the panel's middleware here, so nothing has told
         // Filament which panel it is serving. Without this every resource resolves against

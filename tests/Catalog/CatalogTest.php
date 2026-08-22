@@ -11,12 +11,40 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\CommentResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\LedgerResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\PostResource;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\TagResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Widgets\Summary;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Tag;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Policies\PostPolicy;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use Filament\Panel;
 
+/**
+ * `Catalog::for()` is memoised per panel id, and three traps about that memo
+ * live here rather than as prose inside a test body.
+ *
+ * `PostPolicy::$instantiations` is the counter the suite watches instead of one
+ * invented for `src/`: `Gate::getPolicyFor()` resolves through the container
+ * fresh on every call, with no cache of its own (AGENTS.md §6.9), so a policy's
+ * own constructor already counts every time something reflected it. Read by
+ * "a policy is reflected once no matter how many times the same panel is
+ * asked for".
+ *
+ * A memo keyed by id alone would hand a caller the first panel's rows when it
+ * asks about a second, unrelated object that happens to share that id — and
+ * this is not hypothetical for this file's own plumbing: every test here
+ * builds a fresh `Panel::make()->id('scratch')`, the same id, dozens of times
+ * over. `Catalog::read()` compares the stored panel with `===` on every read
+ * to close it. Fixed by "a second panel object sharing an old id gets its own
+ * rows, not the first one's".
+ *
+ * `catalog.models` and `catalog.custom` are read once per build and never
+ * re-read on their own: the same decision `Conditions\Columns` already made
+ * for a model's schema — config does not change while the process serving it
+ * keeps running, so nothing here notices a change without an explicit
+ * `Catalog::forget()`. Documented, not merely asserted, by "a config change is
+ * invisible to an already-built catalogue until it is forgotten".
+ */
 pest()->extend(TestCase::class);
 
 /**
@@ -251,4 +279,40 @@ test('the verb is the question filament asks: a widget is seen, a page is entere
     expect(PermissionName::title('widget:App\\Filament\\Widgets\\Summary'))->toStartWith('View ')
         ->and(PermissionName::title('page:App\\Filament\\Pages\\Reports'))->toStartWith('Access ')
         ->and(PermissionName::title('panel:admin'))->toStartWith('Access ');
+});
+
+test('a policy is reflected once no matter how many times the same panel is asked for', function (): void {
+    PostPolicy::$instantiations = 0;
+    $panel = Panel::make()->id('scratch')->resources([PostResource::class]);
+
+    Catalog::for($panel);
+    Catalog::for($panel);
+    Catalog::for($panel);
+
+    expect(PostPolicy::$instantiations)->toBe(1);
+});
+
+test("a second panel object sharing an old id gets its own rows, not the first one's", function (): void {
+    $first = Panel::make()->id('scratch')->resources([PostResource::class]);
+    $second = Panel::make()->id('scratch')->resources([TagResource::class]);
+
+    Catalog::for($first);
+    $catalog = Catalog::for($second);
+
+    expect(namesFor($catalog->entries, Post::class))->toBeEmpty()
+        ->and(namesFor($catalog->entries, Tag::class))->toBe(['viewAny', 'view']);
+});
+
+test('a config change is invisible to an already-built catalogue until it is forgotten', function (): void {
+    $panel = Panel::make()->id('scratch');
+
+    expect(namesFor(Catalog::for($panel)->entries, Tag::class))->toBeEmpty();
+
+    config()->set('filament-warden.catalog.models', [Tag::class]);
+
+    expect(namesFor(Catalog::for($panel)->entries, Tag::class))->toBeEmpty();
+
+    Catalog::forget();
+
+    expect(namesFor(Catalog::for($panel)->entries, Tag::class))->toBe(['viewAny', 'view']);
 });
