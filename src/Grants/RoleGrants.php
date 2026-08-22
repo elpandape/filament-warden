@@ -150,12 +150,23 @@ final class RoleGrants
             return;
         }
 
-        // One transaction for the whole grid: each write bumps the cache version
-        // on its own, and the trait registers one more after the commit. Opened
-        // on warden's own connection, not the default one: `Context::resolve()`
-        // is where every write in this class already asks, and a transaction on
-        // the wrong connection would wrap queries that never run on it, leaving
-        // the ones that matter to commit one at a time as they go.
+        // One transaction for the whole grid, opened on warden's own
+        // connection rather than the default one. `Context::resolve()` is
+        // where every write in this class already asks, so a transaction on
+        // the wrong connection would wrap queries that never run on it,
+        // leaving the ones that matter to commit one at a time as they go —
+        // and it silently disabled a promise `BumpsCacheVersion` already
+        // makes: `bumpCacheVersion()` (`Actions/Concerns/
+        // BumpsCacheVersion.php:19-30`) only schedules its after-commit
+        // second bump when `Context::resolve()->grantClass()`'s OWN
+        // connection reports `transactionLevel() > 0`. On a split-connection
+        // install, opening this transaction on the default connection left
+        // that check reading zero always, so the second bump — the one that
+        // orphans a payload a concurrent reader rebuilt from pre-commit rows
+        // — never registered. "Each write bumps the cache version on its
+        // own, and the trait registers one more after the commit" only
+        // became true the moment this transaction moved to warden's own
+        // connection.
         DB::connection(Context::resolve()->connection())->transaction(static function () use ($role, $changes): void {
             self::revoke($role, $changes);
             self::grant($role, $changes);
@@ -297,7 +308,13 @@ final class RoleGrants
 
     /**
      * Every step takes away whatever was there before it writes, for every
-     * change in the batch at once.
+     * change in the batch at once — and always before `grant()` runs, which
+     * grouping makes structural rather than a habit `write()` happened to
+     * follow per cell. Editing with a fresh `allow()->to()->where()` instead
+     * of revoking first would leave the previous twin's grant standing: the
+     * old condition would go on authorizing and nothing would say so.
+     * Measured, and pinned in `RoleGrantsTest.php` ("changing a condition
+     * stops the old one authorizing, which a fresh grant would not").
      *
      * `forbidden` is part of the unique key on grants, so granted and forbidden
      * coexist as two rows: allowing without revoking the forbid leaves both, and
@@ -308,13 +325,27 @@ final class RoleGrants
      * hard on `only_owned` — so both are needed; and `to()` is the one that also
      * takes the grants of every twin sharing the name.
      *
-     * Grouped by entity rather than run once per changed cell: warden's own
-     * `to()`/`toOwn()` accept a list of names and resolve it with one
-     * `whereIn()` lookup and, when there is anything to remove, one `delete()`
-     * — so four warden calls clear an entire entity's worth of changed cells
-     * instead of four calls PER cell. This is the one place grouping is free:
-     * revoking never creates a twin, so there is no `reconstrain()` to confuse
-     * by handing it more than one permission at a time.
+     * Grouped by entity rather than run once per changed cell:
+     * `RevokesPermissions::revoke()` (`Actions/RevokesPermissions.php:69-107`)
+     * accepts a list of names and resolves it with one `whereIn()` lookup
+     * (`Concerns/ResolvesPermissions.php:56-93`) and, when there is anything
+     * to remove, one `delete()` — so four warden calls clear an entire
+     * entity's worth of changed cells instead of four calls PER cell. This is
+     * free of the TWIN problem specifically: revoking never creates one, so
+     * there is no `reconstrain()` to confuse by handing it more than one
+     * permission at a time.
+     *
+     * It is not free of everything else. `revoke()`'s own cache bump and
+     * `PermissionRevoked`/`PermissionUnforbidden` event are gated on whether
+     * the `delete()` removed at least one row (`RevokesPermissions.php:
+     * 98-104`), and that gate now covers the WHOLE group. A name with
+     * nothing to revoke used to mean no bump and no event for it at all;
+     * grouped, that same name can ride inside a bump and an event that fire
+     * only because a sibling in the same call had a row removed — the
+     * event's collection still names every permission the group resolved,
+     * not only the one actually deleted. There is no pre-event on this path,
+     * so nothing here is vetoable: this is observable to a listener of the
+     * post-events, not an authorization change.
      *
      * @param  list<Change>  $changes
      */
@@ -343,23 +374,31 @@ final class RoleGrants
     /**
      * Every change that is not abstaining, written in up to two passes.
      *
-     * The honest promise is not "one write for the whole grid": it is that the
-     * five warden calls a changed cell used to cost — four revokes plus one
-     * grant, all now measured, none guessed — become UP TO five per GROUP
-     * instead of per cell. A cell narrowed to `Shape::All` costs nothing past
-     * `to()`/`toOwn()` itself, so every such cell that shares (entity, stance)
-     * is asked for in one call. A cell narrowed any other way — `Shape::Owned`,
+     * The honest promise is not "one write for the whole grid": it is that
+     * the warden calls a changed cell used to cost — up to four revokes
+     * (three for a door or loose name, which has no entity and so no
+     * `toOwn()` pair to revoke) plus one grant — become up to that same
+     * count per GROUP instead of per cell. A cell narrowed to `Shape::All`
+     * never reaches `toOwn()` at all — that call belongs to `Shape::Owned`,
+     * which is not grouped — so it costs nothing past its one `to()` call,
+     * and every such cell that shares (entity, stance) is asked for in one
+     * call. A cell narrowed any other way — `Shape::Owned`,
      * `Shape::Conditions` — still runs alone, through `narrow()`, exactly as
-     * before: `where()`'s `reconstrain()` re-points EVERY permission in the
-     * chain's `lastGranted` at the same twin, and two different cells asking
-     * for two different conditions must never share one.
+     * before: `where()`'s `reconstrain()`
+     * (`Actions/GrantsPermissions.php:201-249`) re-points EVERY permission
+     * in the chain's `lastGranted` at the same twin, and two different cells
+     * asking for two different conditions must never share one.
      *
-     * Grouping a grant changes more than its query count: warden fires one
+     * Grouping a grant changes more than its query count: `to()`
+     * (`Actions/GrantsPermissions.php:48`) fires one
      * `GrantingPermission`/`ForbiddingPermission` event per call, carrying
-     * every name in it, not one event per name. An application listening for
-     * that event to veto a single cell now vetoes the whole group its cell
+     * every name it resolved (`grant()`, `:134-171`, its insert loop
+     * `:148-157`), not one event per name. An application listening for that
+     * event to veto a single cell now vetoes the whole group its cell
      * happened to land in — that is observable behaviour a consumer can
-     * depend on, and it did not exist before this version.
+     * depend on, and it did not exist before this version. Pinned by
+     * `RoleGrantsTest.php`'s "a veto scoped to one name in the list kills
+     * every name grouped with it".
      *
      * @param  list<Change>  $changes
      */
