@@ -403,14 +403,25 @@ name = editor OR (scope >= 2 AND title = account.name)
 
 > ⚠️ **A grant pinned to a single record is not a cell.** Warden filters a check made against a class down to `entity_id is null`, so a rule with a record key on it answers nothing the grid asks — and it is not a wider rule either. The grid lists those rules above the tabs, read-only: this screen shows them, and cannot remove them.
 
-> 🔒 **A rule this screen cannot write back exactly locks too, from `v1.3.0`.** A value stored as
-> the string `'2'`, `'2.5'`, `'true'` or `'false'` reads back as another type the moment this
-> builder parses it, and a rule whose first line is `or` reads back as `and` — both change what the
-> row means for everybody holding it, so it is drawn, explained, and left alone instead of silently
-> rewritten on the next save. It can still be edited from warden's own fluent API. And a `true`/`false`
-> value compared against a column the model has not cast to `boolean` gets its own warning — in the
-> builder and in the grid's inspector alike — because that comparison is stored and then never
-> matches a single row.
+> 🔒 **A rule the permission form cannot write back exactly locks there, from `v1.3.0`.** A value
+> stored as the string `'2'`, `'2.5'`, `'true'` or `'false'` would read back as another type the
+> moment that screen's condition builder parses it, and a rule whose first line is `or` would read
+> back as `and` — both would change what the row means for everybody holding it. Instead, the field
+> draws the rule, explains why, and leaves it alone rather than silently rewriting it on the next
+> save. It can still be edited from warden's own fluent API. And a `true`/`false` value compared
+> against a column the model has not cast to `boolean` gets its own warning — on the permission form
+> and in this grid's inspector alike — because that comparison is stored and then never matches a
+> single row.
+
+> ℹ️ **The grid never locks a cell for this, and from `v1.3.2` it stops making the type mismatch
+> worse.** A stance flip — grant to forbid, or back — used to re-type a mis-typed condition through
+> the browser's own casting rules as a side effect, on a click that only meant to change the stance:
+> the string `'true'` could come back as the boolean `true`, which matches every row the string
+> never did. Now the value survives untouched whenever the stance is all that moved. What the grid
+> still does not fix, because it is a different and lighter hazard: a rule whose first line reads
+> `or` still comes back as `and` on any grid save, stance-only or not — it changes no cell's answer,
+> only which permission row backs it, which shows up as an orphaned row in `filament-warden:audit`,
+> not as a wrong answer on screen.
 
 ### Permissions Screen
 
