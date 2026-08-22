@@ -17,6 +17,7 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Tag;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
+use Filament\Facades\Filament;
 use Filament\Panel;
 use Filament\Resources\Resource;
 use Illuminate\Support\Facades\Artisan;
@@ -247,6 +248,18 @@ test('a strict panel is not told it fails open, because it does not', function (
     $panel = Panel::make()->id('scratch')->strictAuthorization()->resources([CommentResource::class]);
 
     expect(Audit::of([$panel])->unpoliced[0])->not->toContain('does not fail closed');
+});
+
+test('a resource with no policy turns the build red through the command, not only through the class', function (): void {
+    Filament::getPanel('test')->resources([CommentResource::class]);
+
+    $audit = Audit::run();
+
+    expect($audit->unpoliced)->toHaveCount(1)
+        ->and($audit->unpoliced[0])->toContain('has no policy')
+        ->and($audit->unpoliced[0])->not->toContain('does not fail closed')
+        ->and(audit())->toBe(0)
+        ->and(audit(true))->toBe(1);
 });
 
 test('a resource pointing at a class nobody wrote is named, not swallowed', function (): void {

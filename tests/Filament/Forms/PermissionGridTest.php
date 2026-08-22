@@ -9,12 +9,14 @@ use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\CreateRole;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\PostResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\ForeignGridHost;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\GridHost;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Vault;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
+use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Facades\Filament;
 use Filament\Panel;
@@ -98,6 +100,26 @@ test('a star is a segment on the wire, not a wildcard, so one cell can be addres
 
     expect(Access::granted($user, 'viewAny', roleClass()))->toBeTrue()
         ->and(Access::granted($user, 'delete', roleClass()))->toBeTrue();
+});
+
+test('a payload naming what the catalogue does not carry writes nothing and mints nothing', function (): void {
+    $role = makeRole();
+
+    $catalogued = Context::resolve()->permissionClass()::query()->withoutGlobalScopes()->count();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->set('data.permissions', [
+            'stances' => [
+                'App\\Models\\Nothing' => ['view' => 'granted'],
+                roleClass() => ['nothingDeclaresThis' => 'granted'],
+            ],
+            'narrowing' => [],
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(Context::resolve()->grantClass()::query()->count())->toBe(0)
+        ->and(Context::resolve()->permissionClass()::query()->withoutGlobalScopes()->count())->toBe($catalogued);
 });
 
 test('the field renders every tab of the catalogue at once', function (): void {
@@ -757,4 +779,38 @@ test('the inspector has a place to speak from before it has anything to say', fu
 
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
         ->assertSee('<p class="fw-sr" role="status" x-text="failed ?', escape: false);
+});
+
+test('a save under one panel leaves alone what only another panel declares', function (): void {
+    $role = makeRole();
+    $user = makeUser();
+    Warden::assign($role)->to($user);
+
+    Warden::allow($role)->to('view', Post::class);
+    Warden::allow($role)->to('viewAny', roleClass());
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->set('data.permissions', ['stances' => [], 'narrowing' => []])
+        ->call('save');
+
+    expect(Access::granted($user, 'view', Post::class))->toBeTrue()
+        ->and(Access::granted($user, 'viewAny', roleClass()))->toBeFalse();
+});
+
+test('and under the panel that does declare it, the very same save takes it away', function (): void {
+    $role = makeRole();
+    $user = makeUser();
+    Warden::assign($role)->to($user);
+
+    Warden::allow($role)->to('view', Post::class);
+
+    $panel = Panel::make()->id('other')->resources([PostResource::class]);
+    $panel->boot();
+    Filament::setCurrentPanel($panel);
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->set('data.permissions', ['stances' => [], 'narrowing' => []])
+        ->call('save');
+
+    expect(Access::granted($user, 'view', Post::class))->toBeFalse();
 });

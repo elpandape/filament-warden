@@ -8,6 +8,8 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Facades\Warden;
 
+use function Pest\Livewire\livewire;
+
 pest()->extend(TestCase::class);
 
 test('a guarded page keeps out an authority the store never granted it', function (): void {
@@ -41,4 +43,20 @@ test('a page that never took the guard is the open door filament ships', functio
     signIn();
 
     expect(Reports::canAccess())->toBeTrue();
+});
+
+test('the guard is what filament aborts on when the screen is actually mounted', function (): void {
+    signIn();
+
+    livewire(GuardedPage::class)->assertForbidden();
+});
+
+test('and the same mount goes through once the store says so', function (): void {
+    $user = signIn();
+
+    Warden::allow($user)->to(PermissionName::page(GuardedPage::class));
+
+    livewire(GuardedPage::class)->assertOk();
+
+    livewire(Reports::class)->assertOk();
 });

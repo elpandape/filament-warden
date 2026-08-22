@@ -401,6 +401,20 @@ test('a forbidden wider rule wins over a granted one of the same name', function
     expect(RoleGrants::of($role, gridCatalog())->wider)->toBe(['*' => 'forbidden']);
 });
 
+test('a denial and a grant on one ordinary cell are two rows, and the cell reads denied', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('view', Post::class);
+    Warden::forbid($role)->to('view', Post::class);
+
+    $state = RoleGrants::of($role, gridCatalog());
+
+    expect(grantCount())->toBe(2)
+        ->and($state->stances[Post::class]['view'])->toBe(Stance::Forbidden->value)
+        ->and($state->locked())->toBeEmpty()
+        ->and($state->wider)->toBeEmpty();
+});
+
 /**
  * @return array{mode: string, rules: list<array<string, string>>}
  */

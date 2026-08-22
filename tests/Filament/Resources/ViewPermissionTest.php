@@ -206,7 +206,32 @@ test('an explicit denial comes back as a denial', function (): void {
 
     livewire(ViewPermission::class, ['record' => $row->getKey()])
         ->callAction('probe', ['account' => $holder->getKey()])
-        ->assertNotified();
+        ->assertNotified('forbidden');
+});
+
+test('a grant comes back as a grant, which is the word a denial has to differ from', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+
+    $holder = makeUser('Holder');
+    Warden::allow($holder)->to('viewAny', roleClass());
+
+    livewire(ViewPermission::class, ['record' => latestPermission('viewAny')->getKey()])
+        ->callAction('probe', ['account' => $holder->getKey()])
+        ->assertNotified('granted');
+});
+
+test('a row nobody holds comes back as abstaining, which is neither of the two', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+
+    $holder = makeUser('Holder');
+
+    livewire(ViewPermission::class, ['record' => makePermission('export-reports')->getKey()])
+        ->callAction('probe', ['account' => $holder->getKey()])
+        ->assertNotified('abstains');
 });
 
 test('an account nobody could name is nobody at all', function (): void {

@@ -7,6 +7,7 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Facades\Warden;
+use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Artisan;
 
 pest()->extend(TestCase::class);
@@ -34,6 +35,18 @@ test('the way back hands a role out, and the store answers for it straight away'
     expect(Access::granted($account, 'viewAny', Post::class))->toBeFalse()
         ->and(handOut('super-admin', User::class.':'.recordKey($account)))->toBe(0)
         ->and(Access::granted($account, 'viewAny', Post::class))->toBeTrue();
+});
+
+test('the recipe the readme prints opens the panel door it promises to open', function (): void {
+    $account = makeUser('Locked Out');
+    $role = makeRole('super-admin');
+
+    Warden::allow($role)->everything();
+
+    expect($account->canAccessPanel(Filament::getPanel('test')))->toBeFalse()
+        ->and(handOut('super-admin', User::class.':'.recordKey($account)))->toBe(0)
+        ->and($account->canAccessPanel(Filament::getPanel('test')))->toBeTrue()
+        ->and(Access::granted($account, 'viewAny', roleClass()))->toBeTrue();
 });
 
 test('a role that does not exist is refused, never invented', function (): void {

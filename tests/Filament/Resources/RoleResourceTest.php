@@ -52,6 +52,35 @@ test('an authority with no grant is kept out of the listing', function (): void 
     livewire(ListRoles::class)->assertForbidden();
 });
 
+test('the screen that changes a role is shut at both of its gates', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    livewire(EditRole::class, ['record' => $role->getKey()])->assertForbidden();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    livewire(EditRole::class, ['record' => $role->getKey()])->assertForbidden();
+
+    Warden::allow($user)->to('update', $role);
+
+    livewire(EditRole::class, ['record' => $role->getKey()])->assertOk();
+});
+
+test('the screen that mints a role is shut at both of its gates', function (): void {
+    $user = signIn();
+
+    livewire(CreateRole::class)->assertForbidden();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    livewire(CreateRole::class)->assertForbidden();
+
+    Warden::allow($user)->to('create', roleClass());
+
+    livewire(CreateRole::class)->assertOk();
+});
+
 test('an authority the store trusts sees the roles there are', function (): void {
     $user = signIn();
     Warden::allow($user)->to('viewAny', roleClass());
@@ -95,6 +124,24 @@ test('saving the edit screen hands the grid to warden', function (): void {
 
     expect($role->refresh()->getAttribute('name'))->toBe('editor')
         ->and(Access::granted($holder, 'viewAny', roleClass()))->toBeTrue();
+});
+
+test('whoever may change a role hands out what it does not hold, itself included', function (): void {
+    $user = signIn();
+    $role = makeRole('editor');
+    Warden::assign($role)->to($user);
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    expect(Access::granted($user, 'delete', roleClass()))->toBeFalse();
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->fillForm(['permissions' => ['stances' => [roleClass() => ['delete' => 'granted']]]])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(Access::granted($user, 'delete', roleClass()))->toBeTrue();
 });
 
 test('a role is created with its name and its title', function (): void {

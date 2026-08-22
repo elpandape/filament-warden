@@ -78,6 +78,45 @@ test('an authority with no grant is kept out of the listing', function (): void 
     livewire(ListPermissions::class)->assertForbidden();
 });
 
+test('the screen that changes a permission is shut at both of its gates, and at the config too', function (): void {
+    $user = signIn();
+    $row = makePermission('export-reports');
+
+    livewire(EditPermission::class, ['record' => $row->getKey()])->assertForbidden();
+
+    Warden::allow($user)->to('viewAny', permissionClass());
+
+    livewire(EditPermission::class, ['record' => $row->getKey()])->assertForbidden();
+
+    Warden::allow($user)->to('update', $row);
+
+    livewire(EditPermission::class, ['record' => $row->getKey()])->assertOk();
+
+    config()->set('filament-warden.permissions.update', false);
+
+    livewire(EditPermission::class, ['record' => $row->getKey()])->assertForbidden();
+});
+
+test('the screen that mints a permission is shut at both of its gates, and at the config too', function (): void {
+    $user = signIn();
+
+    config()->set('filament-warden.permissions.create', true);
+
+    livewire(CreatePermission::class)->assertForbidden();
+
+    Warden::allow($user)->to('viewAny', permissionClass());
+
+    livewire(CreatePermission::class)->assertForbidden();
+
+    Warden::allow($user)->to('create', permissionClass());
+
+    livewire(CreatePermission::class)->assertOk();
+
+    config()->set('filament-warden.permissions.create', false);
+
+    livewire(CreatePermission::class)->assertForbidden();
+});
+
 test('an authority the store trusts sees the catalogue', function (): void {
     $user = signIn();
     Warden::allow($user)->to('viewAny', permissionClass());
