@@ -14,6 +14,10 @@ use Filament\Support\Assets\Css;
 
 final class FilamentWardenPlugin implements Plugin
 {
+    private bool $roles = true;
+
+    private bool $permissions = true;
+
     public static function make(): self
     {
         return resolve(self::class);
@@ -34,10 +38,17 @@ final class FilamentWardenPlugin implements Plugin
      */
     public function register(Panel $panel): void
     {
-        $panel->resources([
-            RoleResource::class,
-            PermissionResource::class,
-        ])->bootUsing(static function (Panel $panel): void {
+        $resources = [];
+
+        if ($this->roles) {
+            $resources[] = RoleResource::class;
+        }
+
+        if ($this->permissions) {
+            $resources[] = PermissionResource::class;
+        }
+
+        $panel->resources($resources)->bootUsing(static function (Panel $panel): void {
             // Registered here and run at panel boot, which is the only point
             // where the panel is whole: `Plugin::register()` sees only what was
             // chained above it, and with cached components it suddenly sees
@@ -50,4 +61,24 @@ final class FilamentWardenPlugin implements Plugin
     }
 
     public function boot(Panel $panel): void {}
+
+    /**
+     * Off leaves `RoleResource` unregistered; the grid it carries goes with it.
+     */
+    public function roles(bool $condition = true): static
+    {
+        $this->roles = $condition;
+
+        return $this;
+    }
+
+    /**
+     * Off leaves `PermissionResource` unregistered.
+     */
+    public function permissions(bool $condition = true): static
+    {
+        $this->permissions = $condition;
+
+        return $this;
+    }
 }

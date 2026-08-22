@@ -36,6 +36,22 @@ test('the plugin puts its two resources on the panel, and no page or widget', fu
         ->and($panel->getWidgets())->toBeEmpty();
 });
 
+test('roles(false) drops the role resource and keeps the permission resource', function (): void {
+    $panel = Panel::make()->id('scratch');
+
+    $panel->plugin(FilamentWardenPlugin::make()->roles(false));
+
+    expect($panel->getResources())->toBe([PermissionResource::class]);
+});
+
+test('permissions(false) drops the permission resource and keeps the role resource', function (): void {
+    $panel = Panel::make()->id('scratch');
+
+    $panel->plugin(FilamentWardenPlugin::make()->permissions(false));
+
+    expect($panel->getResources())->toBe([RoleResource::class]);
+});
+
 test('booting the plugin leaves the panel exactly as it found it', function (): void {
     $panel = Panel::make()->id('scratch');
 

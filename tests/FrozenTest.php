@@ -110,7 +110,7 @@ test('the class names an application writes are frozen', function (): void {
 
 test('the plugin offers exactly the methods the README names', function (): void {
     expect(get_class_methods(FilamentWardenPlugin::class))
-        ->toBe(['make', 'getId', 'register', 'boot']);
+        ->toBe(['make', 'getId', 'register', 'boot', 'roles', 'permissions']);
 });
 
 test('the state a grid field hands to a form is frozen', function (): void {
