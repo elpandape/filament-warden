@@ -197,8 +197,19 @@ final class RoleGrants
                 continue;
             }
 
-            if ($from !== $to || ! $stored->is($wanted)) {
-                $changes[] = new Change($name, $entity, $to, $wanted);
+            $moved = ! $stored->is($wanted);
+
+            if ($from !== $to || $moved) {
+                // What the browser sent decides WHETHER the rule moved; what the
+                // store holds decides WHAT gets written when it did not. The two
+                // are not the same object: `is()` compares payloads, and a
+                // payload carries every value as text — which is right for a
+                // screen that only knows text, and wrong as the source of a
+                // write. Reading it as both turns a condition stored as the
+                // string `'true'`, which matches nothing, into the boolean
+                // `true`, which matches every row, on a click that only meant to
+                // forbid instead of grant.
+                $changes[] = new Change($name, $entity, $to, $moved ? $wanted : $stored);
             }
         }
 

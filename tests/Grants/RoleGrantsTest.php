@@ -795,3 +795,77 @@ test('a cell that is both ownership and conditions is never written over', funct
         ->and($permission->refresh()->getAttribute('options'))->toBe($before)
         ->and($permission->getAttribute('only_owned'))->toBeTrue();
 });
+
+/**
+ * `Narrowing::is()` compares `toPayload()`, and both sides of that comparison
+ * route every value through `Value::text()` — so it answers "unchanged" for a
+ * rule whose type moved as long as its text did not, and it cannot be trusted
+ * as the source of what a write becomes. `flipping a stance keeps the rule
+ * exactly as the store wrote it`, `a rule the browser really changed is
+ * written as the browser sent it` and `a numeric string keeps being a string
+ * when only the stance moves` depend on `changes()` picking the value from the
+ * stored `Narrowing` when nothing moved, rather than from what `is()` alone
+ * could tell apart.
+ */
+test('flipping a stance keeps the rule exactly as the store wrote it', function (): void {
+    $role = makeRole();
+    Warden::allow($role)->to('viewAny', Post::class)->where('published', '=', 'true');
+
+    $before = permissionClass()::query()->withoutGlobalScopes()
+        ->whereNotNull('options')->orderByDesc('id')->firstOrFail()->getAttribute('options');
+
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'forbidden']], [
+        Post::class => ['viewAny' => [
+            'mode' => 'conditions',
+            'rules' => [[
+                'logic' => 'and', 'kind' => 'value', 'column' => 'published',
+                'operator' => '=', 'value' => 'true', 'authority' => '',
+            ]],
+        ]],
+    ]);
+
+    $after = permissionClass()::query()->withoutGlobalScopes()
+        ->whereNotNull('options')->orderByDesc('id')->firstOrFail()->getAttribute('options');
+
+    expect($after)->toBe($before);
+});
+
+test('a rule the browser really changed is written as the browser sent it', function (): void {
+    $role = makeRole();
+    Warden::allow($role)->to('viewAny', Post::class)->where('published', '=', 'true');
+
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'granted']], [
+        Post::class => ['viewAny' => [
+            'mode' => 'conditions',
+            'rules' => [[
+                'logic' => 'and', 'kind' => 'value', 'column' => 'published',
+                'operator' => '=', 'value' => 'false', 'authority' => '',
+            ]],
+        ]],
+    ]);
+
+    $after = permissionClass()::query()->withoutGlobalScopes()
+        ->whereNotNull('options')->orderByDesc('id')->firstOrFail()->getAttribute('options');
+
+    expect($after['g']['i'][0][1]['v'])->toBeFalse();
+});
+
+test('a numeric string keeps being a string when only the stance moves', function (): void {
+    $role = makeRole();
+    Warden::allow($role)->to('viewAny', Post::class)->where('id', '=', '2');
+
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'forbidden']], [
+        Post::class => ['viewAny' => [
+            'mode' => 'conditions',
+            'rules' => [[
+                'logic' => 'and', 'kind' => 'value', 'column' => 'id',
+                'operator' => '=', 'value' => '2', 'authority' => '',
+            ]],
+        ]],
+    ]);
+
+    $after = permissionClass()::query()->withoutGlobalScopes()
+        ->whereNotNull('options')->orderByDesc('id')->firstOrFail()->getAttribute('options');
+
+    expect($after['g']['i'][0][1]['v'])->toBe('2');
+});
