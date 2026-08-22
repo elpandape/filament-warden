@@ -9,10 +9,12 @@ use ElPandaPe\FilamentWarden\Grants\Assignment;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
+use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Facades\Filament;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
@@ -82,6 +84,27 @@ function heldKey(Model $role): int|string
     $key = $role->getKey();
 
     return is_int($key) || is_string($key) ? $key : '';
+}
+
+/**
+ * This file's own copy, not a naming preference: `make test`/`make coverage`
+ * run `pest --parallel`, which splits test FILES across worker processes, so
+ * a global helper declared in `AssignmentTest.php` is simply undefined in a
+ * worker that never loads that file — the same reason `RoleResourceTest.php`
+ * carries its own `heldReads()` instead of reusing `assignedRoleReads()`.
+ */
+function assignModalReads(): int
+{
+    $table = Context::resolve()->table('assigned_roles');
+    $reads = 0;
+
+    foreach (DB::getQueryLog() as $entry) {
+        if (str_contains($entry['query'], $table)) {
+            $reads++;
+        }
+    }
+
+    return $reads;
 }
 
 test('without viewAny on roles the tab is filtered out of a page before it mounts', function (): void {
@@ -296,6 +319,45 @@ test('a role value that is not a key writes nothing through the header action', 
         ->assertHasNoTableActionErrors();
 
     expect(Assignment::of($account))->toBeEmpty();
+});
+
+/**
+ * I2 of the v1.4.0 whole-branch review: the CHANGELOG's own "Not included"
+ * entry named this cost — 405 `assigned_roles` statements opening the assign
+ * modal against a 200-role catalogue — and deferred the fix (memoising
+ * `Assignment::assignments()` risks handing a check right after a write a
+ * stale row list, `AssignmentTest.php` already explains why `assignments()`
+ * stays unmemoised) without capping it, unlike every other cost this
+ * codebase measures and defers: `RoleResourceTest.php`'s 11-measured/13-cap,
+ * `AssignmentTest.php`'s 5-measured/8-cap and 6-measured/10-cap.
+ * `Select::getOptionsForJs()` calls `isOptionDisabled()` once per option
+ * (`Select.php:155`), and `disableOptionWhen()` here is
+ * `! Assignment::offers()`, which costs two unmemoised `assignments()` reads
+ * per role — `isRestricted()` and `isElsewhere()` each loop it fresh. Without
+ * a cap, nothing reddens when 405 becomes 2000 on the 200-role installation
+ * this screen exists to serve.
+ */
+test('the assign modal costs 405 assigned_roles statements for 200 roles, capped at 410', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+
+    for ($i = 0; $i < 200; $i++) {
+        makeRole('role-'.$i);
+    }
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    livewire(RolesRelationManager::class, [
+        'ownerRecord' => $account,
+        'pageClass' => EditRole::class,
+    ])->mountTableAction('assign');
+
+    $reads = assignModalReads();
+    DB::disableQueryLog();
+
+    expect($reads)->toBeLessThanOrEqual(410);
 });
 
 test('retracting through the row action takes the role back', function (): void {
