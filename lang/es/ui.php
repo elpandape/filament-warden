@@ -192,6 +192,7 @@ return [
             'open' => 'Pantallas que no deciden quién entra. Filament contesta que sí por ellas, así que están abiertas a cualquiera que llegue al panel.',
             'unpoliced' => 'Recursos cuyo modelo no tiene Policy. Es el caso en el que Filament falla abierto.',
             'orphans' => 'Permisos a los que no apunta ninguna concesión. Nada los consulta. Quien los borra es `warden:clean`.',
+            'forgotten' => 'Permisos que nadie declara y a los que no apunta ninguna concesión. Los dejó atrás un renombrado y ya no pueden casar nunca. Son los que ponen `--check` en rojo.',
             'strays' => 'Concesiones a acciones que ya no declara nadie: un método de Policy renombrado, una errata en un seeder, una pantalla borrada.',
             'drifted' => 'Tipos de entidad que nadie declara. Un alias de morph entero dejó de casar: el mapa se movió y todas sus filas se callaron.',
             'unwalkable' => 'Modelos a los que solo llega un relation manager, y que no se pueden recorrer sin ejecutar la relación.',

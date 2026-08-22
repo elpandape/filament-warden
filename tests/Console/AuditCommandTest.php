@@ -9,8 +9,11 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\BrokenPolicyResou
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\ClosureGroupResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\CommentResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\LedgerResource;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\PostResource;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\TagResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Ledger;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Tag;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
@@ -19,11 +22,35 @@ use Filament\Resources\Resource;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Gate;
 
+/**
+ * `warden:clean` deletes every unused permission, declared or not, so both of the
+ * lists this file separates are true about it. What separates them is the exit
+ * code: the informational one is what normal use of the grid produces —
+ * `revoke()` deletes the grant and leaves the row — so a build that went red on it
+ * would go red on every save, forever.
+ *
+ * Three shapes cannot be asked whether the catalogue declares them, and all three
+ * land informational: a row clamped to one record (the catalogue holds classes,
+ * never rows), the wildcard, and a name that is not a string. Only the first two
+ * can be written by a test; the third is unreachable, because `name` is `NOT NULL`.
+ */
 pest()->extend(TestCase::class);
 
 function audit(bool $check = false): int
 {
     return Artisan::call('filament-warden:audit', $check ? ['--check' => true] : []);
+}
+
+/**
+ * The last command's output with every run of whitespace flattened.
+ *
+ * The console view word-wraps a heading at the terminal width, so a sentence that
+ * is one line in the language file is not one line on screen. `Artisan::output()`
+ * fetches from a buffered output and empties it, so it answers once per run.
+ */
+function auditOutput(): string
+{
+    return (string) preg_replace('/\s+/', ' ', Artisan::output());
 }
 
 test('a clean installation answers zero, with or without the flag', function (): void {
@@ -35,15 +62,118 @@ test('a clean installation answers zero, with or without the flag', function ():
 test('the flag is what turns a finding into a red build', function (): void {
     makePermission('nobody-holds-this');
 
-    expect(Audit::run()->orphans)->not->toBeEmpty()
+    expect(Audit::run()->forgotten)->not->toBeEmpty()
         ->and(audit())->toBe(0)
         ->and(audit(true))->toBe(1);
+
+    expect(auditOutput())->toContain('Permissions nothing declares');
 });
 
-test('a permission somebody holds is not an orphan', function (): void {
+test('a permission somebody holds is in neither list', function (): void {
     Warden::allow(makeRole())->to('viewAny', roleClass());
 
-    expect(Audit::run()->orphans)->toBeEmpty();
+    $audit = Audit::run();
+
+    expect($audit->orphans)->toBeEmpty()
+        ->and($audit->forgotten)->toBeEmpty();
+});
+
+test('a cell turned off leaves a row the catalogue still declares, and it is not a red build', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', roleClass());
+    Warden::disallow($role)->to('viewAny', roleClass());
+
+    $audit = Audit::run();
+
+    expect($audit->orphans)->toContain('viewAny on warden.role')
+        ->and($audit->forgotten)->toBeEmpty()
+        ->and($audit->isClean())->toBeTrue()
+        ->and(audit(true))->toBe(0);
+});
+
+test('a permission clamped to one record is not called undeclared', function (): void {
+    $post = Post::query()->create(['title' => 'A post']);
+
+    $permission = Warden::permission([
+        'name' => 'nothing-declares-this',
+        'entity_type' => $post->getMorphClass(),
+        'entity_id' => $post->getKey(),
+    ]);
+    $permission->save();
+
+    $audit = Audit::run();
+
+    expect($audit->forgotten)->toBeEmpty()
+        ->and($audit->orphans)->not->toBeEmpty()
+        ->and(audit(true))->toBe(0);
+});
+
+test('a record-pinned row whose name the catalogue does declare is informational too', function (): void {
+    $role = makeRole();
+
+    $permission = Warden::permission([
+        'name' => 'viewAny',
+        'entity_type' => $role->getMorphClass(),
+        'entity_id' => $role->getKey(),
+    ]);
+    $permission->save();
+
+    $audit = Audit::run();
+
+    expect($audit->forgotten)->toBeEmpty()
+        ->and($audit->orphans)->toContain('viewAny on warden.role')
+        ->and(audit(true))->toBe(0);
+});
+
+test('the widest rule in the store is not a red build when nobody holds it', function (): void {
+    $permission = Warden::permission(['name' => '*', 'entity_type' => '*']);
+    $permission->save();
+
+    $audit = Audit::run();
+
+    expect($audit->forgotten)->toBeEmpty()
+        ->and($audit->orphans)->not->toBeEmpty()
+        ->and(audit(true))->toBe(0);
+});
+
+test('a name one panel declares is not undeclared because another panel does not', function (): void {
+    $post = new Post();
+    $tag = new Tag();
+
+    $onPosts = Warden::permission(['name' => 'viewAny', 'entity_type' => $post->getMorphClass()]);
+    $onPosts->save();
+
+    $onTags = Warden::permission(['name' => 'viewAny', 'entity_type' => $tag->getMorphClass()]);
+    $onTags->save();
+
+    $audit = Audit::of([
+        Panel::make()->id('posts')->resources([PostResource::class]),
+        Panel::make()->id('tags')->resources([TagResource::class]),
+    ]);
+
+    expect($audit->forgotten)->toBeEmpty()
+        ->and($audit->orphans)->toContain('viewAny on '.Post::class)
+        ->and($audit->orphans)->toContain('viewAny on '.Tag::class);
+});
+
+test('the informational list is printed, and it does not answer nothing to report', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', roleClass());
+    Warden::disallow($role)->to('viewAny', roleClass());
+
+    audit();
+
+    expect(auditOutput())->toContain('Permissions no grant points at.')
+        ->toContain('viewAny on warden.role')
+        ->not->toContain('Nothing to report.');
+});
+
+test('a run with nothing at all still answers nothing to report', function (): void {
+    audit();
+
+    expect(auditOutput())->toContain('Nothing to report.');
 });
 
 test('a grant for an action nothing declares is the silent typo', function (): void {

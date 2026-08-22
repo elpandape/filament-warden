@@ -155,10 +155,14 @@ class PermissionsTable
     /**
      * Any grant pointing at this row, of any kind of authority.
      *
-     * The same shape warden's own `clean` command uses, so the screen and the
-     * console agree on what an orphan is — and built against the grants table
-     * rather than through `Permission::roles()`, which reaches roles only and
+     * The same shape warden's own `clean` command uses, so the screen, the console
+     * and warden agree on which rows are unused — and built against the grants
+     * table rather than through `Permission::roles()`, which reaches roles only and
      * welds a tenant predicate no scope removal can strip.
+     *
+     * The console splits that same set in two by severity; this filter does not.
+     * `held` here means what it means in `warden:clean`: no grant points at the
+     * row, declared or not.
      *
      * The permission side is qualified by the model, which is what the listing
      * selects from: its key is only called `id` until an installation swaps the

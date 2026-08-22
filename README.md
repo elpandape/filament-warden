@@ -60,7 +60,7 @@
 | 🏗️ **Advanced conditions** | Restrict permissions with SQL-like conditions (`name = editor AND scope >= 2`). |
 | 🧪 **Test bench** | Verify permissions in real time from the panel without writing code. |
 | 🛡️ **Security guard** | The panel refuses to boot if there are unprotected pages or widgets. |
-| 📊 **Automatic audit** | Detects unguarded screens, missing policies, and orphaned permissions. |
+| 📊 **Automatic audit** | Detects unguarded screens, missing policies, and permissions nothing declares. |
 | 🔄 **Smart cache** | Automatic invalidation when assigning roles. No ghost permissions. |
 | 🏢 **Multi-tenancy** | Native support for tenant scopes across all warden tables. |
 
@@ -433,18 +433,23 @@ Turn one off only to get the panel up while you close the screens — `php artis
 # View report
 php artisan filament-warden:audit
 
-# CI mode (fails with exit code 1 if issues found)
+# CI mode (fails with exit code 1 on an actionable finding)
 php artisan filament-warden:audit --check
 ```
 
-It writes nothing, and reports six things:
+It writes nothing, and reports seven things:
 
 - **screens nobody guards** — the same finding the guard throws on, which is how it reaches CI at all: no artisan command ever starts a panel;
 - **resources whose model has no policy** — the case Filament fails open on, told apart from a policy that declares nothing and from a resource pointing at a class that does not exist;
-- **permissions no grant points at** — `php artisan warden:clean` is what removes them, and `--dry-run` shows the list first;
+- **permissions the catalogue declares that no grant points at** — *informational: this one never turns `--check` red*. Turning a grid cell off revokes the grant and leaves the row, because warden's `revoke()` only touches `grants`, so a build that failed on this would fail on every save and stay failing. `php artisan warden:clean` is what removes them, and `--dry-run` shows the list first;
+- **permissions nothing declares that no grant points at** — a rename left them behind: they can never match again, and nothing will ever create them;
 - **grants for actions nothing declares any more** — a renamed policy method, a typo in a seeder, a screen that was deleted: the silent mistake warden has no way to detect;
 - **whole entity types nothing declares** — a morph alias that moved, reported apart because the fix is the opposite one;
 - **models only a relation manager reaches**, with the `catalog.models` line that settles it.
+
+`--check` returns 1 for every finding above except the informational one.
+
+The word "orphaned" is wider on the permissions screen than it is here. The **Orphaned** filter there means what `warden:clean` means — no grant points at the row, declared or not — which is the whole of the third and fourth bullets together. This command splits that same population in two, because only half of it is worth failing a build over. Nothing on the screen is renamed: those rows are exactly the rows `warden:clean` will delete, and that is the meaning the screen exists to act on.
 
 ---
 

@@ -192,6 +192,7 @@ return [
             'open' => 'Screens that do not decide who gets in. Filament answers true for these, so they are open to anybody who reaches the panel.',
             'unpoliced' => 'Resources whose model has no policy. This is the case Filament fails open on.',
             'orphans' => 'Permissions no grant points at. Nothing consults them. `warden:clean` is what removes them.',
+            'forgotten' => 'Permissions nothing declares and no grant points at. A rename left them behind and they can never match again. These are what turn `--check` red.',
             'strays' => 'Grants for actions nothing declares any more — a renamed policy method, a typo in a seeder, a screen that was deleted.',
             'drifted' => 'Entity types nothing declares at all. A whole morph alias stopped matching: the map moved, and every row of it went quiet.',
             'unwalkable' => 'Models only a relation manager reaches, which cannot be walked without running the relationship.',

@@ -26,7 +26,8 @@ final readonly class Audit
     /**
      * @param  list<string>  $open  screens that do not decide who gets in
      * @param  list<string>  $unpoliced  resources whose model has no policy
-     * @param  list<string>  $orphans  permissions no grant points at
+     * @param  list<string>  $orphans  permissions the catalogue declares that no grant points at
+     * @param  list<string>  $forgotten  permissions nothing declares that no grant points at
      * @param  list<string>  $strays  grants for actions nothing declares
      * @param  list<string>  $drifted  the same, but a whole entity type at once
      * @param  list<string>  $unwalkable  models only a relation manager reaches
@@ -35,6 +36,7 @@ final readonly class Audit
         public array $open = [],
         public array $unpoliced = [],
         public array $orphans = [],
+        public array $forgotten = [],
         public array $strays = [],
         public array $drifted = [],
         public array $unwalkable = [],
@@ -79,26 +81,54 @@ final readonly class Audit
             }
         }
 
+        [$orphans, $forgotten] = self::orphans($declared);
         [$strays, $drifted] = self::strays($declared, $types);
 
         return new self(
             open: $open,
             unpoliced: $unpoliced,
-            orphans: self::orphans(),
+            orphans: $orphans,
+            forgotten: $forgotten,
             strays: $strays,
             drifted: $drifted,
             unwalkable: array_values(array_unique($unwalkable)),
         );
     }
 
+    /**
+     * The exit code's only source of truth, and `orphans` is deliberately not in
+     * it.
+     *
+     * A permission the catalogue declares that nobody holds is what normal use of
+     * the grid leaves behind on every cell turned off: warden's `revoke()` deletes
+     * the grant and never the row. Putting that bucket back into this conjunction
+     * makes `--check` exactly as red as it was before the split, with every test
+     * still green — this class has one consumer, and it is the command.
+     *
+     * Removing one term and adding another leaves the count at six, so no test
+     * that counts can catch the mistake. `AuditCommandTest` asserts the exit code
+     * on a declared orphan instead.
+     */
     public function isClean(): bool
     {
         return $this->open === []
             && $this->unpoliced === []
-            && $this->orphans === []
+            && $this->forgotten === []
             && $this->strays === []
             && $this->drifted === []
             && $this->unwalkable === [];
+    }
+
+    /**
+     * Nothing was printed at all, which is a different question from `isClean()`.
+     *
+     * A run that reports only the informational bucket exits 0 and still has a
+     * heading and a table on screen, so answering "Nothing to report." underneath
+     * them would contradict the lines above it.
+     */
+    public function isSilent(): bool
+    {
+        return $this->isClean() && $this->orphans === [];
     }
 
     /**
@@ -174,9 +204,37 @@ final readonly class Audit
     }
 
     /**
-     * A permission no grant points at. The shape `warden:clean` uses, so the
-     * screen, the console and this agree on the word — and without the global
-     * scopes, because a row nobody uses belongs to no tenant.
+     * A permission no grant points at, in two severities.
+     *
+     * The predicate is `warden:clean`'s, unchanged: the screen, the console and
+     * warden still agree on which rows are unused, and still without the global
+     * scopes, because a row nobody uses belongs to no tenant. What is new is the
+     * split. Turning a grid cell off revokes the grant and leaves the row behind,
+     * because `revoke()` only touches `grants` — so a declared, unheld row is what
+     * normal use of the grid produces, on every save. It is reported and it is not
+     * red: a build that failed on it would fail forever, and the only way to stop
+     * it failing would be to stop using the grid.
+     *
+     * Red needs a row that can be PROVEN undeclared, and the proof needs a string
+     * name, no wildcard on either side, and no `entity_id`. Those are the three
+     * shapes `strays()` skips outright, and they are decided here the same way and
+     * for the same reasons — but they land informational rather than silent,
+     * because unlike a stray these rows really are unused and `warden:clean`
+     * really will delete them, so saying nothing would be a lie:
+     *
+     * - a row clamped to one record cannot be looked up at all: the catalogue
+     *   holds classes and never rows, so a class-keyed map would call every
+     *   record-pinned row undeclared;
+     * - the widest rule in the store is not a mistake, and `everything()` writes
+     *   `*` as the entity type on purpose;
+     * - a name that is not a string could match nothing anyway, and `label()`
+     *   already shows it as `?` — calling it undeclared would add a red build and
+     *   no action.
+     *
+     * `$declared` is the union of every panel's catalogue, built by `of()`. It has
+     * to be the union: the catalogue is per panel, so a name one panel declares
+     * would read as unknown against another and a two-panel installation would go
+     * red on rows both panels are happy with.
      *
      * The correlated column is qualified by the model and not by the configured
      * table name. The outer query already selects from `$model->getTable()`, so
@@ -184,9 +242,10 @@ final readonly class Audit
      * an installation swaps the model. Taking both off one instance is what
      * makes them unable to disagree.
      *
-     * @return list<string>
+     * @param  array<string, bool>  $declared
+     * @return array{0: list<string>, 1: list<string>}
      */
-    private static function orphans(): array
+    private static function orphans(array $declared): array
     {
         $context = Context::resolve();
         $grants = $context->table('grants');
@@ -202,13 +261,37 @@ final readonly class Audit
             )
             ->get();
 
-        $findings = [];
+        $orphans = [];
+        $forgotten = [];
 
         foreach ($rows as $row) {
-            $findings[] = self::label($row);
+            $name = $row->getAttribute('name');
+            $type = $row->getAttribute('entity_type');
+
+            // The three shapes declaredness cannot be asked about. They share one
+            // line, and `! is_string($name)` shares it for the same reason it does
+            // in `RoleGrants::of()`: `name` is `NOT NULL` in warden's schema, so
+            // that check can never fail on its own — only PHPStan needs it — and a
+            // branch nothing can reach is a branch coverage cannot ask a test to
+            // hit honestly. It also has to stay an `if` with a `continue` rather
+            // than a precomputed boolean, because a boolean does not carry the
+            // `is_string()` narrowing forward to the concatenation below.
+            if (! is_string($name) || $name === '*' || $type === '*' || $row->getAttribute('entity_id') !== null) {
+                $orphans[] = self::label($row);
+
+                continue;
+            }
+
+            if (($declared[$name.'|'.(is_string($type) ? $type : '')] ?? false) === true) {
+                $orphans[] = self::label($row);
+
+                continue;
+            }
+
+            $forgotten[] = self::label($row);
         }
 
-        return $findings;
+        return [$orphans, $forgotten];
     }
 
     /**

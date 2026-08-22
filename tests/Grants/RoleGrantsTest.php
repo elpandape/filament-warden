@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use ElPandaPe\FilamentWarden\Catalog\Audit;
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Conditions\Shape;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
@@ -36,6 +37,11 @@ function gridCatalog(): Catalog
 function grantCount(): int
 {
     return Context::resolve()->grantClass()::query()->count();
+}
+
+function permissionCount(): int
+{
+    return permissionClass()::query()->withoutGlobalScopes()->count();
 }
 
 /**
@@ -100,6 +106,22 @@ test('a cell returned to abstaining leaves nothing behind', function (string $fr
     expect(grantCount())->toBe(0)
         ->and(RoleGrants::of($role, $catalog)->stances)->toBeEmpty();
 })->with(['granted', 'forbidden']);
+
+test('the catalogue row the cell minted survives, and the audit does not go red on it', function (): void {
+    $role = makeRole();
+    $panel = Panel::make()->id('scratch')->resources([PostResource::class]);
+    $catalog = Catalog::for($panel);
+
+    RoleGrants::apply($role, $catalog, [Post::class => ['viewAny' => 'granted']]);
+    RoleGrants::apply($role, $catalog, []);
+
+    $audit = Audit::of([$panel]);
+
+    expect(grantCount())->toBe(0)
+        ->and(permissionCount())->toBe(1)
+        ->and($audit->forgotten)->toBeEmpty()
+        ->and($audit->orphans)->toContain('viewAny on '.Post::class);
+});
 
 test('shift reaches a denial in one step, and that is a single write', function (): void {
     $role = makeRole();
