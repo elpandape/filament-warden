@@ -34,6 +34,17 @@ use Illuminate\Support\Facades\Event;
  * below — if the two constants ever diverge, that pin goes red first and the
  * write half is what the reader must then go and check, because nothing here
  * names it.
+ *
+ * `Narrowing::is()` compares `toPayload()`, and both sides of that comparison
+ * route every value through `Value::text()` — so it answers "unchanged" for a
+ * rule whose type moved as long as its text did not, and it cannot be trusted
+ * as the source of what a write becomes. `flipping a stance keeps the rule
+ * exactly as the store wrote it`, `a rule the browser really changed is
+ * written as the browser sent it`, `a numeric string keeps being a string
+ * when only the stance moves` and `a decimal string keeps being a string when
+ * only the stance moves` depend on `changes()` picking the value from the
+ * stored `Narrowing` when nothing moved, rather than from what `is()` alone
+ * could tell apart.
  */
 pest()->extend(TestCase::class);
 
@@ -796,17 +807,6 @@ test('a cell that is both ownership and conditions is never written over', funct
         ->and($permission->getAttribute('only_owned'))->toBeTrue();
 });
 
-/**
- * `Narrowing::is()` compares `toPayload()`, and both sides of that comparison
- * route every value through `Value::text()` — so it answers "unchanged" for a
- * rule whose type moved as long as its text did not, and it cannot be trusted
- * as the source of what a write becomes. `flipping a stance keeps the rule
- * exactly as the store wrote it`, `a rule the browser really changed is
- * written as the browser sent it` and `a numeric string keeps being a string
- * when only the stance moves` depend on `changes()` picking the value from the
- * stored `Narrowing` when nothing moved, rather than from what `is()` alone
- * could tell apart.
- */
 test('flipping a stance keeps the rule exactly as the store wrote it', function (): void {
     $role = makeRole();
     Warden::allow($role)->to('viewAny', Post::class)->where('published', '=', 'true');
@@ -827,7 +827,9 @@ test('flipping a stance keeps the rule exactly as the store wrote it', function 
     $after = permissionClass()::query()->withoutGlobalScopes()
         ->whereNotNull('options')->orderByDesc('id')->firstOrFail()->getAttribute('options');
 
-    expect($after)->toBe($before);
+    expect($after)->toBe($before)
+        ->and(grantCount())->toBe(1)
+        ->and(RoleGrants::of($role, gridCatalog())->stances[Post::class]['viewAny'])->toBe('forbidden');
 });
 
 test('a rule the browser really changed is written as the browser sent it', function (): void {
@@ -869,5 +871,30 @@ test('a numeric string keeps being a string when only the stance moves', functio
     $after = permissionClass()::query()->withoutGlobalScopes()
         ->whereNotNull('options')->orderByDesc('id')->firstOrFail()->getAttribute('options');
 
-    expect($after['g']['i'][0][1]['v'])->toBe('2');
+    expect($after['g']['i'][0][1]['v'])->toBe('2')
+        ->and(grantCount())->toBe(1)
+        ->and(RoleGrants::of($role, gridCatalog())->stances[Post::class]['viewAny'])->toBe('forbidden');
+});
+
+test('a decimal string keeps being a string when only the stance moves', function (): void {
+    $role = makeRole();
+    Warden::allow($role)->to('viewAny', Post::class)->where('id', '=', '2.5');
+
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'forbidden']], [
+        Post::class => ['viewAny' => [
+            'mode' => 'conditions',
+            'rules' => [[
+                'logic' => 'and', 'kind' => 'value', 'column' => 'id',
+                'operator' => '=', 'value' => '2.5', 'authority' => '',
+            ]],
+        ]],
+    ]);
+
+    /** @var array{g: array{i: list<array{0: string, 1: array<string, mixed>}>}} $after */
+    $after = permissionClass()::query()->withoutGlobalScopes()
+        ->whereNotNull('options')->orderByDesc('id')->firstOrFail()->getAttribute('options');
+
+    expect($after['g']['i'][0][1]['v'])->toBe('2.5')
+        ->and(grantCount())->toBe(1)
+        ->and(RoleGrants::of($role, gridCatalog())->stances[Post::class]['viewAny'])->toBe('forbidden');
 });
