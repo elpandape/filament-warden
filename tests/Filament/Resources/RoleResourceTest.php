@@ -10,6 +10,7 @@ use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Tables\RolesTable;
 use ElPandaPe\FilamentWarden\Grants\Holders;
 use ElPandaPe\FilamentWarden\Support\Access;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
@@ -43,6 +44,28 @@ use function Pest\Livewire\livewire;
  * simply undefined — measured as `Error: Call to undefined function
  * assignedRoleReads()` on a parallel run that passed file-by-file. `heldReads()`
  * below is this file's own copy for that reason, not a naming preference.
+ *
+ * Neither the count column nor `RolesTable::warning()`/`labels()` filters on
+ * `restricted_to_type`: an assignment narrowed to a context is one more row
+ * with the same `role_id`, counted and named exactly like an unrestricted one
+ * — 'a holder restricted to a context still counts as held' and 'the delete
+ * warning names a holder restricted to a context too'. A translated sentence
+ * on `ViewRole`'s section claimed otherwise for one release; it was the
+ * sentence that was wrong, and it was corrected rather than the behaviour.
+ *
+ * `assertSee()` after `mountAction` never renders a modal's body in this
+ * harness — confirmed by dumping the full HTML of a mounted delete action and
+ * finding no `fi-modal` in it at all — so the only way to prove a
+ * `modalDescription` closure is actually WIRED to a given action (as opposed
+ * to merely correct in isolation, which the direct `RolesTable::warning()`
+ * calls above already cover) is to resolve the action object itself and read
+ * `getModalDescription()` off it: `assertActionExists()` for a page's own
+ * action, `assertTableActionExists(..., record: $role)` for a table row's.
+ * This pin exists on all three delete surfaces — "the edit screen's delete
+ * modal...", "the listing's delete modal..." and "the view screen's delete
+ * modal..." — and their three "nobody holds" siblings, because leaving even
+ * one untested is exactly the shape §6.30 warns about: every other test stays
+ * green if that one `->modalDescription(...)` line is deleted.
  */
 pest()->extend(TestCase::class);
 
@@ -636,6 +659,68 @@ test('a role nobody holds says so on the edit screen too', function (): void {
         );
 });
 
+test("the listing's delete modal says what it takes with it too", function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $role = makeRole();
+    Warden::assign($role)->to(makeUser('Amaru Quispe'));
+
+    livewire(ListRoles::class)
+        ->assertTableActionExists(
+            'delete',
+            record: $role,
+            checkActionUsing: fn (DeleteAction $action): bool => is_string($description = $action->getModalDescription()) && str_contains($description, 'Amaru Quispe'),
+        );
+});
+
+test('a role nobody holds says so on the listing too', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $role = makeRole();
+
+    livewire(ListRoles::class)
+        ->assertTableActionExists(
+            'delete',
+            record: $role,
+            checkActionUsing: fn (DeleteAction $action): bool => is_string($description = $action->getModalDescription()) && str_contains($description, 'Nobody holds this role'),
+        );
+});
+
+test("the view screen's delete modal says what it takes with it too", function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $role = makeRole();
+    Warden::assign($role)->to(makeUser('Amaru Quispe'));
+
+    livewire(ViewRole::class, ['record' => $role->getKey()])
+        ->assertActionExists(
+            'delete',
+            checkActionUsing: fn (DeleteAction $action): bool => is_string($description = $action->getModalDescription()) && str_contains($description, 'Amaru Quispe'),
+        );
+});
+
+test('a role nobody holds says so on the view screen too', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $role = makeRole();
+
+    livewire(ViewRole::class, ['record' => $role->getKey()])
+        ->assertActionExists(
+            'delete',
+            checkActionUsing: fn (DeleteAction $action): bool => is_string($description = $action->getModalDescription()) && str_contains($description, 'Nobody holds this role'),
+        );
+});
+
 test('deleting a role from its view screen reaches the store too', function (): void {
     config()->set('cache.default', 'array');
     config()->set('filament-warden.roles.delete', 'all');
@@ -751,6 +836,18 @@ test('the listing counts how many accounts hold each role', function (): void {
         ->assertTableColumnStateSet('held', 1, $role);
 });
 
+test('a holder restricted to a context still counts as held', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    $role = makeRole();
+    $post = Post::query()->create(['title' => 'A post']);
+    Warden::assign($role)->on($post)->to(makeUser('Holder'));
+
+    livewire(ListRoles::class)
+        ->assertTableColumnStateSet('held', 1, $role);
+});
+
 test('the count column stays under the tenant you are in, unlike the delete rule beside it', function (): void {
     $user = signIn();
     Warden::allow($user)->to('viewAny', roleClass());
@@ -790,6 +887,17 @@ test('a role nobody holds says so in the delete warning', function (): void {
 test('the delete warning names who it takes with it', function (): void {
     $role = makeRole();
     Warden::assign($role)->to(makeUser('Amaru Quispe'));
+
+    $warning = RolesTable::warning($role);
+
+    expect($warning)->toContain('1 in total')
+        ->and($warning)->toContain('Amaru Quispe');
+});
+
+test('the delete warning names a holder restricted to a context too', function (): void {
+    $role = makeRole();
+    $post = Post::query()->create(['title' => 'A post']);
+    Warden::assign($role)->on($post)->to(makeUser('Amaru Quispe'));
 
     $warning = RolesTable::warning($role);
 

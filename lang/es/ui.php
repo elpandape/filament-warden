@@ -28,7 +28,7 @@ return [
                 'held' => 'Lo tienen',
             ],
             'holders' => [
-                'description' => 'Contado bajo el tenant en el que estás. Una asignación hecha en otro, o restringida a un contexto, no aparece aquí.',
+                'description' => 'Contado bajo el tenant en el que estás. Una asignación hecha en otro tenant no aparece aquí; una restringida a un contexto sí, contada igual que cualquier otra.',
                 'nobody' => 'Nadie tiene este rol aquí.',
                 'held' => 'Lo tienen :count — :names.',
             ],

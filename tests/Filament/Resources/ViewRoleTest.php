@@ -5,6 +5,7 @@ declare(strict_types=1);
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\CreateRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\EditRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ViewRole;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Facades\Warden;
 
@@ -21,6 +22,14 @@ use function Pest\Livewire\livewire;
  * `RolesTable::warning()`'s own wide read behind the delete button beside it
  * (§6.24) — 'the section stays under the tenant you are in, unlike the delete
  * warning beside it'.
+ *
+ * Neither the section nor the count column filters on `restricted_to_type`:
+ * an assignment narrowed to a context is written to the same table with the
+ * same `role_id`, no different from an unrestricted one, so it is counted and
+ * named exactly the same — 'the screen names a holder restricted to a context
+ * too'. The translated description of this section said the opposite for one
+ * release; the sentence was wrong, not the code, and got corrected to match
+ * what is actually true.
  */
 pest()->extend(TestCase::class);
 
@@ -254,6 +263,19 @@ test('the screen names an account that holds it', function (): void {
     $user = signIn();
     $role = makeRole();
     Warden::assign($role)->to(makeUser('Amaru Quispe'));
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', $role);
+
+    livewire(ViewRole::class, ['record' => $role->getKey()])
+        ->assertSee('Amaru Quispe');
+});
+
+test('the screen names a holder restricted to a context too', function (): void {
+    $user = signIn();
+    $role = makeRole();
+    $post = Post::query()->create(['title' => 'A post']);
+    Warden::assign($role)->on($post)->to(makeUser('Amaru Quispe'));
 
     Warden::allow($user)->to('viewAny', roleClass());
     Warden::allow($user)->to('view', $role);

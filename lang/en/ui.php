@@ -28,7 +28,7 @@ return [
                 'held' => 'Held by',
             ],
             'holders' => [
-                'description' => 'Counted under the tenant you are in. An assignment made elsewhere, or restricted to a context, does not show here.',
+                'description' => 'Counted under the tenant you are in. An assignment made elsewhere does not show here; one restricted to a context does, counted the same as any other.',
                 'nobody' => 'Nobody holds this role here.',
                 'held' => 'Held by :count — :names.',
             ],
