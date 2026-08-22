@@ -297,3 +297,30 @@ test('the name column is searchable and sortable', function (): void {
         static fn (TextColumn $column): bool => $column->isSearchable() && $column->isSortable(),
     );
 });
+
+/**
+ * CORRECTED, against a Step 7 breakage that predicted a fatal and did not get
+ * one. Removing `$relationship` outright left every test in this file green,
+ * `stan` clean. The reason: `getRelationship()`'s lazy closure, installed by
+ * the base `makeTable()`, is overwritten by `->relationship(null)` in
+ * `table()` before it is ever evaluated, and the one branch of
+ * `canViewForRecord()` that would call `getRelationshipName()` is exactly the
+ * one `$relatedResource` skips. `$relationship` is kept anyway (documented in
+ * its own docblock) as the contract Filament expects, not because this class
+ * is measured to need it. `Post` stands in for the owner record here on
+ * purpose — it declares no `roles()` method at all, so the assertion would
+ * fail loudly, not silently, if any code path here ever reached for the
+ * account's own relation instead of `Assignment::of()`.
+ */
+test('an owner record with no roles() relation of its own still renders', function (): void {
+    signInAsRoleManager();
+
+    $post = Post::query()->create(['title' => 'Not an authority']);
+
+    livewire(RolesRelationManager::class, [
+        'ownerRecord' => $post,
+        'pageClass' => EditRole::class,
+    ])
+        ->assertCountTableRecords(0)
+        ->assertOk();
+});

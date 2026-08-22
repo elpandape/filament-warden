@@ -46,11 +46,24 @@ use Illuminate\Database\Eloquent\Model;
 class RolesRelationManager extends RelationManager
 {
     /**
-     * Without this, `getRelationshipName()` falls through to
-     * `static::getRelatedResource()::getParentResourceRegistration()` — and
-     * with no `$relatedResource` either, that call is
-     * `null::getParentResourceRegistration()`: a fatal error, not a `null` a
-     * `??` could catch (`InteractsWithRelationshipTable.php:63-70`).
+     * `InteractsWithRelationshipTable::getRelationshipName()` falls back to
+     * `static::getRelatedResource()::getParentResourceRegistration()` when
+     * this is unset — `null::getParentResourceRegistration()` with no
+     * `$relatedResource` either, a fatal error and not a `null` a `??` could
+     * catch (`InteractsWithRelationshipTable.php:63-70`). CORRECTED against
+     * this exact class, though: with `$relatedResource` declared below AND
+     * `getTitle()` overridden further down, `getRelationshipName()` is never
+     * actually called anywhere in this class's own render or action path —
+     * measured by removing this property outright: all twelve tests in
+     * `RolesRelationManagerTest.php`, including the ones that render the full
+     * table and run both actions, stayed green, and `stan` stayed clean too.
+     * `getRelationship()`'s lazy closure, set by the base `makeTable()`, is
+     * overwritten by `->relationship(null)` in `table()` below before it is
+     * ever evaluated, and `canViewForRecord()`'s branch that would call it is
+     * the one `$relatedResource` skips (§ below). Kept anyway: it is the
+     * contract `RelationManager` documents, a subclass — this one is
+     * deliberately not `final` — may lean on inherited behaviour this class
+     * does not exercise, and Filament's own scaffold expects it declared.
      */
     protected static string $relationship = 'roles';
 
