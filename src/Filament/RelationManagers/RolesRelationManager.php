@@ -107,10 +107,17 @@ class RolesRelationManager extends RelationManager
      * `recordUrl` closure finds no `edit`/`view` action to build a URL from
      * and returns `null` — this table draws no row link at all, a
      * capability this branch never released (see the CHANGELOG entry for
-     * this fix). What `$relatedResource` used to buy for free —
-     * `canViewForRecord()` answering `RoleResource::canAccess()` instead of
-     * guessing at the account model's own relation — is bought back below by
-     * overriding that method directly.
+     * this fix). The same `if ($relatedResource = …)` block in
+     * `makeTable()` does two MORE things this `null` also switches off —
+     * `$table->modelLabel()`/`->pluralModelLabel()` from
+     * `$relatedResource::getModelLabel()`/`::getPluralModelLabel()` — caught
+     * only in a later pass over this same fix (see `table()` below for the
+     * measurement). Everything `$relatedResource` used to buy for free is
+     * bought back explicitly instead, never by leaving this `null` and
+     * hoping a caller notices what silently changed: `canViewForRecord()`
+     * overridden below to answer `RoleResource::canAccess()`, and
+     * `->modelLabel()`/`->pluralModelLabel()` set in `table()` below from
+     * the same `RoleResource` methods.
      */
     protected static ?string $relatedResource = null;
 
@@ -165,6 +172,25 @@ class RolesRelationManager extends RelationManager
             // relationship makes `resolveTableRecord()` fall back to the query
             // below instead.
             ->relationship(null)
+            // A fourth thing `$relatedResource` used to do for free, beyond
+            // the three named in its own docblock:
+            // `InteractsWithRelationshipTable::makeTable()` also called
+            // `$table->modelLabel($relatedResource::getModelLabel())` and the
+            // plural sibling (`InteractsWithRelationshipTable.php:184-189`),
+            // which read THIS package's own translated
+            // `ui.resources.roles.model`/`.models` through `RoleResource`.
+            // With `$relatedResource` forced to `null` for B1/B2, that stopped
+            // running — measured: `getPluralModelLabel()` fell back to
+            // `get_model_label()` (`Support/helpers.php:55-60`), a bare
+            // `Str::plural(kebab(class_basename($model)))`, always English and
+            // always lowercase whatever the application's locale is set to.
+            // `HasEmptyState::getEmptyStateHeading()` reads exactly that
+            // label for "No :model" — the empty state every new account is
+            // in, not an edge case. Reading `RoleResource::getModelLabel()`/
+            // `::getPluralModelLabel()` here restores the same translated
+            // strings without duplicating the keys they read.
+            ->modelLabel(RoleResource::getModelLabel())
+            ->pluralModelLabel(RoleResource::getPluralModelLabel())
             ->query(static fn (): Builder => Context::resolve()->roleClass()::query()->whereKey(Assignment::of($account)))
             ->columns([
                 TextColumn::make('name')

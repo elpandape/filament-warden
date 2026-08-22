@@ -479,6 +479,20 @@ test('the name column is searchable and sortable', function (): void {
  * record here on purpose — it declares no `roles()` method at all, so the
  * assertion would fail loudly, not silently, if any code path here ever
  * reached for the account's own relation instead of `Assignment::of()`.
+ *
+ * Zero records is also the exact state the empty-state heading needs: the
+ * same `$relatedResource = null` that closes B1/B2 also switched off
+ * `InteractsWithRelationshipTable::makeTable()`'s own
+ * `$table->modelLabel($relatedResource::getModelLabel())` call
+ * (`table()`'s own docblock has the measurement), so without
+ * `->modelLabel()`/`->pluralModelLabel()` set explicitly there this screen
+ * would fall back to Filament's `get_model_label()` — always English,
+ * always lowercase — for "No :model" precisely on the screen every new
+ * account starts on. `assertSee('No Roles')` is case-sensitive
+ * (`TestResponse::assertSee()` → `assertStringContainsString()`, not the
+ * `IgnoringCase` sibling), so it tells the translated "Roles" apart from
+ * the untranslated fallback's "roles" — measured against the fallback
+ * before this fix: `No roles`.
  */
 test('an owner record with no roles() relation of its own still renders', function (): void {
     signInAsRoleManager();
@@ -490,6 +504,7 @@ test('an owner record with no roles() relation of its own still renders', functi
         'pageClass' => EditRole::class,
     ])
         ->assertCountTableRecords(0)
+        ->assertSee('No Roles')
         ->assertOk();
 });
 
