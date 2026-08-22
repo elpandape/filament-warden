@@ -240,7 +240,7 @@ return [
             'empty' => 'La regla guardada lleva un grupo de condiciones vacío: solo responde con una fila delante, y entonces siempre.',
             'shape' => 'Las condiciones guardadas usan una forma que este constructor no sabe dibujar: un grupo anidado, o un valor que no es ni texto ni número.',
             'model' => 'Este permiso apunta a una entidad que no resuelve a un modelo, así que no hay columnas contra las que comprobar sus condiciones. Se enseña tal y como está guardada y se deja en paz.',
-            'column' => 'Las condiciones guardadas nombran una columna que esta tabla ya no tiene. Reescribirlas guardaría una regla que no puede casar nunca, así que se enseñan como están y se dejan en paz.',
+            'column' => 'Las condiciones guardadas nombran una columna que no se puede casar con lo que hay disponible ahora. Reescribirlas guardaría una regla que no puede casar nunca, así que se enseñan como están y se dejan en paz.',
             'rewrite' => 'Las condiciones guardadas se pueden leer pero no volver a escribir exactamente como están: un valor volvería con otro tipo, o la primera línea perdería su or. Guardar cambiaría lo que esta regla significa para todos los que la tienen, así que el constructor se cierra.',
             'owned_with_conditions' => 'La regla guardada se limita a lo que la cuenta posee y además lleva condiciones. Una celda dibuja un solo alcance, así que se enseña tal y como está guardada y se deja en paz: leerla solo como propiedad tiraría la condición la próxima vez que alguien guardara.',
             'tangled' => 'Esta celda tiene más de una regla para la misma acción. La rejilla no sabe enseñar eso, así que no la toca.',

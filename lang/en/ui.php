@@ -240,7 +240,7 @@ return [
             'empty' => 'The stored rule carries an empty condition group: it answers only with a record in front of it, and then always.',
             'shape' => 'The stored conditions use a shape this builder cannot draw — a nested group, or a value that is neither text nor a number.',
             'model' => 'This permission points at an entity that does not resolve to a model, so there are no columns to check its conditions against. It is shown as it is stored and left alone.',
-            'column' => 'The stored conditions name a column this table no longer has. Writing them back would store a rule that can never match, so they are shown as they are and left alone.',
+            'column' => 'The stored conditions name a column that cannot be matched against what is available now. Writing them back would store a rule that can never match, so they are shown as they are and left alone.',
             'rewrite' => 'The stored conditions can be read but not written back exactly as they are — a value would come back as another type, or the first line would lose its or. Saving would change what this rule means for everybody holding it, so the builder is closed.',
             'owned_with_conditions' => 'The stored rule is both limited to what the account owns and carries conditions. A cell draws one reach, so it is shown as it is stored and left alone: reading it as ownership alone would drop the condition the next time anybody saved.',
             'tangled' => 'This cell holds more than one rule for the same action. The grid cannot show that, so it does not touch it.',
