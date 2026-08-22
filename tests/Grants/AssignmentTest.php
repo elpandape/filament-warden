@@ -72,25 +72,33 @@ function assignedRoleReads(): int
 }
 
 /**
+ * Named for what it counts, corrected from an earlier `roleTableReads()`:
+ * every SQL STATEMENT whose text matches the table name, not reads
+ * specifically — it would count a write too, if one happened to run in the
+ * measured window. Every measurement this file takes with it only ever runs
+ * SELECTs, so the numbers are correct; the name should not have implied more
+ * than that.
+ *
  * Quoted, and not a bare `str_contains($query, $table)` the way
  * `assignedRoleReads()` above gets away with: `roles` is a literal substring
  * of `assigned_roles`, so an unquoted check here would count every assignment
  * statement as a roles one too. Measured catching itself: an early draft of
- * this file's cost test used the unquoted form and reported 407 "roles" reads
- * against a 200-role catalogue where the real number, once memoised, is 2.
+ * this file's cost test used the unquoted form and reported 407 "roles"
+ * statements against a 200-role catalogue where the real number, once
+ * memoised, is 2.
  */
-function roleTableReads(): int
+function roleTableStatements(): int
 {
     $table = Context::resolve()->table('roles');
-    $reads = 0;
+    $statements = 0;
 
     foreach (DB::getQueryLog() as $entry) {
         if (str_contains($entry['query'], '"'.$table.'"')) {
-            $reads++;
+            $statements++;
         }
     }
 
-    return $reads;
+    return $statements;
 }
 
 test('every role there is can be offered, named the way a person reads it', function (): void {
@@ -498,9 +506,10 @@ test('take() takes a role back and the store stops answering', function (): void
 
     expect(Access::granted($account, 'viewAny', Post::class))->toBeTrue();
 
-    Assignment::take($account, roleKey($role));
+    $result = Assignment::take($account, roleKey($role));
 
-    expect(Access::granted($account, 'viewAny', Post::class))->toBeFalse()
+    expect($result)->toBeTrue()
+        ->and(Access::granted($account, 'viewAny', Post::class))->toBeFalse()
         ->and(assignmentCount())->toBe(0);
 });
 
@@ -513,9 +522,10 @@ test('take() leaves a restricted assignment alone', function (): void {
 
     Warden::assign($role)->on($post)->to($account);
 
-    Assignment::take($account, roleKey($role));
+    $result = Assignment::take($account, roleKey($role));
 
-    expect(assignmentCount())->toBe(1);
+    expect($result)->toBeFalse()
+        ->and(assignmentCount())->toBe(1);
 });
 
 test('take() leaves a role alone this account may not hand out', function (): void {
@@ -526,9 +536,34 @@ test('take() leaves a role alone this account may not hand out', function (): vo
 
     Warden::assign($role)->to($account);
 
-    Assignment::take($account, roleKey($role));
+    $result = Assignment::take($account, roleKey($role));
 
-    expect(assignmentCount())->toBe(1);
+    expect($result)->toBeFalse()
+        ->and(assignmentCount())->toBe(1);
+});
+
+/**
+ * The one that discriminates `isHeld()`'s inverted guard inside `take()` —
+ * `RolesRelationManagerTest.php`'s Livewire-mounted attempt at the same
+ * scenario cannot: `getTableRecord()` there is scoped to the same
+ * `Assignment::of($account)` this guard reads, so a role not held there
+ * never resolves a record in the first place and the closure never runs.
+ * Called directly, bypassing all of that, `Warden::retract()->from()` would
+ * still delete nothing for a role never assigned — the count assertion below
+ * would stay green even with the guard deleted — but it WOULD still be a
+ * call to warden for no reason, and the return value is what says so:
+ * `take()` reports `false` before ever reaching for `role()` or `Warden`.
+ */
+test('take() writes nothing for a role not held', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    $result = Assignment::take($account, roleKey($role));
+
+    expect($result)->toBeFalse()
+        ->and(assignmentCount())->toBe(0);
 });
 
 /**
@@ -611,7 +646,7 @@ test('byKey() answers every option-disabling check from one roles read', functio
         Assignment::offers($account, $key);
     }
 
-    $reads = roleTableReads();
+    $reads = roleTableStatements();
     DB::disableQueryLog();
 
     expect($keys)->toHaveCount(5)

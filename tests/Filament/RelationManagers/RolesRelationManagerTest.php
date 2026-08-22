@@ -330,6 +330,45 @@ test('a raw retract call on a role restricted after it was mounted writes nothin
     expect(Assignment::of($account))->toBe([heldKey($role)]);
 });
 
+/**
+ * CORRECTED, against an earlier draft that credited `Assignment::take()`'s
+ * own `isHeld()` guard for the silence this test shows. Planting a thrown
+ * exception at the top of `retractAction()`'s closure and retracting the
+ * role between mount and call — the exact steps below — the exception never
+ * surfaced: the closure does not run at all. `getTableRecord()` resolves
+ * against this same table's own query, scoped to `Assignment::of($account)`,
+ * so a role no longer held cannot be resolved either;
+ * `resolveTableAction()` throws `ActionNotResolvableException` and
+ * `mountAction()`/`callMountedAction()` swallow it before the closure is
+ * ever reached (`InteractsWithActions.php:651-659`). What this test actually
+ * proves is that silence, not a guard inside this screen — `take()`'s own
+ * `isHeld()` guard is real but unreachable through this exact wiring, pinned
+ * instead directly against `Assignment::take()` in `AssignmentTest.php`'s
+ * "take() writes nothing for a role not held".
+ */
+test('a raw retract call on a role already gone by the time it runs notifies nothing', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::assign($role)->to($account);
+
+    $test = livewire(RolesRelationManager::class, [
+        'ownerRecord' => $account,
+        'pageClass' => EditRole::class,
+    ]);
+
+    $test->mountTableAction('retract', $role);
+
+    Warden::retract($role)->from($account);
+
+    $test->callMountedTableAction()
+        ->assertNotNotified();
+
+    expect(Assignment::of($account))->toBeEmpty();
+});
+
 test('the name column is searchable and sortable', function (): void {
     signInAsRoleManager();
 

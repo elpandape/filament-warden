@@ -269,6 +269,30 @@ class RolesRelationManager extends RelationManager
      * guarantee off the button: it re-checks `offers()` itself
      * (`Grants/Assignment.php`) before writing anything, independent of
      * whichever screen called it.
+     *
+     * `Assignment::take()`'s bool return is read below and would gate the
+     * notification on it — CORRECTED after checking whether that branch can
+     * ever go the other way through THIS wiring, and it cannot. A role
+     * retracted between mount and call does not reach `take()`'s own
+     * `isHeld()` guard at all: it never reaches this closure. `getTableRecord()`
+     * resolves against this same table's query, scoped to
+     * `Assignment::of($account)`, so a role no longer held cannot be resolved
+     * either — `resolveTableAction()` throws `ActionNotResolvableException`
+     * and `mountAction()`/`callMountedAction()` swallow it, silently, before
+     * `$action->call()` (`InteractsWithActions.php:651-659`). Proved the same
+     * way as the paragraph above: a thrown exception planted at the top of
+     * this closure, mounted on a held role, retracted directly before calling
+     * — the exception never surfaced. Kept anyway, for the same reason
+     * `isHeld()` in `give()` is kept even though its own duplicate-row worry
+     * turned out to be false: `Assignment::take()` is a public method other
+     * callers will reach for, and its own correctness — reporting `false`
+     * rather than a false "success" — does not depend on which screen calls
+     * it. It costs nothing here: `$written` below always executes regardless
+     * of which way it resolves, so there is no line only an unreachable
+     * branch reaches. What DOES reach `take()`'s bool return through this
+     * screen, and is pinned in `AssignmentTest.php` rather than here, is a
+     * plain call bypassing Livewire entirely — `Assignment::take()` on a role
+     * never held answers `false`.
      */
     private function retractAction(Model $account): Action
     {
@@ -280,15 +304,14 @@ class RolesRelationManager extends RelationManager
             ->visible(static fn (Model $record): bool => self::offered($account, $record))
             ->action(function (Model $record) use ($account): void {
                 $key = $record->getKey();
+                $written = (is_int($key) || is_string($key)) && Assignment::take($account, $key);
 
-                if (is_int($key) || is_string($key)) {
-                    Assignment::take($account, $key);
+                if ($written) {
+                    Notification::make()
+                        ->title(__('filament-warden::ui.relations.roles.retract.notified'))
+                        ->success()
+                        ->send();
                 }
-
-                Notification::make()
-                    ->title(__('filament-warden::ui.relations.roles.retract.notified'))
-                    ->success()
-                    ->send();
             });
     }
 }

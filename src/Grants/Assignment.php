@@ -36,9 +36,14 @@ final class Assignment
      * `assignments()` below, which this class DOES write to (`give()`,
      * `take()`), and which is deliberately left unmemoised: a memo there would
      * hand a stale row list to a check made right after a write in the same
-     * request, and `AssignmentTest.php`'s own "give() hands a role out and the
-     * store answers for it straight away" test would have caught it going the
-     * other way.
+     * request. CORRECTED citation: not `AssignmentTest.php`'s own "give()
+     * hands a role out…" test — that one reads back through `Access::granted()`
+     * (warden's Resolver, unrelated to this class) and a raw `assignmentCount()`,
+     * neither of which this memo could make stale. The one that actually
+     * exercises the risk is `RolesRelationManagerTest.php`'s "assigning
+     * through the header action writes one row the store honours at once",
+     * which calls `Assignment::of($account)` immediately after a write that
+     * went through `give()` in the same request.
      *
      * `null` and not `[]` as the empty sentinel: an installation can genuinely
      * have zero roles, and the memo has to tell that apart from "not read yet".
@@ -293,10 +298,27 @@ final class Assignment
      * Takes one role back from an account — the entry point a row action
      * reaches for, never `apply()`. See `give()` for the cost this avoids.
      *
-     * No "already gone" guard is needed the way `give()` needs one against a
-     * wasted cache bump: a `retract()->from()` that matches nothing deletes
-     * nothing and, unlike `to()`, warden only bumps the version when a row was
-     * actually removed.
+     * A guard against "not held at all" is added here, for a different reason
+     * than `give()`'s "already held" one: `offers()` does not distinguish
+     * "held, unrestricted, this scope" from "not held at all" —
+     * `isRestricted()`/`isElsewhere()` both loop `assignments()` looking for a
+     * row that matches this role, and both answer `false` when no row matches
+     * at all, same as when one matches and clears. Without this, a caller
+     * that already checked `offers()` and got `true` could still call
+     * `retract()->from()` on nothing and have this method report success
+     * (`true`) for a write that never happened — `retract()->from()` itself
+     * deletes nothing silently, and warden bumps no cache version either
+     * (unlike `to()`, it only bumps when a row was actually removed, so past
+     * this guard there is nothing left to waste). `isHeld()` is reused here
+     * inverted, and its own docblock explains why the check is cheap: it is
+     * `Assignment::of()`, already computed to answer `offers()`'s own
+     * `isRestricted()`/`isElsewhere()` a line above.
+     *
+     * NOT reachable through `RolesRelationManager`'s row action, though — see
+     * `retractAction()`'s docblock for the measurement. Kept for `take()`'s
+     * own correctness as a public method other callers reach for, and pinned
+     * directly here, bypassing Livewire, in `AssignmentTest.php`'s "take()
+     * writes nothing for a role not held".
      *
      * This `offers()` check is the sole server-side authorization for taking a
      * role back through this class: `RolesRelationManager`'s row action
@@ -304,11 +326,15 @@ final class Assignment
      * `retractAction()`'s docblock — so this is where the guarantee actually
      * lives, and it must not be removed on the grounds that a screen's
      * `->visible()` already checked.
+     *
+     * Returns whether it actually wrote something, for the same reason
+     * `give()` does: a caller that reports success on "no exception was
+     * thrown" would report success for a no-op.
      */
-    public static function take(Model $account, int|string $role): void
+    public static function take(Model $account, int|string $role): bool
     {
-        if (! self::offers($account, $role)) {
-            return;
+        if (! self::offers($account, $role) || ! self::isHeld($account, $role)) {
+            return false;
         }
 
         $model = self::role($role);
@@ -316,6 +342,14 @@ final class Assignment
         if ($model instanceof Model) {
             Warden::retract($model)->from($account);
         }
+
+        // Never actually false here, the same reason `give()`'s tail comment
+        // gives: `offers()` and `isHeld()` already resolved this same `$role`
+        // through `role()` twice over, so `$model` cannot be null on this
+        // path — and an explicit early return for that case would be a line
+        // only an impossible branch reaches, uncoverable under this project's
+        // 100% line gate.
+        return $model instanceof Model;
     }
 
     /**
@@ -346,18 +380,30 @@ final class Assignment
      * Whether the account already holds this role, compared as text: a key
      * arriving from a `Select` is a string even where the column is not.
      *
-     * NOT because a second `assign()->to()` would insert a duplicate row — it
-     * would not. Warden's own `AssignsRoles::to()` writes through
-     * `firstOrCreate()`, and `Query\Builder::where()` redirects a `null` value
-     * to `whereNull()`, so a search array carrying `restricted_to_type: null`
-     * FINDS the existing unrestricted row rather than missing it — the same
-     * Laravel behaviour AGENTS.md §6.24 already corrected once, in the
-     * opposite direction. What `to()` does unconditionally, found row or new
-     * one, is `bumpCacheVersion($scope)` — so a `give()` on an already-held
-     * role would still invalidate every cached check at that scope for
-     * nothing changed. That is the real saving this guard buys, pinned in
+     * Two callers, opposite polarity. In `give()`, NOT because a second
+     * `assign()->to()` would insert a duplicate row — it would not. Warden's
+     * own `AssignsRoles::to()` writes through `firstOrCreate()`, and
+     * `Query\Builder::where()` redirects a `null` value to `whereNull()`, so a
+     * search array carrying `restricted_to_type: null` FINDS the existing
+     * unrestricted row rather than missing it — the same Laravel behaviour
+     * AGENTS.md §6.24 already corrected once, in the opposite direction. What
+     * `to()` does unconditionally, found row or new one, is
+     * `bumpCacheVersion($scope)` — so a `give()` on an already-held role would
+     * still invalidate every cached check at that scope for nothing changed.
+     * That is the real saving this guard buys there, pinned in
      * `AssignmentTest.php`'s "give() does not bump the cache version for a
      * role already held".
+     *
+     * In `take()`, inverted (`! isHeld()`): `offers()` cannot tell "held,
+     * unrestricted, this scope" apart from "not held at all", so without this
+     * a caller that had already checked `offers()` could still get a `true`
+     * report for a `retract()->from()` that matched and deleted nothing. NOT
+     * reachable through `RolesRelationManager`'s row action — measured, see
+     * `retractAction()`'s docblock — because that screen's own record
+     * resolution already requires the role to be held before the closure can
+     * run at all. Kept for `take()`'s own correctness as a public method, and
+     * pinned directly against it, bypassing Livewire, in `AssignmentTest.php`'s
+     * "take() writes nothing for a role not held".
      */
     private static function isHeld(Model $account, int|string $role): bool
     {
