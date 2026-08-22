@@ -13,6 +13,7 @@ return [
             'models' => 'Roles',
             'sections' => [
                 'identity' => 'The role',
+                'holders' => 'Who holds it',
             ],
             'fields' => [
                 'name' => 'Name',
@@ -24,6 +25,16 @@ return [
             'columns' => [
                 'name' => 'Name',
                 'title' => 'Title',
+                'held' => 'Held by',
+            ],
+            'holders' => [
+                'description' => 'Counted under the tenant you are in. An assignment made elsewhere, or restricted to a context, does not show here.',
+                'nobody' => 'Nobody holds this role here.',
+                'held' => 'Held by :count — :names.',
+            ],
+            'delete' => [
+                'nobody' => 'Nobody holds this role, so nothing goes with it.',
+                'holders' => 'Every assignment that points at this role goes with it, in the database and with no trace afterwards — :count in total. They are: :names.',
             ],
         ],
         'permissions' => [

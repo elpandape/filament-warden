@@ -15,6 +15,12 @@ use function Pest\Livewire\livewire;
  * `viewAny` and the record opens on `view`. Granting only the second answers with
  * a whole 403 page rather than a failed assertion, which reads like a broken test
  * instead of a missing grant.
+ *
+ * The "who holds it" section added to this screen's infolist reads
+ * `assigned_roles` under the tenant this request is in, on purpose and unlike
+ * `RolesTable::warning()`'s own wide read behind the delete button beside it
+ * (§6.24) — 'the section stays under the tenant you are in, unlike the delete
+ * warning beside it'.
  */
 pest()->extend(TestCase::class);
 
@@ -230,4 +236,46 @@ test('the builder is on the read-only screen with nothing to operate', function 
     livewire(ViewRole::class, ['record' => $role->getKey()])
         ->assertSee('fw-builder', escape: false)
         ->assertSee('interactive: false', escape: false);
+});
+
+test('the screen says who holds it, and says nothing when nobody does', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', $role);
+
+    livewire(ViewRole::class, ['record' => $role->getKey()])
+        ->assertSee('Who holds it')
+        ->assertSee('Nobody holds this role here');
+});
+
+test('the screen names an account that holds it', function (): void {
+    $user = signIn();
+    $role = makeRole();
+    Warden::assign($role)->to(makeUser('Amaru Quispe'));
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', $role);
+
+    livewire(ViewRole::class, ['record' => $role->getKey()])
+        ->assertSee('Amaru Quispe');
+});
+
+test('the section stays under the tenant you are in, unlike the delete warning beside it', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', $role);
+
+    Warden::tenant()->onceTo(7, static function () use ($role): void {
+        Warden::assign($role)->to(makeUser('Amaru Quispe'));
+    });
+
+    Warden::tenant()->onceTo(8, function () use ($role): void {
+        livewire(ViewRole::class, ['record' => $role->getKey()])
+            ->assertSee('Nobody holds this role here')
+            ->assertDontSee('Amaru Quispe');
+    });
 });

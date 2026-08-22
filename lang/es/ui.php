@@ -13,6 +13,7 @@ return [
             'models' => 'Roles',
             'sections' => [
                 'identity' => 'El rol',
+                'holders' => 'Quién lo tiene',
             ],
             'fields' => [
                 'name' => 'Nombre',
@@ -24,6 +25,16 @@ return [
             'columns' => [
                 'name' => 'Nombre',
                 'title' => 'Título',
+                'held' => 'Lo tienen',
+            ],
+            'holders' => [
+                'description' => 'Contado bajo el tenant en el que estás. Una asignación hecha en otro, o restringida a un contexto, no aparece aquí.',
+                'nobody' => 'Nadie tiene este rol aquí.',
+                'held' => 'Lo tienen :count — :names.',
+            ],
+            'delete' => [
+                'nobody' => 'Nadie tiene este rol, así que no se lleva nada.',
+                'holders' => 'Cada asignación que apunta a este rol se va con él, en la base de datos y sin rastro después — :count en total. Son: :names.',
             ],
         ],
         'permissions' => [

@@ -7,15 +7,57 @@ use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\EditRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ListRoles;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ViewRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
+use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Tables\RolesTable;
+use ElPandaPe\FilamentWarden\Grants\Holders;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
+/**
+ * The "held by" count beside a role and `RolesTable::warning()`'s own delete
+ * warning read `assigned_roles` under two different scope rules on purpose
+ * (§6.24), and it is easy to get backwards: the count column INFORMS, so it
+ * stays under the active tenant — 'the count column stays under the tenant
+ * you are in, unlike the delete rule beside it'. `warning()` describes what an
+ * actual delete's cascade removes, which is blind to tenancy exactly like
+ * `RoleResource::isDeletable()`'s own read, so it reads wide — 'the delete
+ * warning reads wide, unlike the count beside it'.
+ *
+ * The count column is a second query per row alongside `isDeletable()`'s own
+ * EXISTS behind the delete button: the two cannot share one query without a
+ * memo (deferred to "Que no cueste"), so the cost is measured and capped
+ * instead of only described — 'the listing's held-by column and delete
+ * button together cost 11 assigned_roles reads for 5 roles, capped at 13'.
+ *
+ * `AssignmentTest.php` already carries an `assignedRoleReads()` helper that
+ * does exactly this counting — reused instead of duplicated everywhere else
+ * in this suite. Not here: `make test`/`make coverage` run `pest --parallel`,
+ * which splits test FILES across worker processes, and a worker running only
+ * this file never `require`s `AssignmentTest.php`, so the global function is
+ * simply undefined — measured as `Error: Call to undefined function
+ * assignedRoleReads()` on a parallel run that passed file-by-file. `heldReads()`
+ * below is this file's own copy for that reason, not a naming preference.
+ */
 pest()->extend(TestCase::class);
+
+function heldReads(): int
+{
+    $table = Context::resolve()->table('assigned_roles');
+    $reads = 0;
+
+    foreach (DB::getQueryLog() as $entry) {
+        if (str_contains($entry['query'], $table)) {
+            $reads++;
+        }
+    }
+
+    return $reads;
+}
 
 test('the resource points at the configured role model, never at a guessed one', function (): void {
     expect(RoleResource::getModel())->toBe(roleClass());
@@ -654,4 +696,108 @@ test('a list with nothing left on it refuses nothing and says nothing', function
         ->assertDontSee('roles.protected lists this name');
 
     expect($role->refresh()->getAttribute('title'))->toBe('Whoever can do everything');
+});
+
+test('a role nobody holds counts as zero, not blank', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    $role = makeRole();
+
+    livewire(ListRoles::class)
+        ->assertTableColumnStateSet('held', 0, $role);
+});
+
+test('the listing counts how many accounts hold each role', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    $role = makeRole();
+    Warden::assign($role)->to(makeUser('Holder'));
+
+    livewire(ListRoles::class)
+        ->assertTableColumnStateSet('held', 1, $role);
+});
+
+test('the count column stays under the tenant you are in, unlike the delete rule beside it', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    $role = makeRole();
+
+    Warden::tenant()->onceTo(7, static function () use ($role): void {
+        Warden::assign($role)->to(makeUser('Holder'));
+    });
+
+    Warden::tenant()->onceTo(8, function () use ($role): void {
+        livewire(ListRoles::class)->assertTableColumnStateSet('held', 0, $role);
+    });
+});
+
+test("the listing's held-by column and delete button together cost 11 assigned_roles reads for 5 roles, capped at 13", function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    for ($index = 0; $index < 5; $index++) {
+        Warden::assign(makeRole("role-{$index}"))->to(makeUser("Holder {$index}"));
+    }
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    livewire(ListRoles::class);
+
+    expect(heldReads())->toBeLessThanOrEqual(13);
+});
+
+test('a role nobody holds says so in the delete warning', function (): void {
+    expect(RolesTable::warning(makeRole()))->toContain('Nobody holds this role');
+});
+
+test('the delete warning names who it takes with it', function (): void {
+    $role = makeRole();
+    Warden::assign($role)->to(makeUser('Amaru Quispe'));
+
+    $warning = RolesTable::warning($role);
+
+    expect($warning)->toContain('1 in total')
+        ->and($warning)->toContain('Amaru Quispe');
+});
+
+test('the delete warning reads wide, unlike the count beside it', function (): void {
+    $role = makeRole();
+
+    Warden::tenant()->onceTo(7, static function () use ($role): void {
+        Warden::assign($role)->to(makeUser('Holder'));
+    });
+
+    $warning = Warden::tenant()->onceTo(8, static fn (): string => RolesTable::warning($role));
+
+    expect($warning)->toContain('1 in total');
+});
+
+test('the delete warning caps the names it lists, not the count', function (): void {
+    $role = makeRole();
+
+    for ($index = 0; $index < Holders::LABELS + 3; $index++) {
+        Warden::assign($role)->to(makeUser("Account {$index}"));
+    }
+
+    $warning = RolesTable::warning($role);
+
+    expect($warning)->toContain((Holders::LABELS + 3).' in total')
+        ->and(mb_substr_count($warning, 'Account '))->toBe(Holders::LABELS);
+});
+
+test('a holder whose morph alias no longer resolves is counted without a name', function (): void {
+    $role = makeRole();
+    Warden::assign($role)->to(makeUser('Amaru Quispe'));
+
+    Context::resolve()->assignedRoleClass()::query()->withoutGlobalScopes()->update(['entity_type' => 'gone.away']);
+
+    $warning = RolesTable::warning($role);
+
+    expect($warning)->toContain('1 in total')
+        ->and($warning)->not->toContain('Amaru Quispe');
 });
