@@ -132,6 +132,7 @@ trait DrawsThePermissionGrid
             return [
                 'model' => null,
                 'columns' => [],
+                'booleans' => [],
                 'authority' => [],
                 'ownership' => [
                     'available' => false,
@@ -146,6 +147,7 @@ trait DrawsThePermissionGrid
         return [
             'model' => $model,
             'columns' => Columns::of($model),
+            'booleans' => Columns::booleans($model),
             'authority' => Columns::authority(),
             'ownership' => [
                 'available' => $ownership->available,

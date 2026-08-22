@@ -9,4 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 final class Post extends Model
 {
     protected $guarded = [];
+
+    /** @var array<string, string> */
+    protected $casts = ['published' => 'boolean'];
 }

@@ -380,6 +380,18 @@ test('the script asks the server for the answer and composes none of it', functi
         ->and($script)->not->toContain('Granted by');
 });
 
+test('the script refuses to call a boolean a match without asking the columns', function (): void {
+    $script = (string) file_get_contents(dirname(__DIR__, 3).'/resources/js/permission-grid.js');
+
+    expect($script)->toContain(
+        "booleanMisfit(rule) {\n".
+        "        return rule.kind === 'value'\n".
+        "            && (rule.value === 'true' || rule.value === 'false')\n".
+        "            && ! this.source.booleans.includes(rule.column)\n".
+        '    },',
+    );
+});
+
 test('an answer that arrives late is not painted onto the cell that replaced it', function (): void {
     $script = (string) file_get_contents(dirname(__DIR__, 3).'/resources/js/permission-grid.js');
 
@@ -408,6 +420,15 @@ test('the browser is told what a condition on this cell could be built from', fu
             && in_array('name', stringsOf($narrowing, 'columns'), true)
             && in_array('email', stringsOf($narrowing, 'authority'), true)
             && partOf($narrowing, 'stored')['mode'] === 'all');
+});
+
+test('the cell inspector gets the same boolean list a condition may compare, never undefined', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'narrowingFor', [roleClass(), 'update'])
+        ->assertReturned(fn (array $narrowing): bool => array_key_exists('booleans', $narrowing)
+            && is_array($narrowing['booleans']));
 });
 
 test('a door has no model, so it is told why it can hold no condition', function (): void {

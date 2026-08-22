@@ -62,6 +62,16 @@ test('every word the browser says arrives already written', function (): void {
         ->and($words['authority'])->toBeString();
 });
 
+test('the browser is told which columns come back as booleans', function (): void {
+    expect(builderFor(Post::class)->getSource()['booleans'])->toBe(['published'])
+        ->and(builderFor(null)->getSource()['booleans'])->toBeEmpty();
+});
+
+test('every screen that draws a condition gets the sentence about a boolean', function (): void {
+    expect(builderFor(Post::class)->getWords()['boolean'])
+        ->toBe(__('filament-warden::ui.conditions.boolean'));
+});
+
 test('what the browser drew is checked against the table before it is a rule', function (): void {
     $field = builderFor(Post::class);
 

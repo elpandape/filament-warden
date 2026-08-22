@@ -69,6 +69,17 @@ const conditions = {
         return rule.column + ' ' + rule.operator + ' ' + right
     },
 
+    /**
+     * A typed `true` or `false` against a column with no boolean cast. Warden
+     * compares strictly, so that condition is stored and never matches — and
+     * the person typing it is the only one who can still change it.
+     */
+    booleanMisfit(rule) {
+        return rule.kind === 'value'
+            && (rule.value === 'true' || rule.value === 'false')
+            && ! this.source.booleans.includes(rule.column)
+    },
+
     add(kind) {
         this.replaceRules([...this.rules(), {
             logic: 'and',

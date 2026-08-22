@@ -72,6 +72,7 @@ final class ConditionBuilder extends Field
      * @return array{
      *     model: class-string<Model>|null,
      *     columns: list<string>,
+     *     booleans: list<string>,
      *     authority: list<string>,
      *     ownership: array{available: bool},
      * }
@@ -81,12 +82,13 @@ final class ConditionBuilder extends Field
         $model = $this->getEntity();
 
         if ($model === null) {
-            return ['model' => null, 'columns' => [], 'authority' => [], 'ownership' => ['available' => false]];
+            return ['model' => null, 'columns' => [], 'booleans' => [], 'authority' => [], 'ownership' => ['available' => false]];
         }
 
         return [
             'model' => $model,
             'columns' => Columns::of($model),
+            'booleans' => Columns::booleans($model),
             'authority' => Columns::authority(),
             'ownership' => ['available' => Ownership::of($model)->available],
         ];

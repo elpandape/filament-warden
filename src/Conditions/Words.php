@@ -22,6 +22,7 @@ final class Words
      * @return array{
      *     operators: list<string>,
      *     authority: string,
+     *     boolean: string,
      *     joiners: array{and: string, or: string},
      *     modes: array<string, array{name: string, hint: string}>,
      * }
@@ -34,6 +35,7 @@ final class Words
                 ComparisonOperator::cases(),
             ),
             'authority' => self::line('authority'),
+            'boolean' => self::line('boolean'),
             'joiners' => [
                 'and' => self::line('and'),
                 'or' => self::line('or'),

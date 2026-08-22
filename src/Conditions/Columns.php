@@ -24,8 +24,8 @@ use Throwable;
  */
 final class Columns
 {
-    /** @var array<string, list<string>> */
-    private static array $columns = [];
+    /** @var array<string, array{columns: list<string>, booleans: list<string>}> */
+    private static array $memo = [];
 
     /**
      * @param  class-string<Model>  $model
@@ -33,22 +33,26 @@ final class Columns
      */
     public static function of(string $model): array
     {
-        if (array_key_exists($model, self::$columns)) {
-            return self::$columns[$model];
-        }
+        return self::read($model)['columns'];
+    }
 
-        try {
-            $instance = new $model;
-
-            $columns = $instance->getConnection()->getSchemaBuilder()->getColumns($instance->getTable());
-        } catch (Throwable) {
-            // A driver that cannot list columns raises rather than degrading, and
-            // so does a connection that will not resolve. The builder is left with
-            // nothing to compare, and says so.
-            $columns = [];
-        }
-
-        return self::$columns[$model] = array_column($columns, 'name');
+    /**
+     * The columns this model reads back as booleans, which is the only thing
+     * that makes a `true` or a `false` in a condition able to match.
+     *
+     * Warden compares with `===` and rescues only numeric pairs, and
+     * `is_numeric(true)` is false — so against a column with no boolean cast the
+     * attribute arrives as `1` and the condition never matches, silently. The
+     * question is asked of the model's casts and never of the schema: sqlite has
+     * no boolean type at all, and a postgres `boolean` column with no cast still
+     * comes back as `1`.
+     *
+     * @param  class-string<Model>  $model
+     * @return list<string>
+     */
+    public static function booleans(string $model): array
+    {
+        return self::read($model)['booleans'];
     }
 
     /**
@@ -95,6 +99,42 @@ final class Columns
      */
     public static function forget(): void
     {
-        self::$columns = [];
+        self::$memo = [];
+    }
+
+    /**
+     * Both answers, worked out together: they need the same instance and the
+     * same one failure.
+     *
+     * @param  class-string<Model>  $model
+     * @return array{columns: list<string>, booleans: list<string>}
+     */
+    private static function read(string $model): array
+    {
+        if (array_key_exists($model, self::$memo)) {
+            return self::$memo[$model];
+        }
+
+        try {
+            $instance = new $model;
+
+            $columns = array_column(
+                $instance->getConnection()->getSchemaBuilder()->getColumns($instance->getTable()),
+                'name',
+            );
+
+            $booleans = array_keys(array_filter(
+                $instance->getCasts(),
+                static fn (mixed $cast): bool => $cast === 'bool' || $cast === 'boolean',
+            ));
+        } catch (Throwable) {
+            // A driver that cannot list columns raises rather than degrading, and
+            // so does a connection that will not resolve. The builder is left with
+            // nothing to compare, and says so.
+            $columns = [];
+            $booleans = [];
+        }
+
+        return self::$memo[$model] = ['columns' => $columns, 'booleans' => $booleans];
     }
 }

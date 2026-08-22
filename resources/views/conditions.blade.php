@@ -69,6 +69,12 @@
                             placeholder="{{ __('filament-warden::ui.conditions.value') }}"
                         >
 
+                        <span
+                            class="fw-misfit"
+                            x-show="booleanMisfit(rule)"
+                            x-text="words.boolean"
+                        ></span>
+
                         <button
                             type="button"
                             class="fw-drop"

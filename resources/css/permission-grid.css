@@ -756,6 +756,14 @@ tr:hover .fw-shortcuts,
     border-inline-start-color: var(--fw-no);
 }
 
+.fw-misfit {
+    flex-basis: 100%;
+    padding-inline-start: 0.625rem;
+    border-inline-start: 3px solid var(--fw-noted);
+    color: var(--fw-muted);
+    font-size: 0.75rem;
+}
+
 .fw-preview {
     display: block;
     margin-block-start: 0.5rem;

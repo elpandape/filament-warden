@@ -172,6 +172,9 @@ abstract class TestCase extends ApplicationTestCase
         Schema::create('posts', static function (Blueprint $table): void {
             $table->id();
             $table->string('title');
+            // The one boolean column the suite has. A condition comparing `true`
+            // only matches where the model casts, and nothing here cast anything.
+            $table->boolean('published')->default(false);
             $table->timestamps();
         });
 

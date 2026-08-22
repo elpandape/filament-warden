@@ -219,6 +219,7 @@ return [
         'warning' => 'With conditions, this grant only answers with a record in front of it. A class check — the one a listing makes when it asks viewAny — fails closed.',
         'no_model' => 'This permission has no model behind it. A condition on it would be stored, shown, and would never grant anything.',
         'no_ownership' => 'The table :table has no :column column, which is where ownership would resolve.',
+        'boolean' => 'A true or false value only matches a column the model casts to boolean. This one is not cast, so the condition would be stored and would never match.',
         'modes' => [
             'all' => [
                 'name' => 'Every row',
