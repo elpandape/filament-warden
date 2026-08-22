@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
+use ElPandaPe\FilamentWarden\Conditions\Columns;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\CreateRole;
@@ -428,8 +429,7 @@ test('the cell inspector gets the same boolean list a condition may compare, nev
 
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
         ->call('callSchemaComponentMethod', 'form.permissions', 'narrowingFor', [roleClass(), 'update'])
-        ->assertReturned(fn (array $narrowing): bool => array_key_exists('booleans', $narrowing)
-            && is_array($narrowing['booleans']));
+        ->assertReturned(fn (array $narrowing): bool => $narrowing['booleans'] === Columns::booleans(roleClass()));
 
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
         ->call('callSchemaComponentMethod', 'form.permissions', 'narrowingFor', [$door, StateKey::DOOR])
