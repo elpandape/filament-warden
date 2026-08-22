@@ -15,6 +15,40 @@ what is covered is listed under **Stability** in the README and pinned by
 release adds the other half: a relation manager a consuming application attaches to its own
 `UserResource`, for the installation that field cannot serve.
 
+### Fixed
+
+- **The tab could rename or delete a role through actions it never shows.**
+  `RolesRelationManager` pointed `$relatedResource` at `RoleResource`, which routed `makeTable()`
+  through `RolesTable::configure()` and cached ITS `EditAction`/`DeleteAction` into the table's
+  `$flatActions` — `recordActions([retract])` replaces the array a render walks but not that cache
+  (`HasRecordActions.php` has no `removeCachedActions()` call, unlike `headerActions()`), and
+  `resolveTableAction()` resolves a mounted action by name straight off it. Measured: a raw
+  `mountAction`/`callMountedAction` call reached the leaked `edit` to rename a role signed in with
+  only `viewAny`/`update`, and the leaked `delete` to remove one signed in with `delete` and
+  `roles.delete => 'all'`. Not privilege escalation — both leaked actions run the same Policies a
+  direct call to `RoleResource`'s own screens would — but the leaked `edit` opened the permission
+  grid on a path that bypasses `EditRole::mutateFormDataBeforeSave()`, the protected-role rename
+  guard AGENTS.md §6.24 built for that page, and it contradicted what this same release says about
+  itself twice: the README and this class's own docblock both promise "never `AttachAction`,
+  `DetachAction` or `DetachBulkAction`" while two of Filament's *other* built-ins were reachable
+  regardless. The same setting also reached `RoleResource::getUrl('edit', …)` for the table's
+  default row link, which threw `Route [filament.{panel}.resources.roles.edit] not defined` as soon
+  as the table had one row on a panel that never registered `RoleResource` — a combination
+  `->roles(false)` and this relation manager are both documented in this same release, with nothing
+  testing them together. Fixed by setting `$relatedResource` to `null` and overriding
+  `canViewForRecord()` directly instead of relying on the base class's own `$relatedResource` branch
+  to provide it: `configureTable()` never runs, so `flatActions` holds only `assign`/`retract`, and
+  the default row-link closure finds no `edit`/`view` action to build a URL from. One consequence,
+  accepted rather than worked around: this table draws no row link at all now, where the leaked
+  `edit` action gave it one. That link was undocumented, untested and unmentioned anywhere in this
+  file, so nothing shipped is being taken away — it existed only within this unreleased branch.
+- **The "held as" badge's `restricted`/`elsewhere` distinction was pinned by nothing that could see
+  the two swap.** The two tests that already built exactly those scenarios asserted only that the
+  retract action was hidden, which reads the same either way `heldAs()` answers, and
+  `LanguageTest.php`'s own pin compares the SET of strings `heldAs()` can produce against the SET of
+  declared translation keys — blind to which record produces which value. Both tests now also
+  assert the column's own state with `assertTableColumnStateSet()`.
+
 ### Added
 
 - **`RolesRelationManager`**, a new public (not `final`) class at
@@ -102,15 +136,15 @@ release adds the other half: a relation manager a consuming application attaches
   because there is no version of it that would not silently fight another panel loading the same
   plugin in the same process.
 - **This release makes two screens measurably slower, and neither cost is fixed here** — both are
-  deferred to the `Catalog`/`Holders` memo already promised for `v1.5.0` ("Que no cueste"). The
-  roles listing's new "held by" column costs **11** `assigned_roles` reads for 5 roles (2 per row
-  plus 1 fixed overhead), on top of the pre-existing read `isDeletable()`'s own delete-button
-  `visible()` already paid — capped at 13 by a test. The relation manager's own assign modal costs
-  **405** `assigned_roles` statements against a 200-role catalogue (unchanged from before this
-  release, and left uncapped by any test on purpose): each option's `disableOptionWhen()` check
-  re-reads the assignments table fresh, because `give()`/`take()` write to that same table and a
-  memo there would risk handing a check made right after a write a stale row list in the same
-  request.
+  deferred to the `Catalog`/`Holders` memo already promised for `v1.5.0` ("Que no cueste"), and both
+  are measured and capped by a test rather than only described. The roles listing's new "held by"
+  column costs **11** `assigned_roles` reads for 5 roles (2 per row plus 1 fixed overhead), on top
+  of the pre-existing read `isDeletable()`'s own delete-button `visible()` already paid — capped at
+  13 by a test. The relation manager's own assign modal costs **405** `assigned_roles` statements
+  against a 200-role catalogue — a new cost, not a carried-over one: this screen did not exist
+  before this release — capped at 410 by a test: each option's `disableOptionWhen()` check re-reads
+  the assignments table fresh, because `give()`/`take()` write to that same table and a memo there
+  would risk handing a check made right after a write a stale row list in the same request.
 - **The same untested `modalDescription` wiring this release closed on all three role surfaces is
   still open on the three permission ones.** `PermissionsTable.php`, `EditPermission.php` and
   `ViewPermission.php` each carry a `->modalDescription(...)` closure with no test proving it is
