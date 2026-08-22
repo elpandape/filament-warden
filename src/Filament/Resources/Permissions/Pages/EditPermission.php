@@ -86,9 +86,11 @@ class EditPermission extends EditRecord
 
         // Half of what closes this builder is not mirrored above:
         // `PermissionForm::conditionsWritable()` also disables it — for a
-        // corrupt blob, a shape the builder will not draw, or a column the
-        // table dropped — and that predicate is private to the form on
-        // purpose, the same reason `ownable()` below is a private copy
+        // corrupt blob, a shape the builder will not draw, an entity that no
+        // longer resolves to a model, a column the table dropped, or a rule
+        // that cannot be written back exactly as it is stored — and that
+        // predicate is private to the form on purpose, the same reason
+        // `ownable()` below is a private copy
         // rather than a public one. It is not duplicated here too. Its
         // ~25 lines of `Narrowing`/`Columns`/`Ownership` reads would not buy
         // a real floor: `EditRecord::save()` calls `$this->form->getState()`
