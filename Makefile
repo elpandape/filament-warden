@@ -3,7 +3,7 @@ PHP = $(DC) run --rm php
 
 PINT_CACHE = --cache-file=.cache/pint.cache
 
-.PHONY: build install update test coverage types stan lint lint-fix rector rector-fix profanity verify ci shell
+.PHONY: build install update test coverage types stan lint lint-fix rector rector-fix profanity verify helpers ci shell
 
 build: ## Build the dev image
 	$(DC) build php
@@ -26,6 +26,15 @@ types: ## 100% type coverage gate
 profanity: ## Language check over the code
 	$(PHP) vendor/bin/pest --profanity
 
+# A duplicate global helper is a fatal at load time, not a failing test: the run
+# dies before Pest executes anything, so this cannot live inside the suite.
+helpers: ## Check for duplicate global test helpers
+	@dup=$$(grep -rhoE '^function [a-zA-Z_][a-zA-Z0-9_]*' tests/ --include=*.php | awk '{print $$2}' | sort | uniq -d); \
+	if [ -n "$$dup" ]; then \
+		echo 'Duplicate global test helpers:'; echo "$$dup"; exit 1; \
+	fi; \
+	echo 'No duplicate global test helpers.'
+
 # The only gate that runs the package's JS instead of reading it. `npm ci` is
 # offline-idempotent against the committed lock, so the gate stays honest about
 # which `@vue/reactivity` it ran under — the whole point is that it is Alpine's.
@@ -47,7 +56,7 @@ rector: ## Rector dry-run
 rector-fix: ## Rector apply
 	$(PHP) vendor/bin/rector process
 
-ci: lint stan rector coverage types profanity verify ## Everything CI runs
+ci: lint stan rector coverage types profanity verify helpers ## Everything CI runs
 
 shell: ## Shell inside the container
 	$(PHP) sh
