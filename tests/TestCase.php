@@ -67,8 +67,13 @@ abstract class TestCase extends ApplicationTestCase
         // test case and would otherwise read the catalogue one test built before this one.
         Assignment::forget();
 
-        // Same reason again: a suite rebuilds a scratch panel with a different resource
-        // list for every test case, and every one of them uses the same 'scratch' id.
+        // UNLIKE the two calls above, this one is not load-bearing for the suite:
+        // `Catalog::read()` already rejects a stale entry by comparing the stored
+        // `Panel` object with `===`, and testbench builds a genuinely new one per
+        // test method, so the ids repeat here but the objects never do. Verified by
+        // removing this call and running the whole suite sequentially: unaffected.
+        // Kept to bound memo growth across the run, the same way `Columns::forget()`
+        // bounds itself by distinct model classes rather than by test isolation.
         Catalog::forget();
 
         // No request has been through the panel's middleware here, so nothing has told

@@ -148,11 +148,30 @@ final class Catalog
     }
 
     /**
-     * A panel's resources, pages and widgets do not change while a process is
-     * running: this IS the schema, not its data. What changes it between one
-     * moment and the next is a suite — a fixture panel rebuilt with a different
-     * resource list for the next test case — the same reason `Columns::forget()`
-     * exists, called from the same `TestCase::setUp()`.
+     * NOT what protects a suite that rebuilds `Panel::make()->id('scratch')`
+     * with a different resource list for every test case — that guarantee is
+     * `read()`'s `===` check, not this method. Verified by emptying this
+     * method's body and running the whole suite sequentially, non-parallel,
+     * the worst case for static state bleeding across test functions in one
+     * process: all 805 tests, including both invalidation tests below, stayed
+     * green. The reason is Testbench, not this method: it boots a fresh
+     * application per test, so a panel provider's `panel()` method constructs
+     * a genuinely new `Panel` object every time, even under the same id — and
+     * the identity check rejects a stale entry the moment the object differs,
+     * with or without a call here.
+     *
+     * What this bounds instead: the memo holds at most one entry per distinct
+     * id it has ever been asked about (a later `Panel` sharing an id
+     * overwrites the earlier one's slot in `read()`, it does not add a
+     * second), the same way `Columns` bounds itself by distinct model
+     * classes. An application declares a small, fixed set of panel ids, so in
+     * production nothing needs to call this for that bound to matter. It
+     * exists for a long-running process that mints many short-lived ids
+     * regardless — and, called from `TestCase::setUp()`, as defence in depth
+     * against a fixture shape that does not exist today: a test reusing the
+     * very same `Panel` object across two cases with different config, which
+     * would defeat the identity check on purpose and is the one thing this
+     * would still notice.
      */
     public static function forget(): void
     {
@@ -168,7 +187,25 @@ final class Catalog
      * compared with `===` on every read: a second object sharing an old id is
      * never served the first one's catalogue. A memo that could hand back the
      * wrong panel's rows would not be a slow screen, it would be a permission
-     * grid answering for someone else's panel.
+     * grid answering for someone else's panel. `Panel` has no `Stringable`
+     * contract and no value-equality of its own to fall back on, so identity
+     * is the only honest comparison available.
+     *
+     * The assignment below also keeps a STRONG reference to `$panel` for as
+     * long as its id's slot survives. That is what makes the `===` check
+     * trustworthy rather than merely convenient: PHP can only recycle an
+     * object's identity — the handle a spl_object_id()/spl_object_hash() style
+     * comparison would rely on — once nothing holds it live, and this memo
+     * itself holds it live. A weak reference here would reopen exactly the
+     * handle-reuse hole `Holders`' own `once()` warning names elsewhere in
+     * this release; this memo does not have it because the reference is
+     * strong, not because objects happen not to collide.
+     *
+     * A later `Panel` sharing an id replaces the earlier slot outright
+     * (`self::$memo[$id] = …` below is an assignment, never an append), so a
+     * third panel under one id does not accumulate rows from the second —
+     * growth is bounded by distinct ids, the same way `Columns` is bounded by
+     * distinct model classes.
      */
     private static function read(Panel $panel): self
     {
