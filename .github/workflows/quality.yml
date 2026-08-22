@@ -55,3 +55,15 @@ jobs:
 
       - name: Profanity
         run: vendor/bin/pest --profanity
+
+      # The seventh gate. It exists because v1.1.0 shipped a Critical that 660 PHP
+      # tests could not see: the only JS checks this package had asserted that a
+      # string was present in the source file.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: verify/package-lock.json
+
+      - name: Verify the JS against Alpine's reactivity
+        run: cd verify && npm ci && node verify-reach-of.mjs && node verify-select-sequencing.mjs
