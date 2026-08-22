@@ -758,7 +758,7 @@ test('the save keeps the lock the screen draws', function (): void {
     expect($held->refresh()->getAttribute('name'))->toBe('export');
 });
 
-test("the lock's grant reads are capped at 16, two over the 14 measured", function (): void {
+test("the lock's grant reads are capped at 5, two over the 3 measured after Holders was memoised", function (): void {
     config()->set('filament-warden.permissions.update', 'loose');
 
     $user = signIn();
@@ -774,7 +774,26 @@ test("the lock's grant reads are capped at 16, two over the 14 measured", functi
 
     livewire(EditPermission::class, ['record' => $held->getKey()]);
 
-    expect(grantReads())->toBeLessThanOrEqual(16);
+    expect(grantReads())->toBeLessThanOrEqual(5);
+});
+
+test("a permission's card reads its holders once per record, capped at 5 over the 3 measured", function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+    Warden::allow($user)->to('delete', permissionClass());
+
+    Warden::allow(makeRole('editor'))->to('viewAny', roleClass());
+
+    $held = heldRow('viewAny');
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    livewire(ViewPermission::class, ['record' => $held->getKey()]);
+
+    expect(grantReads())->toBeLessThanOrEqual(5);
 });
 
 test('a row a single holder has says so too, and one nobody has says nothing', function (): void {

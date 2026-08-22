@@ -7,6 +7,7 @@ namespace ElPandaPe\FilamentWarden\Grants;
 use ElPandaPe\Warden\Context;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use WeakMap;
 
 /**
  * Who holds one permission, and who is explicitly denied it.
@@ -18,8 +19,37 @@ use Illuminate\Database\Eloquent\Relations\Relation;
  *
  * A denial is a state and not an absence, so it is counted apart rather than
  * left out.
+ *
+ * Memoised per record, by identity: `PermissionInfolist` alone asks `of()`
+ * five times over the same `$record`, and the two lock checks on
+ * `PermissionResource` ask `anyFor()` again on every field they gate — three
+ * times over for `name` alone once Filament re-evaluates its `helperText()`.
+ *
+ * The tool is a `WeakMap<Model, self>` and not `once()` called from here,
+ * because this is a static method and `once()` from a static context is a
+ * trap, not a shortcut. `Onceable::objectFromTrace()` reads
+ * `$trace[1]['object']` (`vendor/laravel/framework/src/Illuminate/Support/
+ * Onceable.php:47-50`), and PHP's own backtrace carries an `object` entry
+ * only for a `$this->method()` frame — a `self::method()` call has none. So
+ * `Once::value()` falls back to `$onceable->object ?: $this`
+ * (`Once.php:55`), where `$this` is the ONE shared `Once` singleton every
+ * static call site in the process reaches through `Once::instance()`
+ * (`Once.php:38-41`), and the per-call disambiguation is a hash folding in
+ * `spl_object_hash($permission)` (`Onceable::hashFromTrace()`, `:71`) — a
+ * value PHP is free to reuse the moment the object it named is collected. A
+ * permission read, freed, and replaced at the same address by an unrelated
+ * one would silently inherit the first one's holders. A `WeakMap` keys on
+ * the object itself, never a recyclable string, and drops its entry the
+ * instant the model it was built for is collected — nothing to reuse and
+ * nothing to flush.
+ *
+ * Nothing in this class ever writes a grant: every read here is pure, so for
+ * as long as no other code writes one and hands this class the very same
+ * `$permission` instance back, the memoised answer cannot go stale under a
+ * caller. `forget()` is the escape hatch for the one case that would: it is
+ * exercised, not decorative, in the test that pins this guarantee.
  */
-final readonly class Holders
+final class Holders
 {
     /**
      * How many account labels are read before the rest become a tally. A role
@@ -28,19 +58,111 @@ final readonly class Holders
      */
     public const int LABELS = 10;
 
+    /** @var WeakMap<Model, self> */
+    private static WeakMap $memo;
+
+    /** @var WeakMap<Model, bool> */
+    private static WeakMap $anyMemo;
+
     /**
      * @param  list<string>  $roles  every role that holds it, named
      * @param  list<string>  $accounts  the first accounts that hold it, named
      */
     public function __construct(
-        public array $roles = [],
-        public array $accounts = [],
-        public int $accountCount = 0,
-        public bool $everyone = false,
-        public int $forbidden = 0,
+        public readonly array $roles = [],
+        public readonly array $accounts = [],
+        public readonly int $accountCount = 0,
+        public readonly bool $everyone = false,
+        public readonly int $forbidden = 0,
     ) {}
 
     public static function of(Model $permission): self
+    {
+        self::$memo ??= new WeakMap();
+
+        return self::$memo[$permission] ??= self::build($permission);
+    }
+
+    /**
+     * Whether any grant at all points at this permission — held or
+     * forbidden, to a role, an account or everyone — without building a
+     * single label.
+     *
+     * `isOrphaned()` answers the same question for every row this class
+     * ever reads for real: `build()` below folds a forbidding-only grant
+     * into `$byType`/`$everyone` exactly like a granting one, so the only
+     * way `isOrphaned()` comes back true is that no `grants` row named this
+     * permission at all — which is this method's `EXISTS`, unqualified.
+     * `PermissionsTable`'s own `held` filter already reads "held" the same
+     * way, with the same shape of query, so this is not a new definition of
+     * the word: it is the cheap path to the one this class already answers,
+     * for the two callers — `PermissionResource::isDeletable()` and
+     * `::mayEditName()` — that only ever read the boolean and never the
+     * labels `of()` would build to get there.
+     */
+    public static function anyFor(Model $permission): bool
+    {
+        self::$anyMemo ??= new WeakMap();
+
+        return self::$anyMemo[$permission] ??= Context::resolve()->grantClass()::query()
+            ->withoutGlobalScopes()
+            ->where('permission_id', $permission->getKey())
+            ->exists();
+    }
+
+    /**
+     * Drops the memoised answer for one record, so the next `of()` or
+     * `anyFor()` reads the store again.
+     *
+     * Nothing in `src/` calls this today: no screen this class serves writes
+     * a grant and then asks about the same permission again in the same
+     * request. It exists because a memo that cannot be told "that answer is
+     * stale now" is not a cache, it is a trap with the same shape as the one
+     * this class's own docblock rejects — and the test that pins the
+     * read-write-read guarantee calls it directly to prove the escape hatch
+     * actually opens.
+     */
+    public static function forget(Model $permission): void
+    {
+        unset(self::$memo[$permission], self::$anyMemo[$permission]);
+    }
+
+    /**
+     * The first attribute the record actually carries, in the order a person
+     * would recognise it.
+     *
+     * Read through `getAttributes()` and never through `getAttribute()`: these
+     * are the consuming application's models, and under `Model::shouldBeStrict()`
+     * asking one for a column it does not have throws.
+     */
+    public static function label(Model $record): string
+    {
+        $attributes = $record->getAttributes();
+
+        foreach (['title', 'name', 'email'] as $candidate) {
+            $value = $attributes[$candidate] ?? null;
+
+            if (is_string($value) && $value !== '') {
+                return $value;
+            }
+        }
+
+        $key = $record->getKey();
+
+        return '#'.(is_int($key) || is_string($key) ? $key : '?');
+    }
+
+    public function isOrphaned(): bool
+    {
+        return $this->roles === [] && $this->accountCount === 0 && ! $this->everyone;
+    }
+
+    public function total(): int
+    {
+        return count($this->roles) + $this->accountCount + ($this->everyone ? 1 : 0);
+    }
+
+    private static function build(Model $permission): self
     {
         $context = Context::resolve();
 
@@ -96,41 +218,6 @@ final readonly class Holders
             everyone: $everyone,
             forbidden: $forbidden,
         );
-    }
-
-    /**
-     * The first attribute the record actually carries, in the order a person
-     * would recognise it.
-     *
-     * Read through `getAttributes()` and never through `getAttribute()`: these
-     * are the consuming application's models, and under `Model::shouldBeStrict()`
-     * asking one for a column it does not have throws.
-     */
-    public static function label(Model $record): string
-    {
-        $attributes = $record->getAttributes();
-
-        foreach (['title', 'name', 'email'] as $candidate) {
-            $value = $attributes[$candidate] ?? null;
-
-            if (is_string($value) && $value !== '') {
-                return $value;
-            }
-        }
-
-        $key = $record->getKey();
-
-        return '#'.(is_int($key) || is_string($key) ? $key : '?');
-    }
-
-    public function isOrphaned(): bool
-    {
-        return $this->roles === [] && $this->accountCount === 0 && ! $this->everyone;
-    }
-
-    public function total(): int
-    {
-        return count($this->roles) + $this->accountCount + ($this->everyone ? 1 : 0);
     }
 
     /**

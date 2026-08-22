@@ -125,6 +125,12 @@ class PermissionResource extends Resource
      * A permission nobody holds can go without taking anything with it. One that
      * somebody holds takes their grants down with it, in the database and
      * without a single Eloquent event, so it is closed by default.
+     *
+     * Asked through `Holders::anyFor()` and never `Holders::of($record)
+     * ->isOrphaned()`: this method never reads a label, so it never needs
+     * `of()`'s full build — the listing calls this once per row, and a held
+     * row with many holders would otherwise pay for names nothing here
+     * displays.
      */
     public static function isDeletable(Model $record): bool
     {
@@ -134,7 +140,7 @@ class PermissionResource extends Resource
             return true;
         }
 
-        return $rule === 'orphaned' && Holders::of($record)->isOrphaned();
+        return $rule === 'orphaned' && ! Holders::anyFor($record);
     }
 
     /**
@@ -155,13 +161,17 @@ class PermissionResource extends Resource
      * The question is asked last, so it is skipped wherever `mayEdit()` already
      * says no — a derived row under `'loose'`, or anything under `false` or
      * `'title'` — and it is also skipped under `'all'`, which short-circuits on
-     * its own clause before `Holders::of()` runs. It is NOT skipped for the
+     * its own clause before `Holders::anyFor()` runs. It is NOT skipped for the
      * shipped default's most common row: a loose permission (no entity) under
      * the shipped `'loose'` rule, where `mayEdit()` returns `true` and this
-     * clause always reads `grants`. Measured on the edit screen for exactly that
-     * case: 8 extra reads over the 1.0.1 body and 3 more since 1.1.0 gave the
-     * name field a sentence of its own, one per call site per evaluation — see
-     * 'the lock's grant reads are capped at 16, two over the 14 measured'.
+     * clause reads `grants` every time it is asked. It used to be asked through
+     * `Holders::of($record)->isOrphaned()`, which built the full roles/accounts
+     * breakdown for a boolean nothing here reads; `anyFor()` answers the same
+     * question with one `EXISTS`, and — like `of()` — memoises it by the exact
+     * `$record` instance, so Filament re-evaluating this on every field it
+     * gates pays for the query once per record, not once per evaluation. See
+     * 'the lock's grant reads are capped …' in `PermissionResourceTest.php`
+     * for the measured count.
      */
     public static function mayEditName(Model $record): bool
     {
@@ -169,7 +179,7 @@ class PermissionResource extends Resource
             return false;
         }
 
-        return Config::get('permissions.update') === 'all' || Holders::of($record)->isOrphaned();
+        return Config::get('permissions.update') === 'all' || ! Holders::anyFor($record);
     }
 
     public static function mayEditConditions(Model $record): bool

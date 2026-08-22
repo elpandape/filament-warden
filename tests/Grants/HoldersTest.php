@@ -12,7 +12,17 @@ use Illuminate\Database\Eloquent\Model;
 pest()->extend(TestCase::class);
 
 /**
- * The catalogue row a grant just wrote, whichever of them it is.
+ * `of()` and `anyFor()` are memoised for the life of the process, keyed on
+ * the exact `Model` instance handed to them — never on the row's primary
+ * key. That is why every test in this file is safe reusing `makePermission()`
+ * and `heldPermission()` freely: each call builds a brand new object, so a
+ * fresh in-memory database reusing the same id between test cases never
+ * shares a cache entry with the one before it.
+ *
+ * The one test below that reads the SAME instance twice across a write
+ * depends on that write NOT reaching the memoised answer on its own —
+ * `forget()` is what closes that gap, and nothing in `src/` ever calls it,
+ * so this file is the only thing that exercises it at all.
  */
 function heldPermission(string $name = 'viewAny'): Model
 {
@@ -142,4 +152,64 @@ test('the tally counts every tenant, because the delete cascade does not look at
         ->firstOrFail();
 
     expect(Holders::of($seven)->roles)->toHaveCount(1);
+});
+
+test('of() answers the exact same instance for the exact same record', function (): void {
+    $permission = makePermission('viewAny');
+
+    expect(Holders::of($permission))->toBe(Holders::of($permission));
+});
+
+test('a stale copy of a row does not lock a freshly loaded copy out of the truth', function (): void {
+    $permission = makePermission('viewAny');
+
+    expect(Holders::of($permission)->isOrphaned())->toBeTrue();
+
+    Warden::allow(makeRole('editor'))->to($permission);
+
+    $reloaded = permissionClass()::query()->whereKey($permission->getKey())->firstOrFail();
+
+    expect(Holders::of($permission)->isOrphaned())->toBeTrue()
+        ->and(Holders::of($reloaded)->isOrphaned())->toBeFalse();
+});
+
+test('anyFor() agrees with isOrphaned() for every shape this class builds', function (): void {
+    $orphan = makePermission('unheld');
+    $roleHeld = makePermission('by-role');
+    $accountHeld = makePermission('by-account');
+    $everyoneHeld = makePermission('by-everyone');
+    $forbiddenOnly = makePermission('by-denial');
+
+    Warden::allow(makeRole('editor'))->to($roleHeld);
+    Warden::allow(makeUser('Amaru Quispe'))->to($accountHeld);
+    Warden::allowEveryone()->to($everyoneHeld);
+    Warden::forbid(makeRole('editor'))->to($forbiddenOnly);
+
+    expect(Holders::anyFor($orphan))->toBe(! Holders::of($orphan)->isOrphaned())
+        ->and(Holders::anyFor($roleHeld))->toBe(! Holders::of($roleHeld)->isOrphaned())
+        ->and(Holders::anyFor($accountHeld))->toBe(! Holders::of($accountHeld)->isOrphaned())
+        ->and(Holders::anyFor($everyoneHeld))->toBe(! Holders::of($everyoneHeld)->isOrphaned())
+        ->and(Holders::anyFor($forbiddenOnly))->toBe(! Holders::of($forbiddenOnly)->isOrphaned())
+        ->and(Holders::anyFor($orphan))->toBeFalse()
+        ->and(Holders::anyFor($roleHeld))->toBeTrue()
+        ->and(Holders::anyFor($accountHeld))->toBeTrue()
+        ->and(Holders::anyFor($everyoneHeld))->toBeTrue()
+        ->and(Holders::anyFor($forbiddenOnly))->toBeTrue();
+});
+
+test('a memoised answer survives a grant made after it, until forget() is called', function (): void {
+    $permission = makePermission('viewAny');
+
+    expect(Holders::of($permission)->isOrphaned())->toBeTrue()
+        ->and(Holders::anyFor($permission))->toBeFalse();
+
+    Warden::allow(makeRole('editor'))->to($permission);
+
+    expect(Holders::of($permission)->isOrphaned())->toBeTrue()
+        ->and(Holders::anyFor($permission))->toBeFalse();
+
+    Holders::forget($permission);
+
+    expect(Holders::of($permission)->isOrphaned())->toBeFalse()
+        ->and(Holders::anyFor($permission))->toBeTrue();
 });
