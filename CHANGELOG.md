@@ -8,6 +8,98 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [1.2.0] - 2026-08-21
+
+`1.0.2` stopped the screen writing the wrong thing to the database. `1.1.0` stopped it *saying*
+the wrong thing on screen. This release stops **the build** saying the wrong thing. The headline
+is not any single fix below — it is that using the grid the ordinary way turned
+`filament-warden:audit --check` red forever, and the only way back to a green build was to stop
+using the grid.
+
+### Fixed
+
+- **Turning a cell off in the grid turned `audit --check` red, permanently, on the very next
+  run.** Turning it on mints a row in `permissions`; turning it off calls
+  `RevokesPermissions::revoke()`, which only deletes from `grants` — the catalogue row survives,
+  and `Audit` reported it as an actionable finding indistinguishable from a real problem. `Audit`
+  now splits that population in two: a permission the catalogue still declares but nobody holds is
+  informational (`php artisan warden:clean` is what removes it, and `--dry-run` shows the list
+  first), and a permission nothing declares at all — the case a rename actually leaves behind —
+  keeps failing the build. `isClean()` is a flat conjunction, six terms before this release and
+  six after — one term swapped out for another, so a check that only counts how many terms it
+  combines cannot tell the old, buggy gate from the fixed one; only checking *which* six does.
+  Verified by breaking the fix itself, both ways: putting the old term back into the new gate
+  turned `--check` red again on an ordinary saved cell while the pre-existing "red build" test
+  stayed green, and taking the new term back out collapsed the only test in the suite that can
+  drive `--check` to a nonzero exit code.
+- **A permission that is genuinely undeclared but pinned to a single record can no longer turn the
+  build red, and that is a real reduction in what CI catches, decided on purpose.** Whether a
+  permission is "declared" is a question asked of the catalogue, which is keyed by class; a
+  permission clamped to one record has no class-keyed answer to give, so it is now routed to the
+  informational bucket alongside a permission on the wildcard (which really is unused, and
+  `warden:clean` really will delete it — the informational bucket says so rather than staying
+  silent) and, unreachably in practice since a permission's name is `NOT NULL`, a non-string name.
+- **The Stability table's promise that every config key path is frozen was not true for eight of
+  them.** The helper backing that pin recurses into any array, so a key whose value is an empty
+  array produced no entry at all (`guard.panel`, `catalog.models`, `catalog.custom`) and a key
+  whose value is a list exploded into per-index entries instead of naming the key itself
+  (`roles.protected`, and the four `catalog.scopes.*` buckets that feed `Scope`) — removing any of
+  those eight was silently uncaught. A new pin stops descending at exactly a list or an empty array
+  and names all 27 leaves by path and by shape (19 scalar, 3 empty, 5 list). Measured by deleting
+  each of the eight in turn and confirming the pin goes red where it previously did not.
+
+### Added
+
+- **`console.audit.forgotten`**, the release's one new key (`en` and `es`; the flattened
+  translation list moves `184 → 185`, both locales identical). `console.audit.orphans` keeps its
+  text byte-for-byte — confirmed insertion-only in both language files — because that sentence was
+  already written for the informational bucket and any installation that published translations
+  has the key frozen: renaming it would have been silently overridden by a stale copy, printing the
+  old reassuring sentence over a red CI failure. What changes is which **property** the word
+  answers for, not the key or its wording.
+- **The seven product properties this package exists to hold each now have a named, breakable
+  test — three of them for the first time.** An unpoliced resource reddens
+  `filament-warden:audit` itself, not only the `Audit` class underneath it. Whoever may edit a role
+  is proven to hand out everything the panel declares, including the wildcard cell, to themself as
+  much as to anyone else. A denial and a grant genuinely coexisting on one ordinary cell — not
+  produced through the fluent API's `apply()`, which always deletes the opposite when it writes one
+  — is proven to read as forbidden. The account-repair recipe the README prints (`everything()` +
+  `filament-warden:assign`) is run end to end against a real panel door, before and after. And a
+  guarded widget is proven to stay out of a real page render, not only out of a static call to its
+  own guard method.
+
+### Not included
+
+A minor: one new key, and nothing on a screen changes because of this release — everything above
+is a machine's business.
+
+- **The round-trip identity guard.** A value stored as the string `"2"` still returns as the
+  integer `2`, and a rule whose first line is `or` still returns as `and`, on a save that only
+  touches a permission's title. Deferred to `1.3.0` **with its own headline**, because closing it
+  removes editing from rows a consumer can edit today, and that is a visible behaviour change that
+  belongs in a release note nobody has to go looking for.
+- **The column-type warning.** `Value::cast('true')` fails closed on any model without `'boolean'`
+  in its `$casts` — correct, but silent about why. Same reason, same release: `1.3.0`.
+- **A cap on how many record-pinned rules the grid lists above its tabs before summarising.**
+  Declined here because a cap needs an "…and N more" sentence in both locales — that is a key, and
+  this release's one key belongs to the audit split above.
+- **The word "orphaned" now means three things in this package, and only two surfaces agree.**
+  `warden:clean`'s predicate and `Holders::isOrphaned()` (which gates `permissions.delete`) still
+  mean what they always meant; the audit's new informational bucket is a strict subset of both.
+  Reconciled in the README, not on screen: saying it on the permissions screen's **Orphaned**
+  filter would have needed a second new key, and this release spent its one.
+- **A self-grant of the wildcard's MANAGE column through the real `EditRole` screen.** The
+  property is pinned server-side; nobody wrote the version that clicks the actual cell.
+- **The README's own account-repair recipe is run, but never read.** The new end-to-end test
+  proves the recipe works; it does not compare its steps against the paragraph a person actually
+  reads, so the two can still drift apart silently.
+- **Three of the probe's assertions compare against English translation text that happens to equal
+  the underlying enum value today.** Rewording `stances.*` — a copy change, not a behaviour change
+  — would turn them red, and nothing in the suite says why.
+- **64 unnamespaced global test helpers, where a name collision under `--parallel` is a fatal, not
+  a failing assertion.** The tripwire that would catch a collision is run by hand; it is not one of
+  the seven gates.
+
 ## [1.1.0] - 2026-08-21
 
 `1.0.2` stopped the screen writing the wrong thing to the database. This release stops it *saying*
