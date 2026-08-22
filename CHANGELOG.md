@@ -8,6 +8,100 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [1.3.0] - 2026-08-22
+
+`1.0.2` stopped the screen *writing* the wrong thing. `1.1.0` stopped it *saying* the wrong thing.
+`1.2.0` stopped **the build** saying the wrong thing. This release stops the screen **rewriting** a
+rule nobody asked to change.
+
+**What this release owes you: the shapes it stops editing.**
+
+| Stored as | Through `1.2.0` | From `1.3.0` |
+|---|---|---|
+| the string `'2'` | editable; a save rewrote it as the integer `2` | drawn, explained, no longer editable |
+| the string `'2.5'` | editable; a save rewrote it as the float `2.5` | same |
+| the string `'true'` or `'false'` | editable; a save rewrote it as a boolean | same |
+| a leading `or` | editable; a save rewrote it as `and` | same |
+
+A row shaped like one of these can no longer be edited from this screen, and it can still be edited
+from warden's own fluent API.
+
+### Fixed
+
+- **A save that only touched a permission's title could silently rewrite the condition attached to
+  it.** `PermissionForm::conditionsWritable()` asked whether a stored rule could be *parsed*, not
+  whether it came back byte-identical — exactly the debt `1.2.0` deferred here by name. `lockedReason()`
+  is now the single decision-maker: it re-serialises the rebuilt rule through `ConstraintSerializer`
+  and compares it, order-insensitive on maps and order-sensitive on lists, to what is actually
+  stored — the same question warden itself asks when it decides two rows are the same twin — before
+  calling a row writable. Two locks that used to borrow the generic "a shape this builder cannot
+  draw" sentence now say which cause it actually is: an `entity_type` that no longer resolves to a
+  model, or a stored column the table no longer has. A third cause, new outright, names the
+  round-trip failure itself (see the table above). One case is deliberate and stays: a leading `or`
+  always reads back as `and`, because `Narrowing::conditions()` normalises the first line on
+  purpose — that row is not "fixed," it is now honestly locked instead of silently rewritten.
+- **A condition comparing `true` or `false` against a column the model does not cast to boolean
+  stored, drew, explained itself, and never matched a single row — silently, forever.**
+  `Value::cast('true')` returns PHP's own `true`, and warden compares it with `===` against the raw
+  attribute, which on an uncast column comes back as `1`. Both screens that draw a condition — the
+  permission form's builder and the role grid's own cell inspector — now show a warning next to
+  that value, sourced from one place (`Conditions\Words::all()`) so neither can drift from the
+  other. Wiring the inspector's half (`DrawsThePermissionGrid::narrowingFor()`) was outside this
+  fix's own file list; without it, the cell inspector would have shipped calling `.includes()` on
+  `undefined` for every role's condition, breaking the screen the warning exists to serve.
+- **Unticking a role assigned outside the tenant you were viewing from deleted nothing, reported
+  success, and came back ticked on reload.** `Assignment::of()` reads under warden's tenant scope,
+  which with a tenant active answers *global or this tenant* — so a globally assigned role shows as
+  held from inside any tenant, while `Warden::retract()->from()` deletes one exact scope. For a role
+  held only globally, that exact-scope delete already touched nothing on its own; for a role held
+  both globally and at the active tenant, it silently destroyed the tenant-scoped row while the
+  global one kept the checkbox ticked — a real loss the screen never reported either way. Both cases
+  now read as `elsewhere`, the same shape the permission grid already gives a grant that belongs to
+  another tenant: shown, marked, and left out of the diff. Measured cost:
+  `Assignment::descriptions()` now reads the assignments table 5 times for two held roles, capped at
+  8 (see "Not included" below — this is a real, accepted increase, not a wash). **A bug in the fix
+  itself, found and closed during this same task**: the first version compared a row's `scope`
+  against the write scope with strict `!==`; warden types a tenant id `int|string|null` while the
+  column is a plain integer, so a `TenantResolver` returning a string tenant id would have had
+  *every* correctly scoped assignment misclassified as elsewhere — locked, un-retractable,
+  everywhere, for that installation. It now compares as text, mirroring how `RoleGrants::writable()`
+  already solves the identical mismatch for the permission grid.
+
+### Added
+
+- **An eighth `make ci` gate, `helpers`.** A duplicate name among the suite's 64 unnamespaced global
+  test helpers is a fatal at PHP's load phase, confirmed by deliberately declaring one:
+  `Cannot redeclare function stylesheet() (previously declared in /app/tests/PackageTest.php:24)`,
+  thrown before a single test runs. No test inside Pest can catch a failure that happens before
+  Pest starts, so this check runs on the host, outside Docker, as a `grep`/`sort`/`uniq -d` pass
+  over `tests/*.php` — not PHP execution, so it does not need the container.
+- **Five new keys** (`en` and `es`; the flattened translation list moves `185 → 190`, both locales
+  identical): `conditions.boolean`, `conditions.locked.model`, `conditions.locked.column`,
+  `conditions.locked.rewrite`, `relations.roles.elsewhere`.
+
+### Not included
+
+- **The `Catalog` and `Holders` memo, and with it the query budget of these screens** — the tag
+  "Que no cueste," today `1.5.0`. This release makes a measured cost *worse*, on purpose, and caps
+  it with a test instead of fixing it: `Assignment::descriptions()` now asks two things per role
+  instead of one, 5 reads measured for two held roles against a ceiling of 8.
+- **The relation manager for handing roles out from the account screen** — the tag "Repartir desde
+  la cuenta," today `1.4.0`. `RoleAssignment`'s own checkbox field is what this release touched.
+- **`conditions.locked.model` has no test asserting it is ever actually displayed.**
+  `PermissionForm::conditionsHelp()`'s earlier `no_model` guard checks the *live form's* current
+  `entity_type` before `lockedReason()` ever runs, so that branch is reachable today only through
+  the `disabled()` boolean, never through the help text a person reads — seeing it for real needs a
+  stored `entity_type` that does not resolve **with** a live form value that does.
+- **`RoleGrants::writable()` has no test for a string-typed tenant id**, the same systemic gap this
+  release closed in `Assignment`, left open on its older sibling on purpose: that method already
+  compares as text (fixed earlier, for an unrelated reason, per its own docblock), but nobody has
+  proven it against a resolver that hands back a string — this release does not touch pre-existing
+  code outside what it set out to fix.
+- **Nobody opened a browser.** The boolean-misfit warning and the three new lock sentences are the
+  only visible surface this release adds, and none of it has been seen rendered — in light or dark,
+  against a real installation holding a row whose condition value is the string `'2'`. Verified end
+  to end through Pest's HTTP/Livewire layer only. Pending, not seen.
+
 ## [1.2.0] - 2026-08-22
 
 `1.0.2` stopped the screen writing the wrong thing to the database. `1.1.0` stopped it *saying*
