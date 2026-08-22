@@ -56,9 +56,9 @@ jobs:
       - name: Profanity
         run: vendor/bin/pest --profanity
 
-      # The seventh gate. It exists because v1.1.0 shipped a Critical that 660 PHP
-      # tests could not see: the only JS checks this package had asserted that a
-      # string was present in the source file.
+      # The seventh of eight gates. It exists because v1.1.0 shipped a Critical
+      # that 660 PHP tests could not see: the only JS checks this package had
+      # asserted that a string was present in the source file.
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -67,3 +67,18 @@ jobs:
 
       - name: Verify the JS against Alpine's reactivity
         run: cd verify && npm ci && node verify-reach-of.mjs && node verify-select-sequencing.mjs
+
+      # The eighth gate. A duplicate name among the suite's global test helpers
+      # is a fatal at PHP's load phase, not a failing test: the run dies before
+      # Pest executes a single assertion, so no test inside the suite can catch
+      # it (see `helpers` in the Makefile). Plain text over `tests/*.php`, so it
+      # needs neither PHP nor the container.
+      - name: Duplicate test helpers
+        run: |
+          dup=$(grep -rhoE '^function [a-zA-Z_][a-zA-Z0-9_]*' tests/ --include=*.php | awk '{print $2}' | sort | uniq -d)
+          if [ -n "$dup" ]; then
+            echo 'Duplicate global test helpers:'
+            echo "$dup"
+            exit 1
+          fi
+          echo 'No duplicate global test helpers.'
