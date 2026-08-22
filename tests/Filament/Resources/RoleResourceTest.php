@@ -13,6 +13,7 @@ use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
+use Filament\Actions\DeleteAction;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\DB;
 
@@ -602,6 +603,37 @@ test('deleting a role from its edit screen reaches the store too', function (): 
 
     expect(roleClass()::query()->whereKey($role->getKey())->exists())->toBeFalse()
         ->and(Access::granted($holder, 'viewAny', roleClass()))->toBeFalse();
+});
+
+test("the edit screen's delete modal says what it takes with it too", function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $role = makeRole();
+    Warden::assign($role)->to(makeUser('Amaru Quispe'));
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->assertActionExists(
+            'delete',
+            checkActionUsing: fn (DeleteAction $action): bool => is_string($description = $action->getModalDescription()) && str_contains($description, 'Amaru Quispe'),
+        );
+});
+
+test('a role nobody holds says so on the edit screen too', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $role = makeRole();
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->assertActionExists(
+            'delete',
+            checkActionUsing: fn (DeleteAction $action): bool => is_string($description = $action->getModalDescription()) && str_contains($description, 'Nobody holds this role'),
+        );
 });
 
 test('deleting a role from its view screen reaches the store too', function (): void {

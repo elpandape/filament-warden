@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages;
 
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
+use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Tables\RolesTable;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
@@ -23,7 +24,9 @@ class EditRole extends EditRecord
      * list and the `roles.delete` rule live — is never on that path. Measured
      * with the plain `DeleteAction::make()` this page first carried: a protected
      * role was deleted outright from its own edit screen, and the next assertion
-     * died with `ModelNotFoundException`.
+     * died with `ModelNotFoundException`. The description is `RolesTable`'s own
+     * — the assignments go with it by a foreign key, below Eloquent and with no
+     * event of their own, so this is the last moment anybody is told.
      *
      * @return array<Action>
      */
@@ -36,6 +39,7 @@ class EditRole extends EditRecord
             // way, silently and with no expiry. Void on purpose — whatever
             // `after()` returns stands in for the action's own result.
             DeleteAction::make()
+                ->modalDescription(static fn (Model $record): string => RolesTable::warning($record))
                 ->visible(fn (Model $record): bool => RoleResource::canDelete($record))
                 ->after(static function (): void {
                     Warden::refresh();
