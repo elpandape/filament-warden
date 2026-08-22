@@ -23,6 +23,7 @@
 - [🚀 Installation](#-installation)
 - [⚡ Quick Start](#-quick-start)
 - [🔌 Setup](#-setup)
+    - [Plugin Options](#plugin-options)
     - [Policies](#policies)
     - [Lock the Panel](#lock-the-panel)
     - [Lock Pages & Widgets](#lock-pages--widgets)
@@ -218,6 +219,18 @@ php artisan filament-warden:assign super-admin "App\Models\User:1"
 
 ## 🔌 Setup
 
+### Plugin Options
+
+Both resources are registered by default. Drop one an installation does not want:
+
+```php
+FilamentWardenPlugin::make()
+    ->roles(false)        // no role resource, no grid
+    ->permissions(false); // no permission resource
+```
+
+Each takes a `bool`, defaulting to `true`, so `->roles()` alone is the same as `->roles(true)`. The guard, the audit and the two Filament assets stay registered either way — turning a resource off does not turn off what protects the rest of the panel (see [The Guard](#the-guard)).
+
 ### Policies
 
 All your policies must extend `WardenPolicy`. The `allows()` method resolves directly from warden's store, avoiding infinite loops with the Gate.
@@ -293,7 +306,43 @@ Filament returns `true` by default for `Page::canAccess()` and `Widget::canView(
 
 ### Assign Roles to Users
 
-Add the field to your user resource:
+Two ways to hand a role to an account. Use whichever fits the size of the installation.
+
+#### From an Account Screen
+
+For a real catalogue of roles — one a `CheckboxList` cannot page, sort, or explain. This is the
+one thing the package cannot do for you: `Resource::getRelations()` is a concrete static, and
+nothing outside your own `UserResource` can write to it. Add one line:
+
+```php
+use ElPandaPe\FilamentWarden\Filament\RelationManagers\RolesRelationManager;
+
+public static function getRelations(): array
+{
+    return [RolesRelationManager::class];
+}
+```
+
+That is the whole of it. Everything else — who may assign or retract which role — is decided by
+the package, the same way `RoleAssignment` below decides it for the field.
+
+It lists the roles the account holds, deduplicated (a role assigned both with and without a
+context is two rows of warden's own pivot table sharing one key), with a badge saying **how**:
+here, elsewhere, or restricted to a context. Assigning opens a searchable list; retracting is one
+click on the row. Both are hand-written actions, never `AttachAction`, `DetachAction` or
+`DetachBulkAction` — in Filament 5.7 those three check **no policy at all**
+(`RelationManager::getDefaultActionAuthorizationResponse()` closes them only with `isReadOnly()`,
+which is `false` on any edit page) — and both write through warden's fluent API, one role at a
+time, never `attach()`/`detach()`/`sync()`, for the same cache-bump reason `RoleAssignment` warns
+about below.
+
+> 🔒 **A role held restricted to a context, or outside the tenant you are viewing from, shows its
+> badge and carries no retract action.** Same two reasons `RoleAssignment` locks them below —
+> retracting either from here would either take every context with it or delete the wrong row.
+
+#### From a Field
+
+For a small installation. Frozen since `v0.7.0`, and still the right answer there:
 
 ```php
 use ElPandaPe\FilamentWarden\Filament\Forms\RoleAssignment;
@@ -442,7 +491,7 @@ Lists the `permissions` **table** — the rows warden has actually created — a
 
 From v0.8.0, the panel **refuses to boot** if it finds an unguarded page or widget. That is what stops a custom screen from being left open to everyone by accident.
 
-It is on by default, and **the plugin takes no options**: `FilamentWardenPlugin` accepts `make()`, `getId()`, `register()` and `boot()`, and nothing else. The switches are config keys, one per kind:
+It is on by default, and neither of the plugin's `roles()`/`permissions()` toggles (see [Plugin Options](#plugin-options)) touches it — those turn a resource on or off, never the guard. The guard's own switches are config keys, one per kind:
 
 ```php
 // config/filament-warden.php
@@ -656,8 +705,9 @@ Two different kinds of thing are in that list, and both matter for the same reas
 | Category | Items |
 |---|---|
 | Permission prefixes | `page:`, `widget:`, `panel:` and `PermissionName`, which mints them and reads them back |
-| Plugin | `FilamentWardenPlugin`, its ID `filament-warden`, and its four methods: `make()`, `getId()`, `register()`, `boot()` |
+| Plugin | `FilamentWardenPlugin`, its ID `filament-warden`, and its six methods: `make()`, `getId()`, `register()`, `boot()`, `roles()`, `permissions()` |
 | Fields | `PermissionGrid`, `PermissionGridEntry`, `ConditionBuilder`, `RoleAssignment`, and the `{stances, narrowing}` state envelope a form receives |
+| Relation managers | `RolesRelationManager`'s class name — a consuming application's own `UserResource::getRelations()` stores it by name, so renaming the class breaks every installation that attached it |
 | Traits | `AuthorizesPageAccess`, `AuthorizesWidgetView`, `AccessesPanels` |
 | Authorization | `WardenPolicy`, `Access` |
 | Catalog | `Catalog::for()`, `Entry` and its `key()`, `Origin`, `Scope` |

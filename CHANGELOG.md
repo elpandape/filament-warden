@@ -8,6 +8,124 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [1.4.0] - 2026-08-22
+
+`RoleAssignment`, since `v0.7.0`, has been the only way to hand a role out from a screen — a
+`CheckboxList` that does not page, does not sort, and does not say why a role is where it is. This
+release adds the other half: a relation manager a consuming application attaches to its own
+`UserResource`, for the installation that field cannot serve.
+
+### Added
+
+- **`RolesRelationManager`**, a new public (not `final`) class at
+  `ElPandaPe\FilamentWarden\Filament\RelationManagers\RolesRelationManager`. A package cannot
+  attach a relation manager to a resource it does not own — `Resource::getRelations()` is a
+  concrete static and there is no registry a plugin can write to (AGENTS.md §6.18) — so the whole
+  of what a consuming application does is add one line to its own `UserResource`:
+
+  ```php
+  public static function getRelations(): array
+  {
+      return [RolesRelationManager::class];
+  }
+  ```
+
+  It lists the roles the signed-in account's target holds, read through `Assignment::of()`, which
+  already deduplicates a role assigned both with and without a context to one row, with a badge
+  naming how it is held: here, elsewhere, or restricted to a context. One header action assigns a
+  role from a searchable list; one row action retracts it. Both are hand-written, never
+  `AttachAction`, `DetachAction` or `DetachBulkAction` — those three check **no policy at all** in
+  Filament 5.7 (`RelationManager::getDefaultActionAuthorizationResponse()` closes them only with
+  `isReadOnly()`, `false` on any edit page) — and both write through warden's fluent API, never
+  `attach()`/`detach()`/`sync()`, which skip warden's cache bump the same way `RoleAssignment`
+  already warns about. Both actions are hidden **and** denied in the server on a `ViewRecord` page,
+  where `isReadOnly()` is `true` but closes no `Action` of this package's own — only Filament's own
+  action classes are in that `match`.
+- **`Assignment::give()`/`take()`**, two new public methods, one entry point per role. The relation
+  manager's actions write through these, never `Assignment::apply()` — `apply()` is a set diff over
+  the *whole* catalogue, unmemoised, the right shape for `RoleAssignment`'s `CheckboxList` (which
+  hands over the entire wanted state at once) and the wrong one for a row action that already knows
+  exactly which role it touched. Measured over a 21-role catalogue, counting `assigned_roles`
+  reads: `give()` reaching a given state costs **6**, `apply()` reaching the same state costs
+  **47** — capped at `give()` ≤ 10, with a second assertion that `apply()`'s count is strictly
+  higher, so the comparison itself is what the guarantee rests on, not a number frozen for one
+  side.
+- **`FilamentWardenPlugin::roles(bool $condition = true)` and
+  `::permissions(bool $condition = true)`**, two new fluent methods. Off leaves the matching
+  resource unregistered — the role resource takes its grid with it, the permission resource with
+  it. Both default to `true`, so an application that upgrades and calls neither keeps both
+  resources exactly as before. The guard, the audit and the two Filament assets stay registered
+  regardless of either toggle.
+- **A "held by" count on the roles listing**, and a **"Who holds it" section on `ViewRole`**,
+  both reading `assigned_roles` under the active tenant. The section names up to 10 holders
+  (`Holders::LABELS`, the same cap the permissions screen already uses) and skips an authority
+  whose morph alias no longer resolves rather than erroring.
+- **The delete action's modal now says what it takes with it, on all three surfaces a role can be
+  deleted from** — the roles listing, `ViewRole`, and `EditRole` — mirroring
+  `PermissionResource`'s own three-surface coverage since `v1.0.2`. The warning reads **wide**
+  (`withoutGlobalScopes()`), the same reasoning `RoleResource::isDeletable()` already uses: the
+  cascade that removes `assigned_roles` rows on delete is blind to tenancy, so counting only the
+  active tenant's rows would understate what is actually lost.
+- **17 new keys** in `en` and `es`: `relations.roles.held_column`, `relations.roles.held.here`,
+  `relations.roles.held.elsewhere`, `relations.roles.held.restricted`,
+  `relations.roles.assign.label`, `relations.roles.assign.heading`, `relations.roles.assign.field`,
+  `relations.roles.assign.notified`, `relations.roles.retract.label`,
+  `relations.roles.retract.notified`, `resources.roles.sections.holders`,
+  `resources.roles.columns.held`, `resources.roles.holders.description`,
+  `resources.roles.holders.nobody`, `resources.roles.holders.held`, `resources.roles.delete.nobody`,
+  `resources.roles.delete.holders`. The flattened translation list `FrozenTest.php` pins moves
+  `190 → 207`, both locales identical, regenerated from the language files rather than counted by
+  hand.
+- **Stability**: the plugin now names six methods instead of four — `make()`, `getId()`,
+  `register()`, `boot()`, `roles()`, `permissions()` — each named one by one, per the lesson §6.24
+  already drew from `->guardPages()`/`->guardWidgets()`/`->tenant(null)` shipping against a test
+  that only asserted a category. `RolesRelationManager` gets its own row: its class name is frozen,
+  since a consuming application's own `UserResource::getRelations()` stores it by name.
+
+### Not included
+
+- **`->cluster()`, promised in the plan, is not shipped — a verified negative, not an omission.**
+  A resource's cluster is `protected static ?string $cluster` on the resource class itself
+  (`BelongsToCluster.php:12`), with only a getter and no setter anywhere in the framework: no
+  `Panel::cluster()`, no field on `ResourceConfiguration` (which carries exactly `resource`, `key`,
+  `slug`), and `Panel.php` itself has zero cluster-related methods. Assignment happens once, at
+  registration time, inside `HasComponents::resources()` → `registerToCluster()`, reading that
+  static property directly — there is no later hook and no per-panel override this call accepts.
+  The only way left to change the answer is to reflection-mutate the class's own static property,
+  which is one value shared by the whole process, not scoped per `Panel` — the same unscoped
+  global-switch shape AGENTS.md §6.21 already names for `Warden::tenant()->to()`, one layer lower
+  (a PHP class static instead of a container singleton). Two escapes were checked and ruled out: a
+  subclass (every `Page` hardcodes `$resource` at the concrete base, so the same problem cascades
+  to it) and `Panel::bootUsing()` (clusters are computed before those callbacks run, and
+  `resources()` only appends — it does not let a later call redirect an already-registered
+  resource's cluster). Two of the three plugin options from the plan ship; the third does not,
+  because there is no version of it that would not silently fight another panel loading the same
+  plugin in the same process.
+- **This release makes two screens measurably slower, and neither cost is fixed here** — both are
+  deferred to the `Catalog`/`Holders` memo already promised for `v1.5.0` ("Que no cueste"). The
+  roles listing's new "held by" column costs **11** `assigned_roles` reads for 5 roles (2 per row
+  plus 1 fixed overhead), on top of the pre-existing read `isDeletable()`'s own delete-button
+  `visible()` already paid — capped at 13 by a test. The relation manager's own assign modal costs
+  **405** `assigned_roles` statements against a 200-role catalogue (unchanged from before this
+  release, and left uncapped by any test on purpose): each option's `disableOptionWhen()` check
+  re-reads the assignments table fresh, because `give()`/`take()` write to that same table and a
+  memo there would risk handing a check made right after a write a stale row list in the same
+  request.
+- **The same untested `modalDescription` wiring this release closed on all three role surfaces is
+  still open on the three permission ones.** `PermissionsTable.php`, `EditPermission.php` and
+  `ViewPermission.php` each carry a `->modalDescription(...)` closure with no test proving it is
+  wired to that specific action — the exact gap this release closed for `RolesTable.php`,
+  `ViewRole.php` and `EditRole.php`. Pre-existing, not introduced here, not touched.
+- **Two minors `1.3.0` left open are still open — checked, not assumed.**
+  `conditions.locked.model` still has no test proving the sentence is ever actually shown on
+  screen. `RoleGrants::writable()` still has no test for a string-typed tenant id, the same
+  systemic gap `1.3.0` closed on `Assignment`'s side of the identical comparison.
+- **Nobody attached the relation manager to a real application and opened it.** Every guarantee in
+  this release is verified end to end through Pest's HTTP/Livewire layer only. The deliverable
+  *is* a screen, and unlike the last three releases, that screen has not been seen — not in a
+  browser, not in light mode or dark, not with `RolesRelationManager` actually wired into a
+  `UserResource::getRelations()`. Pending, not seen.
+
 ## [1.3.2] - 2026-08-22
 
 `1.3.0` closed this hazard on the permission form and said, in its own release note, that it was
