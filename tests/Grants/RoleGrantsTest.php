@@ -1040,3 +1040,23 @@ test('the transaction opens on warden own connection, not the default one', func
     })->toThrow(RuntimeException::class)
         ->and(grantCount())->toBe(0);
 });
+
+test('two different conditions saved together keep their own twin, not one shared', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    RoleGrants::apply($role, $catalog, [
+        Post::class => ['viewAny' => 'granted', 'update' => 'granted'],
+    ], [
+        Post::class => [
+            'viewAny' => conditionOn('title', 'alpha'),
+            'update' => conditionOn('title', 'beta'),
+        ],
+    ]);
+
+    $state = RoleGrants::of($role, $catalog);
+
+    expect($state->narrowings[Post::class]['viewAny']->rules[0]->value)->toBe('alpha')
+        ->and($state->narrowings[Post::class]['update']->rules[0]->value)->toBe('beta')
+        ->and(grantCount())->toBe(2);
+});
