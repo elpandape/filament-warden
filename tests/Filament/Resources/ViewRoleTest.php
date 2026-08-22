@@ -10,6 +10,12 @@ use ElPandaPe\Warden\Facades\Warden;
 
 use function Pest\Livewire\livewire;
 
+/**
+ * Every test below signs in against two gates, not one: the resource opens on
+ * `viewAny` and the record opens on `view`. Granting only the second answers with
+ * a whole 403 page rather than a failed assertion, which reads like a broken test
+ * instead of a missing grant.
+ */
 pest()->extend(TestCase::class);
 
 /**
@@ -62,7 +68,6 @@ test('reading a role is its own permission, apart from changing it', function ()
     $user = signIn();
     $role = makeRole('editor');
 
-    // Two gates, not one: the resource opens on `viewAny` and the record on `view`.
     Warden::allow($user)->to('viewAny', roleClass());
     Warden::allow($user)->to('view', $role);
 
@@ -75,7 +80,6 @@ test('the screen draws what the role holds', function (): void {
     $user = signIn();
     $role = makeRole();
 
-    // Two gates, not one: the resource opens on `viewAny` and the record on `view`.
     Warden::allow($user)->to('viewAny', roleClass());
     Warden::allow($user)->to('view', $role);
     Warden::allow($role)->to('viewAny', roleClass());
@@ -89,7 +93,6 @@ test('the screen that only reads hands the browser what it drew', function (): v
     $user = signIn();
     $role = makeRole();
 
-    // Two gates, not one: the resource opens on `viewAny` and the record on `view`.
     Warden::allow($user)->to('viewAny', roleClass());
     Warden::allow($user)->to('view', $role);
     Warden::allow($role)->to('viewAny', roleClass());
@@ -109,19 +112,18 @@ test('both screens are handed the same payload, because it is worked out once', 
     Warden::allow($user)->to('view', roleClass());
     Warden::allow($user)->to('update', roleClass());
     Warden::allow($role)->to('viewAny', roleClass());
-    Warden::allow($role)->to('update', roleClass())->where('name', 'editor');
+    Warden::allow($role)->to('update', roleClass())->where('name', '=', '2');
 
     $onThePage = stateHandedTo(livewire(ViewRole::class, ['record' => $role->getKey()])->html());
 
     livewire(EditRole::class, ['record' => $role->getKey()])
-        ->assertSet('data.permissions', $onThePage);
+        ->assertSetStrict('data.permissions', $onThePage);
 });
 
 test('no cell of a screen that only reads is a control that cycles', function (): void {
     $user = signIn();
     $role = makeRole();
 
-    // Two gates, not one: the resource opens on `viewAny` and the record on `view`.
     Warden::allow($user)->to('viewAny', roleClass());
     Warden::allow($user)->to('view', $role);
 
@@ -183,7 +185,6 @@ test('the inspector answers here too, because understanding is reading', functio
     $user = signIn();
     $role = makeRole();
 
-    // Two gates, not one: the resource opens on `viewAny` and the record on `view`.
     Warden::allow($user)->to('viewAny', roleClass());
     Warden::allow($user)->to('view', $role);
     Warden::forbid($role)->to('delete', roleClass());
@@ -197,7 +198,6 @@ test('a screen that cannot change anything never says something is unsaved', fun
     $user = signIn();
     $role = makeRole();
 
-    // Two gates, not one: the resource opens on `viewAny` and the record on `view`.
     Warden::allow($user)->to('viewAny', roleClass());
     Warden::allow($user)->to('view', $role);
     Warden::allow($role)->to('viewAny', roleClass());
@@ -211,7 +211,6 @@ test('a screen that only reads still says how far a rule reaches', function (): 
     $user = signIn();
     $role = makeRole();
 
-    // Two gates, not one: the resource opens on `viewAny` and the record on `view`.
     Warden::allow($user)->to('viewAny', roleClass());
     Warden::allow($user)->to('view', $role);
     Warden::allow($role)->to('update', roleClass())->where('name', 'editor');
@@ -225,7 +224,6 @@ test('the builder is on the read-only screen with nothing to operate', function 
     $user = signIn();
     $role = makeRole();
 
-    // Two gates, not one: the resource opens on `viewAny` and the record on `view`.
     Warden::allow($user)->to('viewAny', roleClass());
     Warden::allow($user)->to('view', $role);
 

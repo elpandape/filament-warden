@@ -25,6 +25,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 
+/**
+ * `StateKey::MANAGE` and warden's `'*'` are one value wearing two hats.
+ *
+ * The read half files a stored `'*'` under `StateKey::MANAGE` because the two
+ * ARE the same string; the write half in `RoleGrants::cells()` hands warden
+ * `RoleGrants::WILDCARD` under that same key. Only the read half is pinned
+ * below — if the two constants ever diverge, that pin goes red first and the
+ * write half is what the reader must then go and check, because nothing here
+ * names it.
+ */
 pest()->extend(TestCase::class);
 
 function gridCatalog(): Catalog
@@ -144,6 +154,17 @@ test('the wildcard column reaches every action the policy declares', function ()
     expect(Access::granted($user, 'viewAny', Post::class))->toBeTrue()
         ->and(Access::granted($user, 'delete', Post::class))->toBeTrue()
         ->and(RoleGrants::of($role, gridCatalog())->stances[Post::class][StateKey::MANAGE])->toBe('granted');
+});
+
+test('a wildcard warden wrote itself is filed under the key the grid draws', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->toManage(Post::class);
+
+    $stances = RoleGrants::of($role, gridCatalog())->stances;
+
+    expect($stances[Post::class][StateKey::MANAGE] ?? null)->toBe('granted')
+        ->and($stances[Post::class]['viewAny'] ?? null)->toBeNull();
 });
 
 test('a policy action named manage is a cell of its own, not the wildcard', function (): void {

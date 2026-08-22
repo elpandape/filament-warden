@@ -157,3 +157,21 @@ function flattenKeys(array $lines, string $prefix = ''): array
 
     return $keys;
 }
+
+/**
+ * The newest catalogue row a fluent chain just wrote, by the name it carries.
+ *
+ * Five test files each carried their own copy of this query, and every copy
+ * carried the same three clauses that make the read honest: `withoutGlobalScopes()`
+ * because all four warden models carry `TenantScope`, `orderByDesc('id')` because
+ * a chain that narrows leaves a twin behind and the twin is the newer row, and
+ * `firstOrFail()` so a missing row fails here instead of as a null two lines on.
+ */
+function latestPermission(?string $name = null): Model
+{
+    return permissionClass()::query()
+        ->withoutGlobalScopes()
+        ->when($name !== null, fn ($query) => $query->where('name', $name))
+        ->orderByDesc('id')
+        ->firstOrFail();
+}

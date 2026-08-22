@@ -15,11 +15,7 @@ pest()->extend(TestCase::class);
 
 function probedPermission(?string $name = null): Model
 {
-    return Context::resolve()->permissionClass()::query()
-        ->withoutGlobalScopes()
-        ->when($name !== null, fn ($query) => $query->where('name', $name))
-        ->orderByDesc('id')
-        ->firstOrFail();
+    return latestPermission($name);
 }
 
 test('an account that holds it is told so, and by which permission', function (): void {

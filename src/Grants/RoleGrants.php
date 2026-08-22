@@ -95,12 +95,19 @@ final class RoleGrants
                 continue;
             }
 
+            // No translation from warden's stored name to the grid's state key,
+            // because there is none to make: `StateKey::MANAGE` is DEFINED as the
+            // very name warden stores the extra column under, and the write half
+            // in `cells()` pairs the two on purpose. A ternary between them reads
+            // as a guard while both sides answer the same string, and no test can
+            // tell its branches apart — worse, it would absorb the one change that
+            // must not pass quietly. Measured: with the ternary in place, moving
+            // `MANAGE` off `'*'` kept every test green, and a policy declaring its
+            // own `manage` action would then have driven two writes from one cell.
+            // Without it, the pin in `RoleGrantsTest` goes red.
             [$row, $action] = match (true) {
                 $type === null && in_array($name, $doors, true) => [$name, StateKey::DOOR],
-                is_string($type) && isset($models[$type]) => [
-                    $models[$type],
-                    $name === self::WILDCARD ? StateKey::MANAGE : $name,
-                ],
+                is_string($type) && isset($models[$type]) => [$models[$type], $name],
                 default => [null, null],
             };
 

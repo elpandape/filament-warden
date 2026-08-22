@@ -29,11 +29,7 @@ function signInToEditPermissions(): void
  */
 function narrowedRow(string $name): Model
 {
-    return permissionClass()::query()
-        ->withoutGlobalScopes()
-        ->where('name', $name)
-        ->orderByDesc('id')
-        ->firstOrFail();
+    return latestPermission($name);
 }
 
 test('a stored rule that cannot be read survives a save that only touched the title', function (): void {

@@ -689,6 +689,7 @@ test('a cell nobody wrote says the wider rule that answers for it', function ():
         ->toContain('>'.__('filament-warden::ui.grid.states.granted').'</span>')
         ->toContain('>'.__('filament-warden::ui.grid.states.broader').'</span>')
         ->and(boxOf($html, roleClass(), StateKey::MANAGE))
+        ->toContain('>'.__('filament-warden::ui.grid.states.granted').'</span>')
         ->not->toContain('>'.__('filament-warden::ui.grid.states.broader').'</span>');
 });
 

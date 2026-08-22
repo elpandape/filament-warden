@@ -24,11 +24,7 @@ pest()->extend(TestCase::class);
 
 function heldRow(string $name = 'viewAny'): Model
 {
-    return Context::resolve()->permissionClass()::query()
-        ->withoutGlobalScopes()
-        ->where('name', $name)
-        ->orderByDesc('id')
-        ->firstOrFail();
+    return latestPermission($name);
 }
 
 function grantReads(): int

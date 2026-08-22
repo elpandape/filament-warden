@@ -14,11 +14,7 @@ pest()->extend(TestCase::class);
 
 function reachedPermission(string $name = 'view'): Model
 {
-    return Context::resolve()->permissionClass()::query()
-        ->withoutGlobalScopes()
-        ->where('name', $name)
-        ->orderByDesc('id')
-        ->firstOrFail();
+    return latestPermission($name);
 }
 
 function documents(int $count = 3): void

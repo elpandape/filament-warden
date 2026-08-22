@@ -16,11 +16,7 @@ pest()->extend(TestCase::class);
  */
 function heldPermission(string $name = 'viewAny'): Model
 {
-    return Context::resolve()->permissionClass()::query()
-        ->withoutGlobalScopes()
-        ->where('name', $name)
-        ->orderByDesc('id')
-        ->firstOrFail();
+    return latestPermission($name);
 }
 
 test('a permission nobody holds is an orphan, and says so', function (): void {
