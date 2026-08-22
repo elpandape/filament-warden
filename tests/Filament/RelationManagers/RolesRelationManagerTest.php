@@ -118,9 +118,24 @@ test('with viewAny on roles the tab opens and lists what the account holds', fun
         'pageClass' => EditRole::class,
     ])
         ->assertCanSeeTableRecords([$role])
+        ->assertTableColumnStateSet('held_as', 'here', $role)
         ->assertOk();
 });
 
+/**
+ * I1 of the v1.4.0 whole-branch review: this test and the one below it built
+ * exactly the two scenarios `heldAs()` tells apart, and until now both
+ * proved only `assertTableActionHidden('retract', …)` — which reads the same
+ * whether `heldAs()` answers `restricted` or `elsewhere`, because BOTH close
+ * the retract action the same way. `LanguageTest.php`'s "every way a role
+ * can be held has a word" pins the SET `heldAs()` can produce against the
+ * SET of declared keys, which cannot see a swap of which record produces
+ * which value — the two match arms in `heldAs()` (`Assignment::isRestricted()`
+ * before `isElsewhere()`, mirroring `Assignment::descriptions()`'s own
+ * priority) could trade places and all 798 tests before this one stayed
+ * green. `assertTableColumnStateSet()` reads the badge's own state, not
+ * just whether a button is hidden, and is what actually distinguishes them.
+ */
 test('a role restricted to a context is listed and has no retract action', function (): void {
     signInAsRoleManager();
 
@@ -135,6 +150,7 @@ test('a role restricted to a context is listed and has no retract action', funct
         'pageClass' => EditRole::class,
     ])
         ->assertCanSeeTableRecords([$role])
+        ->assertTableColumnStateSet('held_as', 'restricted', $role)
         ->assertTableActionHidden('retract', $role)
         ->assertOk();
 });
@@ -153,6 +169,7 @@ test('a role held at another scope is listed and has no retract action', functio
             'pageClass' => EditRole::class,
         ])
             ->assertCanSeeTableRecords([$role])
+            ->assertTableColumnStateSet('held_as', 'elsewhere', $role)
             ->assertTableActionHidden('retract', $role)
             ->assertOk();
     });
