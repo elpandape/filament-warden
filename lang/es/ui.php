@@ -192,6 +192,10 @@ return [
     'relations' => [
         'roles' => [
             'label' => 'Roles',
+            'concurrent' => [
+                'kept_title' => 'Guardado, y alguien más estaba editando',
+                'kept' => '{1} Un rol que no cambiaste ya lo había cambiado otra persona. Se ha dejado como ella lo puso.|[2,*] :count roles que no cambiaste ya los había cambiado otra persona. Se han dejado como ellas los pusieron.',
+            ],
             'help' => 'Lo que esta cuenta es. Un rol reparte lo que digan sus permisos en cuanto se da.',
             'protected' => 'No puedes editar este rol, así que tampoco puedes repartirlo.',
             'restricted' => 'Esta cuenta tiene este rol en un contexto. Quitarlo desde aquí se llevaría todos los contextos, así que se deja en paz.',

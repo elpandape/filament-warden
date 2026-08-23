@@ -192,6 +192,10 @@ return [
     'relations' => [
         'roles' => [
             'label' => 'Roles',
+            'concurrent' => [
+                'kept_title' => 'Saved, and somebody else had been editing too',
+                'kept' => '{1} One role you did not change had already been changed by somebody else. It was left as they set it.|[2,*] :count roles you did not change had already been changed by somebody else. They were left as those people set them.',
+            ],
             'help' => 'What this account is. A role hands out whatever its permissions say, the moment it is given.',
             'protected' => 'You cannot edit this role, so you cannot hand it out either.',
             'restricted' => 'This account holds this role in a context. Taking it back from here would take every context with it, so it is left alone.',

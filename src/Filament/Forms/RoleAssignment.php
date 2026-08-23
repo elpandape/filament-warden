@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace ElPandaPe\FilamentWarden\Filament\Forms;
 
 use ElPandaPe\FilamentWarden\Grants\Assignment;
+use ElPandaPe\FilamentWarden\Grants\SaveReport;
 use Filament\Forms\Components\CheckboxList;
+use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -28,6 +30,12 @@ use Illuminate\Database\Eloquent\Model;
  */
 final class RoleAssignment extends CheckboxList
 {
+    /**
+     * Where the untouched copy of the store's answer sits inside the page's own
+     * state array. Namespaced because that array is the application's.
+     */
+    public const string BASELINE = '__filament_warden_roles_baseline';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -59,7 +67,7 @@ final class RoleAssignment extends CheckboxList
         $this->afterStateHydrated(static function (RoleAssignment $component): void {
             $account = $component->getRecord();
 
-            $component->state($account instanceof Model ? Assignment::of($account) : []);
+            $component->fillFrom($account instanceof Model ? Assignment::of($account) : []);
         });
 
         $this->saveRelationshipsUsing(static function (RoleAssignment $component): void {
@@ -69,9 +77,91 @@ final class RoleAssignment extends CheckboxList
             // does, so the guarantee is written again inside `apply()`. This is
             // the outer half of it.
             if ((! $component->isDisabled()) && $account instanceof Model) {
-                Assignment::apply($account, $component->getState());
+                $report = Assignment::apply($account, $component->getState(), $component->baseline());
+
+                // The screen tells the truth again, and the next save starts from
+                // what is actually there rather than colliding on the same roles.
+                $component->fillFrom(Assignment::of($account));
+
+                $component->announce($report);
             }
         });
+    }
+
+    /**
+     * The list, and beside it an untouched copy of what the store said.
+     *
+     * A `CheckboxList` has ONE state slot and it holds the set, so the copy
+     * cannot go in it. It goes in the page's own state array as a sibling key —
+     * measured before it was relied on: it survives the mount, a click and the
+     * save, and `Schema::getState()` does not return it, so it can never reach
+     * `$record->update()`.
+     *
+     * That array belongs to the application, so the key is namespaced and this
+     * is the only place that writes it. If a page has no `$data` to write into,
+     * there is simply no baseline and the save behaves as it did before there
+     * was one.
+     *
+     * @param  list<int|string>  $held
+     */
+    public function fillFrom(array $held): void
+    {
+        $this->state($held);
+
+        $livewire = $this->getLivewire();
+
+        if (property_exists($livewire, 'data') && is_array($livewire->data)) {
+            $livewire->data[self::BASELINE] = $held;
+        }
+    }
+
+    /**
+     * @return list<int|string>|null
+     */
+    public function baseline(): ?array
+    {
+        $livewire = $this->getLivewire();
+
+        if (! property_exists($livewire, 'data') || ! is_array($livewire->data)) {
+            return null;
+        }
+
+        $baseline = $livewire->data[self::BASELINE] ?? null;
+
+        if (! is_array($baseline)) {
+            return null;
+        }
+
+        return array_values(array_filter(
+            $baseline,
+            static fn (mixed $key): bool => is_int($key) || is_string($key),
+        ));
+    }
+
+    /**
+     * What the save met, said by the field itself.
+     *
+     * The grid can leave this to `EditRole`, which owns its page and replaces
+     * the "Saved" notification outright. This field is one line inside a form
+     * the application wrote, so there is no notification of ours to replace —
+     * and saying nothing would be the silence this release exists to end. It
+     * sends its own, beside whatever the page sends.
+     *
+     * Only one thing to say, unlike the grid: `SaveReport::refused` is always
+     * empty from this screen, because a checkbox has no third value for two
+     * people to disagree about. `Assignment::apply()` carries the reasoning.
+     */
+    public function announce(SaveReport $report): void
+    {
+        if ($report->preserved === 0) {
+            return;
+        }
+
+        Notification::make()
+            ->success()
+            ->title(__('filament-warden::ui.relations.roles.concurrent.kept_title'))
+            ->body(trans_choice('filament-warden::ui.relations.roles.concurrent.kept', $report->preserved))
+            ->send();
     }
 
     /**

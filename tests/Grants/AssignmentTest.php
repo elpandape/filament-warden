@@ -779,3 +779,84 @@ test('the apply() transaction opens on warden own connection, not the default on
     })->toThrow(RuntimeException::class)
         ->and(assignmentCount())->toBe(0);
 });
+
+test('a role nobody ticked here is left as somebody else set it', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole();
+
+    $wasShowing = [];
+
+    Warden::assign($role)->to($account);
+
+    $report = Assignment::apply($account, [], $wasShowing);
+
+    expect(Assignment::of($account))->toContain(roleKey($role))
+        ->and($report->preserved)->toBe(1)
+        ->and($report->written)->toBe(0)
+        ->and($report->refused)->toBeEmpty();
+});
+
+test('a role this person ticked is assigned when nobody else moved it', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole();
+
+    $report = Assignment::apply($account, [roleKey($role)], []);
+
+    expect(Assignment::of($account))->toContain(roleKey($role))
+        ->and($report->written)->toBe(1)
+        ->and($report->preserved)->toBe(0);
+});
+
+test('a checkbox cannot collide the way a cell can, so nothing is ever refused here', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole();
+
+    // The screen showed it unticked; this person ticks it; somebody else ticks
+    // it too. There is no third value for the two of them to disagree about.
+    $wasShowing = [];
+
+    Warden::assign($role)->to($account);
+
+    $report = Assignment::apply($account, [roleKey($role)], $wasShowing);
+
+    expect($report->refused)->toBeEmpty()
+        ->and($report->metAnother())->toBeFalse();
+});
+
+test('two people who hand out the same role do not annoy each other', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole();
+
+    $wasShowing = [];
+
+    Warden::assign($role)->to($account);
+
+    $report = Assignment::apply($account, [roleKey($role)], $wasShowing);
+
+    expect(Assignment::of($account))->toContain(roleKey($role))
+        ->and($report->metAnother())->toBeFalse()
+        ->and($report->written)->toBe(0);
+});
+
+test('without a baseline every role counts as ticked by this person', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole();
+
+    Warden::assign($role)->to($account);
+
+    $report = Assignment::apply($account, []);
+
+    expect(Assignment::of($account))->toBeEmpty()
+        ->and($report->written)->toBe(1)
+        ->and($report->metAnother())->toBeFalse();
+});

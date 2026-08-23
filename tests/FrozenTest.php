@@ -329,7 +329,10 @@ test('the translation keys an application overrides are frozen', function (): vo
         'probe.unresolved',
         'probe.unreadable',
         'relations.roles.label',
+        'relations.roles.concurrent.kept_title',
+        'relations.roles.concurrent.kept',
         'relations.roles.help',
+
         'relations.roles.protected',
         'relations.roles.restricted',
         'relations.roles.elsewhere',

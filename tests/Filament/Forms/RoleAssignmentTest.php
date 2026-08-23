@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Filament\Forms\RoleAssignment;
+use ElPandaPe\FilamentWarden\Grants\Assignment;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\AccountHost;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\AccountHostElsewhere;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
@@ -12,6 +14,13 @@ use ElPandaPe\Warden\Facades\Warden;
 
 use function Pest\Livewire\livewire;
 
+/**
+ * The two halves of this field's state come back in different types, and a test
+ * that compares them strictly has to know it: the checkbox list round-trips its
+ * values through the browser, so it returns role keys as STRINGS, while the
+ * baseline is written server-side and keeps the integers the store gave. Nothing
+ * in `Assignment` cares — `wants()` casts both sides — but `toContain` does.
+ */
 pest()->extend(TestCase::class);
 
 function assignedCount(): int
@@ -159,4 +168,95 @@ test('an assignment held elsewhere is drawn locked too, and never written over',
     });
 
     expect(assignedCount())->toBe(1);
+});
+
+test('a save leaves alone the role somebody else handed out while this screen was open', function (): void {
+    $signedIn = signIn();
+    Warden::allow($signedIn)->to('update', roleClass());
+
+    $account = makeUser();
+    $mine = makeRole('mine');
+    $theirs = makeRole('theirs');
+
+    $screen = livewire(AccountHost::class, ['accountKey' => $account->getKey()]);
+
+    $screen->set('data.roles', [$mine->getKey()]);
+
+    // Somebody else, in another request, while this screen sits open.
+    Warden::assign($theirs)->to($account);
+
+    $screen->call('save');
+
+    expect(Assignment::of($account))->toContain($theirs->getKey())
+        ->and(Assignment::of($account))->toContain($mine->getKey());
+});
+
+test('a save leaves alone the role somebody else took back', function (): void {
+    $signedIn = signIn();
+    Warden::allow($signedIn)->to('update', roleClass());
+
+    $account = makeUser();
+    $role = makeRole();
+
+    Warden::assign($role)->to($account);
+
+    $screen = livewire(AccountHost::class, ['accountKey' => $account->getKey()]);
+
+    Warden::retract($role)->from($account);
+
+    $screen->call('save');
+
+    expect(Assignment::of($account))->toBeEmpty();
+});
+
+test('the field re-reads the store after a save, so the next one does not collide again', function (): void {
+    $signedIn = signIn();
+    Warden::allow($signedIn)->to('update', roleClass());
+
+    $account = makeUser();
+    $role = makeRole();
+
+    $screen = livewire(AccountHost::class, ['accountKey' => $account->getKey()]);
+
+    Warden::assign($role)->to($account);
+
+    $screen->call('save');
+
+    $key = $role->getKey();
+
+    expect($screen->get('data.roles'))->toContain(is_int($key) || is_string($key) ? (string) $key : '')
+        ->and($screen->get('data.'.RoleAssignment::BASELINE))->toContain($role->getKey());
+});
+
+test('a page keeping its state somewhere other than data gets no baseline, and saves as before', function (): void {
+    $signedIn = signIn();
+    Warden::allow($signedIn)->to('update', roleClass());
+
+    $account = makeUser();
+    $role = makeRole();
+
+    Warden::assign($role)->to($account);
+
+    livewire(AccountHostElsewhere::class, ['accountKey' => $account->getKey()])
+        ->set('elsewhere.roles', [])
+        ->call('save');
+
+    expect(Assignment::of($account))->toBeEmpty();
+});
+
+test('a baseline that is not a list is read as no baseline at all', function (): void {
+    $signedIn = signIn();
+    Warden::allow($signedIn)->to('update', roleClass());
+
+    $account = makeUser();
+    $role = makeRole();
+
+    Warden::assign($role)->to($account);
+
+    livewire(AccountHost::class, ['accountKey' => $account->getKey()])
+        ->set('data.'.RoleAssignment::BASELINE, 'not a list')
+        ->set('data.roles', [])
+        ->call('save');
+
+    expect(Assignment::of($account))->toBeEmpty();
 });

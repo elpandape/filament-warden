@@ -20,14 +20,17 @@ namespace ElPandaPe\FilamentWarden\Grants;
  *   something else. Their intent was not applied, and that is the half a
  *   notification has to say out loud rather than count.
  *
- * `refused` carries the cell's own keys rather than a sentence, because the
- * words belong to the screen: the same row and action keys the grid is drawn
- * from, so a caller can look their titles up in the catalogue it already has.
+ * `refused` carries each thing's own keys rather than a sentence, because the
+ * words belong to the screen. The grid pushes `['row' => …, 'action' => …]` and
+ * reads their titles out of the catalogue; the account screen pushes
+ * `['role' => …]` and reads them out of the options it already offered. One
+ * report rather than two nearly identical ones — and no translating done here,
+ * because a class that writes grants has no business choosing words.
  */
 final readonly class SaveReport
 {
     /**
-     * @param  list<array{row: string, action: string}>  $refused
+     * @param  list<array<string, string>>  $refused
      */
     public function __construct(
         public int $written = 0,

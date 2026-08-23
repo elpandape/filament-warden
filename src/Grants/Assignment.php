@@ -261,18 +261,37 @@ final class Assignment
      * markup: a disabled option reaches the state exactly like a disabled field
      * does, so the guarantee cannot rest on how the checkbox was drawn.
      *
-     * The state arrives as whatever livewire hands over.
+     * The state arrives as whatever livewire hands over, and so does the
+     * baseline: neither is trusted to be an array.
+     *
+     * A forged baseline cannot escalate. It decides only WHETHER a change is
+     * written, never what — every assignment still runs the same
+     * `mayHandOut()`/`isRestricted()`/`isElsewhere()` guards above it — so the
+     * worst a doctored one does is suppress the forger's own save.
      */
-    public static function apply(Model $account, mixed $wanted): void
+    public static function apply(Model $account, mixed $wanted, mixed $baseline = null): SaveReport
     {
         $wanted = is_array($wanted) ? array_values($wanted) : [];
         $held = self::of($account);
+
+        // What the screen was showing when it opened, when it stamped one. The
+        // same three-way comparison the grid makes, in the shape a set of role
+        // keys takes: a checkbox nobody here touched is left as whoever did
+        // touch it left it, instead of being unticked back.
+        //
+        // Null means no screen — a console script or a test asserting a state
+        // outright — so every role counts as touched, which is what this method
+        // did before there was a baseline.
+        $was = is_array($baseline) ? array_values($baseline) : null;
+
+        $written = 0;
+        $preserved = 0;
 
         // Opened on warden's own connection, not the default one: every write
         // this loop makes goes through `Context::resolve()` already, and a
         // transaction on the wrong connection wraps queries that never run on
         // it while the ones that matter commit one at a time as they go.
-        DB::connection(Context::resolve()->connection())->transaction(static function () use ($account, $wanted, $held): void {
+        DB::connection(Context::resolve()->connection())->transaction(static function () use ($account, $wanted, $held, $was, &$written, &$preserved): void {
             foreach (self::byKey() as $key => $role) {
                 if (! self::mayHandOut($role)
                     || self::isRestricted($account, $key)
@@ -283,13 +302,36 @@ final class Assignment
                 $isHeld = in_array($key, $held, true);
                 $isWanted = self::wants($wanted, $key);
 
-                if ($isWanted && ! $isHeld) {
-                    Warden::assign($role)->to($account);
+                if ($isHeld === $isWanted) {
+                    continue;
                 }
 
-                if ($isHeld && ! $isWanted) {
-                    Warden::retract($role)->from($account);
+                // Only one question here, where the grid asks two — and that is
+                // a property of a checkbox, not an omission. A cell has three
+                // stances, so two people can move one to DIFFERENT values and
+                // genuinely collide. A role is held or it is not: reaching this
+                // line means the store and the payload disagree, so if the
+                // baseline also disagrees with the payload then this person did
+                // not touch it, and if it agrees with the payload then whoever
+                // moved the store moved it the same way this person did. Both
+                // people moving it to different values is unreachable, because
+                // there is no third value to differ about. `SaveReport::refused`
+                // therefore stays empty from this screen, always.
+                if ($was !== null && self::wants($was, $key) === $isWanted) {
+                    $preserved++;
+
+                    continue;
                 }
+
+                $written++;
+
+                if ($isWanted) {
+                    Warden::assign($role)->to($account);
+
+                    continue;
+                }
+
+                Warden::retract($role)->from($account);
             }
         });
 
@@ -305,6 +347,8 @@ final class Assignment
         // still names the same role" reads `Assignment::of($account)`
         // straight after this method returns and is what pins it.
         self::forgetAssignments();
+
+        return new SaveReport($written, $preserved);
     }
 
     /**
