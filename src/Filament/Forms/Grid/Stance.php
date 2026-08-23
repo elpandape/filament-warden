@@ -22,7 +22,10 @@ enum Stance: string
      * Declared once, here, and handed to the browser in the component's own
      * payload: the script reads this order, it never carries one of its own.
      * The generation before this one implemented the same rule twice, in two
-     * languages, and the two could disagree without a test noticing.
+     * languages, and the two could disagree without a test noticing. This one
+     * did it twice in ONE language: a `next()`/`previous()` pair sat directly
+     * below this method, spelling the same cycle out again, called by nothing
+     * but its own test. They are gone; the order is here.
      *
      * @return list<string>
      */
@@ -32,24 +35,6 @@ enum Stance: string
             static fn (self $stance): string => $stance->value,
             [self::Abstain, self::Granted, self::Forbidden],
         );
-    }
-
-    public function next(): self
-    {
-        return match ($this) {
-            self::Abstain => self::Granted,
-            self::Granted => self::Forbidden,
-            self::Forbidden => self::Abstain,
-        };
-    }
-
-    public function previous(): self
-    {
-        return match ($this) {
-            self::Abstain => self::Forbidden,
-            self::Forbidden => self::Granted,
-            self::Granted => self::Abstain,
-        };
     }
 
     /**

@@ -48,16 +48,6 @@ final readonly class RoleState
     }
 
     /**
-     * The cells this screen must not write.
-     *
-     * @return array<string, array<string, bool>>
-     */
-    public function locked(): array
-    {
-        return $this->map(static fn (Narrowing $narrowing): bool => ! $narrowing->isEditable());
-    }
-
-    /**
      * The store, in the shape the browser holds it.
      *
      * Both screens hand alpine this and nothing else: the form as a live binding

@@ -67,20 +67,13 @@ test('a rule wider than one action over one entity is a wildcard, on either side
 test('a permission nothing declares is the silent mistake, and it is named', function (): void {
     $row = catalogRow('viwAny', new Post()->getMorphClass());
 
-    expect(Provenance::of($row, panelCatalog()))->toBe(Provenance::Unknown)
-        ->and(Provenance::Unknown->isDeclared())->toBeFalse();
+    expect(Provenance::of($row, panelCatalog()))->toBe(Provenance::Unknown);
 });
 
 test('an action over a model with no policy is not declared either', function (): void {
     $row = catalogRow('viewAny', new Comment()->getMorphClass());
 
     expect(Provenance::of($row, panelCatalog()))->toBe(Provenance::Unknown);
-});
-
-test('every provenance but the unknown one is declared', function (): void {
-    foreach ([Provenance::Wildcard, Provenance::Policy, Provenance::Loose] as $provenance) {
-        expect($provenance->isDeclared())->toBeTrue();
-    }
 });
 
 test('a row with no name at all is not declared', function (): void {

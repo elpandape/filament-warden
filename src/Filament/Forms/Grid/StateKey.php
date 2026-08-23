@@ -34,9 +34,19 @@ final class StateKey
         return self::guard($entry->model ?? $entry->name);
     }
 
-    public static function action(Entry $entry): string
+    /**
+     * The same guard, for a caller holding a bare name rather than an entry.
+     *
+     * There was a `action(Entry)` here that applied it and that nothing called:
+     * `GridView` keys a door with `DOOR` and an entity's columns with the action
+     * string straight off the catalogue, so the guard covered the ROW and left
+     * the COLUMN unguarded — a policy declaring `export.csv` reached the browser
+     * as a nested path that does not exist, quietly, while a model or loose name
+     * with a dot threw. One guard, and both halves go through it.
+     */
+    public static function of(string $key): string
     {
-        return $entry->model === null ? self::DOOR : self::guard($entry->name);
+        return self::guard($key);
     }
 
     private static function guard(string $key): string

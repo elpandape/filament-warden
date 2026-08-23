@@ -7,24 +7,13 @@ use ElPandaPe\FilamentWarden\Tests\TestCase;
 
 pest()->extend(TestCase::class);
 
-test('a click walks the cycle forward', function (Stance $from, Stance $to): void {
-    expect($from->next())->toBe($to);
-})->with([
-    [Stance::Abstain, Stance::Granted],
-    [Stance::Granted, Stance::Forbidden],
-    [Stance::Forbidden, Stance::Abstain],
-]);
-
-test('shift walks it backward, so a denial is one step away', function (Stance $from, Stance $to): void {
-    expect($from->previous())->toBe($to);
-})->with([
-    [Stance::Abstain, Stance::Forbidden],
-    [Stance::Forbidden, Stance::Granted],
-    [Stance::Granted, Stance::Abstain],
-]);
-
-test('the order handed to the browser is the order php walks', function (): void {
-    expect(Stance::order())->toBe(['abstain', 'granted', 'forbidden']);
+test('the cycle is declared once, and this is it', function (): void {
+    // There was a `next()`/`previous()` pair spelling the same cycle out a
+    // second time, in the same file, called by nothing but its own two tests.
+    // `order()` is what travels to the browser, so it is the only one that can
+    // disagree with anything.
+    expect(Stance::order())->toBe(['abstain', 'granted', 'forbidden'])
+        ->and(get_class_methods(Stance::class))->toBe(['order', 'isWritten', 'cases', 'from', 'tryFrom']);
 });
 
 test('abstaining is the one stance the store never holds', function (): void {

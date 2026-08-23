@@ -266,7 +266,6 @@ test('a permission carrying conditions is shown as narrowed', function (): void 
     $state = RoleGrants::of($role, $catalog);
 
     expect($state->narrowed()[Post::class]['update'])->toBeTrue()
-        ->and($state->locked())->toBeEmpty()
         ->and($state->narrowings[Post::class]['update']->shape)->toBe(Shape::Conditions);
 });
 
@@ -440,7 +439,6 @@ test('a denial and a grant on one ordinary cell are two rows, and the cell reads
 
     expect(grantCount())->toBe(2)
         ->and($state->stances[Post::class]['view'])->toBe(Stance::Forbidden->value)
-        ->and($state->locked())->toBeEmpty()
         ->and($state->wider)->toBeEmpty();
 });
 
@@ -576,7 +574,7 @@ test('two rows for one cell are shown, said out loud, and never written over', f
     $state = RoleGrants::of($role, gridCatalog());
 
     expect($state->narrowings[Post::class]['update']->shape)->toBe(Shape::Tangled)
-        ->and($state->locked()[Post::class]['update'])->toBeTrue()
+        ->and($state->narrowings[Post::class]['update']->isEditable())->toBeFalse()
         ->and(RoleGrants::changes($role, gridCatalog(), [], []))->toBeEmpty();
 });
 
@@ -709,7 +707,7 @@ test('a grant that belongs to another tenant is shown, marked and left alone', f
 
     expect($state->stances[Post::class]['viewAny'])->toBe('granted')
         ->and($state->narrowings[Post::class]['viewAny']->shape)->toBe(Shape::Elsewhere)
-        ->and($state->locked()[Post::class]['viewAny'])->toBeTrue();
+        ->and($state->narrowings[Post::class]['viewAny']->isEditable())->toBeFalse();
 });
 
 test('switching off a cell that belongs to another tenant writes nothing, rather than saying it did', function (): void {
@@ -749,7 +747,6 @@ test('a role grant kept global by configuration is writable under a tenant', fun
         $state = RoleGrants::of($role, $catalog);
 
         expect($state->narrowings[Post::class]['viewAny']->shape)->toBe(Shape::All)
-            ->and($state->locked())->toBeEmpty()
             ->and(RoleGrants::changes($role, $catalog, []))->toHaveCount(1);
     });
 });
@@ -800,7 +797,7 @@ test('a cell that is both ownership and conditions is shown, said out loud, and 
 
     expect($state->stances[Post::class]['update'])->toBe('granted')
         ->and($state->narrowings[Post::class]['update']->shape)->toBe(Shape::Unreadable)
-        ->and($state->locked()[Post::class]['update'])->toBeTrue()
+        ->and($state->narrowings[Post::class]['update']->isEditable())->toBeFalse()
         ->and(RoleGrants::changes($role, $catalog, [], []))->toBeEmpty();
 });
 

@@ -120,13 +120,4 @@ enum Provenance: string
 
         $everything ? $query->whereNot($declared) : $query->where($declared);
     }
-
-    /**
-     * Whether the code still declares this permission. What nothing declares,
-     * nothing asks for.
-     */
-    public function isDeclared(): bool
-    {
-        return $this !== self::Unknown;
-    }
 }

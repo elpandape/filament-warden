@@ -317,7 +317,7 @@ final readonly class GridView
 
     private static function column(string $action, Scope $scope): Column
     {
-        return new Column($action, self::actionLabel($action), $scope);
+        return new Column(StateKey::of($action), self::actionLabel($action), $scope);
     }
 
     /**
