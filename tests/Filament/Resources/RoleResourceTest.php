@@ -1175,3 +1175,17 @@ test('a save that refuses more cells than it names counts the rest', function ()
         ->and($body)->toContain(__('filament-warden::ui.grid.concurrent.more', ['count' => 1]))
         ->and($body)->not->toContain('viewAny on ');
 });
+
+test('the screen shows the name that was actually written, not what was typed', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole('super-admin');
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->fillForm(['name' => 'owner'])
+        ->call('save')
+        ->assertHasNoFormErrors()
+        ->assertSet('data.name', 'super-admin');
+});

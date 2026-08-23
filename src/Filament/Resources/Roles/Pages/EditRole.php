@@ -77,13 +77,17 @@ class EditRole extends EditRecord
     }
 
     /**
-     * The screen tells the truth again, whatever the save met.
+     * The rest of the form catches up with what actually got written.
      *
-     * Without this the person is left looking at what the store held when they
-     * opened it, their next save collides on the very same cells, and nothing on
-     * screen explains why. Re-filling also re-stamps the baseline, so the second
-     * attempt starts from what is actually there. The grid's own field says what
-     * the save met — this page no longer needs to.
+     * `mutateFormDataBeforeSave()` only reaches the record — it rewrites the
+     * array `handleRecordUpdate()` persists, never the browser's own copy of
+     * `data.name`. So a forged rename of a protected role never reaches the
+     * store, but without this hook the screen keeps showing what was typed,
+     * not what is actually there: the truth this whole version is about,
+     * one field short. The permissions grid no longer needs this: its own
+     * field re-reads itself and re-stamps its own baseline after every save
+     * (`PermissionGrid::setUp()`), on any page that embeds it, this one
+     * included.
      */
     protected function afterSave(): void
     {
