@@ -51,19 +51,46 @@ jobs:
       # The title convention this project already uses by hand is
       # "<tag> — <headline>" (AGENTS.md §8, `gh release create ... --title`), and
       # that headline lives nowhere but the annotated tag's own subject line — it
-      # is not in CHANGELOG.md. A lightweight tag has no subject; fall back to the
-      # bare tag name rather than fail the release over a missing headline.
+      # is not in CHANGELOG.md.
+      #
+      # The guard is on `%(objecttype)`, NOT on the subject coming back empty.
+      # `%(contents:subject)` on a ref that points straight at a commit — which is
+      # what a lightweight tag is — returns that COMMIT's subject, never an empty
+      # string, so a `${subject:-…}` fallback alone can never fire. Only an
+      # annotated tag object carries a subject that means what this title claims
+      # it means. Measured through this job on a real lightweight tag: without the
+      # `%(objecttype)` guard the title handed to `gh` was the commit message of
+      # whatever the tag pointed at; with it, the bare tag name.
       - name: Read the release title from the tag
         id: title
         run: |
-          subject="$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents:subject)')"
+          ref="refs/tags/${GITHUB_REF_NAME}"
+          objecttype="$(git for-each-ref "$ref" --format='%(objecttype)')"
+
+          if [ "$objecttype" = "tag" ]; then
+            subject="$(git for-each-ref "$ref" --format='%(contents:subject)')"
+          else
+            subject=""
+          fi
+
           echo "title=${subject:-$GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
 
       # `-rc.` and other semver pre-release suffixes are marked as such, matching
       # how this project's own v1.0.0-rc.1 release was flagged.
+      #
+      # TITLE and NOTES_FILE go through `env:`, never spliced into the script as
+      # `${{ }}` text. The Actions runner expands a `${{ }}` inside `run:` into the
+      # script BEFORE bash parses it, so a tag subject containing `$(…)` runs that
+      # command in a job holding `contents: write` — and whoever can push a tag is
+      # exactly whoever this workflow reacts to. Measured both ways on one payload:
+      # spliced, the substitution executed and its output replaced the text, so the
+      # title shipped mangled as well; through `env:`, `gh` received the subject
+      # verbatim as a single argument and nothing ran.
       - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          TITLE: ${{ steps.title.outputs.title }}
+          NOTES_FILE: ${{ steps.notes.outputs.file }}
         run: |
           prerelease_flag=()
           case "$GITHUB_REF_NAME" in
@@ -72,6 +99,6 @@ jobs:
 
           gh release create "$GITHUB_REF_NAME" \
             --verify-tag \
-            --title "${{ steps.title.outputs.title }}" \
-            --notes-file "${{ steps.notes.outputs.file }}" \
+            --title "$TITLE" \
+            --notes-file "$NOTES_FILE" \
             "${prerelease_flag[@]}"
