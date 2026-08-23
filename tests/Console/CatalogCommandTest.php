@@ -59,3 +59,25 @@ test('it can be narrowed to one panel', function (): void {
 test('an unknown panel is an error and not an empty listing', function (): void {
     expect(Artisan::call('filament-warden:catalog', ['--panel' => 'nope']))->toBe(1);
 });
+
+test('the heading counts every stored row, not the deduplicated catalogue keys', function (): void {
+    config()->set('filament-warden.catalog.models', [Post::class]);
+
+    Warden::allow(makeRole('editor'))->to('viewAny', Post::class)->where('title', '=', 'x');
+    Warden::allow(makeRole('viewer'))->to('viewAny', Post::class)->where('title', '=', 'y');
+
+    $total = permissionClass()::query()->withoutGlobalScopes()->count();
+
+    expect($total)->toBe(2)
+        ->and(catalogOutput())->toContain("holds {$total} permission rows");
+});
+
+test('a row pinned to one record does not answer a class-level entry "in store"', function (): void {
+    config()->set('filament-warden.catalog.models', [Post::class]);
+
+    $post = Post::query()->create(['title' => 'pinned']);
+
+    Warden::allow(makeRole('editor'))->to('viewAny', $post);
+
+    expect(catalogOutput())->toContain('viewAny | '.Post::class.' | '.Post::class.' | read | model | no');
+});

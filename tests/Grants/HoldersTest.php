@@ -242,3 +242,38 @@ test('the count and the names agree for a role that does exist', function (): vo
     expect($holders->roleCount)->toBe(1)
         ->and($holders->roles)->toBe(['Editor']);
 });
+
+test('a role that both grants and forbids the same permission counts once', function (): void {
+    $role = makeRole('editor');
+
+    Warden::allow($role)->to('viewAny', Post::class);
+    Warden::forbid($role)->to('viewAny', Post::class);
+
+    $holders = Holders::of(latestPermission('viewAny'));
+
+    expect($holders->roleCount)->toBe(1)
+        ->and($holders->roles)->toBe(['Editor'])
+        ->and($holders->forbidden)->toBe(1);
+});
+
+test('two distinct roles that hold it are counted apart, not folded to one', function (): void {
+    Warden::allow(makeRole('editor'))->to('viewAny', Post::class);
+    Warden::allow(makeRole('viewer'))->to('viewAny', Post::class);
+
+    $holders = Holders::of(latestPermission('viewAny'));
+
+    expect($holders->roleCount)->toBe(2)
+        ->and($holders->roles)->toHaveCount(2);
+});
+
+test('an account that both grants and forbids the same permission counts once', function (): void {
+    $user = makeUser('Amaru Quispe');
+
+    Warden::allow($user)->to('viewAny', Post::class);
+    Warden::forbid($user)->to('viewAny', Post::class);
+
+    $holders = Holders::of(latestPermission('viewAny'));
+
+    expect($holders->accountCount)->toBe(1)
+        ->and($holders->accounts)->toBe(['Amaru Quispe']);
+});

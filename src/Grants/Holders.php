@@ -207,7 +207,12 @@ final class Holders
             }
         }
 
-        $roleKeys = $byType[$roleAlias] ?? [];
+        // One authority can name more than one `grants` row for this permission:
+        // `forbidden` and `scope` are both part of the unique index, so a role
+        // granted globally AND forbidden, or granted both globally and under a
+        // tenant, reads back as two rows. Deduplicated once here, before either
+        // the count or the labels are built from it.
+        $roleKeys = array_values(array_unique($byType[$roleAlias] ?? []));
         unset($byType[$roleAlias]);
 
         [$accounts, $accountCount] = self::accounts($byType);
@@ -235,6 +240,7 @@ final class Holders
         $total = 0;
 
         foreach ($byType as $type => $keys) {
+            $keys = array_values(array_unique($keys));
             $total += count($keys);
 
             // An authority nobody can name still counts, it just goes unnamed.
