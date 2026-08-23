@@ -61,11 +61,12 @@ jobs:
       # the annotated tag's subject is the only place a machine can read it from —
       # CHANGELOG.md does not carry it. It is not, however, where the shipped
       # titles came from: of the 26 tags that have a release, only 10 subjects match
-      # it — 11 differ by the case of one word and 5 completely, because they were
-      # typed by hand at `gh release create` time. From here on the annotation IS
-      # the title, verbatim and unedited, so `git tag -a` has to carry the whole
-      # "<tag> — <headline>" string: five of those 26 annotations carry the headline
-      # alone, and shipped as-is one of those would leave the version off the title.
+      # it — 11 differ by the case of one word, and the same 5 that differ completely
+      # are the 5 whose subject carries the headline alone, with no "<tag> — " on the
+      # front. All 26 were typed by hand at `gh release create` time. From here on the
+      # annotation IS the title, verbatim and unedited, so `git tag -a` has to carry
+      # the whole "<tag> — <headline>" string; one of those five shapes would ship a
+      # release title with no version in it.
       #
       # The guard is on `%(objecttype)`, NOT on the subject coming back empty.
       # `%(contents:subject)` on a ref that points straight at a commit — which is

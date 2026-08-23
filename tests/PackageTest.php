@@ -13,20 +13,26 @@
  * times, twice on one line: the shields URL that actually renders, the `alt` beside
  * it, and the Requirements row. AGENTS.md §8 gates a release on that README.
  *
- * The direction guarded is LOWERING the floor, which is what this version did and is
- * silent in all four — nothing downstream moves, and the analysis, the matrix and the
- * README go on describing the number that left. Raising it is NOT silent: composer
- * aborts on the older runtime before anything else gets a turn. The test earns its
- * place on the quiet direction, not the loud one.
+ * The test is a symmetric consistency check, not a one-way guard, and the reason
+ * matters because it decides which assertions a future reader may drop. LOWERING the
+ * floor is silent in the three files downstream of the manifest — nothing moves, and
+ * the analysis, the matrix and the README go on describing the number that left.
+ * RAISING it is loud only when the manifest moves ALONE: composer then aborts on the
+ * older runtime, but only inside `run-tests.yml`'s floor job, since `quality.yml` is
+ * pinned to the ceiling and installs happily. Raise the manifest and the matrix
+ * together — how a floor is actually bumped — and composer is green everywhere and
+ * this test is the only thing that goes red. Measured, both directions.
  *
  * The assertions are `toContain` on file text, the house style of `FrozenTest`. They
  * pin the number, not the behaviour: a matrix that keeps the literal and adds an
  * `exclude:` for the floor still passes.
  *
- * The export test reads `.gitignore` rather than asking git what is tracked, because
- * the only root files git does not carry — `AGENTS.md` and `CLAUDE.md` — are named
- * there, and a suite that shells out to git would depend on a `.git` this package has
- * no right to expect.
+ * The export test asks `git archive` what the tarball holds instead of reading
+ * `.gitattributes` and inferring. Inference was tried and thrown away: it stayed green
+ * while `README.md export-ignore` or `/src export-ignore` emptied the package, and it
+ * went red on clean checkouts over a `*.log` pattern, a stray untracked file or an
+ * entry in the developer's global ignore file. The cost is a dependency on a checkout,
+ * which is not a cost: `/tests export-ignore` means this suite only ever runs in one.
  */
 
 declare(strict_types=1);
@@ -72,26 +78,31 @@ test('the PHP floor is the same number everywhere that states it', function (): 
         ->toContain(sprintf('| PHP | `%s` |', $declared));
 });
 
-test('every file at the root is either shipped or export-ignored', function (): void {
-    $root = dirname(__DIR__);
+test('the distribution carries exactly what a consumer installs', function (): void {
+    $entries = [];
+    $status = 1;
 
-    $shipped = ['CHANGELOG.md', 'CONTRIBUTING.md', 'LICENSE.md', 'README.md', 'SECURITY.md', 'composer.json'];
+    exec(sprintf('git -C %s archive --format=tar HEAD | tar -t', escapeshellarg(dirname(__DIR__))), $entries, $status);
 
-    $untracked = array_map(
-        static fn (string $line): string => mb_ltrim(mb_trim($line), '/'),
-        explode("\n", (string) file_get_contents($root.'/.gitignore')),
-    );
+    expect($status)->toBe(0);
 
-    $attributes = (string) file_get_contents($root.'/.gitattributes');
+    $top = array_unique(array_map(
+        static fn (string $entry): string => explode('/', $entry)[0],
+        $entries,
+    ));
 
-    /** @var list<string> $entries */
-    $entries = scandir($root);
+    sort($top);
 
-    foreach ($entries as $name) {
-        if (! is_file($root.'/'.$name) || in_array($name, $shipped, true) || in_array($name, $untracked, true)) {
-            continue;
-        }
-
-        expect($attributes)->toContain($name.' export-ignore');
-    }
+    expect($top)->toBe([
+        'CHANGELOG.md',
+        'CONTRIBUTING.md',
+        'LICENSE.md',
+        'README.md',
+        'SECURITY.md',
+        'composer.json',
+        'config',
+        'lang',
+        'resources',
+        'src',
+    ]);
 });
