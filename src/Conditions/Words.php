@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Conditions;
 
+use ElPandaPe\FilamentWarden\Support\Line;
 use ElPandaPe\Warden\Enums\ComparisonOperator;
-use Illuminate\Support\Str;
 
 /**
  * Every word the condition builder says, worked out once and handed to the
@@ -54,9 +54,6 @@ final class Words
      */
     private static function line(string $key): string
     {
-        $line = __('filament-warden::ui.conditions.'.$key);
-        $full = 'filament-warden::ui.conditions.'.$key;
-
-        return is_string($line) && $line !== $full ? $line : Str::headline($key);
+        return Line::orHumanize('filament-warden::ui.conditions.'.$key, $key);
     }
 }

@@ -8,13 +8,13 @@ use ElPandaPe\FilamentWarden\Catalog\PermissionName;
 use ElPandaPe\FilamentWarden\Conditions\Ownership;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Tables\PermissionsTable;
+use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Facades\Warden;
 use ElPandaPe\Warden\Support\Titles\PermissionTitle;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\Relation;
 
 class EditPermission extends EditRecord
 {
@@ -212,10 +212,8 @@ class EditPermission extends EditRecord
             return false;
         }
 
-        // Warden's wildcard and a morph alias that no longer resolves both land
-        // here as a string that is not a model class, which is the same answer.
-        $model = Relation::getMorphedModel($entityType) ?? $entityType;
+        $model = Morph::model($entityType);
 
-        return is_subclass_of($model, Model::class) && Ownership::of($model)->available;
+        return $model !== null && Ownership::of($model)->available;
     }
 }

@@ -14,6 +14,7 @@ use ElPandaPe\FilamentWarden\Grants\RecordGrant;
 use ElPandaPe\FilamentWarden\Grants\RoleState;
 use ElPandaPe\FilamentWarden\Grants\Tenants;
 use ElPandaPe\FilamentWarden\Support\Config;
+use ElPandaPe\FilamentWarden\Support\Line;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
@@ -502,9 +503,7 @@ final readonly class GridView
      */
     private static function translated(string $key, string $fallback): string
     {
-        $line = __($key);
-
-        return is_string($line) && $line !== $key ? $line : self::humanize($fallback);
+        return Line::orHumanize($key, $fallback);
     }
 
     private static function humanize(string $value): string

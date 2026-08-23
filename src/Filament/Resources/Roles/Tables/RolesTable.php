@@ -7,6 +7,7 @@ namespace ElPandaPe\FilamentWarden\Filament\Resources\Roles\Tables;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Grants\Holders;
 use ElPandaPe\FilamentWarden\Support\Config;
+use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\DeleteAction;
@@ -15,7 +16,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\Relation;
 
 class RolesTable
 {
@@ -189,9 +189,9 @@ class RolesTable
             // A stale morph alias does not throw, it stops resolving — and an
             // authority nobody can name is simply left out, the same choice
             // `Holders::accounts()` makes.
-            $class = Relation::getMorphedModel($type) ?? $type;
+            $class = Morph::model($type);
 
-            if (! is_subclass_of($class, Model::class)) {
+            if ($class === null) {
                 continue;
             }
 

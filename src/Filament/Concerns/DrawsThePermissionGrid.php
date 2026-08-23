@@ -19,6 +19,7 @@ use ElPandaPe\FilamentWarden\Grants\Explanation;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Grants\RoleState;
 use ElPandaPe\FilamentWarden\Support\Config;
+use ElPandaPe\FilamentWarden\Support\Line;
 use ElPandaPe\Warden\Context;
 use Filament\Facades\Filament;
 use Filament\Panel;
@@ -254,9 +255,7 @@ trait DrawsThePermissionGrid
      */
     private static function line(string $key, array $replace = []): string
     {
-        $line = __($key, $replace);
-
-        return is_string($line) ? $line : $key;
+        return Line::of($key, $replace);
     }
 
     /**

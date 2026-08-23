@@ -12,6 +12,7 @@ use ElPandaPe\FilamentWarden\Conditions\Ownership;
 use ElPandaPe\FilamentWarden\Filament\Forms\ConditionBuilder;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
 use ElPandaPe\FilamentWarden\Grants\Holders;
+use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Constraints\ConstraintSerializer;
 use ElPandaPe\Warden\Constraints\Group;
 use ElPandaPe\Warden\Context;
@@ -26,7 +27,6 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Str;
 
 /**
@@ -244,9 +244,7 @@ class PermissionForm
             return null;
         }
 
-        $class = Relation::getMorphedModel($type) ?? $type;
-
-        return is_subclass_of($class, Model::class) ? $class : null;
+        return Morph::model($type);
     }
 
     private static function ownable(Get $get): bool

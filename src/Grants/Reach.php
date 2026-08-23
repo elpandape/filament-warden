@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Grants;
 
+use ElPandaPe\FilamentWarden\Support\Line;
+use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Context;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Throwable;
 
 /**
@@ -109,9 +110,7 @@ final readonly class Reach
             return null;
         }
 
-        $class = Relation::getMorphedModel($type) ?? $type;
-
-        return is_subclass_of($class, Model::class) ? $class : null;
+        return Morph::model($type);
     }
 
     /**
@@ -133,10 +132,11 @@ final readonly class Reach
     /**
      * @param  array<string, string>  $replace
      */
+    /**
+     * @param  array<string, bool|float|int|string|null>  $replace
+     */
     private static function line(string $key, array $replace = []): string
     {
-        $line = __('filament-warden::ui.probe.reach.'.$key, $replace);
-
-        return is_string($line) ? $line : $key;
+        return Line::of('filament-warden::ui.probe.reach.'.$key, $replace);
     }
 }

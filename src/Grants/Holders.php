@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Grants;
 
+use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Context;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use WeakMap;
 
 /**
@@ -235,11 +235,10 @@ final class Holders
         foreach ($byType as $type => $keys) {
             $total += count($keys);
 
-            // A stale morph alias does not throw, it stops resolving — and an
-            // authority nobody can name still counts, it just goes unnamed.
-            $class = Relation::getMorphedModel($type) ?? $type;
+            // An authority nobody can name still counts, it just goes unnamed.
+            $class = Morph::model($type);
 
-            if (is_subclass_of($class, Model::class)) {
+            if ($class !== null) {
                 $labels = [...$labels, ...self::labels($class, $keys, self::LABELS - count($labels))];
             }
         }

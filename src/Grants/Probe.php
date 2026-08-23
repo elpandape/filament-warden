@@ -6,9 +6,10 @@ namespace ElPandaPe\FilamentWarden\Grants;
 
 use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
+use ElPandaPe\FilamentWarden\Support\Line;
+use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Facades\Warden;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\Relation;
 
 /**
  * What the store answers for one account, asked out loud.
@@ -88,7 +89,7 @@ final readonly class Probe
             verdict: $verdict,
             cause: $cause,
             summary: $cause->line([
-                'permission' => $label ?? self::line('filament-warden::ui.explain.no_permission'),
+                'permission' => $label ?? Line::of('filament-warden::ui.explain.no_permission'),
                 'role' => self::label($why->role) ?? '',
             ]),
             permission: $label,
@@ -97,7 +98,7 @@ final readonly class Probe
             // do not pass and answers "nothing matched", which reads exactly like
             // "there is no such rule".
             note: Narrowing::of($permission)->isNarrowed() && ! $entity instanceof Model
-                ? self::line('filament-warden::ui.probe.narrowed')
+                ? Line::of('filament-warden::ui.probe.narrowed')
                 : null,
         );
     }
@@ -119,9 +120,7 @@ final readonly class Probe
             return '*';
         }
 
-        $class = Relation::getMorphedModel($type) ?? $type;
-
-        return is_subclass_of($class, Model::class) ? $class : false;
+        return Morph::model($type) ?? false;
     }
 
     /**
@@ -134,19 +133,13 @@ final readonly class Probe
         return new self(
             verdict: Stance::Abstain,
             cause: Cause::NotApplicable,
-            summary: self::line('filament-warden::ui.probe.'.$reason),
+            summary: Line::of('filament-warden::ui.probe.'.$reason),
         );
     }
 
     /**
      * @param  array<string, string>  $replace
      */
-    private static function line(string $key, array $replace = []): string
-    {
-        $line = __($key, $replace);
-
-        return is_string($line) ? $line : $key;
-    }
 
     /**
      * The title if warden generated one, the name if it did not, and nothing at
