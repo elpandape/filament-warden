@@ -8,6 +8,11 @@
  * catalogue draws no cell at all, which would leave the test's control
  * assertion (`stances` not empty) failing for a reason that has nothing to do
  * with what the test is about.
+ *
+ * A test that says "somebody else" moved a cell has to mount the field FIRST
+ * and grant AFTER: `RoleGrants::changes()` compares the baseline stamped at
+ * mount against what the store now holds, so a grant made before the field
+ * ever opens is simply what was already there — nothing to report as met.
  */
 declare(strict_types=1);
 
@@ -30,6 +35,7 @@ use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Facades\Filament;
 use Filament\Panel;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
@@ -879,4 +885,41 @@ test('a grid on somebody else page starts its next save from what is actually st
     expect($state['baseline']['stances'])->toBe($state['stances'])
         ->and($state['baseline']['narrowing'])->toBe($state['narrowing'])
         ->and($state['stances'])->not->toBeEmpty();
+});
+
+test('the field is what says the save met somebody else', function (): void {
+    $role = makeRole('editor');
+
+    $component = livewire(GridHost::class, ['roleKey' => $role->getKey()]);
+
+    Warden::allow($role)->to('viewAny', roleClass());
+
+    $component->call('save')
+        ->assertNotified(__('filament-warden::ui.grid.concurrent.kept_title'));
+});
+
+test('a save that met nobody says nothing extra', function (): void {
+    $role = makeRole('editor');
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('save')
+        ->assertNotNotified(__('filament-warden::ui.grid.concurrent.kept_title'));
+});
+
+test('nothing is announced when the save is rolled back', function (): void {
+    $role = makeRole('editor');
+
+    $component = livewire(GridHost::class, ['roleKey' => $role->getKey()]);
+
+    Warden::allow($role)->to('viewAny', roleClass());
+
+    $connection = DB::connection(Context::resolve()->connection());
+
+    expect(fn () => $connection->transaction(function () use ($component): void {
+        $component->call('save');
+
+        throw new RuntimeException('a failure the field cannot see coming');
+    }))->toThrow(RuntimeException::class);
+
+    $component->assertNotNotified(__('filament-warden::ui.grid.concurrent.kept_title'));
 });

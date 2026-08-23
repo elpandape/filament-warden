@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace ElPandaPe\FilamentWarden\Filament\Forms;
 
 use ElPandaPe\FilamentWarden\Filament\Concerns\DrawsThePermissionGrid;
+use ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\State;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Grants\SaveReport;
 use ElPandaPe\FilamentWarden\Support\Config;
+use ElPandaPe\Warden\Context;
 use Filament\Forms\Components\Field;
+use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -25,6 +28,15 @@ use Illuminate\Database\Eloquent\Model;
 final class PermissionGrid extends Field
 {
     use DrawsThePermissionGrid;
+
+    /**
+     * How many refused cells are named before the rest become a tally.
+     *
+     * Names then a tally, the shape `Holders::LABELS` uses for the same reason:
+     * a grid can refuse as many cells as it draws, and a notification listing
+     * two hundred of them says nothing.
+     */
+    private const int NAMED = 5;
 
     protected string $view = 'filament-warden::forms.permission-grid';
 
@@ -77,11 +89,9 @@ final class PermissionGrid extends Field
                     $component->gridBaseline(),
                 );
 
-                // One channel, and this is it. The page reads the report here to
-                // decide what its notification says; the grid itself says nothing
-                // about the save and simply re-reads the store afterwards. A
-                // second copy inside the state would be the same screen telling
-                // the same fact twice, which is how the two halves drift.
+                // Kept reachable for a page that wants to say something more of
+                // its own — not the only place the fact is said any more, since
+                // the field announces it below.
                 app()->instance(SaveReport::class, $report);
 
                 // The screen tells the truth again, on ANY page. `EditRole` gets
@@ -95,8 +105,46 @@ final class PermissionGrid extends Field
                 $payload = $component->storedState()->toPayload();
 
                 $component->state($payload + ['baseline' => $payload]);
+
+                $component->announce($report);
             }
         });
+    }
+
+    /**
+     * What the save did, said once and in the grid's own words.
+     *
+     * Sent through `afterCommit` and not straight away, because this runs
+     * inside `getState()` — before the record is updated, and inside whatever
+     * transaction the page opened. Announcing there would name a save a later
+     * failure can still undo. With no transaction open the callback runs on the
+     * spot, which is the common case: a panel opts into transactions and does
+     * not get them by default.
+     */
+    public function announce(SaveReport $report): void
+    {
+        if (! $report->metAnother()) {
+            return;
+        }
+
+        $notification = $report->refused === []
+            ? Notification::make()
+                ->success()
+                ->title(__('filament-warden::ui.grid.concurrent.kept_title'))
+                ->body(trans_choice('filament-warden::ui.grid.concurrent.kept', $report->preserved))
+            : Notification::make()
+                ->warning()
+                ->title(__('filament-warden::ui.grid.concurrent.refused_title'))
+                ->body(__('filament-warden::ui.grid.concurrent.refused', ['cells' => $this->refusedCells($report)]));
+
+        // `Model::getConnection()` returns the concrete `Connection`, which
+        // declares `afterCommit()`; `Builder::getConnection()` is typed
+        // `ConnectionInterface` and does not.
+        (new (Context::resolve()->grantClass()))->getConnection()->afterCommit(
+            static function () use ($notification): void {
+                $notification->send();
+            },
+        );
     }
 
     /**
@@ -118,6 +166,30 @@ final class PermissionGrid extends Field
     protected function onScreenStance(string $row, string $action): Stance
     {
         return self::stanceIn($this->gridState(), $row, $action);
+    }
+
+    /**
+     * The refused cells, in the grid's own words.
+     *
+     * Asking the catalogue again is free since it was memoised per panel, and
+     * it is what keeps one cell from having two names on one screen.
+     */
+    private function refusedCells(SaveReport $report): string
+    {
+        $catalog = $this->catalog();
+
+        $named = array_map(
+            fn (array $cell): string => GridView::cellLabel($catalog, $cell['row'], $cell['action']),
+            array_slice($report->refused, 0, self::NAMED),
+        );
+
+        $rest = count($report->refused) - count($named);
+
+        if ($rest > 0) {
+            $named[] = (string) __('filament-warden::ui.grid.concurrent.more', ['count' => $rest]);
+        }
+
+        return implode(', ', $named);
     }
 
     /**

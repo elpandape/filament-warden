@@ -6,6 +6,7 @@ namespace ElPandaPe\FilamentWarden\Filament\Forms;
 
 use ElPandaPe\FilamentWarden\Grants\Assignment;
 use ElPandaPe\FilamentWarden\Grants\SaveReport;
+use ElPandaPe\Warden\Context;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Model;
@@ -148,15 +149,17 @@ final class RoleAssignment extends CheckboxList
     /**
      * What the save met, said by the field itself.
      *
-     * The grid can leave this to `EditRole`, which owns its page and replaces
-     * the "Saved" notification outright. This field is one line inside a form
-     * the application wrote, so there is no notification of ours to replace —
-     * and saying nothing would be the silence this release exists to end. It
-     * sends its own, beside whatever the page sends.
+     * This field is one line inside a form the application wrote, so there is
+     * no "Saved" notification of ours to replace — it sends its own, beside
+     * whatever the page sends.
      *
      * Only one thing to say, unlike the grid: `SaveReport::refused` is always
      * empty from this screen, because a checkbox has no third value for two
      * people to disagree about. `Assignment::apply()` carries the reasoning.
+     *
+     * Sent through `afterCommit` and not straight away, for the same reason as
+     * `PermissionGrid::announce()`: this runs inside `getState()`, before the
+     * record is updated and inside whatever transaction the page opened.
      */
     public function announce(SaveReport $report): void
     {
@@ -164,11 +167,19 @@ final class RoleAssignment extends CheckboxList
             return;
         }
 
-        Notification::make()
+        $notification = Notification::make()
             ->success()
             ->title(__('filament-warden::ui.relations.roles.concurrent.kept_title'))
-            ->body(trans_choice('filament-warden::ui.relations.roles.concurrent.kept', $report->preserved))
-            ->send();
+            ->body(trans_choice('filament-warden::ui.relations.roles.concurrent.kept', $report->preserved));
+
+        // `Model::getConnection()` returns the concrete `Connection`, which
+        // declares `afterCommit()`; `Builder::getConnection()` is typed
+        // `ConnectionInterface` and does not.
+        (new (Context::resolve()->grantClass()))->getConnection()->afterCommit(
+            static function () use ($notification): void {
+                $notification->send();
+            },
+        );
     }
 
     /**
