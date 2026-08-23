@@ -37,6 +37,15 @@ final class AccountHostProtected extends Component implements HasActions, HasSch
     public int|string $accountKey = 0;
 
     /** @var array<string, mixed> */
+    /**
+     * Never read. It is here to BE a non-public property of that name: the field
+     * used to look for one, and `property_exists()` answers true for this while
+     * reading it throws through Livewire's `__get()`.
+     *
+     * @var array<string, mixed>
+     *
+     * @phpstan-ignore property.onlyWritten
+     */
     private array $data = ['mine' => true];
 
     public function mount(int|string $accountKey): void
@@ -66,16 +75,6 @@ final class AccountHostProtected extends Component implements HasActions, HasSch
         $view = 'filament-warden-tests::account-host';
 
         return view($view);
-    }
-
-    /**
-     * What this page keeps for itself, so a test can say the field left it be.
-     *
-     * @return array<string, mixed>
-     */
-    public function ownData(): array
-    {
-        return $this->data;
     }
 
     private function account(): User

@@ -9,7 +9,6 @@ use ElPandaPe\FilamentWarden\Grants\SaveReport;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 
 /**
  * Handing roles to an account, from the account's own screen.
@@ -114,7 +113,11 @@ final class RoleAssignment extends CheckboxList
         if ($holder !== null) {
             $livewire = $this->getLivewire();
 
-            data_set($livewire, $holder.'.'.self::BASELINE, $held);
+            $bag = data_get($livewire, $holder.'.'.self::BASELINE);
+            $bag = is_array($bag) ? $bag : [];
+            $bag[$this->getStatePath() ?? ''] = $held;
+
+            data_set($livewire, $holder.'.'.self::BASELINE, $bag);
         }
     }
 
@@ -129,7 +132,8 @@ final class RoleAssignment extends CheckboxList
             return null;
         }
 
-        $baseline = data_get($this->getLivewire(), $holder.'.'.self::BASELINE);
+        $bag = data_get($this->getLivewire(), $holder.'.'.self::BASELINE);
+        $baseline = is_array($bag) ? ($bag[$this->getStatePath() ?? ''] ?? null) : null;
 
         if (! is_array($baseline)) {
             return null;
@@ -186,43 +190,40 @@ final class RoleAssignment extends CheckboxList
     }
 
     /**
-     * The state bag the copy sits in, or null when there is none to sit in.
+     * The one bag the copies sit in, or null when there is none to sit in.
      *
-     * It is this field's own CONTAINER path — everything before the last
-     * segment — and both halves of that matter.
+     * It is the state path of this field's ROOT container — the outermost
+     * schema — and it took three wrong answers to get there, each of them
+     * correct about the last and wrong somewhere else:
      *
-     * Not a property called `data`: Filament's own pages call it that, but
-     * Filament itself mounts schemas under eight different roots (`data`,
-     * `filters`, `tableFilters`, `deferredFilters`, `settings`, `columnMap`,
-     * and more), so keying off the name left this field silently unprotected
-     * wherever that name was something else — the screen looking fixed while
-     * the defect stayed live on it.
+     * - A property named `data`. Filament's resource pages call it that and
+     *   mount schemas under five more roots besides — `filters`,
+     *   `deferredFilters`, `tableFilters`, `tableDeferredFilters` and
+     *   `mountedActions.{i}.data` — so the field was silently unprotected
+     *   wherever the name differed, with the screen looking fixed.
+     * - The ROOT of the field's state path. An action modal's is
+     *   `mountedActions`, a public array Filament reads and writes and still not
+     *   a state bag: a string key in it breaks `array_key_last()`, `array_pop()`
+     *   and `getMountedActionSchemaName()`.
+     * - The field's immediate CONTAINER. Right for one field, wrong inside a
+     *   repeater: a repeating container validates on itself, so Laravel returns
+     *   the whole item as validated data and `pruneStateToMatchKeys()` keeps
+     *   whatever it finds there — the copy rode into `$record->update()`.
      *
-     * And not the ROOT of that path either, which was the first correction and
-     * was worse: a field inside an action modal has the path
-     * `mountedActions.{i}.data.roles`, whose root is `mountedActions` — a public
-     * array Filament reads and writes, and still the wrong one. A string key in
-     * it breaks `array_key_last()` and `array_pop()`, and
-     * `getMountedActionSchemaName()` then resolves a schema that does not exist.
-     * The container path puts the copy inside the action's own state bag, which
-     * is where the field's own state already is.
+     * The root container is the only candidate that is both a real state bag and
+     * outside every repeating item, so what goes there is pruned away exactly
+     * like the field's own state is. Two rows of a repeater still need two
+     * copies, so the bag is a map keyed by each field's full state path — which
+     * also covers two of these fields on one form.
      *
-     * The bag has to be there already. A schema whose state path names something
-     * the component does not have would otherwise get a dynamic property created
-     * here, gone by the next request — the same `PropertyNotFoundException` this
-     * method exists to avoid, one layer over.
+     * A schema with no state path of its own leaves nothing to sit beside, and
+     * then there is no baseline at all.
      */
     private function holder(): ?string
     {
-        $path = $this->getStatePath() ?? '';
+        $root = $this->getRootContainer()->getStatePath();
 
-        if (! str_contains($path, '.')) {
-            return null;
-        }
-
-        $holder = Str::beforeLast($path, '.');
-
-        return is_array(data_get($this->getLivewire(), $holder)) ? $holder : null;
+        return $root === '' ? null : $root;
     }
 
     /**

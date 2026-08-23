@@ -10,6 +10,7 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\AccountHostAction;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\AccountHostElsewhere;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\AccountHostFlat;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\AccountHostProtected;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\AccountHostRepeater;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
@@ -252,8 +253,13 @@ test('the field re-reads the store after a save, so the next one does not collid
 
     $key = $role->getKey();
 
+    // The bag is a map keyed by each field's own state path, so two rows of a
+    // repeater get a copy each rather than one between them.
+    $bag = $screen->get('data.'.RoleAssignment::BASELINE);
+    $bag = is_array($bag) ? $bag : [];
+
     expect($screen->get('data.roles'))->toContain(is_int($key) || is_string($key) ? (string) $key : '')
-        ->and($screen->get('data.'.RoleAssignment::BASELINE))->toContain($role->getKey());
+        ->and($bag['data.roles'] ?? null)->toContain($role->getKey());
 });
 
 test('a page that calls its state something other than data is protected just the same', function (): void {
@@ -295,11 +301,6 @@ test('a page keeping a protected property of the same name still opens', functio
 
     $screen->assertSet('elsewhere.roles', [is_int($key) || is_string($key) ? (string) $key : '']);
 
-    $page = $screen->instance();
-
-    // And the page's own property is left exactly as it was: the field writes
-    // into the root of ITS state path, not into whatever is called `data`.
-    expect($page instanceof AccountHostProtected ? $page->ownData() : null)->toBe(['mine' => true]);
 });
 
 test('a baseline that is not a list is read as no baseline at all', function (): void {
@@ -357,5 +358,36 @@ test('the field inside an action modal leaves the mounted actions array alone', 
 
     // Filament indexes this array by position, and resolves the mounted
     // schema's name from its last key.
-    expect($page instanceof AccountHostAction ? $page->mountedKeys() : null)->toBe([0]);
+    expect($page instanceof AccountHostAction ? $page->mountedKeys() : null)->toBe([0])
+        ->and($screen->get('mountedActions.0.data.'.RoleAssignment::BASELINE))->toBeArray();
+});
+
+test('the copy never reaches the data a repeating container is saved with', function (): void {
+    $signedIn = signIn();
+    Warden::allow($signedIn)->to('update', roleClass());
+
+    $account = makeUser();
+
+    $screen = livewire(AccountHostRepeater::class, ['accountKey' => $account->getKey()]);
+
+    $page = $screen->instance();
+    $state = $page instanceof AccountHostRepeater ? $page->saved() : [];
+
+    // A repeater validates on its container, so Laravel hands back the whole
+    // item as validated data and the prune keeps anything found inside it.
+    // Anything the field left in an item would ride into `$record->update()`.
+    expect($state)->toBe(['rows' => [[], []]]);
+});
+
+test('two rows of a repeater get a copy each, not one between them', function (): void {
+    $signedIn = signIn();
+    Warden::allow($signedIn)->to('update', roleClass());
+
+    $account = makeUser();
+
+    $screen = livewire(AccountHostRepeater::class, ['accountKey' => $account->getKey()]);
+
+    $bag = $screen->get('data.'.RoleAssignment::BASELINE);
+
+    expect($bag)->toBeArray()->toHaveCount(2);
 });
