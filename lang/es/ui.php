@@ -229,6 +229,7 @@ return [
             'drifted' => 'Tipos de entidad que nadie declara. Un alias de morph entero dejó de casar: el mapa se movió y todas sus filas se callaron.',
             'unkeyable' => 'Nombres del catálogo con un punto. Livewire parte las rutas de estado por puntos, así que no pueden ser una celda: una pantalla de rol lanza en cuanto dibuja una. Renombra el permiso.',
             'unwalkable' => 'Modelos a los que solo llega un relation manager, y que no se pueden recorrer sin ejecutar la relación.',
+            'stranded' => 'Concesiones cuya autoridad ya no existe. No las borra ninguna cascada: al borrar un rol quedan atrás sus propias concesiones, y ni warden ni `warden:clean` las quitan.',
             'clean' => 'Nada que informar.',
         ],
         'assign' => [

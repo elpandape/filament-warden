@@ -15,11 +15,12 @@ use Filament\Panel;
  *
  * `isClean()` is a flat conjunction and the only thing `--check` consults, so a
  * bucket left out of it is a finding every build swallows: a change that looks
- * done, passes every other test, and fixes nothing. And one bucket is out of it
- * on purpose — a permission the catalogue declares that nobody holds is what
- * every grid save that turns a cell off leaves behind.
+ * done, passes every other test, and fixes nothing. And two buckets are out of
+ * it on purpose — a permission the catalogue declares that nobody holds is what
+ * every grid save that turns a cell off leaves behind, and a grant whose
+ * authority is gone has no cure this package can write.
  *
- * Every parameter of the constructor has a default, so an eighth bucket added
+ * Every parameter of the constructor has a default, so a tenth bucket added
  * without touching this file is legal PHP and clean at `level: max`. Nothing
  * goes red on its own: what catches it is `'this file puts a finding in every
  * bucket the audit carries'`, which walks the constructor by reflection.
@@ -62,6 +63,7 @@ function auditWith(string $bucket): Audit
         drifted: $bucket === 'drifted' ? $finding : [],
         unwalkable: $bucket === 'unwalkable' ? $finding : [],
         unkeyable: $bucket === 'unkeyable' ? $finding : [],
+        stranded: $bucket === 'stranded' ? $finding : [],
     );
 }
 
@@ -79,6 +81,11 @@ test('the declared and unheld bucket is reported and never reddens the build', f
         ->and(auditWith('orphans')->isSilent())->toBeFalse();
 });
 
+test('the stranded bucket is reported and never reddens the build', function (): void {
+    expect(auditWith('stranded')->isClean())->toBeTrue()
+        ->and(auditWith('stranded')->isSilent())->toBeFalse();
+});
+
 test('the gate reads exactly the buckets this file names, no more and no fewer', function (): void {
     $reaching = array_values(array_filter(
         declaredBuckets(),
@@ -86,7 +93,7 @@ test('the gate reads exactly the buckets this file names, no more and no fewer',
     ));
 
     expect($reaching)->toBe(gateBuckets())
-        ->and(declaredBuckets())->toHaveCount(count(gateBuckets()) + 1);
+        ->and(declaredBuckets())->toHaveCount(count(gateBuckets()) + 2);
 });
 
 test('this file puts a finding in every bucket the audit carries', function (string $bucket): void {

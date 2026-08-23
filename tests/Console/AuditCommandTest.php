@@ -41,6 +41,11 @@ use Illuminate\Support\Facades\Gate;
  * name on a real model), and `to($name, '*')` writes only the second half (a
  * real name on the wildcard entity type). A row with both cannot tell either
  * term apart from the disjunction; the tests below each write only one half.
+ *
+ * The `test` panel registers no resource for `Post`, so a grant naming its class
+ * is itself undeclared and lands in `drifted` — a build failure the assertion on
+ * `isClean()` would otherwise blame on the stranded grant it is not testing for.
+ * `catalog.models` exists for exactly this: a model with a policy and no resource.
  */
 pest()->extend(TestCase::class);
 
@@ -360,4 +365,51 @@ test('a relation group built with a closure does not take the catalogue with it'
 
     expect(Catalog::for($panel)->entries)->not->toBeEmpty()
         ->and(Audit::of([$panel])->unwalkable)->toBeEmpty();
+});
+
+test('a grant whose authority no longer exists is reported', function (): void {
+    $role = makeRole('editor');
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    Context::resolve()->roleClass()::query()->whereKey($role->getKey())->delete();
+
+    expect(Audit::run()->stranded)->not->toBeEmpty();
+});
+
+test('a stranded grant never turns a build red', function (): void {
+    config()->set('filament-warden.catalog.models', [Post::class]);
+
+    $role = makeRole('editor');
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    Context::resolve()->roleClass()::query()->whereKey($role->getKey())->delete();
+
+    $audit = Audit::run();
+
+    expect($audit->stranded)->not->toBeEmpty()
+        ->and($audit->isClean())->toBeTrue()
+        ->and($audit->isSilent())->toBeFalse();
+
+    /** @var Illuminate\Testing\PendingCommand $pending */
+    $pending = $this->artisan('filament-warden:audit', ['--check' => true]);
+
+    $pending->assertExitCode(0);
+});
+
+test('a grant whose authority is alive is not reported', function (): void {
+    $role = makeRole('editor');
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    expect(Audit::run()->stranded)->toBeEmpty();
+});
+
+test('a grant behind a stray morph alias is drifted, not stranded twice over', function (): void {
+    Warden::allow(makeRole())->to('viewAny', roleClass());
+
+    Context::resolve()->grantClass()::query()->withoutGlobalScopes()->update(['entity_type' => 'gone.away']);
+
+    expect(Audit::run()->stranded)->toBeEmpty();
 });

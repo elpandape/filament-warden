@@ -6,6 +6,7 @@ namespace ElPandaPe\FilamentWarden\Catalog;
 
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Guard;
+use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Context;
 use Filament\Facades\Filament;
 use Filament\Panel;
@@ -33,6 +34,7 @@ final readonly class Audit
      * @param  list<string>  $drifted  the same, but a whole entity type at once
      * @param  list<string>  $unwalkable  models only a relation manager reaches
      * @param  list<string>  $unkeyable  catalogue names the grid cannot key, which throw when a role screen renders
+     * @param  list<string>  $stranded  grants whose authority no longer exists
      */
     public function __construct(
         public array $open = [],
@@ -43,6 +45,7 @@ final readonly class Audit
         public array $drifted = [],
         public array $unwalkable = [],
         public array $unkeyable = [],
+        public array $stranded = [],
     ) {}
 
     public static function run(): self
@@ -107,6 +110,7 @@ final readonly class Audit
             drifted: $drifted,
             unwalkable: array_values(array_unique($unwalkable)),
             unkeyable: array_values(array_unique($unkeyable)),
+            stranded: self::stranded(),
         );
     }
 
@@ -144,7 +148,7 @@ final readonly class Audit
      */
     public function isSilent(): bool
     {
-        return $this->isClean() && $this->orphans === [];
+        return $this->isClean() && $this->orphans === [] && $this->stranded === [];
     }
 
     /**
@@ -308,6 +312,85 @@ final readonly class Audit
         }
 
         return [$orphans, $forgotten];
+    }
+
+    /**
+     * Grants whose authority is gone.
+     *
+     * Nothing cascades these: warden's schema puts foreign keys on exactly two
+     * columns — `assigned_roles.role_id` and `grants.permission_id` — and both
+     * polymorphic authority pairs are plain columns with an index and no
+     * constraint. So deleting a role takes its assignments and leaves its own
+     * grants behind, and no listener picks them up: `IsRole::bootIsRole()`
+     * dispatches `RoleDeleted` and warden ships nothing that listens for it.
+     * `warden:clean` cannot help either — it prunes permissions NO grant points
+     * at, so a stranded row actually protects its permission from the pruner.
+     *
+     * Informational, never red. The only cure is upstream, in the schema or in
+     * a listener warden would have to ship; turning somebody's build red over a
+     * row this package can neither write nor delete is the noisy gate this
+     * command already demoted a bucket for once.
+     *
+     * Read across every tenant, for the same reason `Holders` does: an
+     * authority is gone or it is not, and that question has no scope.
+     *
+     * @return list<string>
+     */
+    private static function stranded(): array
+    {
+        $context = Context::resolve();
+
+        $grants = $context->grantClass()::query()
+            ->withoutGlobalScopes()
+            ->get(['entity_type', 'entity_id']);
+
+        /** @var array<string, list<int|string>> $byType */
+        $byType = [];
+
+        foreach ($grants as $grant) {
+            $type = $grant->getAttribute('entity_type');
+            $key = $grant->getAttribute('entity_id');
+
+            // Both null is a grant to everyone, and a type with no key is
+            // warden's wildcard authority: neither names a row that could be
+            // missing.
+            if (is_string($type) && (is_int($key) || is_string($key))) {
+                $byType[$type][] = $key;
+            }
+        }
+
+        $findings = [];
+
+        foreach ($byType as $type => $keys) {
+            $class = Morph::model($type);
+
+            // A type that resolves to nothing is the morph map having moved,
+            // which `drifted` already reports against the catalogue. Counting
+            // it here too would say the same thing twice in two vocabularies.
+            if ($class === null) {
+                continue;
+            }
+
+            $wanted = array_values(array_unique($keys));
+
+            $alive = [];
+
+            foreach ($class::query()->withoutGlobalScopes()->whereKey($wanted)->get() as $record) {
+                $found = $record->getKey();
+
+                if (is_int($found) || is_string($found)) {
+                    $alive[(string) $found] = true;
+                }
+            }
+
+            foreach ($wanted as $key) {
+                if (! array_key_exists((string) $key, $alive)) {
+                    $findings[] = $type.':'.$key;
+                }
+            }
+        }
+
+        return $findings;
     }
 
     /**

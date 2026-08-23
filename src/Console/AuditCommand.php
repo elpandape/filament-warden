@@ -18,10 +18,11 @@ use Illuminate\Console\Command;
  * whole of Filament, the HTTP middleware, so no artisan command ever starts a
  * panel.
  *
- * One of the seven lists is informational and never reaches the exit code:
- * permissions the catalogue declares that no grant points at. Turning a grid cell
- * off leaves exactly that row behind, so a build that went red on it would go red
- * on every save and stay red.
+ * Two of the lists are informational and never reach the exit code: permissions the
+ * catalogue declares that no grant points at, and grants whose authority no longer
+ * exists. Turning a grid cell off leaves exactly the first behind, so a build that
+ * went red on it would go red on every save and stay red; and the second has no cure
+ * inside this package at all.
  */
 final class AuditCommand extends Command
 {
@@ -41,6 +42,7 @@ final class AuditCommand extends Command
         $this->report(__('filament-warden::ui.console.audit.drifted'), $audit->drifted);
         $this->report(__('filament-warden::ui.console.audit.unwalkable'), $audit->unwalkable);
         $this->report(__('filament-warden::ui.console.audit.unkeyable'), $audit->unkeyable);
+        $this->report(__('filament-warden::ui.console.audit.stranded'), $audit->stranded, red: false);
 
         if ($audit->isSilent()) {
             $this->components->info((string) __('filament-warden::ui.console.audit.clean'));
