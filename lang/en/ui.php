@@ -232,6 +232,10 @@ return [
             'stranded' => 'Grants whose authority no longer exists. Nothing cascades these: deleting a role leaves its own grants behind, and neither warden nor `warden:clean` removes them.',
             'clean' => 'Nothing to report.',
         ],
+        'catalog' => [
+            'heading' => 'The panels declare :entries abilities. The store holds :rows permission rows.',
+            'unknown_panel' => 'No panel with the id [:panel].',
+        ],
         'assign' => [
             'missing_role' => 'No role named [:role]. Nothing was created: assigning by name would have minted one.',
             'missing_authority' => 'Could not read [:authority]. Give it as Class:id, for example "App\\Models\\User:1".',

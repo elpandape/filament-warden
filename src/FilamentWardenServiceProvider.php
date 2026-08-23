@@ -6,6 +6,7 @@ namespace ElPandaPe\FilamentWarden;
 
 use ElPandaPe\FilamentWarden\Console\AssignRoleCommand;
 use ElPandaPe\FilamentWarden\Console\AuditCommand;
+use ElPandaPe\FilamentWarden\Console\CatalogCommand;
 use ElPandaPe\FilamentWarden\Policies\PermissionPolicy;
 use ElPandaPe\FilamentWarden\Policies\RolePolicy;
 use ElPandaPe\Warden\Context;
@@ -30,6 +31,7 @@ final class FilamentWardenServiceProvider extends ServiceProvider
             $this->commands([
                 AssignRoleCommand::class,
                 AuditCommand::class,
+                CatalogCommand::class,
             ]);
 
             $this->publishes([

@@ -232,6 +232,10 @@ return [
             'stranded' => 'Concesiones cuya autoridad ya no existe. No las borra ninguna cascada: al borrar un rol quedan atrás sus propias concesiones, y ni warden ni `warden:clean` las quitan.',
             'clean' => 'Nada que informar.',
         ],
+        'catalog' => [
+            'heading' => 'Los paneles declaran :entries acciones. El almacén tiene :rows filas de permiso.',
+            'unknown_panel' => 'No hay ningún panel con el id [:panel].',
+        ],
         'assign' => [
             'missing_role' => 'No hay ningún rol llamado [:role]. No se creó nada: asignar por nombre habría acuñado uno.',
             'missing_authority' => 'No se pudo leer [:authority]. Se escribe como Clase:id, por ejemplo "App\\Models\\User:1".',

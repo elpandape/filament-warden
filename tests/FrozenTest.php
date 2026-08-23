@@ -9,6 +9,7 @@ use ElPandaPe\FilamentWarden\Catalog\PermissionName;
 use ElPandaPe\FilamentWarden\Catalog\Scope;
 use ElPandaPe\FilamentWarden\Console\AssignRoleCommand;
 use ElPandaPe\FilamentWarden\Console\AuditCommand;
+use ElPandaPe\FilamentWarden\Console\CatalogCommand;
 use ElPandaPe\FilamentWarden\Filament\Forms\RoleAssignment;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\EditRole;
 use ElPandaPe\FilamentWarden\FilamentWardenPlugin;
@@ -365,6 +366,8 @@ test('the translation keys an application overrides are frozen', function (): vo
         'console.audit.unwalkable',
         'console.audit.stranded',
         'console.audit.clean',
+        'console.catalog.heading',
+        'console.catalog.unknown_panel',
         'console.assign.missing_role',
         'console.assign.missing_authority',
         'console.assign.done',
@@ -445,14 +448,19 @@ test('the translation keys an application overrides are frozen', function (): vo
 test('the console commands are frozen', function (): void {
     $assign = app(AssignRoleCommand::class);
     $audit = app(AuditCommand::class);
+    $catalog = app(CatalogCommand::class);
 
     expect(array_keys(app(Kernel::class)->all()))
         ->toContain('filament-warden:assign')
         ->toContain('filament-warden:audit')
+        ->toContain('filament-warden:catalog')
         ->and($assign->getName())->toBe('filament-warden:assign')
         ->and($audit->getName())->toBe('filament-warden:audit')
+        ->and($catalog->getName())->toBe('filament-warden:catalog')
         ->and(array_keys($assign->getDefinition()->getArguments()))
         ->toBe(['role', 'authority'])
         ->and(array_keys($audit->getDefinition()->getOptions()))
-        ->toContain('check');
+        ->toContain('check')
+        ->and(array_keys($catalog->getDefinition()->getOptions()))
+        ->toContain('panel');
 });
