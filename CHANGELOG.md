@@ -38,6 +38,17 @@ Two people editing the same role stopped undoing each other's work. Nothing else
 
 ### Changed
 
+- **A cell is compared whole — its stance and how far it reaches — and the reach only weighs in when
+  the baseline actually holds one.** It does not when the condition builder is switched off, nor when
+  the stored rule is one this screen can read and cannot rebuild from a payload. Both are a flag
+  rather than a stand-in value, because a substituted reach can make one of the two comparisons
+  trivially true but never both, and the one it misses collapses into "the reach changed" — which is
+  true of every cell somebody clears. That would have refused a lone administrator's own revoke and
+  blamed a colleague who was not there.
+- **A forged baseline cannot escalate.** It decides only *whether* a change is written, never what:
+  the stance and the reach come from the payload. The worst a doctored one does is suppress the
+  forger's own save, which is what everybody had before this release.
+
 - **The grid field's state envelope gained a third key, `baseline`.** It is the same payload
   `RoleState::toPayload()` already worked out at hydration — not a second derivation of the store
   that could drift — and it travels in the state because it cannot be worked out later (by save time
