@@ -20,15 +20,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Deliberately one PHP version, not the `run-tests.yml` matrix. Pint reads
+      # Deliberately one PHP runtime, not the `run-tests.yml` matrix. Pint reads
       # syntax; Rector takes its target from `composer.json`'s `require.php`
-      # (`withPhpSets()`), not from the runtime. PHPStan is the one that would have
-      # silently followed the runtime instead of the manifest, so `phpstan.neon`
-      # pins the declared range and one run covers both floors. Coverage, type
-      # coverage and profanity execute the suite once, at 8.5 only: `run-tests.yml`'s
-      # matrix proves the suite PASSES under 8.4, but nothing re-measures coverage
-      # there — a cost trade-off, not a proven equivalence. Pinned to the ceiling,
-      # 8.5, so this job matches the Docker dev image.
+      # (`withPhpSets()`), not from the runtime. PHPStan is the one that follows the
+      # runtime, so it runs TWICE below — once here at the ceiling, once at the
+      # floor through `phpstan-floor.neon`, which explains why a `phpVersion` range
+      # cannot do it in one. Coverage, type coverage and profanity execute the suite
+      # once, at 8.5 only: `run-tests.yml`'s matrix proves the suite PASSES under
+      # 8.4, but nothing re-measures coverage there — a cost trade-off, not a proven
+      # equivalence. Pinned to the ceiling, 8.5, to match the Docker dev image.
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.5'
@@ -44,14 +44,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache
-          key: analysers-${{ runner.os }}-php8.5-${{ hashFiles('composer.lock', 'pint.json', 'phpstan.neon', 'rector.php') }}
+          key: analysers-${{ runner.os }}-php8.5-${{ hashFiles('composer.lock', 'pint.json', 'phpstan.neon', 'phpstan-floor.neon', 'rector.php') }}
           restore-keys: analysers-${{ runner.os }}-php8.5-
 
       - name: Pint
         run: vendor/bin/pint --test --cache-file=.cache/pint.cache --parallel
 
       - name: PHPStan
-        run: vendor/bin/phpstan analyse --error-format=github --memory-limit=1G
+        run: |
+          vendor/bin/phpstan analyse --error-format=github --memory-limit=1G
+          vendor/bin/phpstan analyse -c phpstan-floor.neon --error-format=github --memory-limit=1G
 
       - name: Rector
         run: vendor/bin/rector process --dry-run

@@ -1,0 +1,24 @@
+# The second half of the PHPStan gate: the same analysis, at the floor
+# `composer.json` declares.
+#
+# A `phpVersion: {min, max}` range does NOT report the union of the two ends.
+# `PhpVersionFactoryFactory::create()` reads `min` and hands that one version to
+# every version-dependent rule; only `Scope::getPhpVersion()`, `ConstantResolver`
+# and the `version_compare()` extension see the range at all. Measured on a file
+# carrying one 8.4 deprecation and two 8.5 ones: the range reported only the 8.4
+# one — byte for byte what `phpVersion: 80400` reports — while the runtime
+# default reported all three. So a range would have traded the ceiling for the
+# floor rather than covering both.
+#
+# Two runs cover both: `phpstan.neon` at the runtime, which the dev image and
+# `quality.yml` both pin to the ceiling, and this one at the floor.
+includes:
+    - phpstan.neon
+
+parameters:
+
+    phpVersion: 80400
+
+    # Its own cache, or the two runs evict each other's on every build:
+    # `ResultCacheManager` puts the whole project config in the cache meta.
+    tmpDir: .cache/phpstan-floor

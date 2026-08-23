@@ -12,15 +12,9 @@ parameters:
 
     level: max
 
-    # PHPStan analyses at the RUNTIME PHP version unless told otherwise, so the
-    # single 8.5 job in `quality.yml` would verify nothing about the 8.4 floor.
-    # Measured both ways with `phpstan diagnose`: without this block it prints
-    # "PHP version for analysis: 8.5.9 (from runtime)" while already knowing
-    # "PHP composer.json required version: 8.4-8.5.99"; with it, "8.4-8.5.99
-    # (from config)".
-    phpVersion:
-        min: 80400
-        max: 80599
+    # No `phpVersion` here on purpose: this half analyses at the runtime, which
+    # the dev image and `quality.yml` both pin to the ceiling. The floor is the
+    # job of `phpstan-floor.neon`, which explains why it cannot be one config.
 
     reportUnmatchedIgnoredErrors: true
 

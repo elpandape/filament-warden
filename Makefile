@@ -41,8 +41,9 @@ helpers: ## Check for duplicate global test helpers
 verify: ## Drive the JS through the reactivity Alpine really uses
 	$(PHP) sh -c 'cd verify && npm ci --silent && node verify-reach-of.mjs && node verify-select-sequencing.mjs'
 
-stan: ## PHPStan (level max)
+stan: ## PHPStan (level max), at the ceiling and again at the declared floor
 	$(PHP) vendor/bin/phpstan analyse --memory-limit=1G
+	$(PHP) vendor/bin/phpstan analyse -c phpstan-floor.neon --memory-limit=1G
 
 lint: ## Pint check (no changes)
 	$(PHP) vendor/bin/pint --test $(PINT_CACHE) --parallel
