@@ -35,7 +35,7 @@ use Illuminate\Support\Str;
  * Every field says why it is closed when it is closed. A screen that greys a
  * control out and explains nothing is a screen that gets worked around.
  */
-class PermissionForm
+final class PermissionForm
 {
     public static function configure(Schema $schema): Schema
     {

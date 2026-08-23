@@ -30,6 +30,14 @@ use UnitEnum;
  * permission nothing consults. Every one of the six switches under
  * `permissions.*` is read here — opening any of them is one line of config, and
  * closing it again afterwards means cleaning up whatever was created meanwhile.
+ *
+ * Left non-final on purpose, and the reason is one sentence rather than sixteen:
+ * the README's Stability section says these screens are not an extension point.
+ * They are open so an application can experiment, not because subclassing them
+ * is supported — `canDelete()` gaining an optional parameter in `1.5.0` was a
+ * fatal for anyone who had overridden it, and that is the shape to expect. The
+ * classes that build a form, an infolist or a table are `final`: nothing was
+ * ever promised about those.
  */
 class PermissionResource extends Resource
 {

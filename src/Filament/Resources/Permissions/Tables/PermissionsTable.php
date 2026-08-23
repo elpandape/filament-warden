@@ -29,7 +29,7 @@ use Illuminate\Support\Str;
  * The catalogue as a list, with the two things a row cannot say for itself:
  * where it came from, and how far it reaches.
  */
-class PermissionsTable
+final class PermissionsTable
 {
     public static function configure(Table $table): Table
     {

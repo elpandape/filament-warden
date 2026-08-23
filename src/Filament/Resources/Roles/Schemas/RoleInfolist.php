@@ -13,7 +13,7 @@ use Filament\Support\Icons\Heroicon;
 /**
  * The same two questions as the form, answered and not asked.
  */
-class RoleInfolist
+final class RoleInfolist
 {
     public static function configure(Schema $schema): Schema
     {

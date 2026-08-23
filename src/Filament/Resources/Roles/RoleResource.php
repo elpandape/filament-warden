@@ -28,6 +28,14 @@ use UnitEnum;
  * The model is resolved at runtime and never declared as `$model`: Filament's
  * fallback builds the class from the CONSUMING application's namespace, so a
  * package resource that leaves it unset points at a class that does not exist.
+ *
+ * Left non-final on purpose, and the reason is one sentence rather than sixteen:
+ * the README's Stability section says these screens are not an extension point.
+ * They are open so an application can experiment, not because subclassing them
+ * is supported — `canDelete()` gaining an optional parameter in `1.5.0` was a
+ * fatal for anyone who had overridden it, and that is the shape to expect. The
+ * classes that build a form, an infolist or a table are `final`: nothing was
+ * ever promised about those.
  */
 class RoleResource extends Resource
 {

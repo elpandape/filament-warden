@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\Model;
  * matches by it, so renaming it unprotects the role on the spot — and the grid is
  * its powers. The title is a label nothing resolves by.
  */
-class RoleForm
+final class RoleForm
 {
     public static function configure(Schema $schema): Schema
     {

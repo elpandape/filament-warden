@@ -25,7 +25,7 @@ use Illuminate\Support\Str;
  * The names are read in one place only — the moment somebody deletes it, and
  * the grants go with it.
  */
-class PermissionInfolist
+final class PermissionInfolist
 {
     public static function configure(Schema $schema): Schema
     {

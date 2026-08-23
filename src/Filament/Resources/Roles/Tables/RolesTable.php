@@ -17,7 +17,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
-class RolesTable
+final class RolesTable
 {
     /**
      * Two closures below share a memo apiece — `$heldCounts` for the
