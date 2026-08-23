@@ -634,7 +634,7 @@ Catalog::forget();
     'delete'      => 'orphaned',   // false | 'orphaned' | 'all'
     'constraints' => true,         // the condition builder
     'only_owned'  => true,         // the ownership checkbox
-    'probe'       => true,         // the test bench, built on explain()
+    'probe'       => true,         // the test bench, built on explain() — see below
 ],
 ```
 
@@ -674,6 +674,13 @@ A protected role keeps its name and its grid: both are shown, neither can be edi
     'constraints' => true,  // Show scope
 ],
 ```
+
+> 🔎 **`probe` lets anyone who can view a permission search your accounts.** The bench needs an
+> account to test the permission against, so its picker searches whatever of `name`, `email` and
+> `title` that model has and shows up to twenty matches. That is a list of your people's names and
+> addresses, offered to everybody with `view` on a permission. It is off with one line if that is not
+> a trade you want. From `v1.8.0` a `%` in the box is looked for rather than obeyed, and a model with
+> none of those three columns returns nothing instead of the first twenty rows.
 
 ### Catalog
 

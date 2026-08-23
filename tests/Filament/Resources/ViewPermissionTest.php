@@ -5,6 +5,7 @@ declare(strict_types=1);
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages\ViewPermission;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Document;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Vault;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Facades\Warden;
 use Illuminate\Support\Facades\Auth;
@@ -269,4 +270,32 @@ test('the test bench says how far the permission reaches, when it can be counted
 
     expect(ElPandaPe\FilamentWarden\Grants\Reach::of($twin, $holder)->sentence())
         ->toStartWith('It falls on 1 of 2 rows.');
+});
+
+test('a wildcard in the search is looked for, not obeyed', function (): void {
+    signIn();
+
+    makeUser('Ada');
+    makeUser('Bob');
+    $literal = makeUser('a%b');
+
+    // Before this, `%` was a LIKE wildcard and the box paged the account table.
+    $key = $literal->getKey();
+
+    expect(ViewPermission::accounts('%'))->toBe([is_int($key) || is_string($key) ? $key : '' => 'a%b'])
+        ->and(ViewPermission::accounts('_'))->toBeEmpty()
+        ->and(array_values(ViewPermission::accounts('Ada')))->toBe(['Ada']);
+});
+
+test('an account model with nothing to search by finds nothing, rather than the first twenty', function (): void {
+    signIn();
+
+    makeUser('Ada');
+
+    // A model whose table has none of name, email or title: the query had no
+    // condition at all and answered with whatever came first.
+    config()->set('auth.providers.users.model', Vault::class);
+    Auth::forgetGuards();
+
+    expect(ViewPermission::accounts('Ada'))->toBeEmpty();
 });

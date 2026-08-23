@@ -24,6 +24,23 @@ use Illuminate\Database\Eloquent\Model;
 
 class ViewPermission extends ViewRecord
 {
+    /**
+     * The columns an account can be searched by, each with the whole clause it
+     * turns into.
+     *
+     * Whole clauses rather than names because the ESCAPE below has to be spelled
+     * out and the query builder has no way to say it — and written out here
+     * rather than built, so what reaches `orWhereRaw()` is a literal this file
+     * contains and never a column name from anywhere else.
+     *
+     * @var array<string, literal-string>
+     */
+    private const array SEARCHABLE = [
+        'name' => "name like ? escape '\\'",
+        'email' => "email like ? escape '\\'",
+        'title' => "title like ? escape '\\'",
+    ];
+
     protected static string $resource = PermissionResource::class;
 
     public static function accountLabel(mixed $value): ?string
@@ -46,12 +63,32 @@ class ViewPermission extends ViewRecord
             return [];
         }
 
-        $columns = array_values(array_intersect(['name', 'email', 'title'], Columns::of($model)));
+        $clauses = array_values(array_intersect_key(self::SEARCHABLE, array_flip(Columns::of($model))));
+
+        // With nothing to search, the closure below added no condition at all
+        // and the query answered with the first twenty accounts — every search
+        // returning the same twenty names and addresses, and none of them what
+        // was typed. A search nobody can perform returns nothing.
+        if ($clauses === []) {
+            return [];
+        }
+
+        // `%` and `_` are wildcards to LIKE, so a search for `%` matched every
+        // row and the box was a way to page through the account table rather
+        // than a way to find one in it.
+        //
+        // Escaping them needs the ESCAPE clause spelled out, and that is the
+        // part worth measuring rather than assuming: SQLite has no default
+        // escape character, so a backslashed term WITHOUT the clause matches
+        // nothing at all — the search would have gone from too wide to
+        // permanently empty. Measured on this suite's own driver; the clause is
+        // standard SQL and the other two take it as well.
+        $term = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
 
         $records = $model::query()
-            ->where(static function (mixed $query) use ($columns, $search): void {
-                foreach ($columns as $column) {
-                    $query->orWhere($column, 'like', '%'.$search.'%');
+            ->where(static function (mixed $query) use ($clauses, $term): void {
+                foreach ($clauses as $clause) {
+                    $query->orWhereRaw($clause, [$term]);
                 }
             })
             ->limit(20)
