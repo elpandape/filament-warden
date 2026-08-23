@@ -77,10 +77,12 @@ final readonly class GridView
             self::doors('loose', $catalog, [Origin::Custom, Origin::Panel], $state, $narrowings, $wider),
         ];
 
-        // Four of the decisions made below are made a second time in
+        // `reach()` below is one of seven decisions this package makes twice —
+        // once here for the server-rendered pass and once in
         // `resources/js/permission-grid.js`, because a click has to redraw
-        // without a round trip. Its own docblock names all four with their
-        // counterparts here; if one of them changes, both change.
+        // without a round trip. Most of the others live in `Cell`,
+        // `Conditions/Narrowing` and `Conditions/Rule`; that file's docblock is
+        // the index and names which of ours each of its rules pairs with.
 
         // An empty tab is a tab that shows nothing: the generation before this
         // one shipped one, and the grid could open on it.

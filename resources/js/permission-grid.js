@@ -6,27 +6,35 @@
  * says — because the generation before this one wrote those out twice and
  * nothing could tell when the two copies disagreed.
  *
- * What does NOT arrive is the handful of RULES below, and this comment used to
- * claim there was one of them. There are five, and they are here because a click
- * has to redraw without asking the server. Each has a counterpart in PHP that
- * decides the same thing for the server-rendered pass, and the pair has to move
- * together — so they are named rather than left to be discovered:
+ * What does NOT arrive is the RULES below. This comment claimed there was one
+ * of them, and then that there were five; counted properly there are seven with
+ * a counterpart in PHP and one without. They are here because a click has to
+ * redraw without asking the server, so they cannot be collapsed — what they can
+ * be is named, beside the file that decides the same thing on the server,
+ * because each pair has to move together:
  *
  * - `drawn()`: an abstaining cell that something wider already answers is drawn
- *   as `broader`. PHP: `GridView::cell()`, which fills `Cell::drawn`.
+ *   as `broader`. PHP: `Cell::drawn()`.
  * - `reached()`: which wider rule wins — the row's own MANAGE column, the
  *   wildcard over every entity, or the rule for this name — with a forbidding
  *   one beating a granting one. PHP: `GridView::reach()`.
- * - `answers()`: what a cell ANSWERS rather than what was written on it, which
- *   is what a tab counter counts. PHP: `Tab::granted()`, and there is a test
- *   pinning the two together on a role that holds only the wildcard.
- * - `reachOf()`: a locked cell shows the store's word and an editable one shows
- *   the pending click. PHP: `Narrowing`, through `RoleState`.
- * - the clause cut, which is marked where it happens.
+ * - `answers()`: what one cell ANSWERS rather than what was written on it.
+ *   PHP: `Cell::answers()`.
+ * - `granted()`: the tab counter, which counts what the cells answer and not
+ *   what the role wrote. PHP: `Tab::granted()`, and a test pins the two together
+ *   on a role that holds only the wildcard.
+ * - `reachOf()`: a locked cell shows the store's word, an editable one the
+ *   pending click. PHP: `Conditions/Narrowing`, reached through `Grants/RoleState`.
+ * - `clauses()`: the clause cut. PHP: `Narrowing::clauses()`.
+ * - `preview()` and `lineOf()`: the sentence a rule reads as, and its bracketing.
+ *   PHP: `Narrowing::preview()` and `Conditions/Rule::text()`.
  *
- * `cycle()` is not on that list and used to be: PHP carried a second walker over
- * the same order until `1.8.0`. Now the order is declared once, in
- * `Stance::order()`, and only this file walks it.
+ * `booleanMisfit()` is the one with no counterpart: PHP ships the column list it
+ * needs (`Columns::booleans()`) and decides nothing about it.
+ *
+ * `cycle()` came off this list in `1.8.0`: PHP carried a second walker over the
+ * same order until then. Now the order is declared once, in `Stance::order()`,
+ * and only this file walks it.
  */
 /**
  * The half both screens share: a flat list of conditions, its groups and the

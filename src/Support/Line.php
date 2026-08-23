@@ -7,11 +7,11 @@ namespace ElPandaPe\FilamentWarden\Support;
 use Illuminate\Support\Str;
 
 /**
- * A translated line, under one of the two fallback policies this package has.
+ * A translated line, under one of the two fallback policies that are shared.
  *
- * Six places wrote one of these out, and the copies were not identical — which
- * is the part worth keeping rather than the count. There are two real policies,
- * and which one a caller needs depends on **whose key it is**:
+ * Seven places wrote one of these out, and the copies were not identical, which
+ * is the part worth keeping rather than the count. Two of the policies are
+ * general and live here; which one a caller needs depends on **whose key it is**:
  *
  * - `of()` is for a key this package ships. It must exist, so there is nothing
  *   to fall back to; the only guard is against a translation file handing back
@@ -25,6 +25,11 @@ use Illuminate\Support\Str;
  * Collapsing the two would mean either printing `filament-warden::ui.x.y` at a
  * person, or humanising a key of ours that simply went missing and calling it a
  * translation.
+ *
+ * There is a THIRD, and it is not here on purpose: `Grants\Cause::line()` falls
+ * back to the case's own value, which is a word a person can read and which
+ * this class has no way to know. A policy that needs something only the caller
+ * holds stays with the caller.
  */
 final class Line
 {

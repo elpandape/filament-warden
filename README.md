@@ -542,7 +542,7 @@ php artisan filament-warden:audit
 php artisan filament-warden:audit --check
 ```
 
-It writes nothing, and reports seven things:
+It writes nothing, and reports eight things:
 
 - **screens nobody guards** — the same finding the guard throws on, which is how it reaches CI at all: no artisan command ever starts a panel;
 - **resources whose model has no policy** — the case Filament fails open on, told apart from a policy that declares nothing and from a resource pointing at a class that does not exist;
@@ -550,7 +550,8 @@ It writes nothing, and reports seven things:
 - **permissions nothing declares that no grant points at** — a rename left them behind: they can never match again, and nothing will ever create them;
 - **grants for actions nothing declares any more** — a renamed policy method, a typo in a seeder, a screen that was deleted: the silent mistake warden has no way to detect;
 - **whole entity types nothing declares** — a morph alias that moved, reported apart because the fix is the opposite one;
-- **models only a relation manager reaches**, with the `catalog.models` line that settles it.
+- **models only a relation manager reaches**, with the `catalog.models` line that settles it;
+- **catalogue names carrying a dot** — Livewire splits a state path on dots, so such a name cannot be a cell and a role screen throws the moment it draws one. Rename the permission. New in `v1.8.0`: before it, the only way to find out was somebody opening the screen.
 
 `--check` returns 1 for every finding above except the informational one.
 

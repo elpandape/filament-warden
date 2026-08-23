@@ -37,12 +37,20 @@ final class StateKey
     /**
      * The same guard, for a caller holding a bare name rather than an entry.
      *
-     * There was a `action(Entry)` here that applied it and that nothing called:
-     * `GridView` keys a door with `DOOR` and an entity's columns with the action
-     * string straight off the catalogue, so the guard covered the ROW and left
-     * the COLUMN unguarded — a policy declaring `export.csv` reached the browser
-     * as a nested path that does not exist, quietly, while a model or loose name
-     * with a dot threw. One guard, and both halves go through it.
+     * There was an `action(Entry)` here that applied it and that nothing called,
+     * while three other places built an action key without it. Routing them all
+     * through this is defence in depth rather than a hole closed, and the
+     * difference is worth writing down because the first version of this comment
+     * claimed the hole: **an action name cannot carry a dot today**. Those names
+     * come from `ReflectionMethod::getName()` on a policy, and
+     * `public function export.csv()` is a PHP parse error; a `catalog.scopes`
+     * entry that no policy declares never reaches a column, because both loops
+     * in `GridView::groups()` gate on the reflected set.
+     *
+     * What IS reachable is a loose `catalog.custom` name with a dot, which
+     * arrives as a ROW key and has always thrown here. `filament-warden:audit`
+     * finds that one before a screen does, which is the part of this that
+     * changed something.
      */
     public static function of(string $key): string
     {

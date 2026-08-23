@@ -19,9 +19,12 @@ and stops carrying weight nobody lifts.
 - **The account picker on a permission's test bench searched for a wildcard instead of a word.** A
   `%` typed in it is a LIKE wildcard, so the box was a way to page through your account table rather
   than a way to find someone in it — and it is offered to everyone who may *view* a permission.
-  Escaping it needs the ESCAPE clause spelled out, which is the half worth measuring rather than
-  assuming: SQLite has no default escape character, so a backslashed term **without** the clause
-  matches nothing at all, and the search would have gone from too wide to permanently empty.
+  Escaping it needs an ESCAPE clause, and the character in it had to be measured on three engines
+  rather than one: a backslash — the obvious choice, and what this was written with first — is a
+  syntax error on MySQL and rejected by Postgres, while doubling it breaks SQLite and Postgres
+  instead. There is no backslash literal that works everywhere, so the clause uses `!`, measured on
+  SQLite, Postgres 16 and MySQL 8.4. The clause itself cannot be dropped either: SQLite has no
+  default escape character, so an escaped term without it matches nothing at all.
 
   The other half of the same method: with an account model whose table has none of `name`, `email` or
   `title`, the query had no condition at all and answered with the first twenty accounts, none of
@@ -38,19 +41,23 @@ and stops carrying weight nobody lifts.
   somebody's role screen at the moment they open it. The audit walked the same catalogue and said
   nothing. It has a bucket now and reddens `--check` with the rest.
 
-  The same rename found the guard was only half connected: the grid keys a **row** through
-  `StateKey`, and an entity's **columns** straight off the catalogue. A policy declaring `export.csv`
-  reached the browser as a nested state path that does not exist, quietly, while a model or loose
-  name with a dot threw. One guard covers both halves now.
+  Three other places built a state key without going through `StateKey`, and they do now — defence
+  in depth rather than a hole closed, which is worth stating precisely because the first draft of
+  this entry claimed the hole: **an action name cannot carry a dot today.** Those names come from
+  reflecting a policy's methods, and `public function export.csv()` is a PHP parse error. The name
+  that *is* reachable is a loose `catalog.custom` one, and that has always thrown — what changed is
+  that the audit finds it first.
 
 ### Changed
 
-- **The grid script says how many rules it carries, and it is five rather than one.** It opened by
-  claiming it carried none of its own bar the clause cut. `drawn()`, `reached()`, `answers()` and
-  `reachOf()` each decide something PHP decides too, and each is there for the same honest reason: a
-  click has to redraw without a round trip. They cannot be collapsed, so both sides now name their
-  counterpart — the script lists its four, and `GridView` says four of its decisions are made again
-  there. A pair that has to move together should not have to be discovered.
+- **The grid script says how many rules it carries, and it is seven rather than one.** It opened by
+  claiming it carried none of its own bar the clause cut; a first correction said five and also
+  under-counted. `drawn()`, `reached()`, `answers()`, `granted()`, `reachOf()`, `clauses()` and the
+  `preview()`/`lineOf()` pair each decide something PHP decides too, and each is there for the same
+  honest reason: a click has to redraw without a round trip. They cannot be collapsed, so the script
+  names every counterpart by the file it actually lives in — `Cell`, `GridView`, `Tab`, `Narrowing`,
+  `Rule` — and `GridView` points back at that list. A pair that has to move together should not have
+  to be discovered.
 
 - **Three public methods are gone, and one turned out not to be dead.** `Stance::next()`/`previous()`
   spelled the cycle out a second time, three lines under an `order()` whose own comment warns about
@@ -63,11 +70,13 @@ and stops carrying weight nobody lifts.
   other six build a form, an infolist or a table, and nothing was ever promised about those. The ten
   keep their door open and now say so where a reader is.
 
-- **Two helpers written out six times each are one each.** `Support\Morph::model()` answers the
-  question every morph reader actually had — is this a model? — instead of six copies of
-  `getMorphedModel($x) ?? $x` each re-checking the result. `Support\Line` carries the two translation
-  fallbacks this package has, and says why they cannot be one: a key we ship must exist, a key named
-  after something your application owns may not.
+- **Two helpers written out many times are one each.** `Support\Morph::model()` answers the question
+  every morph reader actually had — is this a model? — instead of six copies of
+  `getMorphedModel($x) ?? $x` each re-checking the result. `Support\Line` collapses seven copies of a
+  translated line into the two general fallback policies, and says why they cannot be one: a key we
+  ship must exist, a key named after something your application owns may not. A third policy stays
+  where it was, with `Grants\Cause`, because its fallback is the enum case's own value and nothing
+  shared can know that.
 
 - **The grid's template stopped deciding two things.** It compared `drawn()` against the literal
   `'broader'` — one of `Cell`'s own words, in the file that decides nothing — and held the `&&` for
@@ -80,8 +89,8 @@ and stops carrying weight nobody lifts.
 ### Added
 
 - **`release.yml` refuses a tag whose subject is not `<tag> — <headline>`.** From `1.5.0` that
-  subject *is* the release title, verbatim, and five of the 26 tags that already have a release carry
-  the headline with no version on the front. It is the one half of the convention a machine can
+  subject *is* the release title, verbatim, and five of the tags that already have a release carry
+  the headline with no version on the front — measured when there were 29 of them. It is the one half of the convention a machine can
   check; that it is in English is not, and AGENTS.md says so rather than pretending otherwise.
 
 ### Not included

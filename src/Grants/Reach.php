@@ -130,9 +130,6 @@ final readonly class Reach
     }
 
     /**
-     * @param  array<string, string>  $replace
-     */
-    /**
      * @param  array<string, bool|float|int|string|null>  $replace
      */
     private static function line(string $key, array $replace = []): string

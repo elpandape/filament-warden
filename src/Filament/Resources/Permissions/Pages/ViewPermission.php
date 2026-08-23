@@ -36,9 +36,9 @@ class ViewPermission extends ViewRecord
      * @var array<string, literal-string>
      */
     private const array SEARCHABLE = [
-        'name' => "name like ? escape '\\'",
-        'email' => "email like ? escape '\\'",
-        'title' => "title like ? escape '\\'",
+        'name' => "name like ? escape '!'",
+        'email' => "email like ? escape '!'",
+        'title' => "title like ? escape '!'",
     ];
 
     protected static string $resource = PermissionResource::class;
@@ -77,13 +77,27 @@ class ViewPermission extends ViewRecord
         // row and the box was a way to page through the account table rather
         // than a way to find one in it.
         //
-        // Escaping them needs the ESCAPE clause spelled out, and that is the
-        // part worth measuring rather than assuming: SQLite has no default
-        // escape character, so a backslashed term WITHOUT the clause matches
-        // nothing at all — the search would have gone from too wide to
-        // permanently empty. Measured on this suite's own driver; the clause is
-        // standard SQL and the other two take it as well.
-        $term = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
+        // Escaping them takes an ESCAPE clause, and the character in it is the
+        // part that had to be measured on three engines rather than one.
+        //
+        // A backslash — the obvious choice, and what this was written with
+        // first — is not portable: `escape '\'` is a syntax error on MySQL,
+        // which reads the backslash inside the string literal unless
+        // `NO_BACKSLASH_ESCAPES` is set, and Postgres rejects it too. Doubling
+        // it to `escape '\\'` fixes those two and breaks SQLite and Postgres,
+        // which then see two characters where one is required. There is no
+        // backslash literal that works everywhere.
+        //
+        // `!` needs no escaping in a string literal on any of them, so the
+        // clause is the same text for every driver. Measured on SQLite,
+        // Postgres 16 and MySQL 8.4. It has to be escaped in the term itself
+        // like the wildcards, or a person searching for `!` would be typing an
+        // escape character.
+        //
+        // And the clause cannot be dropped: SQLite has no default escape
+        // character, so an escaped term without it matches nothing at all —
+        // the search would go from too wide to permanently empty.
+        $term = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
 
         $records = $model::query()
             ->where(static function (mixed $query) use ($clauses, $term): void {

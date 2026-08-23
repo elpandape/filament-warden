@@ -287,6 +287,19 @@ test('a wildcard in the search is looked for, not obeyed', function (): void {
         ->and(array_values(ViewPermission::accounts('Ada')))->toBe(['Ada']);
 });
 
+test('the escape character is looked for too, not treated as an escape', function (): void {
+    signIn();
+
+    makeUser('Ada');
+    $bang = makeUser('a!b');
+
+    // `!` is the ESCAPE character in the clause, so it has to be escaped in the
+    // term as well or somebody called `a!b` could never be found.
+    expect(array_values(ViewPermission::accounts('!')))->toBe(['a!b'])
+        ->and(array_values(ViewPermission::accounts('a!b')))->toBe(['a!b'])
+        ->and($bang->getKey())->not->toBeNull();
+});
+
 test('an account model with nothing to search by finds nothing, rather than the first twenty', function (): void {
     signIn();
 

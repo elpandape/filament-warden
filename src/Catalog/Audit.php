@@ -120,7 +120,7 @@ final readonly class Audit
      * makes `--check` exactly as red as it was before the split, with every test
      * still green — this class has one consumer, and it is the command.
      *
-     * Removing one term and adding another leaves the count at six, so no test
+     * Removing one term and adding another leaves the count unchanged, so no test
      * that counts can catch the mistake. `AuditCommandTest` asserts the exit code
      * on a declared orphan instead.
      */

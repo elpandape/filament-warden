@@ -45,7 +45,12 @@ enum Cause: string
     }
 
     /**
-     * @param  array<string, string>  $replace
+     * Not `Line::of()`, and the difference is the fallback: this one answers
+     * with the case's OWN value rather than the translation key, which is a
+     * word a person can read where `filament-warden::ui.explain.causes.tangled`
+     * is not. `Line` cannot know it, so the policy lives with the enum.
+     *
+     * @param  array<string, bool|float|int|string|null>  $replace
      */
     public function line(array $replace = []): string
     {

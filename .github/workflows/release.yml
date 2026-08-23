@@ -93,12 +93,14 @@ jobs:
           # The one half of the convention a machine can check. The other half —
           # that it is in English — is not a question a workflow can answer, and
           # AGENTS.md §8 says so; this is what is left, and it is worth having:
-          # five of the 26 tags that already have a release carry the headline
-          # with no version on the front, and from `1.5.0` on that string IS the
-          # release title, verbatim.
+          # five of the tags that already have a release carry the headline with
+          # no version on the front — measured against `c864846`, when there were
+          # 29 of them — and from `1.5.0` on that string IS the release title,
+          # verbatim.
           case "$title" in
-            "$GITHUB_REF_NAME — "*) ;;
             "$GITHUB_REF_NAME") ;;
+            # `?*` and not `*`: an em dash with nothing after it is not a headline.
+            "$GITHUB_REF_NAME — "?*) ;;
             *)
               echo "::error::The tag's subject is [$title]. It becomes the release title verbatim, so it has to read '$GITHUB_REF_NAME — <headline>'." >&2
               exit 1

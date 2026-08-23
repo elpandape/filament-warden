@@ -635,7 +635,7 @@ final class RoleGrants
                 continue;
             }
 
-            $cells[] = [StateKey::row($entry), $entry->name, $entry->name, $entry->model];
+            $cells[] = [StateKey::row($entry), StateKey::of($entry->name), $entry->name, $entry->model];
             $wildcards[$entry->model] = StateKey::row($entry);
         }
 

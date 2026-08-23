@@ -6,6 +6,7 @@ namespace ElPandaPe\FilamentWarden\Grants;
 
 use ElPandaPe\FilamentWarden\Catalog\Entry;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
+use ElPandaPe\FilamentWarden\Support\Line;
 use ElPandaPe\Warden\Facades\Warden;
 use Illuminate\Database\Eloquent\Model;
 
@@ -131,9 +132,7 @@ final readonly class Explanation
      */
     private static function line(string $key, array $replace = []): string
     {
-        $line = __($key, $replace);
-
-        return is_string($line) ? $line : $key;
+        return Line::of($key, $replace);
     }
 
     /**
