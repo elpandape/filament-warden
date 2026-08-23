@@ -69,14 +69,20 @@ final class PermissionName
      * rows in somebody else's database because we changed our minds about a verb.
      * A fourth shape is a MAJOR, and `tests/FrozenTest.php` is what says so.
      *
+     * A row this package did NOT mint gets warden's own answer for the row as
+     * it stands — one title, not three, because warden has only ever written the
+     * one. That branch is here rather than at the two call sites so that "did we
+     * write this?" is asked in one place for both families of row: the doors
+     * this package mints, and everything warden titles.
+     *
      * @return list<string>
      */
-    public static function generated(string $name): array
+    public static function generated(string $name, ?string $entityType = null, bool $onlyOwned = false): array
     {
         $screen = self::screen($name);
 
         if ($screen === null) {
-            return [];
+            return [PermissionTitle::generate($name, $entityType, null, $onlyOwned)];
         }
 
         return [

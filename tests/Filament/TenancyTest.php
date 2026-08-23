@@ -97,3 +97,23 @@ test('the grid draws the warning where a person is already reading', function ()
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
         ->assertSee('No tenant is active');
 });
+
+test('under strict it is not mixing, because a read without a tenant sees only the global rows', function (): void {
+    $role = makeRole();
+
+    Warden::tenant()->onceTo(7, static function () use ($role): void {
+        Warden::allow($role)->to('viewAny', roleClass());
+    });
+
+    // The factory behaviour: no filter at all, so the screen really is showing
+    // every tenant and says so.
+    config()->set('warden.scope.null_behavior', 'all');
+
+    expect(Tenants::mixing())->toBeTrue();
+
+    // And under strict the same read is filtered to `scope is null`, which is
+    // one tenant's worth of rows — the sentence would have been false.
+    config()->set('warden.scope.null_behavior', 'strict');
+
+    expect(Tenants::mixing())->toBeFalse();
+});

@@ -119,14 +119,13 @@ class EditPermission extends EditRecord
             $data['only_owned'] = false;
         }
 
-        $was = PermissionTitle::generate(
+        $was = PermissionName::generated(
             $this->text($record->getAttribute('name')),
             $this->nullableText($record->getAttribute('entity_type')),
-            null,
             (bool) $record->getAttribute('only_owned'),
         );
 
-        if (($data['title'] ?? null) !== $was) {
+        if (! in_array($data['title'] ?? null, $was, true)) {
             return $data;
         }
 

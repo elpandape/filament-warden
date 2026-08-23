@@ -26,7 +26,13 @@ final class Tenants
      */
     public static function mixing(): bool
     {
-        if (app(Tenancy::class)->current() !== null) {
+        // Not `current() === null`: that is only half the question. Without a
+        // tenant, `scope.null_behavior` decides what a read sees, and warden
+        // answers it in one place — `readFilter()` returns `['null', null]` under
+        // `'strict'`, which is only the global rows, and null under the factory
+        // `'all'`, which is no filter at all. Only the second is every tenant at
+        // once, and only the second is what the sentence above the grid says.
+        if (app(Tenancy::class)->readFilter() !== null) {
             return false;
         }
 

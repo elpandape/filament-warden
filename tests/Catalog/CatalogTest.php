@@ -17,6 +17,7 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Tag;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Policies\PostPolicy;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
+use ElPandaPe\Warden\Support\Titles\PermissionTitle;
 use Filament\Panel;
 
 /**
@@ -269,8 +270,13 @@ test('a name this package minted reads back into something a person recognises',
     'a loose name of the application' => ['export-reports', null],
 ]);
 
-test('a name this package never minted has no title of ours to correct', function (): void {
-    expect(PermissionName::generated('export-reports'))->toBeEmpty()
+test('a name this package never minted gets wardens own answer, not an empty one', function (): void {
+    // One question, two families of row. A door this package mints has three
+    // shapes because two older versions wrote different ones; everything else
+    // has warden's single title for the row as it stands, which is the same
+    // comparison the permission form was making on its own.
+    expect(PermissionName::generated('export-reports'))->toBe(['Export reports'])
+        ->and(PermissionName::generated('view', 'post'))->toBe([PermissionTitle::generate('view', 'post', null, false)])
         ->and(PermissionName::generated('page:App\\Filament\\Pages\\Reports'))
         ->toBe(['Page:App\\Filament\\Pages\\Reports', 'Reports', 'Access Reports']);
 });
