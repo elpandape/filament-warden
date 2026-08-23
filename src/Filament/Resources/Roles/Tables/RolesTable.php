@@ -6,6 +6,7 @@ namespace ElPandaPe\FilamentWarden\Filament\Resources\Roles\Tables;
 
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Grants\Holders;
+use ElPandaPe\FilamentWarden\Support\Config;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\DeleteAction;
@@ -18,8 +19,37 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 
 class RolesTable
 {
+    /**
+     * Two closures below share a memo apiece — `$heldCounts` for the
+     * informing column, `$assignedRoleIds` for the deciding button — each
+     * built from ONE grouped query the first row that needs it asks for, and
+     * reused by every row after (§6.24, "Que no cueste"). Before this,
+     * `assignmentCount()` and `RoleResource::isDeletable()`'s own `EXISTS`
+     * each paid their own query PER ROW: measured for 5 roles, 11
+     * `assigned_roles` statements; after, 3 — the two grouped queries plus
+     * one unrelated to either (warden authorizing the signed-in user's own
+     * `delete`/`viewAny` on the resource, which this fix does not touch).
+     *
+     * Local variables captured by reference, not a class-level static
+     * property: a fresh pair is born every time `configure()` runs — once
+     * per table build, i.e. once per request — so there is nothing to reset
+     * between test cases the way `Assignment::forget()` has to reset its own
+     * memo, and nothing here can outlive the render it was built for.
+     *
+     * The two memos answer DIFFERENT questions under DIFFERENT scope rules,
+     * on purpose, and are never merged into one query: `$assignedRoleIds` is
+     * wide (`withoutGlobalScopes()`) because it feeds a DELETE decision and
+     * the cascade that decision triggers is blind to tenancy; `$heldCounts`
+     * keeps the active tenant's scope because it only INFORMS, and reading
+     * wide there would show a number `retract()` issued from this screen
+     * could not act on. Folding both into one query would silently pick one
+     * of those two rules for both columns.
+     */
     public static function configure(Table $table): Table
     {
+        $heldCounts = null;
+        $assignedRoleIds = null;
+
         return $table
             ->defaultSort('name')
             ->columns([
@@ -33,17 +63,6 @@ class RolesTable
                     ->placeholder('—')
                     ->toggleable(),
 
-                // Worked out per row against `assigned_roles`, under the tenant
-                // this request is in — informing, not deciding (§6.24), and a
-                // SECOND read alongside `isDeletable()`'s own EXISTS behind the
-                // delete button's `visible()`: the two answer different
-                // questions under different scope rules — `isDeletable()` must
-                // read wide because the cascade is blind to tenancy, this must
-                // stay scoped because it only informs — and cannot share a
-                // query without a memo, which is the next tag's ("Que no
-                // cueste") to add. The cost this doubles into is capped by a
-                // test in `RoleResourceTest.php`, not just described here.
-                //
                 // Neither sortable nor searchable: both fall back to the
                 // column's own name and would ask the database for a column
                 // that does not exist — an error at click time, not at build
@@ -51,7 +70,13 @@ class RolesTable
                 TextColumn::make('held')
                     ->label(__('filament-warden::ui.resources.roles.columns.held'))
                     ->badge()
-                    ->state(static fn (Model $record): int => self::assignmentCount($record)),
+                    ->state(static function (Model $record) use (&$heldCounts): int {
+                        $heldCounts ??= self::heldCounts();
+
+                        $key = $record->getKey();
+
+                        return (is_int($key) || is_string($key)) ? ($heldCounts[$key] ?? 0) : 0;
+                    }),
             ])
             ->recordActions([
                 EditAction::make(),
@@ -65,7 +90,17 @@ class RolesTable
                 // whatever `after()` returns stands in for the action's own result.
                 DeleteAction::make()
                     ->modalDescription(static fn (Model $record): string => self::warning($record))
-                    ->visible(static fn (Model $record): bool => RoleResource::canDelete($record))
+                    ->visible(static function (Model $record) use (&$assignedRoleIds): bool {
+                        // Fetched only under the one rule that ever reads it
+                        // (`RoleResource::isDeletable()`'s own `'all'`/`false`
+                        // branches never query at all): a page where nothing
+                        // asks about it pays nothing.
+                        if (Config::get('roles.delete') === 'unassigned') {
+                            $assignedRoleIds ??= self::assignedRoleIds();
+                        }
+
+                        return RoleResource::canDelete($record, $assignedRoleIds);
+                    })
                     ->after(static function (): void {
                         Warden::refresh();
                     }),
@@ -157,15 +192,65 @@ class RolesTable
     }
 
     /**
-     * Scoped, because a badge that informs keeps its scope (§6.24): counting
-     * every tenant's rows would show a number `retract()` issued from here
-     * could not act on.
+     * How many rows each role has in `assigned_roles`, scoped, for the whole
+     * page in one query — because a badge that informs keeps its scope
+     * (§6.24): counting every tenant's rows would show a number `retract()`
+     * issued from here could not act on. Read row by row rather than
+     * `groupBy('role_id')`: warden's own migration puts no cast on
+     * `assigned_roles`, and reducing in PHP keeps this the same shape as
+     * every other reader in this class rather than trusting a driver-specific
+     * aggregate's return type.
+     *
+     * A holder restricted to a context is one more row with the same
+     * `role_id` and counts here exactly like an unrestricted one — this
+     * column has never filtered on `restricted_to_type`, and grouping by row
+     * count does not change that.
+     *
+     * @return array<int|string, int>
      */
-    private static function assignmentCount(Model $record): int
+    private static function heldCounts(): array
     {
-        return Context::resolve()->assignedRoleClass()::query()
-            ->where('role_id', $record->getKey())
-            ->count();
+        $counts = [];
+
+        foreach (Context::resolve()->assignedRoleClass()::query()->get(['role_id']) as $row) {
+            $key = $row->getAttribute('role_id');
+
+            if (is_int($key) || is_string($key)) {
+                $counts[$key] = ($counts[$key] ?? 0) + 1;
+            }
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Every role id with at least one assignment row, ANY tenant — the
+     * DECIDING half of §6.24's split, read wide for the same reason
+     * `RoleResource::isDeletable()`'s own single-record query already is:
+     * the cascade that removes these rows on delete is blind to scope.
+     *
+     * A set (`true` values, keyed by id) rather than a list: `isDeletable()`
+     * does one `isset()` per row against this instead of an `in_array()`
+     * scan, and the id is cast to string on the way in for the same reason
+     * `Assignment::role()` compares keys as text — a key arriving from
+     * anywhere other than this class's own query is not guaranteed to share
+     * PHP's int/string type with the column.
+     *
+     * @return array<string, true>
+     */
+    private static function assignedRoleIds(): array
+    {
+        $ids = [];
+
+        foreach (Context::resolve()->assignedRoleClass()::query()->withoutGlobalScopes()->get(['role_id']) as $row) {
+            $key = $row->getAttribute('role_id');
+
+            if (is_int($key) || is_string($key)) {
+                $ids[(string) $key] = true;
+            }
+        }
+
+        return $ids;
     }
 
     /**

@@ -116,10 +116,12 @@ class RoleResource extends Resource
     /**
      * A protected role never leaves, whatever the policy says, and an assigned
      * one only leaves when the installation said it could.
+     *
+     * @param  array<string, true>|null  $assignedRoleIds  see `isDeletable()`
      */
-    public static function canDelete(Model $record): bool
+    public static function canDelete(Model $record, ?array $assignedRoleIds = null): bool
     {
-        return self::isDeletable($record) && parent::canDelete($record);
+        return self::isDeletable($record, $assignedRoleIds) && parent::canDelete($record);
     }
 
     public static function isProtected(Model $record): bool
@@ -149,8 +151,21 @@ class RoleResource extends Resource
      * remove — a silent no-op from the wrong scope. The other two readers of this
      * table, `Grants\Reach::restricted()` and `Grants\Assignment::assignments()`,
      * are of the second kind and keep their scopes on purpose.
+     *
+     * `$assignedRoleIds`, when given, is `RolesTable`'s own doing (v1.5.0,
+     * "Que no cueste"): a role id set built ONCE from a single wide, grouped
+     * query for the whole listing, so this method answers from an array
+     * lookup instead of paying its own `EXISTS` per row. `null` — every
+     * caller outside that one table, including `EditRole`'s and `ViewRole`'s
+     * own single-record delete buttons and every direct call in
+     * `RoleResourceTest.php` — keeps the exact query below, unchanged: this
+     * method's own freshness guarantee for a single record was never the
+     * thing that needed fixing, and batching it for callers who only ever
+     * ask about one record at a time would only add a branch nothing exercises.
+     *
+     * @param  array<string, true>|null  $assignedRoleIds
      */
-    public static function isDeletable(Model $record): bool
+    public static function isDeletable(Model $record, ?array $assignedRoleIds = null): bool
     {
         if (self::isProtected($record)) {
             return false;
@@ -164,6 +179,12 @@ class RoleResource extends Resource
 
         if ($rule !== 'unassigned') {
             return false;
+        }
+
+        if ($assignedRoleIds !== null) {
+            $key = $record->getKey();
+
+            return (is_int($key) || is_string($key)) && ! isset($assignedRoleIds[(string) $key]);
         }
 
         return ! Context::resolve()->assignedRoleClass()::query()

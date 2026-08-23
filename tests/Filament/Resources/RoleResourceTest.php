@@ -30,11 +30,16 @@ use function Pest\Livewire\livewire;
  * `RoleResource::isDeletable()`'s own read, so it reads wide — 'the delete
  * warning reads wide, unlike the count beside it'.
  *
- * The count column is a second query per row alongside `isDeletable()`'s own
- * EXISTS behind the delete button: the two cannot share one query without a
- * memo (deferred to "Que no cueste"), so the cost is measured and capped
- * instead of only described — 'the listing's held-by column and delete
- * button together cost 11 assigned_roles reads for 5 roles, capped at 13'.
+ * The count column used to be a second query per row alongside
+ * `isDeletable()`'s own EXISTS behind the delete button — 11 `assigned_roles`
+ * reads for 5 roles, capped at 13, before "Que no cueste" (v1.5.0) gave each
+ * its own single grouped query for the whole page instead: one scoped
+ * (`RolesTable::heldCounts()`) for the column that informs, one wide
+ * (`RolesTable::assignedRoleIds()`) for the button that decides — never
+ * folded into ONE query, because §6.24 ties each to a different scope rule.
+ * 'the listing's held-by column and delete button together cost 3
+ * assigned_roles reads for 5 roles, capped at 5' is what is measured and
+ * capped now.
  *
  * `AssignmentTest.php` already carries an `assignedRoleReads()` helper that
  * does exactly this counting — reused instead of duplicated everywhere else
@@ -863,7 +868,7 @@ test('the count column stays under the tenant you are in, unlike the delete rule
     });
 });
 
-test("the listing's held-by column and delete button together cost 11 assigned_roles reads for 5 roles, capped at 13", function (): void {
+test("the listing's held-by column and delete button together cost 3 assigned_roles reads for 5 roles, capped at 5", function (): void {
     $user = signIn();
     Warden::allow($user)->to('viewAny', roleClass());
     Warden::allow($user)->to('delete', roleClass());
@@ -877,7 +882,13 @@ test("the listing's held-by column and delete button together cost 11 assigned_r
 
     livewire(ListRoles::class);
 
-    expect(heldReads())->toBeLessThanOrEqual(13);
+    foreach (DB::getQueryLog() as $entry) {
+        if (str_contains($entry['query'], Context::resolve()->table('assigned_roles'))) {
+            dump($entry['query'], $entry['bindings']);
+        }
+    }
+
+    expect(heldReads())->toBeLessThanOrEqual(5);
 });
 
 test('a role nobody holds says so in the delete warning', function (): void {

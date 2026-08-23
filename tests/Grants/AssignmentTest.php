@@ -26,6 +26,21 @@ use Illuminate\Support\Facades\Event;
  * held BOTH globally and at the active scope, where warden's own filter would
  * otherwise delete the local row while the checkbox — reading a still-present
  * global row — reports nothing changed.
+ *
+ * `assignments()` is memoised per account as of v1.5.0 ("Que no cueste"),
+ * invalidated by every writer this class has (`give()`, `take()`, `apply()`).
+ * A test that writes `assigned_roles` directly through `Warden::assign()`/
+ * `::retract()` — bypassing this class's own writers entirely, the way every
+ * test in this file arranges its fixtures — is not a scenario the memo can
+ * see, and calling one of `isRestricted()`/`isElsewhere()`/`of()` again
+ * afterward for the SAME account would read the pre-write snapshot. In a real
+ * deployment that never happens: nothing outside this class writes
+ * `assigned_roles` within a single PHP request (`AssignRoleCommand` is a
+ * separate CLI process), and each real request starts this memo empty. A test
+ * that arranges a fixture write and then re-checks the SAME account within
+ * one test function is standing in for two separate requests, so it calls
+ * `Assignment::forget()` — the same reset `TestCase::setUp()` already calls
+ * between test cases — at the point that represents that boundary.
  */
 pest()->extend(TestCase::class);
 
@@ -58,8 +73,11 @@ function assignmentCount(): int
 }
 
 /**
- * `assignments()` does not memoise, so every call — one per role, from
- * `isRestricted()` and again from `isElsewhere()` — is its own query.
+ * Counts every SQL statement touching `assigned_roles` in the measured
+ * window — before v1.5.0's memo, that meant one per call, from
+ * `isRestricted()` and again from `isElsewhere()`; after, every call for the
+ * SAME account shares the one query the first of them makes, so this
+ * function's own count is what the caps below actually measure.
  */
 function assignedRoleReads(): int
 {
@@ -154,6 +172,7 @@ test('an assignment narrowed to a context says so', function (): void {
     expect(Assignment::isRestricted($account, roleKey($role)))->toBeFalse();
 
     Warden::assign($role)->on($post)->to($account);
+    Assignment::forget();
 
     expect(Assignment::isRestricted($account, roleKey($role)))->toBeTrue();
 });
@@ -405,7 +424,15 @@ test('the screen says why it will not hand that role back', function (): void {
     });
 });
 
-test('the elsewhere check is capped at 8, three over the 5 measured', function (): void {
+/**
+ * Capped at 5, three over the 2 measured after `assignments()` was memoised
+ * (v1.5.0, "Que no cueste") — down from the 8-over-5 this cap held before:
+ * `descriptions()` loops `byKey()` calling `isRestricted()` then
+ * `isElsewhere()` for every role, and both used to pay their own query per
+ * role per call; now every one of those, for the SAME account, shares the
+ * one query the first of them makes.
+ */
+test('the elsewhere check is capped at 5, three over the 2 measured', function (): void {
     signInAsHandOut();
 
     $account = makeUser();
@@ -420,7 +447,7 @@ test('the elsewhere check is capped at 8, three over the 5 measured', function (
     $reads = assignedRoleReads();
     DB::disableQueryLog();
 
-    expect($reads)->toBeLessThanOrEqual(8);
+    expect($reads)->toBeLessThanOrEqual(5);
 });
 
 test('give() hands a role out and the store answers for it straight away', function (): void {
@@ -499,6 +526,30 @@ test('give() writes nothing for a value that names no role', function (): void {
     expect(assignmentCount())->toBe(0);
 });
 
+/**
+ * The test the `$assignmentsByEntity` memo's own docblock cites as the one
+ * that would actually go stale if `give()`/`take()` forgot to invalidate: the
+ * SAME `$account` object, no Livewire round-trip between the write and the
+ * re-read, so nothing outside this class's own invalidation could make the
+ * second `of()` call see the write.
+ */
+test('give()/take() invalidate the assignments memo, a read right after a write sees it', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    expect(Assignment::of($account))->toBeEmpty();
+
+    Assignment::give($account, roleKey($role));
+
+    expect(Assignment::of($account))->toBe([roleKey($role)]);
+
+    Assignment::take($account, roleKey($role));
+
+    expect(Assignment::of($account))->toBeEmpty();
+});
+
 test('take() takes a role back and the store stops answering', function (): void {
     signInAsHandOut();
 
@@ -572,13 +623,17 @@ test('take() writes nothing for a role not held', function (): void {
 
 /**
  * The whole reason `give()`/`take()` exist: `apply()` re-derives its answer for
- * every role in the catalogue on every call, none of it memoised, so a screen
- * built for a 200-role installation would pay for all 200 on a single click.
- * Measured over a 21-role catalogue, `apply()` reads `assigned_roles` 47 times
- * reaching the same state `give()` reaches in 6. The cap on `give()` is set a
- * few over the measured 6, and the comparison itself — not a hardcoded number
- * for `apply()` — is what proves the saving, so a change to either side still
- * has to keep `give()` cheaper.
+ * every role in the catalogue on every call, so a screen built for a 200-role
+ * installation would pay for all 200 on a single click even after
+ * `assignments()` was memoised (v1.5.0, "Que no cueste") — the memo shares one
+ * query across every role checked for the SAME account, but `apply()` still
+ * asks `mayHandOut()` to authorize each of the 21 roles individually, and that
+ * cost is untouched by this class's own memos. Measured over a 21-role
+ * catalogue: `apply()` read `assigned_roles` 47 times reaching the same state
+ * `give()` reached in 6 before the memo; after, 5 and 4. The cap on `give()`
+ * is set a few over the measured 4, and the comparison itself — not a
+ * hardcoded number for `apply()` — is what proves the saving, so a change to
+ * either side still has to keep `give()` cheaper.
  */
 test('give() reads assigned_roles far fewer times than apply() reaching the same state', function (): void {
     signInAsHandOut();
@@ -614,7 +669,7 @@ test('give() reads assigned_roles far fewer times than apply() reaching the same
     DB::disableQueryLog();
 
     expect(assignmentCount())->toBe(1)
-        ->and($giveReads)->toBeLessThanOrEqual(10)
+        ->and($giveReads)->toBeLessThanOrEqual(8)
         ->and($applyReads)->toBeGreaterThan($giveReads);
 });
 

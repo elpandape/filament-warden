@@ -32,18 +32,7 @@ final class Assignment
      *
      * Nothing in this class ever creates or deletes a role — only `RoleResource`
      * does, on a screen entirely separate from this one — so within a single
-     * request the answer cannot change out from under a caller, unlike
-     * `assignments()` below, which this class DOES write to (`give()`,
-     * `take()`), and which is deliberately left unmemoised: a memo there would
-     * hand a stale row list to a check made right after a write in the same
-     * request. CORRECTED citation: not `AssignmentTest.php`'s own "give()
-     * hands a role out…" test — that one reads back through `Access::granted()`
-     * (warden's Resolver, unrelated to this class) and a raw `assignmentCount()`,
-     * neither of which this memo could make stale. The one that actually
-     * exercises the risk is `RolesRelationManagerTest.php`'s "assigning
-     * through the header action writes one row the store honours at once",
-     * which calls `Assignment::of($account)` immediately after a write that
-     * went through `give()` in the same request.
+     * request the answer cannot change out from under a caller.
      *
      * `null` and not `[]` as the empty sentinel: an installation can genuinely
      * have zero roles, and the memo has to tell that apart from "not read yet".
@@ -51,6 +40,58 @@ final class Assignment
      * @var array<int|string, Model>|null
      */
     private static ?array $rolesByKey = null;
+
+    /**
+     * One account's rows off `assigned_roles`, memoised — added in v1.5.0
+     * ("Que no cueste"), where `byKey()` above was memoised a version earlier
+     * (v1.4.0). Before this, `disableOptionWhen()` re-ran this query once per
+     * option with no memo of its own, and `offers()` reads it twice
+     * (`isRestricted()`, `isElsewhere()`): measured opening the assign modal
+     * against 200 roles, 405 `assigned_roles` statements. After: 2 — one for
+     * this memo's own first read, and one unrelated to it entirely (warden
+     * resolving whether the SIGNED-IN account may `viewAny` on the role
+     * resource at all, which this class never writes to and never needs to
+     * invalidate).
+     *
+     * Keyed by entity — `getMorphClass().':'.getKey()`, never by object
+     * identity: a `WeakMap` keyed on the `$account` instance (`Holders`'
+     * own pattern, `Grants/Holders.php`) would miss the very case that makes
+     * memoising this risky at all. Livewire rehydrates a FRESH model
+     * instance for `ownerRecord` between two chained test calls
+     * (`->mountTableAction(...)->callMountedTableAction()` are two separate
+     * simulated requests, each reconstructing the component from a snapshot),
+     * so a write made through one instance and a read made through another
+     * would simply miss a `WeakMap` entirely — passing by accident, proving
+     * nothing about invalidation. Keying on the account's own identity
+     * instead means a write and a read against the SAME account share the
+     * SAME entry regardless of which PHP object carried it, so the memo can
+     * actually go stale, and the invalidation this class writes to
+     * (`give()`, `take()`, `apply()`, one `forgetAssignments()` call apiece
+     * right after a write commits) is the thing standing between that
+     * staleness and the answer a caller gets.
+     *
+     * The risk this was built to respect: memoising `assignments()` hands a
+     * check made right after a write the row list from BEFORE that write,
+     * unless every writer clears it. Three writers reach it — `give()`,
+     * `take()`, and `apply()`, which reads `of()` once before its own
+     * transaction and would otherwise leave a caller who reads again right
+     * after it returns holding that same stale answer (pinned directly in
+     * `AssignmentTest.php`'s own "a key that arrives as text still names the
+     * same role", already in this file before this memo existed). Two tests
+     * exercise the risk end to end: `AssignmentTest.php`'s "give()/take()
+     * invalidate the assignments memo, a read right after a write sees it"
+     * reads, writes, and reads again against the very same `$account` object
+     * with no Livewire in between — the shape that would actually go stale
+     * if `give()` or `take()` forgot to invalidate — and
+     * `RolesRelationManagerTest.php`'s "assigning through the header action
+     * writes one row the store honours at once", which goes through `give()`
+     * from inside a mounted Livewire action and reads back through
+     * `Assignment::of($account)` afterwards, across the hydrate cycle
+     * described above.
+     *
+     * @var array<string, Collection<int, Model>>
+     */
+    private static array $assignmentsByEntity = [];
 
     /**
      * Every role there is, by key, named the way a person would recognise it.
@@ -243,6 +284,19 @@ final class Assignment
                 }
             }
         });
+
+        // The one writer of the three that does not clear the memo inline as
+        // it goes: `self::of($account)` above already populated
+        // `$assignmentsByEntity` from BEFORE any of this transaction's
+        // writes, and every `isRestricted()`/`isElsewhere()` call inside the
+        // loop deliberately keeps reading that same pre-write snapshot — each
+        // role in the catalogue is visited once, so nothing in the loop ever
+        // needs to see an earlier iteration's write. Once the transaction
+        // commits, though, that snapshot is exactly what a caller must not
+        // be handed back; `AssignmentTest.php`'s "a key that arrives as text
+        // still names the same role" reads `Assignment::of($account)`
+        // straight after this method returns and is what pins it.
+        self::forgetAssignments($account);
     }
 
     /**
@@ -250,8 +304,14 @@ final class Assignment
      * reaches for, never `apply()`.
      *
      * `apply()` is a set diff over the WHOLE catalogue: `byKey()` plus
-     * `mayHandOut()`/`isRestricted()`/`isElsewhere()` per role, none memoised.
-     * That is the right shape for `RoleAssignment`'s `CheckboxList`, which hands
+     * `mayHandOut()`/`isRestricted()`/`isElsewhere()` per role. `byKey()` and
+     * `assignments()` (behind the latter two) are both memoised now, one
+     * query apiece for the whole call regardless of catalogue size — before,
+     * `apply()` read `assigned_roles` 47 times over a 21-role catalogue
+     * reaching the same state `give()` reached in 6; after, 5 and 4 (both
+     * measured in `AssignmentTest.php`'s own comparison test, which is what
+     * still has to keep `give()` cheaper, not a hardcoded number for either
+     * side). That is the right shape for `RoleAssignment`'s `CheckboxList`, which hands
      * over the entire wanted state and has no way to say what changed. A row
      * action already knows exactly which role it touched, so paying for every
      * other role in the catalogue on every click would defeat the reason this
@@ -290,6 +350,13 @@ final class Assignment
 
         if ($model instanceof Model) {
             Warden::assign($model)->to($account);
+
+            // The memo `offers()`/`isHeld()` just read from is exactly what
+            // this line makes stale: a caller reading `Assignment::of()` (or
+            // `isRestricted()`/`isElsewhere()`) for this same account right
+            // after `give()` returns must see the row this just wrote, not
+            // the snapshot from before it existed.
+            self::forgetAssignments($account);
         }
 
         // Never actually false here: `offers()` already resolved this same
@@ -349,6 +416,11 @@ final class Assignment
 
         if ($model instanceof Model) {
             Warden::retract($model)->from($account);
+
+            // Same reason as `give()`'s own call: the memo just read by
+            // `offers()`/`isHeld()` above is now the row list from BEFORE
+            // this delete, and has to go.
+            self::forgetAssignments($account);
         }
 
         // Never actually false here, the same reason `give()`'s tail comment
@@ -375,13 +447,15 @@ final class Assignment
     }
 
     /**
-     * Forgets the memoised catalogue. A suite raises a different one for every
-     * test case and would otherwise read the one before — the same reason
+     * Forgets both memoised reads: the catalogue and every account's
+     * assignment rows. A suite raises a different one for every test case
+     * and would otherwise read the one before — the same reason
      * `Conditions\Columns::forget()` exists, called from the same `setUp()`.
      */
     public static function forget(): void
     {
         self::$rolesByKey = null;
+        self::$assignmentsByEntity = [];
     }
 
     /**
@@ -491,16 +565,48 @@ final class Assignment
     }
 
     /**
+     * Memoised per account, by entity rather than by object: see
+     * `$assignmentsByEntity`'s own docblock for why identity is the wrong key
+     * here.
+     *
      * @return Collection<int, Model>
      */
     private static function assignments(Model $account): Collection
     {
+        $key = self::entityKey($account);
+
+        if (array_key_exists($key, self::$assignmentsByEntity)) {
+            return self::$assignmentsByEntity[$key];
+        }
+
         /** @var Collection<int, Model> $assignments */
         $assignments = Context::resolve()->assignedRoleClass()::query()
             ->where('entity_type', $account->getMorphClass())
             ->where('entity_id', $account->getKey())
             ->get();
 
-        return $assignments;
+        return self::$assignmentsByEntity[$key] = $assignments;
+    }
+
+    /**
+     * Drops one account's memoised assignment rows — called by every writer
+     * this class has (`give()`, `take()`, `apply()`) right after a write
+     * commits, never before.
+     */
+    private static function forgetAssignments(Model $account): void
+    {
+        unset(self::$assignmentsByEntity[self::entityKey($account)]);
+    }
+
+    /**
+     * The morph class plus the key, not the object: `getKey()` is `mixed`,
+     * and an account somehow keyless (never persisted) falls back to its own
+     * object id rather than colliding every such account onto one entry.
+     */
+    private static function entityKey(Model $account): string
+    {
+        $key = $account->getKey();
+
+        return $account->getMorphClass().':'.((is_int($key) || is_string($key)) ? $key : spl_object_id($account));
     }
 }
