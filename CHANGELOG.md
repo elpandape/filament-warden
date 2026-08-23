@@ -27,13 +27,20 @@ other screen that saves a whole set at once: handing roles out from an account.
 
 ### Changed
 
-- **The copy of what the store said travels in the page's own state array, under a namespaced key.**
+- **The copy of what the store said travels beside the field's own state, under a namespaced key.**
   A `CheckboxList` has one state slot and the set is in it — that part of `1.6.0`'s reasoning was
   right. What was wrong was the conclusion drawn from it: a field can put a sibling key beside its
   own, and this one does. Measured before it was relied on rather than argued: the key survives the
   mount, a click and the save, and `Schema::getState()` does not return it, so it can never reach
-  `$record->update()`. A page that keeps its state somewhere other than `$data` simply gets no
-  baseline, and saves the way it did before there was one.
+  `$record->update()` — checked on a real `EditRecord` and `CreateRecord`, not only on a test double.
+
+  The place it goes is the **root of this field's own state path**, not a property called `data`.
+  Filament's own pages do call it that; a Livewire component written by hand — which is what this
+  package's README tells you to put the field in — may call it anything, and keying off the name
+  would have left your screen looking fixed while the defect stayed live on it. It also would have
+  crashed a page that happened to keep a non-public `$data` of its own, because `property_exists()`
+  answers true for one and reading it then throws. A schema with no state path of its own leaves the
+  field nothing to sit beside, and then there is simply no baseline.
 
 - **Nothing is ever refused from this screen, and that is a property of a checkbox rather than a gap.**
   A cell has three stances, so two people can move one to *different* values and genuinely collide. A
@@ -62,6 +69,11 @@ other screen that saves a whole set at once: handing roles out from an account.
 - **The roles relation manager is untouched, and does not need touching.** Its actions say "assign
   *this* role", not "make the set equal this".
 - **No history of who changed what**, and **no automatic resolution** in either direction.
+- **A role the screen may not hand out is still dropped without being counted.** `mayHandOut()`,
+  `isRestricted()` and `isElsewhere()` skip a role before any of this, exactly as they did before, so
+  an intent they refuse is not in `written`, `preserved` or the notification. The screen shows why
+  next to the checkbox, so it is visible rather than silent — but "nothing is ever refused here" is a
+  statement about two people colliding, not about everything a save might decline to do.
 - **Everything under "Calidad" moves to `1.8.0`**, with the tag-subject shape check `release.yml` was
   promised. `1.6.0` said those would be `1.7.0`; the second half of a data-loss fix earned the slot
   instead, and a release headline should be one thing.

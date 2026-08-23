@@ -15,16 +15,18 @@ use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 /**
- * The same screen with its form state under a property of another name.
+ * A screen whose form state is `$elsewhere` and which ALSO keeps a protected
+ * `$data` of its own, for reasons of its own.
  *
- * Filament's own pages call it `data`; a Livewire component written by hand —
- * which is what the README tells people to put this field in — may call it
- * anything. The field has to protect this page exactly as well as the other, and
- * it does only because it reads its own state path instead of a name.
+ * `property_exists()` answers true for a protected property, and reading one
+ * then goes through Livewire's `__get()`, which resolves only public ones and
+ * throws. A field that looked for a property called `data` died on mount here.
+ * Nothing about this page is exotic: the name is common and the visibility is
+ * the application's business.
  *
  * @property-read Schema $form
  */
-final class AccountHostElsewhere extends Component implements HasActions, HasSchemas
+final class AccountHostProtected extends Component implements HasActions, HasSchemas
 {
     use InteractsWithActions;
     use InteractsWithSchemas;
@@ -33,6 +35,9 @@ final class AccountHostElsewhere extends Component implements HasActions, HasSch
     public ?array $elsewhere = [];
 
     public int|string $accountKey = 0;
+
+    /** @var array<string, mixed> */
+    private array $data = ['mine' => true];
 
     public function mount(int|string $accountKey): void
     {
@@ -61,6 +66,16 @@ final class AccountHostElsewhere extends Component implements HasActions, HasSch
         $view = 'filament-warden-tests::account-host';
 
         return view($view);
+    }
+
+    /**
+     * What this page keeps for itself, so a test can say the field left it be.
+     *
+     * @return array<string, mixed>
+     */
+    public function ownData(): array
+    {
+        return $this->data;
     }
 
     private function account(): User

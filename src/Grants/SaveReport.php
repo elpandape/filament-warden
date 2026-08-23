@@ -20,17 +20,21 @@ namespace ElPandaPe\FilamentWarden\Grants;
  *   something else. Their intent was not applied, and that is the half a
  *   notification has to say out loud rather than count.
  *
- * `refused` carries each thing's own keys rather than a sentence, because the
- * words belong to the screen. The grid pushes `['row' => …, 'action' => …]` and
- * reads their titles out of the catalogue; the account screen pushes
- * `['role' => …]` and reads them out of the options it already offered. One
- * report rather than two nearly identical ones — and no translating done here,
- * because a class that writes grants has no business choosing words.
+ * `refused` carries the cell's own keys rather than a sentence, because the
+ * words belong to the screen: the row and action keys the grid is drawn from, so
+ * a caller looks their titles up in the catalogue it already has.
+ *
+ * The account screen shares this class and never fills that list — a role is
+ * held or it is not, so two people can only ever have moved one the same way,
+ * and `Assignment::apply()` explains why the branch does not exist. The shape
+ * stays the grid's for the reason a wider one cost: typed as any map, pushing a
+ * key `EditRole::refusedCells()` does not read passes `level: max` and fails at
+ * runtime instead. A shape no code produces is not worth a static guarantee.
  */
 final readonly class SaveReport
 {
     /**
-     * @param  list<array<string, string>>  $refused
+     * @param  list<array{row: string, action: string}>  $refused
      */
     public function __construct(
         public int $written = 0,

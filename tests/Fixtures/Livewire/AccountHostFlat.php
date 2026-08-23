@@ -15,22 +15,21 @@ use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 /**
- * The same screen with its form state under a property of another name.
+ * A screen with no state path of its own, so the field's path is a bare name.
  *
- * Filament's own pages call it `data`; a Livewire component written by hand —
- * which is what the README tells people to put this field in — may call it
- * anything. The field has to protect this page exactly as well as the other, and
- * it does only because it reads its own state path instead of a name.
+ * There is then nothing for the copy of the store's answer to sit beside, and
+ * this page gets no baseline — it saves the way every page did before there was
+ * one. That is a branch, so it needs a page like this to walk it.
  *
  * @property-read Schema $form
  */
-final class AccountHostElsewhere extends Component implements HasActions, HasSchemas
+final class AccountHostFlat extends Component implements HasActions, HasSchemas
 {
     use InteractsWithActions;
     use InteractsWithSchemas;
 
-    /** @var array<string, mixed>|null */
-    public ?array $elsewhere = [];
+    /** @var array<int, mixed>|null */
+    public ?array $roles = [];
 
     public int|string $accountKey = 0;
 
@@ -45,8 +44,7 @@ final class AccountHostElsewhere extends Component implements HasActions, HasSch
     {
         return $schema
             ->components([RoleAssignment::make('roles')])
-            ->record($this->account())
-            ->statePath('elsewhere');
+            ->record($this->account());
     }
 
     public function save(): void

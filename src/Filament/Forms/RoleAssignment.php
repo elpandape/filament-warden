@@ -9,6 +9,7 @@ use ElPandaPe\FilamentWarden\Grants\SaveReport;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 /**
  * Handing roles to an account, from the account's own screen.
@@ -98,8 +99,8 @@ final class RoleAssignment extends CheckboxList
      * `$record->update()`.
      *
      * That array belongs to the application, so the key is namespaced and this
-     * is the only place that writes it. If a page has no `$data` to write into,
-     * there is simply no baseline and the save behaves as it did before there
+     * is the only place that writes it. A page with nowhere to put it — see
+     * `holder()` — gets no baseline, and the save behaves as it did before there
      * was one.
      *
      * @param  list<int|string>  $held
@@ -108,10 +109,15 @@ final class RoleAssignment extends CheckboxList
     {
         $this->state($held);
 
-        $livewire = $this->getLivewire();
+        $holder = $this->holder();
 
-        if (property_exists($livewire, 'data') && is_array($livewire->data)) {
-            $livewire->data[self::BASELINE] = $held;
+        if ($holder !== null) {
+            $livewire = $this->getLivewire();
+
+            /** @var array<string, mixed> $state */
+            $state = $livewire->{$holder};
+            $state[self::BASELINE] = $held;
+            $livewire->{$holder} = $state;
         }
     }
 
@@ -120,13 +126,16 @@ final class RoleAssignment extends CheckboxList
      */
     public function baseline(): ?array
     {
-        $livewire = $this->getLivewire();
+        $holder = $this->holder();
 
-        if (! property_exists($livewire, 'data') || ! is_array($livewire->data)) {
+        if ($holder === null) {
             return null;
         }
 
-        $baseline = $livewire->data[self::BASELINE] ?? null;
+        /** @var array<string, mixed> $state */
+        $state = $this->getLivewire()->{$holder};
+
+        $baseline = $state[self::BASELINE] ?? null;
 
         if (! is_array($baseline)) {
             return null;
@@ -180,6 +189,42 @@ final class RoleAssignment extends CheckboxList
     public function offers(mixed $value): bool
     {
         return Assignment::offers($this->account(), $value);
+    }
+
+    /**
+     * The property the copy sits in, or null when there is none to sit in.
+     *
+     * Taken from this field's OWN state path rather than from the name `data`,
+     * and both halves of that matter. Filament's own pages do call it `data`,
+     * but a Livewire component written by hand — which is exactly what the
+     * README tells people to put this field in — may call it anything, and
+     * keying off the name left the fix silently switched off there while the
+     * screen still looked fixed.
+     *
+     * Reading the path rather than a name is also what keeps this from throwing.
+     * `property_exists()` answers true for a NON-public property, and reading one
+     * then goes through Livewire's `__get()`, which resolves only public ones and
+     * throws — so a field that looked for a property called `data` died on mount
+     * on a page that happened to keep a private one of its own, which is nobody's
+     * fault but this field's. The root of a state path cannot have that problem:
+     * it is the property Filament itself reads and writes, so it is public
+     * because the page works at all. `AccountHostProtected` is the fixture that
+     * holds that line — a private `$data` beside the form, and nothing breaks.
+     *
+     * A schema with no state path of its own leaves the field's path a bare name
+     * with nothing to sit beside, and then there is no baseline.
+     */
+    private function holder(): ?string
+    {
+        $path = $this->getStatePath() ?? '';
+
+        if (! str_contains($path, '.')) {
+            return null;
+        }
+
+        $root = Str::before($path, '.');
+
+        return is_array($this->getLivewire()->{$root}) ? $root : null;
     }
 
     /**

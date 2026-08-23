@@ -279,9 +279,11 @@ final class Assignment
         // keys takes: a checkbox nobody here touched is left as whoever did
         // touch it left it, instead of being unticked back.
         //
-        // Null means no screen — a console script or a test asserting a state
-        // outright — so every role counts as touched, which is what this method
-        // did before there was a baseline.
+        // Null means no screen behind the call — a test asserting a state
+        // outright, or a caller an application writes — so every role counts as
+        // touched, which is what this method did before there was a baseline.
+        // Nothing in this package calls it that way; the field always sends one
+        // when it has anywhere to keep it.
         $was = is_array($baseline) ? array_values($baseline) : null;
 
         $written = 0;

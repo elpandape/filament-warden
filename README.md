@@ -739,7 +739,7 @@ Two different kinds of thing are in that list, and both matter for the same reas
 |---|---|
 | Permission prefixes | `page:`, `widget:`, `panel:` and `PermissionName`, which mints them and reads them back |
 | Plugin | `FilamentWardenPlugin`, its ID `filament-warden`, and its six methods: `make()`, `getId()`, `register()`, `boot()`, `roles()`, `permissions()` |
-| Fields | `PermissionGrid`, `PermissionGridEntry`, `ConditionBuilder`, `RoleAssignment`, and the `{stances, narrowing, baseline}` state envelope a form receives — `baseline` joined it in `v1.6.0`, and an addition is a minor |
+| Fields | `PermissionGrid`, `PermissionGridEntry`, `ConditionBuilder`, `RoleAssignment`, the `{stances, narrowing, baseline}` state envelope a form receives — `baseline` joined it in `v1.6.0`, and an addition is a minor — and the key `RoleAssignment` keeps beside its own list, `__filament_warden_roles_baseline`, which from `v1.7.0` sits in your page's state array |
 | Relation managers | `RolesRelationManager`'s class name — a consuming application's own `UserResource::getRelations()` stores it by name, so renaming the class breaks every installation that attached it |
 | Traits | `AuthorizesPageAccess`, `AuthorizesWidgetView`, `AccessesPanels` |
 | Authorization | `WardenPolicy`, `Access` |

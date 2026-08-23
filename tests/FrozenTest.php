@@ -9,6 +9,7 @@ use ElPandaPe\FilamentWarden\Catalog\PermissionName;
 use ElPandaPe\FilamentWarden\Catalog\Scope;
 use ElPandaPe\FilamentWarden\Console\AssignRoleCommand;
 use ElPandaPe\FilamentWarden\Console\AuditCommand;
+use ElPandaPe\FilamentWarden\Filament\Forms\RoleAssignment;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\EditRole;
 use ElPandaPe\FilamentWarden\FilamentWardenPlugin;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
@@ -138,6 +139,14 @@ test('the state a grid field hands to a form is frozen', function (): void {
     // so a new key is a line somebody typed rather than a diff nobody read.
     expect(array_keys(partOf(is_array($state) ? $state : [], 'permissions')))
         ->toBe(['stances', 'narrowing', 'baseline']);
+});
+
+test('the key the roles field keeps beside its own is frozen', function (): void {
+    // The literal is the promise. `RoleAssignment::BASELINE` would follow a
+    // rename and go green on the very change this exists to catch (§6.22), and
+    // this key is not ours alone: from `1.7.0` it sits at the top level of an
+    // application's own state array.
+    expect(RoleAssignment::BASELINE)->toBe('__filament_warden_roles_baseline');
 });
 
 test('the config keys an application publishes are frozen', function (): void {
