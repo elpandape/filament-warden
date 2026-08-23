@@ -402,3 +402,26 @@ test('the tabs and their panels share an id the component key makes unique', fun
         ->and(GridView::domId('infolist.permissions'))->toBe('fw-infolist-permissions')
         ->and(GridView::domId('form.permissions'))->not->toBe(GridView::domId('infolist.permissions'));
 });
+
+test('a cell is named the way the grid names it, so a save says the same words', function (): void {
+    $catalog = Catalog::for(
+        Panel::make()->id('labels')->resources([PostResource::class])->pages([Reports::class]),
+    );
+
+    expect(GridView::cellLabel($catalog, Post::class, 'viewAny'))->toBe('posts · List')
+        ->and(GridView::cellLabel($catalog, Post::class, StateKey::MANAGE))->toBe('posts · Everything');
+});
+
+test('a door is named by its row alone, because its row is its only cell', function (): void {
+    $catalog = Catalog::for(
+        Panel::make()->id('labels-door')->resources([PostResource::class])->pages([Reports::class]),
+    );
+
+    expect(GridView::cellLabel($catalog, 'page:'.Reports::class, StateKey::DOOR))->toBe('Reports');
+});
+
+test('a row the catalogue no longer declares is still named, not dropped', function (): void {
+    $catalog = Catalog::for(Panel::make()->id('labels-gone')->resources([PostResource::class]));
+
+    expect(GridView::cellLabel($catalog, 'App\\Models\\Invoice', 'delete'))->toBe('Invoice · Delete');
+});

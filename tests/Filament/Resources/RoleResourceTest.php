@@ -1045,3 +1045,90 @@ test('a holder whose morph alias no longer resolves is counted without a name', 
     expect($warning)->toContain('1 in total')
         ->and($warning)->not->toContain('Amaru Quispe');
 });
+
+test('a save leaves alone the cell somebody else changed while this screen was open', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $screen = livewire(EditRole::class, ['record' => $role->getKey()]);
+
+    // Somebody else, in another request, while this screen sits open.
+    Warden::allow($role)->to('viewAny', roleClass());
+
+    $screen->call('save')->assertHasNoFormErrors();
+
+    expect(Access::granted($role, 'viewAny', roleClass()))->toBeTrue();
+});
+
+test('a save refuses the cell this person and somebody else moved apart', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $screen = livewire(EditRole::class, ['record' => $role->getKey()]);
+
+    $screen->set('data.permissions.stances.'.roleClass().'.viewAny', 'granted');
+
+    Warden::forbid($role)->to('viewAny', roleClass());
+
+    $screen->call('save')->assertHasNoFormErrors();
+
+    expect(Access::granted($role, 'viewAny', roleClass()))->toBeFalse();
+});
+
+test('the screen re-reads the store after a save, so the next one does not collide again', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $screen = livewire(EditRole::class, ['record' => $role->getKey()]);
+
+    Warden::allow($role)->to('viewAny', roleClass());
+
+    $screen->call('save');
+
+    $screen->assertSet('data.permissions.stances.'.roleClass().'.viewAny', 'granted')
+        ->assertSet('data.permissions.baseline.stances.'.roleClass().'.viewAny', 'granted');
+});
+
+test('a save that refuses more cells than it names counts the rest', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $actions = ['viewAny', 'view', 'create', 'update', 'delete', 'deleteAny'];
+
+    $screen = livewire(EditRole::class, ['record' => $role->getKey()]);
+
+    foreach ($actions as $action) {
+        $screen->set('data.permissions.stances.'.roleClass().'.'.$action, 'granted');
+    }
+
+    // Somebody else, meanwhile, forbids every one of them.
+    foreach ($actions as $action) {
+        Warden::forbid($role)->to($action, roleClass());
+    }
+
+    $screen->call('save');
+
+    foreach ($actions as $action) {
+        expect(Access::granted($role, $action, roleClass()))->toBeFalse();
+    }
+
+    // Six refused, five named, so the sixth is a tally rather than a name.
+    // Six refused, five named, so the sixth is a tally rather than a name.
+    $screen->assertNotified(__('filament-warden::ui.grid.concurrent.refused_title'));
+});
