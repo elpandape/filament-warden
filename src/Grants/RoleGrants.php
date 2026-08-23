@@ -376,7 +376,7 @@ final class RoleGrants
      *
      * The honest promise is not "one write for the whole grid": it is that
      * the warden calls a changed cell used to cost — up to four revokes
-     * (three for a door or loose name, which has no entity and so no
+     * (two for a door or loose name, which has no entity and so no
      * `toOwn()` pair to revoke) plus one grant — become up to that same
      * count per GROUP instead of per cell. A cell narrowed to `Shape::All`
      * never reaches `toOwn()` at all — that call belongs to `Shape::Owned`,
