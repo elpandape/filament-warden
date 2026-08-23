@@ -77,6 +77,11 @@ final readonly class GridView
             self::doors('loose', $catalog, [Origin::Custom, Origin::Panel], $state, $narrowings, $wider),
         ];
 
+        // Four of the decisions made below are made a second time in
+        // `resources/js/permission-grid.js`, because a click has to redraw
+        // without a round trip. Its own docblock names all four with their
+        // counterparts here; if one of them changes, both change.
+
         // An empty tab is a tab that shows nothing: the generation before this
         // one shipped one, and the grid could open on it.
         return new self(
