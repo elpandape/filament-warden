@@ -163,14 +163,14 @@ here says what it counts, and a projection says that it is a projection.
 - **`Shape::Owned` cells are not grouped, although they provably could be.** Only `Shape::All` is.
   Grouping ownership writes would work today and would leave a trap for whoever next touches the
   narrowed path, where `reconstrain()` makes sharing a call unsafe.
-- **The release workflow has never produced a release.** Its title extraction, its CHANGELOG
-  extraction, its pre-release flag and its refusal on a missing section were exercised with `act`
-  against synthetic tag pushes on this repository's real history, and the command-injection fix was
-  demonstrated in both directions with the same payload. What no one has seen is an actual release
-  object on GitHub, or Packagist picking it up. `act` also skips `actions/checkout` by default, so
-  the checkout half was established by reading the action's own refspecs and by fetching the live
-  remote by hand, not by running a real runner.
-- **The 8.4 leg of the matrix has never run.** It cannot, without a push.
+- **This release is the first thing the release workflow has ever published.** Before it, its title
+  extraction, its CHANGELOG extraction, its pre-release flag and its refusal on a missing section
+  had been exercised only with `act`, against synthetic tag pushes on this repository's real
+  history; the command-injection fix was demonstrated in both directions with the same payload. `act`
+  also skips `actions/checkout` by default, so the checkout half was established by reading the
+  action's own refspecs and by fetching the live remote by hand. If you are reading this on GitHub,
+  the rest of that chain has now run once. Packagist picking it up is downstream of this file and is
+  checked by hand.
 - **The distribution gate has three limits, disclosed rather than closed.** A development file
   somebody *tracks* inside `src/` is counted on both sides and ships; the oracle reads `HEAD` and
   not the tag a consumer installs; and it is blind to a root file until that file is committed.
