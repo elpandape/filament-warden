@@ -11,6 +11,7 @@
 Makefile export-ignore
 compose.yaml export-ignore
 composer.lock export-ignore
+phpstan-floor.neon export-ignore
 phpstan.neon export-ignore
 phpunit.xml.dist export-ignore
 pint.json export-ignore
