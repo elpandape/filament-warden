@@ -43,10 +43,9 @@ use function Pest\Livewire\livewire;
  *
  * That statement count is HALF the guarantee, and on its own it is the
  * comfortable half. Reading every row of `assigned_roles` and reducing in PHP
- * also costs exactly three statements, and it was what this screen did for
- * one commit: measured over a 200-row fixture, the listing hydrated 400
- * `AssignedRole` models against 10 for the grouped shape, and head to head
- * over 20 000 rows the whole-table pair took 0.439 s and 46 MB against
+ * costs exactly three statements too: measured over a 200-row fixture, that
+ * shape hydrates 400 `AssignedRole` models against 10 for the bounded one,
+ * and head to head over 20 000 rows it takes 0.439 s and 46 MB against
  * 0.002 s and no measurable allocation. A statement counter cannot see any of
  * that, so 'the listing's two reads are bounded by the role catalogue, not by
  * the assignment table' counts rows instead, through Eloquent's own

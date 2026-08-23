@@ -48,21 +48,27 @@ final class Assignment
      * (v1.4.0). Before this, `disableOptionWhen()` re-ran this query once per
      * option with no memo of its own, and `offers()` reads it twice
      * (`isRestricted()`, `isElsewhere()`): measured opening the assign modal
-     * against 200 roles, 405 `assigned_roles` statements. After: 2 — one for
-     * this memo's own first read, and one unrelated to it entirely (warden
-     * resolving whether the SIGNED-IN account may `viewAny` on the role
-     * resource at all, which this class never writes to and never needs to
-     * invalidate).
+     * against 200 roles, 405 `assigned_roles` statements. After: 3, and the
+     * same 3 against a 20-role catalogue, so what is left does not scale with
+     * the option count. Two of those are this memo reading once for each of
+     * the two simulated requests that opening a modal takes — the component
+     * is constructed, then the action is mounted, and Livewire rehydrates a
+     * fresh `ownerRecord` in between. The third is warden resolving whether
+     * the SIGNED-IN account may `viewAny` on the role resource at all, which
+     * this class never writes to and never needs to invalidate.
      *
      * A `WeakMap` on the `$account` instance, which is `Holders`' own
      * pattern and is chosen here for the same reason: an entry dies with the
      * object it was built for, so nothing has to guess when a request ended.
-     * A long-lived worker holds none of these between requests, and a second
-     * read reached through a different instance re-queries rather than
-     * answering from a snapshot somebody else's request took. What it does
-     * NOT do is cover a write and a read that share one instance — that is
-     * what `forgetAssignments()` is for, called by all three writers this
-     * class has (`give()`, `take()`, `apply()`) right after a write commits.
+     * A long-lived worker holds none of these between requests, and a read
+     * reached through a different instance re-queries rather than answering
+     * from a snapshot somebody else's request took — which is the second of
+     * those three statements, and is the honest price of not having a
+     * request boundary to hook.
+     *
+     * What the map cannot do for itself is notice a write. That is
+     * `forgetAssignments()`, called by all three writers this class has
+     * (`give()`, `take()`, `apply()`) right after a write commits.
      *
      * The inner key is the tenant, because `assignments()` reads THROUGH
      * warden's `TenantScope`: the same account genuinely answers differently

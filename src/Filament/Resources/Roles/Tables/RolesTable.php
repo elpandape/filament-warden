@@ -30,14 +30,14 @@ class RolesTable
      * unrelated to either (warden authorizing the signed-in user's own
      * `delete`/`viewAny` on the resource, which this fix does not touch).
      *
-     * Neither query is bounded by the PAGE, which is what a first draft of
-     * this docblock claimed: a column closure cannot reach the record set
-     * Filament paginated without going back through the table component.
-     * They are bounded by the ROLE CATALOGUE instead — `heldCounts()` groups
-     * and `assignedRoleIds()` is `distinct()`, so each returns at most one
-     * row per role however many assignment rows exist. That distinction is
-     * the whole cost of this screen: reading every row and reducing in PHP
-     * gives the same three statements and hydrates the entire table.
+     * Neither query is bounded by the PAGE: a column closure cannot reach the
+     * record set Filament paginated without going back through the table
+     * component. Both are bounded by the ROLE CATALOGUE instead —
+     * `heldCounts()` groups and `assignedRoleIds()` is `distinct()`, so each
+     * returns at most one row per role however many assignment rows exist.
+     * That is the whole cost of this screen, and it is invisible to a
+     * statement count: reading every row and reducing in PHP gives the same
+     * three statements and hydrates the entire table.
      *
      * Local variables captured by reference, not a class-level static
      * property: a fresh pair is born every time `configure()` runs — once
@@ -221,11 +221,13 @@ class RolesTable
      * `retrieved` event; a statement counter sees 3 either way and cannot
      * tell them apart.
      *
-     * `count(*)` comes back typed by the driver — `int` under SQLite, a
-     * numeric string under some others — so it is narrowed with `is_numeric()`
-     * exactly like every other value this class reads off a row, rather than
-     * trusted. `AssignedRole` declares no `$casts` at all, so nothing on the
-     * model would have normalised it either.
+     * `count(*)` is whatever the driver hands back, and nothing normalises it
+     * on the way through: `AssignedRole` declares no `$casts` at all, so an
+     * aggregate has no cast to fall into. Measured here, under SQLite, it
+     * arrives as `int`; what another driver returns is not something this
+     * suite can measure, so it is narrowed with `is_numeric()` — the same
+     * treatment every other value this class reads off a row already gets —
+     * rather than assumed.
      *
      * A holder restricted to a context is one more row with the same
      * `role_id` and counts here exactly like an unrestricted one — this
@@ -273,8 +275,8 @@ class RolesTable
      * canonical numeric string array key back to `int`, so a set built from
      * either type answers `isset()` for a key of either type. Measured:
      * `$ids[(string) 5]` stores `int(5)`, and both `isset($ids[5])` and
-     * `isset($ids['5'])` are true. A `(string)` cast here would have been a
-     * no-op that made the declared key type wrong — which is what it was.
+     * `isset($ids['5'])` are true. A cast here would be a no-op that made
+     * the declared key type wrong.
      *
      * @return array<int|string, true>
      */

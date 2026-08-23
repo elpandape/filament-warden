@@ -432,11 +432,9 @@ test('the screen says why it will not hand that role back', function (): void {
  * account instance and the same tenant, shares the one query the first of
  * them makes.
  *
- * Two over and not the three this cap used to leave, because three would put
- * the ceiling at 5 — and 5 is what this fixture measured BEFORE the memo,
- * measured again while writing this cap by running it against the previous
- * release's `Assignment`. A ceiling that the shape it was written for
- * already passes bounds nothing.
+ * Two over and not three, because three would put the ceiling at 5 — and 5 is
+ * what this same fixture measures against an unmemoised `assignments()`. A
+ * ceiling the shape it excludes already passes bounds nothing.
  */
 test('the elsewhere check is capped at 4, two over the 2 measured', function (): void {
     signInAsHandOut();
