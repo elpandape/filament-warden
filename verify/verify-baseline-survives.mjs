@@ -104,7 +104,31 @@ for (const stance of ['forbidden', 'granted', 'abstain', 'granted']) {
 
 check('baseline is intact after four writes', three.state.baseline?.stances?.['App\\Models\\Post']?.viewAny === 'granted')
 
-console.log('\n=== 4. The control: a non-spread write is what would lose it ===')
+console.log('\n=== 4. The OTHER write: narrow(), which every condition edit goes through ===')
+
+// The stance write and the reach write are two separate spreads on two separate
+// lines. A gate that drove only the first would have said "either one" while
+// covering one of them — and the reach write is the one a person reaches by
+// editing a condition rather than by clicking a cell.
+const five = makeGrid()
+
+five.narrow('App\\Models\\Post', 'viewAny', {
+    mode: 'conditions',
+    rules: [{ logic: 'and', column: 'published', operator: '=', value: 'true' }],
+})
+
+check('the reach actually changed', five.state.narrowing?.['App\\Models\\Post']?.viewAny?.mode === 'conditions')
+check('baseline survived the reach write too', five.state.baseline?.stances?.['App\\Models\\Post']?.viewAny === 'granted')
+
+console.log('\n=== 5. And clearing a reach — narrow()\'s own delete branch ===')
+
+const six = makeGrid()
+
+six.narrow('App\\Models\\Post', 'viewAny', { mode: 'all', rules: [] })
+
+check('baseline survived the reach delete branch', six.state.baseline?.stances?.['App\\Models\\Post']?.viewAny === 'granted')
+
+console.log('\n=== 6. The control: a non-spread write is what would lose it ===')
 
 const four = makeGrid()
 

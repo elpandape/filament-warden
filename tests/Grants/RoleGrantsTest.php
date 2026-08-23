@@ -1171,3 +1171,37 @@ test('without a baseline every cell counts as touched', function (): void {
         ->and($report->written)->toBe(1)
         ->and($report->metAnother())->toBeFalse();
 });
+
+test('a lone editor can still clear a narrowed cell when the builder is switched off', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    Warden::allow($role)->toOwn(Post::class, 'viewAny');
+
+    $wasShowing = ['stances' => [Post::class => ['viewAny' => 'granted']], 'narrowing' => []];
+
+    $report = RoleGrants::apply($role, $catalog, [], null, $wasShowing);
+
+    expect(grantCount())->toBe(0)
+        ->and($report->written)->toBe(1)
+        ->and($report->refused)->toBeEmpty();
+});
+
+test('a lone editor can still clear a cell whose reach this screen cannot rebuild', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    Warden::allow($role)->to('viewAny', Post::class)->where('a_column_that_left', '=', 'x');
+
+    $wasShowing = [
+        'stances' => [Post::class => ['viewAny' => 'granted']],
+        'narrowing' => [Post::class => ['viewAny' => ['mode' => 'conditions', 'rules' => [
+            ['logic' => 'and', 'column' => 'a_column_that_left', 'operator' => '=', 'value' => 'x'],
+        ]]]],
+    ];
+
+    $report = RoleGrants::apply($role, $catalog, [], [], $wasShowing);
+
+    expect($report->refused)->toBeEmpty()
+        ->and($report->written)->toBe(1);
+});

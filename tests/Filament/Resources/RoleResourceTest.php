@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use ElPandaPe\FilamentWarden\Catalog\Catalog;
+use ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\CreateRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\EditRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ListRoles;
@@ -15,6 +17,9 @@ use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\DeleteAction;
+use Filament\Notifications\Livewire\Notifications;
+use Filament\Notifications\Notification;
+use Filament\Panel;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -83,6 +88,35 @@ use function Pest\Livewire\livewire;
  * green if that one `->modalDescription(...)` line is deleted.
  */
 pest()->extend(TestCase::class);
+
+/**
+ * The body of the notification the page actually sent.
+ *
+ * `Notification::assertNotified()` compares whole objects, so it cannot say
+ * WHICH words a body carries; it reads them out of a freshly mounted
+ * `Notifications` component, and so does this. Mounting CONSUMES them, so this
+ * CONSUMES them, so a test uses this OR `assertNotified()`, never both: whichever
+ * runs second finds nothing. This one is the stronger of the two — it can say
+ * which words a body carries, which is the whole point of a notification that
+ * names the cells it refused.
+ */
+function lastNotification(): ?Notification
+{
+    $component = new Notifications;
+    $component->mount();
+
+    $first = $component->notifications->first();
+
+    return $first instanceof Notification ? $first : null;
+}
+
+function catalogForRoles(): Catalog
+{
+    /** @var Panel $panel */
+    $panel = Filament\Facades\Filament::getCurrentOrDefaultPanel();
+
+    return Catalog::for($panel);
+}
 
 function heldReads(): int
 {
@@ -1061,7 +1095,11 @@ test('a save leaves alone the cell somebody else changed while this screen was o
 
     $screen->call('save')->assertHasNoFormErrors();
 
-    expect(Access::granted($role, 'viewAny', roleClass()))->toBeTrue();
+    $sent = lastNotification();
+
+    expect(Access::granted($role, 'viewAny', roleClass()))->toBeTrue()
+        ->and($sent?->getTitle())->toBe(__('filament-warden::ui.grid.concurrent.kept_title'))
+        ->and($sent?->getBody())->toBe(trans_choice('filament-warden::ui.grid.concurrent.kept', 1));
 });
 
 test('a save refuses the cell this person and somebody else moved apart', function (): void {
@@ -1128,7 +1166,12 @@ test('a save that refuses more cells than it names counts the rest', function ()
         expect(Access::granted($role, $action, roleClass()))->toBeFalse();
     }
 
-    // Six refused, five named, so the sixth is a tally rather than a name.
-    // Six refused, five named, so the sixth is a tally rather than a name.
-    $screen->assertNotified(__('filament-warden::ui.grid.concurrent.refused_title'));
+    $sent = lastNotification();
+    $body = $sent?->getBody();
+    $body = is_string($body) ? $body : '';
+
+    expect($sent?->getTitle())->toBe(__('filament-warden::ui.grid.concurrent.refused_title'))
+        ->and($body)->toContain(GridView::cellLabel(catalogForRoles(), roleClass(), 'viewAny'))
+        ->and($body)->toContain(__('filament-warden::ui.grid.concurrent.more', ['count' => 1]))
+        ->and($body)->not->toContain('viewAny on ');
 });

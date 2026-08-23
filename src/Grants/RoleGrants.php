@@ -272,24 +272,34 @@ final class RoleGrants
             if ($wasStances !== null) {
                 $was = self::stanceIn($wasStances, $row, $action);
 
-                // With the builder off the reach is not on offer, so it cannot
-                // have been touched; reading the baseline's as the wanted one
-                // takes that dimension out of both comparisons at once. And a
-                // baseline reach this version cannot rebuild is read the same
-                // way, deliberately: unable to tell whether they touched it, the
-                // safe answer is that they did not, which preserves rather than
-                // writes.
-                $wasNarrowing = $narrowings === null
-                    ? $wanted
-                    : (self::wanted($wasNarrowings[$row][$action] ?? null, $entity) ?? $wanted);
+                // Two questions, and the reach is only allowed to answer either
+                // of them when the baseline actually holds one.
+                //
+                // It does not when the builder is switched off — the screen never
+                // sent a reach, so it cannot have been touched — nor when the
+                // stored reach is one this version can read and cannot rebuild
+                // from a payload. Both are a flag rather than a stand-in value,
+                // and that is the whole point: a substituted `Narrowing` can
+                // neutralise `is($wanted)` or `is($stored)` but never both, and
+                // the one it misses collapses into "the reach changed", which is
+                // true of every cleared cell. That refused a lone administrator's
+                // own revoke and told them a colleague had been editing.
+                $wasReach = $narrowings === null
+                    ? null
+                    : self::wanted($wasNarrowings[$row][$action] ?? null, $entity);
 
-                if ($was === $to && $wasNarrowing->is($wanted)) {
+                $reachAnswers = $wasReach instanceof Narrowing;
+
+                $touched = $was !== $to || ($reachAnswers && ! $wasReach->is($wanted));
+                $drifted = $was !== $from || ($reachAnswers && ! $wasReach->is($stored));
+
+                if (! $touched) {
                     $preserved++;
 
                     continue;
                 }
 
-                if ($was !== $from || ! $wasNarrowing->is($stored)) {
+                if ($drifted) {
                     $refused[] = ['row' => $row, 'action' => $action];
 
                     continue;

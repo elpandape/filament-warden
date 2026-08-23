@@ -109,10 +109,19 @@ final class PermissionGrid extends Field
     }
 
     /**
-     * What the store held when this screen opened, or null on a screen that
-     * never stamped one — a record being created, or a state written by hand.
-     * Null asks the save to treat every cell as touched, which is what it did
-     * before there was a baseline.
+     * What the store held when this screen opened, or null when there is none.
+     *
+     * A record being created is NOT that case, which is worth saying because it
+     * looks like it should be: `afterStateHydrated` runs there too and stamps an
+     * empty baseline, so a create page takes the three-way path over an empty
+     * store — where every cell somebody sets reads as touched and is written.
+     * Null is for a state written by hand, and it asks the save to treat every
+     * cell as touched, which is what it did before there was a baseline at all.
+     *
+     * A forged baseline cannot escalate: it only ever decides WHETHER a change
+     * is written, never what. The stance and reach come from the payload, so the
+     * worst a doctored one can do is suppress the forger's own save — which is
+     * the behaviour everybody had before this version.
      *
      * @return array{stances?: mixed, narrowing?: mixed}|null
      */

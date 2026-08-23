@@ -31,8 +31,9 @@ Two people editing the same role stopped undoing each other's work. Nothing else
   no branch and get none: their payload and the store already agree.
 
   A save that met nobody else keeps the notification it has always had. One that did says which cells
-  were kept and which were refused, naming up to five and counting the rest — the same shape
-  `Holders::LABELS` already used. And the grid re-reads the store afterwards, so the next save starts
+  were kept and which were refused, naming up to five and counting the rest — the shape
+  `Holders::LABELS` already used, though not its number: ten labels fit a screen, five cells fit a
+  sentence. And the grid re-reads the store afterwards, so the next save starts
   from what is actually there instead of colliding on the very same cells again.
 
 ### Changed
@@ -78,6 +79,10 @@ Two people editing the same role stopped undoing each other's work. Nothing else
   options and lock rules know nothing about. It goes to `1.7.0`, where the shape of that field can be
   decided on its own terms. The window there is also far narrower: two people editing the **same
   account** at once, rather than the same role.
+- **A page of your own that embeds `PermissionGrid` gets the protection but not the report.** The
+  three-way comparison lives in the field, so nothing is silently reverted there either; the
+  notification is `EditRole`'s, so a refused cell on your page is simply not written and the save says
+  nothing. Reading `SaveReport` off the container after a save is what a page would do about it.
 - **The roles relation manager is not touched, and does not need to be.** Its actions say "assign
   *this* role", not "make the set equal this" — the vulnerable shape is the set diff, and that is the
   thing worth naming.

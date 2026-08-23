@@ -23,9 +23,10 @@ class EditRole extends EditRecord
     /**
      * How many refused cells are named before the rest become a tally.
      *
-     * The same shape `Holders::LABELS` already uses, and for the same reason: a
-     * grid can refuse as many cells as it draws, and a notification that listed
-     * two hundred of them would say nothing.
+     * Names then a tally, the shape `Holders::LABELS` already uses for the same
+     * reason — a grid can refuse as many cells as it draws, and a notification
+     * listing two hundred of them says nothing. The number is not the same one:
+     * that is 10 account labels on a screen, this is 5 cells in a sentence.
      */
     private const int NAMED = 5;
 
