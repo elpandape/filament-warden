@@ -38,8 +38,12 @@ final class StateKey
      * The same guard, for a caller holding a bare name rather than an entry.
      *
      * There was an `action(Entry)` here that applied it and that nothing called,
-     * while three other places built an action key without it. Routing them all
-     * through this is defence in depth rather than a hole closed, and the
+     * while the two places that build an action key did so without it. Both go
+     * through this now. (`RoleGrants::of()` builds one bare as well, on the READ
+     * half: a stored name with a dot lands in the state map, is drawn by
+     * nothing, is emitted by nothing and counted by nothing, so it is left
+     * alone rather than made to throw on a screen that is only reading.)
+     * Routing them is defence in depth rather than a hole closed, and the
      * difference is worth writing down because the first version of this comment
      * claimed the hole: **an action name cannot carry a dot today**. Those names
      * come from `ReflectionMethod::getName()` on a policy, and

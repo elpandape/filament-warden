@@ -60,7 +60,8 @@ jobs:
       # "<tag> — <headline>" (AGENTS.md §8, `gh release create ... --title`), and
       # the annotated tag's subject is the only place a machine can read it from —
       # CHANGELOG.md does not carry it. It is not, however, where the shipped
-      # titles came from: of the 26 tags that have a release, only 10 subjects match
+      # titles came from: of the tags that had a release when this was measured,
+      # only 10 of 26 subjects matched
       # it — 11 differ by the case of one word, and the same 5 that differ completely
       # are the 5 whose subject carries the headline alone, with no "<tag> — " on the
       # front. All 26 were typed by hand at `gh release create` time. From here on the

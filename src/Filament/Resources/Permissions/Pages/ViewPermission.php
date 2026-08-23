@@ -81,18 +81,22 @@ class ViewPermission extends ViewRecord
         // part that had to be measured on three engines rather than one.
         //
         // A backslash — the obvious choice, and what this was written with
-        // first — is not portable: `escape '\'` is a syntax error on MySQL,
-        // which reads the backslash inside the string literal unless
-        // `NO_BACKSLASH_ESCAPES` is set, and Postgres rejects it too. Doubling
-        // it to `escape '\\'` fixes those two and breaks SQLite and Postgres,
-        // which then see two characters where one is required. There is no
-        // backslash literal that works everywhere.
+        // first — is not portable, and exactly ONE engine is why: `escape '\'`
+        // is a syntax error on MySQL, which reads the backslash inside the
+        // string literal unless `NO_BACKSLASH_ESCAPES` is set. SQLite and
+        // Postgres both take it as it stands (Postgres under its default
+        // `standard_conforming_strings = on`), so a first draft of this comment
+        // blamed two engines and was measured wrong. Doubling it to
+        // `escape '\\'` satisfies MySQL and then breaks the other two, which
+        // see two characters where one is required — so there is no backslash
+        // literal that works everywhere, which is the part that stands.
         //
         // `!` needs no escaping in a string literal on any of them, so the
         // clause is the same text for every driver. Measured on SQLite,
-        // Postgres 16 and MySQL 8.4. It has to be escaped in the term itself
-        // like the wildcards, or a person searching for `!` would be typing an
-        // escape character.
+        // Postgres 16 and MySQL 8.4; `sqlsrv` takes ESCAPE too but nobody here
+        // has run it. It has to be escaped in the term itself like the
+        // wildcards, or a person searching for `!` would be typing an escape
+        // character.
         //
         // And the clause cannot be dropped: SQLite has no default escape
         // character, so an escaped term without it matches nothing at all —

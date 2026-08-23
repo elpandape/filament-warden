@@ -20,10 +20,11 @@ and stops carrying weight nobody lifts.
   `%` typed in it is a LIKE wildcard, so the box was a way to page through your account table rather
   than a way to find someone in it — and it is offered to everyone who may *view* a permission.
   Escaping it needs an ESCAPE clause, and the character in it had to be measured on three engines
-  rather than one: a backslash — the obvious choice, and what this was written with first — is a
-  syntax error on MySQL and rejected by Postgres, while doubling it breaks SQLite and Postgres
-  instead. There is no backslash literal that works everywhere, so the clause uses `!`, measured on
-  SQLite, Postgres 16 and MySQL 8.4. The clause itself cannot be dropped either: SQLite has no
+  rather than one. A backslash — the obvious choice, and what this was written with first — is a
+  syntax error on MySQL; SQLite and Postgres both take it, so exactly one engine forced the change
+  and a first draft of this entry blamed two. Doubling it satisfies MySQL and breaks the other two.
+  There is no backslash literal that works everywhere, so the clause uses `!`, measured on SQLite,
+  Postgres 16 and MySQL 8.4. The clause itself cannot be dropped either: SQLite has no
   default escape character, so an escaped term without it matches nothing at all.
 
   The other half of the same method: with an account model whose table has none of `name`, `email` or
@@ -41,8 +42,9 @@ and stops carrying weight nobody lifts.
   somebody's role screen at the moment they open it. The audit walked the same catalogue and said
   nothing. It has a bucket now and reddens `--check` with the rest.
 
-  Three other places built a state key without going through `StateKey`, and they do now — defence
-  in depth rather than a hole closed, which is worth stating precisely because the first draft of
+  The two other places that build a state key did so without going through `StateKey`, and they do
+  now — defence in depth rather than a hole closed, which is worth stating precisely because the
+  first draft of
   this entry claimed the hole: **an action name cannot carry a dot today.** Those names come from
   reflecting a policy's methods, and `public function export.csv()` is a PHP parse error. The name
   that *is* reachable is a loose `catalog.custom` one, and that has always thrown — what changed is
