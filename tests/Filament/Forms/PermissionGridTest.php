@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * The save-from-another-page test grants on `roleClass()`, not a fixture model:
+ * `RoleResource` is always registered by the plugin, while the `test` panel
+ * carries no resource for `Post` and nothing here adds it to
+ * `filament-warden.catalog.models`. A grant on a model outside the panel's
+ * catalogue draws no cell at all, which would leave the test's control
+ * assertion (`stances` not empty) failing for a reason that has nothing to do
+ * with what the test is about.
+ */
 declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
@@ -849,9 +858,6 @@ test('and under the panel that does declare it, the very same save takes it away
 test('a grid on somebody else page starts its next save from what is actually stored', function (): void {
     $role = makeRole('editor');
 
-    // Somebody else grants the cell between this screen opening and it saving.
-    // roleClass(), not Post::class: the `test` panel registers no resource for
-    // Post, so a grant on it would draw no cell and leave the control empty.
     $component = livewire(GridHost::class, ['roleKey' => $role->getKey()]);
 
     Warden::allow($role)->to('viewAny', roleClass());
