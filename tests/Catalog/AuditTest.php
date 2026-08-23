@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Catalog\Audit;
+use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\PostResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
@@ -32,7 +33,7 @@ pest()->extend(TestCase::class);
  */
 function gateBuckets(): array
 {
-    return ['open', 'unpoliced', 'forgotten', 'strays', 'drifted', 'unwalkable'];
+    return ['open', 'unpoliced', 'forgotten', 'strays', 'drifted', 'unwalkable', 'unkeyable'];
 }
 
 /**
@@ -60,6 +61,7 @@ function auditWith(string $bucket): Audit
         strays: $bucket === 'strays' ? $finding : [],
         drifted: $bucket === 'drifted' ? $finding : [],
         unwalkable: $bucket === 'unwalkable' ? $finding : [],
+        unkeyable: $bucket === 'unkeyable' ? $finding : [],
     );
 }
 
@@ -108,4 +110,23 @@ test('a row one panel declares is not forgotten because another panel never hear
         ->and($both->forgotten)->toBeEmpty()
         ->and(Audit::of([$ignorant])->forgotten)->toContain($label)
         ->and(Audit::of([$ignorant])->isClean())->toBeFalse();
+});
+
+test('a catalogue name carrying a dot is found by the build, not by a person opening the screen', function (): void {
+    config()->set('filament-warden.catalog.custom', ['reports.export' => 'read']);
+
+    Catalog::forget();
+
+    $audit = Audit::of([Panel::make()->id('dotted')]);
+
+    expect($audit->unkeyable)->toBe(['dotted: reports.export'])
+        ->and($audit->isClean())->toBeFalse();
+});
+
+test('a name the grid can key is not reported', function (): void {
+    config()->set('filament-warden.catalog.custom', ['reports-export' => 'read']);
+
+    Catalog::forget();
+
+    expect(Audit::of([Panel::make()->id('undotted')])->unkeyable)->toBeEmpty();
 });

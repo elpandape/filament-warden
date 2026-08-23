@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Catalog;
 
+use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Guard;
 use ElPandaPe\Warden\Context;
 use Filament\Facades\Filament;
@@ -31,6 +32,7 @@ final readonly class Audit
      * @param  list<string>  $strays  grants for actions nothing declares
      * @param  list<string>  $drifted  the same, but a whole entity type at once
      * @param  list<string>  $unwalkable  models only a relation manager reaches
+     * @param  list<string>  $unkeyable  catalogue names the grid cannot key, which throw when a role screen renders
      */
     public function __construct(
         public array $open = [],
@@ -40,6 +42,7 @@ final readonly class Audit
         public array $strays = [],
         public array $drifted = [],
         public array $unwalkable = [],
+        public array $unkeyable = [],
     ) {}
 
     public static function run(): self
@@ -56,6 +59,7 @@ final readonly class Audit
         $open = [];
         $unpoliced = [];
         $unwalkable = [];
+        $unkeyable = [];
         $declared = [];
         $types = [];
 
@@ -78,6 +82,16 @@ final readonly class Audit
                 if ($entry->entityType !== null) {
                     $types[$entry->entityType] = true;
                 }
+
+                // Livewire splits a state path on dots, so a name carrying one
+                // cannot be a cell. `StateKey` throws when the grid meets it —
+                // which is a 500 on somebody's role screen, at the moment they
+                // open it. A build has no business finding out that way.
+                foreach ([$entry->model ?? $entry->name, $entry->model === null ? null : $entry->name] as $key) {
+                    if (is_string($key) && ! StateKey::keyable($key)) {
+                        $unkeyable[] = $panel->getId().': '.$entry->name;
+                    }
+                }
             }
         }
 
@@ -92,6 +106,7 @@ final readonly class Audit
             strays: $strays,
             drifted: $drifted,
             unwalkable: array_values(array_unique($unwalkable)),
+            unkeyable: array_values(array_unique($unkeyable)),
         );
     }
 
@@ -116,7 +131,8 @@ final readonly class Audit
             && $this->forgotten === []
             && $this->strays === []
             && $this->drifted === []
-            && $this->unwalkable === [];
+            && $this->unwalkable === []
+            && $this->unkeyable === [];
     }
 
     /**

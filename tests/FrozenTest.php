@@ -361,6 +361,7 @@ test('the translation keys an application overrides are frozen', function (): vo
         'console.audit.forgotten',
         'console.audit.strays',
         'console.audit.drifted',
+        'console.audit.unkeyable',
         'console.audit.unwalkable',
         'console.audit.clean',
         'console.assign.missing_role',

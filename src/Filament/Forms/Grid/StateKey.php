@@ -49,9 +49,20 @@ final class StateKey
         return self::guard($key);
     }
 
+    /**
+     * Whether a name can be a state key at all, asked rather than enforced.
+     *
+     * `filament-warden:audit` needs the question without the exception: a build
+     * should go red on a name the grid cannot draw, not a person's screen.
+     */
+    public static function keyable(string $key): bool
+    {
+        return ! str_contains($key, '.');
+    }
+
     private static function guard(string $key): string
     {
-        if (str_contains($key, '.')) {
+        if (! self::keyable($key)) {
             throw new LogicException(
                 "The permission [{$key}] cannot be shown on the grid: livewire splits state paths on dots. Rename it.",
             );

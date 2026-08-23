@@ -227,6 +227,7 @@ return [
             'forgotten' => 'Permisos que nadie declara y a los que no apunta ninguna concesión. Los dejó atrás un renombrado y ya no pueden casar nunca. Son los que ponen `--check` en rojo.',
             'strays' => 'Concesiones a acciones que ya no declara nadie: un método de Policy renombrado, una errata en un seeder, una pantalla borrada.',
             'drifted' => 'Tipos de entidad que nadie declara. Un alias de morph entero dejó de casar: el mapa se movió y todas sus filas se callaron.',
+            'unkeyable' => 'Nombres del catálogo con un punto. Livewire parte las rutas de estado por puntos, así que no pueden ser una celda: una pantalla de rol lanza en cuanto dibuja una. Renombra el permiso.',
             'unwalkable' => 'Modelos a los que solo llega un relation manager, y que no se pueden recorrer sin ejecutar la relación.',
             'clean' => 'Nada que informar.',
         ],

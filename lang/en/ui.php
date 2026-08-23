@@ -227,6 +227,7 @@ return [
             'forgotten' => 'Permissions nothing declares and no grant points at. A rename left them behind and they can never match again. These are what turn `--check` red.',
             'strays' => 'Grants for actions nothing declares any more — a renamed policy method, a typo in a seeder, a screen that was deleted.',
             'drifted' => 'Entity types nothing declares at all. A whole morph alias stopped matching: the map moved, and every row of it went quiet.',
+            'unkeyable' => 'Catalogue names carrying a dot. Livewire splits a state path on dots, so these cannot be a cell: a role screen throws the moment it draws one. Rename the permission.',
             'unwalkable' => 'Models only a relation manager reaches, which cannot be walked without running the relationship.',
             'clean' => 'Nothing to report.',
         ],
