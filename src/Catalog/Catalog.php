@@ -53,6 +53,9 @@ final class Catalog
     /** @var array<string, array{panel: Panel, catalog: self}> */
     private static array $memo = [];
 
+    /** @var list<array{panels: list<Panel>, catalog: self}> */
+    private static array $unions = [];
+
     /** @param  list<Entry>  $entries */
     private function __construct(public readonly array $entries) {}
 
@@ -148,6 +151,49 @@ final class Catalog
     }
 
     /**
+     * Every panel's catalogue at once, deduplicated.
+     *
+     * The permissions table is not per panel and the catalogue is, so a row
+     * derived from another panel's resource read as declared by nobody while
+     * the audit — which has walked every panel since it learned to — said the
+     * opposite. The screen and the command now ask the same question.
+     *
+     * The panel list arrives explicitly, the way `Audit::of()` takes it, so
+     * this is testable against panels built by hand; a method that reached for
+     * `Filament::getPanels()` itself could only ever be asked about whatever
+     * the process happens to have registered.
+     *
+     * Memoised on the panel OBJECTS and never on their ids, for the reason
+     * `read()` sets out at length: an id names a different panel every time a
+     * suite builds one. Each panel's own memo is reused, so this costs a walk
+     * only the first time a given list is asked about.
+     *
+     * @param  list<Panel>  $panels
+     */
+    public static function union(array $panels): self
+    {
+        foreach (self::$unions as $union) {
+            if ($union['panels'] === $panels) {
+                return $union['catalog'];
+            }
+        }
+
+        $entries = [];
+
+        foreach ($panels as $panel) {
+            foreach (self::read($panel)->entries as $entry) {
+                $entries[] = $entry;
+            }
+        }
+
+        $catalog = new self(self::deduplicate($entries));
+
+        self::$unions[] = ['panels' => $panels, 'catalog' => $catalog];
+
+        return $catalog;
+    }
+
+    /**
      * NOT what protects a suite that rebuilds `Panel::make()->id('scratch')`
      * with a different resource list for every test case — that guarantee is
      * `read()`'s `===` check, not this method. Verified by emptying this
@@ -176,6 +222,7 @@ final class Catalog
     public static function forget(): void
     {
         self::$memo = [];
+        self::$unions = [];
     }
 
     /**

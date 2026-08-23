@@ -15,7 +15,6 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
-use Filament\Panel;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
@@ -182,12 +181,7 @@ final class PermissionsTable
 
     private static function catalog(): Catalog
     {
-        // Nullable in the signature and never null in fact: it throws when there
-        // is no panel at all, which is the only way it could answer null.
-        /** @var Panel $panel */
-        $panel = Filament::getCurrentOrDefaultPanel();
-
-        return Catalog::for($panel);
+        return Catalog::union(array_values(Filament::getPanels()));
     }
 
     /**

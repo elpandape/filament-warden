@@ -10,7 +10,6 @@ use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Grants\Holders;
 use Filament\Facades\Filament;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Panel;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -132,11 +131,7 @@ final class PermissionInfolist
 
     private static function catalog(): Catalog
     {
-        // Nullable in the signature and never null in fact.
-        /** @var Panel $panel */
-        $panel = Filament::getCurrentOrDefaultPanel();
-
-        return Catalog::for($panel);
+        return Catalog::union(array_values(Filament::getPanels()));
     }
 
     /**

@@ -117,7 +117,7 @@ test('the plugin offers exactly the methods the README names', function (): void
 
 test("the catalogue's public methods are exactly these, forget among them", function (): void {
     expect(get_class_methods(Catalog::class))
-        ->toBe(['for', 'relationManagers', 'resourceClasses', 'pageClasses', 'widgetClasses', 'forget']);
+        ->toBe(['for', 'relationManagers', 'resourceClasses', 'pageClasses', 'widgetClasses', 'union', 'forget']);
 });
 
 test('the state a grid field hands to a form is frozen', function (): void {

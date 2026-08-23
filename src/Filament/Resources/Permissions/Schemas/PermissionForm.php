@@ -21,7 +21,6 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Panel;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
@@ -120,25 +119,22 @@ final class PermissionForm
     }
 
     /**
-     * Every entity the panel knows about, plus warden's wildcard and the loose
+     * Every entity any panel knows about, plus warden's wildcard and the loose
      * permission that points at nothing.
      *
-     * And the row's own entity, always — even when this panel does not show it.
-     * The catalogue is per panel and the permissions table is not: without this,
-     * a permission belonging to another panel could not be opened at all,
-     * because the select would refuse the value it was drawn with.
+     * And the row's own entity, always. The catalogue now spans every panel, so
+     * a row derived from another panel's resource is offered like any other —
+     * but a row whose entity no panel declares at all (a morph alias left over,
+     * a model dropped everywhere) still has to be offered, or the select would
+     * refuse the value it was drawn with and the row could not be opened.
      *
      * @return array<string, string>
      */
     public static function entities(?Model $record = null): array
     {
-        // Nullable in the signature and never null in fact.
-        /** @var Panel $panel */
-        $panel = Filament::getCurrentOrDefaultPanel();
-
         $options = ['*' => (string) __('filament-warden::ui.resources.permissions.entity.any')];
 
-        foreach (Catalog::for($panel)->entries as $entry) {
+        foreach (Catalog::union(array_values(Filament::getPanels()))->entries as $entry) {
             if ($entry->entityType !== null && $entry->model !== null) {
                 $options[$entry->entityType] = Str::headline(Str::plural(class_basename($entry->model)));
             }
