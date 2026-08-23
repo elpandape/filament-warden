@@ -13,17 +13,19 @@
  * times, twice on one line: the shields URL that actually renders, the `alt` beside
  * it, and the Requirements row. AGENTS.md §8 gates a release on that README.
  *
- * The test is a symmetric consistency check, not a one-way guard, and the reason
- * matters because it decides which assertions a future reader may drop. LOWERING the
- * floor is silent in the three files downstream of the manifest — nothing moves, and
- * the analysis, the matrix and the README go on describing the number that left.
- * RAISING it is loud only when the manifest moves ALONE: composer then aborts on the
- * older runtime, but only inside `run-tests.yml`'s floor job, since `quality.yml` is
- * pinned to the ceiling and installs happily. Raise the manifest and the matrix
- * together — how a floor is actually bumped — and composer is green everywhere and
- * this test is the only thing that goes red. Measured, both directions.
+ * The floor test is a symmetric consistency check, and the reason matters because it
+ * decides which of its assertions a future reader may drop. LOWERING the floor is
+ * silent in the three files downstream of the manifest — nothing moves, and the
+ * analysis, the matrix and the README go on describing the number that left. RAISING
+ * it is loud in composer, but only where composer runs against the older runtime, so
+ * `run-tests.yml`'s floor job alone; it is also loud in Rector, everywhere, because
+ * `rector.php`'s `withPhpSets()` follows `require.php` and not the runtime — measured
+ * at the ceiling with the manifest raised: `AddOverrideAttributeToOverriddenPropertiesRector`
+ * fires and the gate exits 2. What NOTHING else catches, in either direction, is
+ * `phpstan-floor.neon` and the three README strings drifting away from the manifest.
+ * That is what this test is for.
  *
- * The assertions are `toContain` on file text, the house style of `FrozenTest`. They
+ * Its assertions are `toContain` on file text, the house style of `FrozenTest`. They
  * pin the number, not the behaviour: a matrix that keeps the literal and adds an
  * `exclude:` for the floor still passes.
  *
@@ -31,8 +33,17 @@
  * `.gitattributes` and inferring. Inference was tried and thrown away: it stayed green
  * while `README.md export-ignore` or `/src export-ignore` emptied the package, and it
  * went red on clean checkouts over a `*.log` pattern, a stray untracked file or an
- * entry in the developer's global ignore file. The cost is a dependency on a checkout,
- * which is not a cost: `/tests export-ignore` means this suite only ever runs in one.
+ * entry in the developer's global ignore file. What it asserts is the top level exactly
+ * and, beneath it, that every tracked file still ships — so a `/src/Filament
+ * export-ignore` is caught, while a development file someone TRACKS inside `src/` is
+ * not: it is in both counts. Two further limits, both deliberate: it reads `HEAD`, not
+ * the tag a consumer actually installs, and it is blind to a root file until that file
+ * is committed. The old shape saw the uncommitted one; CI sees it on push.
+ *
+ * It needs a checkout, and fails red without one — the safe direction. Regla de oro 1
+ * puts the suite in the container against a bind-mounted repository, and CI checks out
+ * with `.git`, so this is not a cost here; it would be one somewhere that copies the
+ * tree without `.git`.
  */
 
 declare(strict_types=1);
@@ -78,13 +89,25 @@ test('the PHP floor is the same number everywhere that states it', function (): 
         ->toContain(sprintf('| PHP | `%s` |', $declared));
 });
 
-test('the distribution carries exactly what a consumer installs', function (): void {
+test('the distribution ships ten top-level entries and every tracked file under them', function (): void {
+    $root = escapeshellarg(dirname(__DIR__));
+    $tarball = (string) tempnam(sys_get_temp_dir(), 'dist');
+
+    $written = [];
+    $status = 1;
+
+    exec(sprintf('git -C %s archive --format=tar --output=%s HEAD', $root, escapeshellarg($tarball)), $written, $status);
+
+    expect($status)->toBe(0);
+
     $entries = [];
     $status = 1;
 
-    exec(sprintf('git -C %s archive --format=tar HEAD | tar -t', escapeshellarg(dirname(__DIR__))), $entries, $status);
+    exec(sprintf('tar -tf %s', escapeshellarg($tarball)), $entries, $status);
 
     expect($status)->toBe(0);
+
+    unlink($tarball);
 
     $top = array_unique(array_map(
         static fn (string $entry): string => explode('/', $entry)[0],
@@ -105,4 +128,20 @@ test('the distribution carries exactly what a consumer installs', function (): v
         'resources',
         'src',
     ]);
+
+    foreach (['config', 'lang', 'resources', 'src'] as $directory) {
+        $tracked = [];
+        $status = 1;
+
+        exec(sprintf('git -C %s ls-files %s', $root, escapeshellarg($directory)), $tracked, $status);
+
+        expect($status)->toBe(0);
+
+        $shipped = array_filter(
+            $entries,
+            static fn (string $entry): bool => str_starts_with($entry, $directory.'/') && ! str_ends_with($entry, '/'),
+        );
+
+        expect($shipped)->toHaveSameSize($tracked);
+    }
 });
