@@ -83,6 +83,18 @@ final class PermissionGrid extends Field
                 // second copy inside the state would be the same screen telling
                 // the same fact twice, which is how the two halves drift.
                 app()->instance(SaveReport::class, $report);
+
+                // The screen tells the truth again, on ANY page. `EditRole` gets
+                // there by re-filling the whole form afterwards; a page this
+                // package does not own has no such hook, and without this a
+                // refused cell stays refused for good — its next save reads as
+                // touched against a baseline that is still the one from before,
+                // and nothing on screen explains why. Safe because the field is
+                // `dehydrated(false)`: rewritten state can never reach
+                // `$record->update()`.
+                $payload = $component->storedState()->toPayload();
+
+                $component->state($payload + ['baseline' => $payload]);
             }
         });
     }

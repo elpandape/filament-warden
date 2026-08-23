@@ -845,3 +845,32 @@ test('and under the panel that does declare it, the very same save takes it away
 
     expect(Access::granted($user, 'view', Post::class))->toBeFalse();
 });
+
+test('a grid on somebody else page starts its next save from what is actually stored', function (): void {
+    $role = makeRole('editor');
+
+    // Somebody else grants the cell between this screen opening and it saving.
+    // roleClass(), not Post::class: the `test` panel registers no resource for
+    // Post, so a grant on it would draw no cell and leave the control empty.
+    $component = livewire(GridHost::class, ['roleKey' => $role->getKey()]);
+
+    Warden::allow($role)->to('viewAny', roleClass());
+
+    $component->call('save');
+
+    /**
+     * @var array{
+     *     stances: array<string, array<string, string>>,
+     *     narrowing: array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>,
+     *     baseline: array{
+     *         stances: array<string, array<string, string>>,
+     *         narrowing: array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>,
+     *     },
+     * } $state
+     */
+    $state = $component->get('data.permissions');
+
+    expect($state['baseline']['stances'])->toBe($state['stances'])
+        ->and($state['baseline']['narrowing'])->toBe($state['narrowing'])
+        ->and($state['stances'])->not->toBeEmpty();
+});
