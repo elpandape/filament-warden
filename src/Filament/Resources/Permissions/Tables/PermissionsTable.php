@@ -132,7 +132,7 @@ final class PermissionsTable
         }
 
         return __('filament-warden::ui.resources.permissions.delete.holders', [
-            'roles' => count($holders->roles),
+            'roles' => $holders->roleCount,
             'accounts' => $holders->accountCount,
             'names' => implode(', ', [...$holders->roles, ...$holders->accounts]),
         ]);

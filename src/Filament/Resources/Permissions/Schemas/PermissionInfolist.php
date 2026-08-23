@@ -74,7 +74,7 @@ final class PermissionInfolist
                     ->schema([
                         TextEntry::make('roles')
                             ->label(__('filament-warden::ui.resources.permissions.holders.roles'))
-                            ->state(static fn (Model $record): int => count(Holders::of($record)->roles)),
+                            ->state(static fn (Model $record): int => Holders::of($record)->roleCount),
 
                         TextEntry::make('accounts')
                             ->label(__('filament-warden::ui.resources.permissions.holders.accounts'))

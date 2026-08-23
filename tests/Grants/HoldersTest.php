@@ -213,3 +213,32 @@ test('a memoised answer survives a grant made after it, until forget() is called
     expect(Holders::of($permission)->isOrphaned())->toBeFalse()
         ->and(Holders::anyFor($permission))->toBeTrue();
 });
+
+test('a grant pointing at a role that no longer exists is still somebody holding it', function (): void {
+    $role = makeRole('editor');
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    $permission = latestPermission('viewAny');
+
+    Context::resolve()->roleClass()::query()->whereKey($role->getKey())->delete();
+
+    $holders = Holders::of($permission);
+
+    expect($holders->roleCount)->toBe(1)
+        ->and($holders->roles)->toBeEmpty()
+        ->and($holders->isOrphaned())->toBeFalse()
+        ->and($holders->total())->toBe(1)
+        ->and(Holders::anyFor(latestPermission('viewAny')))->toBeTrue();
+});
+
+test('the count and the names agree for a role that does exist', function (): void {
+    $role = makeRole('editor');
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    $holders = Holders::of(latestPermission('viewAny'));
+
+    expect($holders->roleCount)->toBe(1)
+        ->and($holders->roles)->toBe(['Editor']);
+});

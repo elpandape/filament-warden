@@ -70,6 +70,7 @@ final class Holders
      */
     public function __construct(
         public readonly array $roles = [],
+        public readonly int $roleCount = 0,
         public readonly array $accounts = [],
         public readonly int $accountCount = 0,
         public readonly bool $everyone = false,
@@ -88,17 +89,17 @@ final class Holders
      * forbidden, to a role, an account or everyone — without building a
      * single label.
      *
-     * `isOrphaned()` answers the same question for every row this class
-     * ever reads for real: `build()` below folds a forbidding-only grant
-     * into `$byType`/`$everyone` exactly like a granting one, so the only
-     * way `isOrphaned()` comes back true is that no `grants` row named this
-     * permission at all — which is this method's `EXISTS`, unqualified.
-     * `PermissionsTable`'s own `held` filter already reads "held" the same
-     * way, with the same shape of query, so this is not a new definition of
-     * the word: it is the cheap path to the one this class already answers,
-     * for the two callers — `PermissionResource::isDeletable()` and
-     * `::mayEditName()` — that only ever read the boolean and never the
-     * labels `of()` would build to get there.
+     * `isOrphaned()` answers the same question for every row this class ever
+     * reads for real: `build()` folds a forbidding-only grant into the tally
+     * exactly like a granting one, and BOTH authorities are counted from the
+     * keys the grants carry rather than from the records those keys resolve to
+     * — so a grant whose role or account has since been deleted still counts,
+     * and the only way `isOrphaned()` comes back true is that no `grants` row
+     * named this permission at all, which is this method's `EXISTS`,
+     * unqualified. Counting the roles from the records instead is what made
+     * this sentence false: nothing cascades a role's own grants (there is no
+     * foreign key on `grants.entity_type`/`entity_id`), so those rows outlive
+     * their authority and a screen that counted labels called them nobody.
      */
     public static function anyFor(Model $permission): bool
     {
@@ -154,12 +155,12 @@ final class Holders
 
     public function isOrphaned(): bool
     {
-        return $this->roles === [] && $this->accountCount === 0 && ! $this->everyone;
+        return $this->roleCount === 0 && $this->accountCount === 0 && ! $this->everyone;
     }
 
     public function total(): int
     {
-        return count($this->roles) + $this->accountCount + ($this->everyone ? 1 : 0);
+        return $this->roleCount + $this->accountCount + ($this->everyone ? 1 : 0);
     }
 
     private static function build(Model $permission): self
@@ -212,7 +213,8 @@ final class Holders
         [$accounts, $accountCount] = self::accounts($byType);
 
         return new self(
-            roles: self::labels($context->roleClass(), $roleKeys, count($roleKeys)),
+            roles: self::labels($context->roleClass(), $roleKeys, self::LABELS),
+            roleCount: count($roleKeys),
             accounts: $accounts,
             accountCount: $accountCount,
             everyone: $everyone,
