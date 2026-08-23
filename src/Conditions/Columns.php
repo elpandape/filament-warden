@@ -21,16 +21,16 @@ use Throwable;
  * Asked of the model's own connection and not of the `Schema::` facade, which
  * would resolve the default one.
  *
- * Kept as `getColumns()` rather than switched to `getColumnListing()`, but not
- * for the types: the schema's own types never decide anything here — sqlite has
+ * Kept as `getColumns()` rather than `getColumnListing()` because the rows it
+ * answers with carry the schema's type name, and one caller needs it: `LIKE`
+ * raises in postgres against a column that is not a text type. The BOOLEAN
+ * question is a different one and still goes to the model's casts — sqlite has
  * no boolean type at all, and an uncast postgres `boolean` column still comes
- * back as `1` — so the boolean question goes to the model's casts instead, and
- * `getColumns()` stays only because it is the call that answers with the column
- * list this class needs.
+ * back as `1`.
  */
 final class Columns
 {
-    /** @var array<string, array{columns: list<string>, booleans: list<string>}> */
+    /** @var array<string, array{columns: list<string>, booleans: list<string>, texts: list<string>}> */
     private static array $memo = [];
 
     /**
@@ -40,6 +40,28 @@ final class Columns
     public static function of(string $model): array
     {
         return self::read($model)['columns'];
+    }
+
+    /**
+     * The columns a `LIKE` can be pointed at.
+     *
+     * Postgres raises when `LIKE` meets a column that is not a text type; mysql
+     * and sqlite coerce instead. So a search that picks its columns by NAME —
+     * which is the only thing a package can do about somebody else's account
+     * model — has to drop what it cannot compare, or the screen throws on one
+     * engine and works on the others.
+     *
+     * Matched on the schema's own type name by substring, because the spelling
+     * is the driver's: `varchar`, `character varying`, `bpchar`, `text`,
+     * `longtext`, `citext`. Anything that names neither is left out, which
+     * fails towards a narrower search and never towards a raise.
+     *
+     * @param  class-string<Model>  $model
+     * @return list<string>
+     */
+    public static function texts(string $model): array
+    {
+        return self::read($model)['texts'];
     }
 
     /**
@@ -109,11 +131,11 @@ final class Columns
     }
 
     /**
-     * Both answers, worked out together: they need the same instance and the
-     * same one failure.
+     * All three answers, worked out together: they need the same instance and
+     * the same one failure.
      *
      * @param  class-string<Model>  $model
-     * @return array{columns: list<string>, booleans: list<string>}
+     * @return array{columns: list<string>, booleans: list<string>, texts: list<string>}
      */
     private static function read(string $model): array
     {
@@ -124,10 +146,21 @@ final class Columns
         try {
             $instance = new $model;
 
-            $columns = array_column(
-                $instance->getConnection()->getSchemaBuilder()->getColumns($instance->getTable()),
-                'name',
-            );
+            $schema = $instance->getConnection()->getSchemaBuilder()->getColumns($instance->getTable());
+
+            $columns = array_column($schema, 'name');
+
+            // `getColumns()` declares `type_name` as `string` on every row it
+            // returns, never absent and never null, so an `is_string()` guard
+            // here is dead code PHPStan at `level: max` refuses to pass.
+            $texts = array_values(array_map(
+                static fn (array $column): string => (string) $column['name'],
+                array_filter(
+                    $schema,
+                    static fn (array $column): bool => str_contains(mb_strtolower($column['type_name']), 'char')
+                        || str_contains(mb_strtolower($column['type_name']), 'text'),
+                ),
+            ));
 
             $booleans = array_keys(array_filter(
                 $instance->getCasts(),
@@ -138,9 +171,10 @@ final class Columns
             // so does a connection that will not resolve. The builder is left with
             // nothing to compare, and says so.
             $columns = [];
+            $texts = [];
             $booleans = [];
         }
 
-        return self::$memo[$model] = ['columns' => $columns, 'booleans' => $booleans];
+        return self::$memo[$model] = ['columns' => $columns, 'booleans' => $booleans, 'texts' => $texts];
     }
 }

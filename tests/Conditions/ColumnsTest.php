@@ -31,6 +31,14 @@ test('a connection that will not answer leaves nothing to compare', function ():
     expect(Columns::of(Broken::class))->toBeEmpty();
 });
 
+test('it names the columns a like can compare', function (): void {
+    expect(Columns::texts(Post::class))->toBe(['title']);
+});
+
+test('a model whose schema cannot be read offers no text columns', function (): void {
+    expect(Columns::texts(Broken::class))->toBeEmpty();
+});
+
 test('what is remembered can be forgotten', function (): void {
     Columns::of(Post::class);
     Columns::forget();

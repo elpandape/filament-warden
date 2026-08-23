@@ -63,7 +63,7 @@ class ViewPermission extends ViewRecord
             return [];
         }
 
-        $clauses = array_values(array_intersect_key(self::SEARCHABLE, array_flip(Columns::of($model))));
+        $clauses = array_values(array_intersect_key(self::SEARCHABLE, array_flip(Columns::texts($model))));
 
         // With nothing to search, the closure below added no condition at all
         // and the query answered with the first twenty accounts — every search

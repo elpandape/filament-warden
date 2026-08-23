@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use ElPandaPe\FilamentWarden\Conditions\Columns;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages\CreatePermission;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages\EditPermission;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages\ListPermissions;
@@ -11,6 +12,7 @@ use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Tables\PermissionsTa
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Comment;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
@@ -1115,4 +1117,12 @@ test('a rule naming a column the table no longer has says which cause it is', fu
     livewire(EditPermission::class, ['record' => $permission->getKey()])
         ->assertSee(__('filament-warden::ui.conditions.locked.column'))
         ->assertDontSee(__('filament-warden::ui.conditions.locked.shape'));
+});
+
+test('the probe searches only columns a like can compare', function (): void {
+    makeUser('Amaru Quispe');
+
+    expect(Columns::texts(User::class))->toContain('name')
+        ->and(Columns::texts(User::class))->not->toContain('id')
+        ->and(ViewPermission::accounts('Amaru'))->not->toBeEmpty();
 });
