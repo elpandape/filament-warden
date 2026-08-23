@@ -216,18 +216,20 @@ class RolesTable
      * measured against 200 assignment rows over 5 roles, the listing
      * hydrated 400 `AssignedRole` models — this query and
      * `assignedRoleIds()` below reading every row once each — against 10
-     * after, five apiece. Both numbers are what the listing's own
-     * `'reads bounded by the role catalogue'` test counts, through Eloquent's
-     * `retrieved` event; a statement counter sees 3 either way and cannot
-     * tell them apart.
+     * after, five apiece. The test `'the listing's two reads are bounded by
+     * the role catalogue, not by the assignment table'` counts the 10,
+     * through Eloquent's `retrieved` event, and caps it; the 400 is what the
+     * unbounded bodies produce on the same fixture. A statement counter sees
+     * 3 either way and cannot tell them apart.
      *
      * `count(*)` is whatever the driver hands back, and nothing normalises it
      * on the way through: `AssignedRole` declares no `$casts` at all, so an
      * aggregate has no cast to fall into. Measured here, under SQLite, it
      * arrives as `int`; what another driver returns is not something this
-     * suite can measure, so it is narrowed with `is_numeric()` — the same
-     * treatment every other value this class reads off a row already gets —
-     * rather than assumed.
+     * suite can measure, so it is narrowed with `is_numeric()` rather than
+     * assumed. The other row values this class reads are keys, not
+     * aggregates, and take a different narrowing (`is_int() || is_string()`)
+     * for that reason.
      *
      * A holder restricted to a context is one more row with the same
      * `role_id` and counts here exactly like an unrestricted one — this
