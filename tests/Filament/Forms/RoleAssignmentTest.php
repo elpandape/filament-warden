@@ -15,6 +15,7 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
@@ -203,6 +204,31 @@ test('a save leaves alone the role somebody else handed out while this screen wa
 
     expect(Assignment::of($account))->toContain($theirs->getKey())
         ->and(Assignment::of($account))->toContain($mine->getKey());
+});
+
+test('nothing is announced when the save is rolled back', function (): void {
+    $signedIn = signIn();
+    Warden::allow($signedIn)->to('update', roleClass());
+
+    $account = makeUser();
+    $mine = makeRole('mine');
+    $theirs = makeRole('theirs');
+
+    $screen = livewire(AccountHost::class, ['accountKey' => $account->getKey()]);
+
+    $screen->set('data.roles', [$mine->getKey()]);
+
+    Warden::assign($theirs)->to($account);
+
+    $connection = DB::connection(Context::resolve()->connection());
+
+    expect(fn () => $connection->transaction(function () use ($screen): void {
+        $screen->call('save');
+
+        throw new RuntimeException('a failure the field cannot see coming');
+    }))->toThrow(RuntimeException::class);
+
+    $screen->assertNotNotified(__('filament-warden::ui.relations.roles.concurrent.kept_title'));
 });
 
 test('a save that met nobody says nothing', function (): void {

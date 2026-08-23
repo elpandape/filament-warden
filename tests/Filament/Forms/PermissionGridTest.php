@@ -10,9 +10,20 @@
  * with what the test is about.
  *
  * A test that says "somebody else" moved a cell has to mount the field FIRST
- * and grant AFTER: `RoleGrants::changes()` compares the baseline stamped at
- * mount against what the store now holds, so a grant made before the field
- * ever opens is simply what was already there — nothing to report as met.
+ * and grant AFTER: `RoleGrants::plan()` opens with `if ($from === $to && !
+ * $moved) continue;` — comparing the fresh store read against the payload —
+ * and that guard fires BEFORE the code ever reaches the baseline comparison
+ * that decides `preserved`. A grant made before the field opens leaves the
+ * mount-time payload and the fresh store agreeing (both already show the
+ * grant), so the guard trips and the cell is skipped outright; the baseline
+ * block never runs.
+ *
+ * `GridHost::save()` also calls `saveRelationships()` twice — once inside
+ * `getState()`, once explicitly — and the second call always finds nothing
+ * left to report: the first call's own re-hydration rewrites state to match
+ * the store before the second one runs, so `$from === $to` for every cell by
+ * construction. That is why a save through `GridHost` always leaves the
+ * container holding an all-zero `SaveReport`, whatever it actually wrote.
  */
 declare(strict_types=1);
 
@@ -22,6 +33,7 @@ use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\CreateRole;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
+use ElPandaPe\FilamentWarden\Grants\SaveReport;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\PostResource;
@@ -922,4 +934,19 @@ test('nothing is announced when the save is rolled back', function (): void {
     }))->toThrow(RuntimeException::class);
 
     $component->assertNotNotified(__('filament-warden::ui.grid.concurrent.kept_title'));
+});
+
+test('what the save did stays reachable in the container for a page that wants to say more', function (): void {
+    $role = makeRole('editor');
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('save');
+
+    expect(app()->bound(SaveReport::class))->toBeTrue();
+
+    $report = app(SaveReport::class);
+
+    expect($report->written)->toBe(0)
+        ->and($report->preserved)->toBe(0)
+        ->and($report->refused)->toBeEmpty();
 });
