@@ -102,6 +102,44 @@ final readonly class GridView
     }
 
     /**
+     * How the grid names one cell, for a caller that holds its keys and needs
+     * its words.
+     *
+     * A save that refuses a cell has to name it, and naming it any other way
+     * would give one cell two vocabularies on one screen — the store's
+     * `deleteAny on warden.role` beside the grid's own `Roles - Delete any`.
+     * The catalogue this reads is memoised per panel since `1.5.0`, so asking
+     * for it again here costs nothing.
+     */
+    public static function cellLabel(Catalog $catalog, string $row, string $action): string
+    {
+        $entries = array_values(array_filter(
+            $catalog->entries,
+            static fn (Entry $entry): bool => StateKey::row($entry) === $row,
+        ));
+
+        $entry = $entries[0] ?? null;
+
+        $rowLabel = match (true) {
+            ! $entry instanceof Entry => self::humanize(class_basename($row)),
+            $entry->model === null => self::doorLabel($entry),
+            default => self::entityLabel($entry->model, $entries),
+        };
+
+        // A door has one cell and it is the row: naming its column as well would
+        // read as two things where there is one.
+        if ($action === StateKey::DOOR) {
+            return $rowLabel;
+        }
+
+        $actionLabel = $action === StateKey::MANAGE
+            ? self::translated('filament-warden::ui.grid.manage', 'everything')
+            : self::actionLabel($action);
+
+        return $rowLabel.' · '.$actionLabel;
+    }
+
+    /**
      * What the browser needs and nothing more: the cycle order, which actions a
      * granted wildcard reaches on each row, and which rows belong to each tab.
      *

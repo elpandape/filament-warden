@@ -30,6 +30,13 @@ use function Pest\Livewire\livewire;
  * too'. The translated description of this section said the opposite for one
  * release; the sentence was wrong, not the code, and got corrected to match
  * what is actually true.
+ *
+ * The two screens no longer hand over byte-identical arrays and that is the
+ * point of the second test here, not a loosened first one: only the form can be
+ * saved, so only the form is stamped with what it was showing when it opened.
+ * The shared halves still have to match, because they are still worked out in
+ * one place — and the extra key has to be a copy of that same payload rather
+ * than a second derivation of the store, which is what would drift.
  */
 pest()->extend(TestCase::class);
 
@@ -131,8 +138,31 @@ test('both screens are handed the same payload, because it is worked out once', 
 
     $onThePage = stateHandedTo(livewire(ViewRole::class, ['record' => $role->getKey()])->html());
 
-    livewire(EditRole::class, ['record' => $role->getKey()])
-        ->assertSetStrict('data.permissions', $onThePage);
+    $state = livewire(EditRole::class, ['record' => $role->getKey()])->get('data.permissions');
+    $state = is_array($state) ? $state : [];
+
+    expect(partOf($state, 'stances'))->toBe(partOf($onThePage, 'stances'))
+        ->and(partOf($state, 'narrowing'))->toBe(partOf($onThePage, 'narrowing'));
+});
+
+test('only the form carries a baseline, and it is a copy of what it was handed', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+    Warden::allow($role)->to('viewAny', roleClass());
+    Warden::allow($role)->to('update', roleClass())->where('name', '=', '2');
+
+    $onThePage = stateHandedTo(livewire(ViewRole::class, ['record' => $role->getKey()])->html());
+
+    $state = livewire(EditRole::class, ['record' => $role->getKey()])->get('data.permissions');
+    $state = is_array($state) ? $state : [];
+
+    expect(array_keys($onThePage))->toBe(['stances', 'narrowing'])
+        ->and(array_keys($state))->toBe(['stances', 'narrowing', 'baseline'])
+        ->and(partOf($state, 'baseline'))->toBe($onThePage);
 });
 
 test('no cell of a screen that only reads is a control that cycles', function (): void {

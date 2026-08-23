@@ -46,7 +46,11 @@ test('a role that holds nothing opens on an empty grid', function (): void {
     $role = makeRole();
 
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
-        ->assertSet('data.permissions', ['stances' => [], 'narrowing' => []]);
+        ->assertSet('data.permissions', [
+            'stances' => [],
+            'narrowing' => [],
+            'baseline' => ['stances' => [], 'narrowing' => []],
+        ]);
 });
 
 test('saving writes what the grid says through warden', function (): void {

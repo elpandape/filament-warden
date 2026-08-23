@@ -290,6 +290,13 @@ return [
             'all' => 'all',
             'clear' => 'none',
         ],
+        'concurrent' => [
+            'kept_title' => 'Saved, and somebody else had been editing too',
+            'kept' => '{1} One cell you did not change had already been changed by somebody else. It was left as they set it.|[2,*] :count cells you did not change had already been changed by somebody else. They were left as those people set them.',
+            'refused_title' => 'Saved, but not all of it',
+            'refused' => 'Somebody else changed these while you had this open, so what you set was not written. Check what they hold now and set yours again: :cells',
+            'more' => 'and :count more',
+        ],
         'mixing' => 'No tenant is active, so this shows every tenant at once — that is what the store answers right now. A row that belongs to another tenant is marked and cannot be changed from here.',
         'wider' => 'This role holds a rule wider than the grid can show, so every cell below is already answered:',
         'records' => 'This role also holds rules pinned to single records. They answer no check about the entity as a whole, so they own no cell below — and this screen cannot change them:',

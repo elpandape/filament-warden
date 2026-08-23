@@ -1076,3 +1076,98 @@ test('two different conditions saved together keep their own twin, not one share
         ->and($state->narrowings[Post::class]['update']->rules[0]->value)->toBe('beta')
         ->and(grantCount())->toBe(2);
 });
+
+test('a cell nobody touched is left as somebody else set it', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    $wasShowing = ['stances' => [], 'narrowing' => []];
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    $report = RoleGrants::apply($role, $catalog, [], null, $wasShowing);
+
+    expect(Access::granted($role, 'viewAny', Post::class))->toBeTrue()
+        ->and($report->preserved)->toBe(1)
+        ->and($report->written)->toBe(0)
+        ->and($report->refused)->toBeEmpty();
+});
+
+test('a cell this person moved is written when nobody else moved it', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    $wasShowing = ['stances' => [], 'narrowing' => []];
+
+    $report = RoleGrants::apply(
+        $role,
+        $catalog,
+        [Post::class => ['viewAny' => 'granted']],
+        null,
+        $wasShowing,
+    );
+
+    expect(Access::granted($role, 'viewAny', Post::class))->toBeTrue()
+        ->and($report->written)->toBe(1)
+        ->and($report->preserved)->toBe(0)
+        ->and($report->refused)->toBeEmpty();
+});
+
+test('a cell two people moved apart is refused, not overwritten', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    $wasShowing = ['stances' => [], 'narrowing' => []];
+
+    Warden::forbid($role)->to('viewAny', Post::class);
+
+    $report = RoleGrants::apply(
+        $role,
+        $catalog,
+        [Post::class => ['viewAny' => 'granted']],
+        null,
+        $wasShowing,
+    );
+
+    expect(Access::granted($role, 'viewAny', Post::class))->toBeFalse()
+        ->and($report->written)->toBe(0)
+        ->and($report->preserved)->toBe(0)
+        ->and($report->refused)->toBe([['row' => Post::class, 'action' => 'viewAny']]);
+});
+
+test('two people who set the same cell the same way do not annoy each other', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    $wasShowing = ['stances' => [], 'narrowing' => []];
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    $before = grantCount();
+
+    $report = RoleGrants::apply(
+        $role,
+        $catalog,
+        [Post::class => ['viewAny' => 'granted']],
+        null,
+        $wasShowing,
+    );
+
+    expect(grantCount())->toBe($before)
+        ->and($report->metAnother())->toBeFalse()
+        ->and($report->written)->toBe(0)
+        ->and($report->refused)->toBeEmpty();
+});
+
+test('without a baseline every cell counts as touched', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    $report = RoleGrants::apply($role, $catalog, []);
+
+    expect(Access::granted($role, 'viewAny', Post::class))->toBeFalse()
+        ->and($report->written)->toBe(1)
+        ->and($report->metAnother())->toBeFalse();
+});

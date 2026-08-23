@@ -11,6 +11,7 @@ use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Conditions\Ownership;
 use ElPandaPe\FilamentWarden\Conditions\Shape;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
+use ElPandaPe\FilamentWarden\Filament\Forms\Grid\State;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\Warden\Actions\GrantsPermissions;
 use ElPandaPe\Warden\Context;
@@ -141,13 +142,14 @@ final class RoleGrants
      *
      * @param  array<string, array<string, string>>  $desired
      * @param  array<string, array<string, mixed>>|null  $narrowings  null when the screen does not offer them
+     * @param  array{stances?: mixed, narrowing?: mixed}|null  $baseline  what the screen was showing when it opened
      */
-    public static function apply(Model $role, Catalog $catalog, array $desired, ?array $narrowings = null): void
+    public static function apply(Model $role, Catalog $catalog, array $desired, ?array $narrowings = null, ?array $baseline = null): SaveReport
     {
-        $changes = self::changes($role, $catalog, $desired, $narrowings);
+        [$changes, $report] = self::plan($role, $catalog, $desired, $narrowings, $baseline);
 
         if ($changes === []) {
-            return;
+            return $report;
         }
 
         // One transaction for the whole grid, opened on warden's own
@@ -171,17 +173,67 @@ final class RoleGrants
             self::revoke($role, $changes);
             self::grant($role, $changes);
         });
+
+        return $report;
     }
 
     /**
      * @param  array<string, array<string, string>>  $desired
      * @param  array<string, array<string, mixed>>|null  $narrowings  null when the screen does not offer them
+     * @param  array{stances?: mixed, narrowing?: mixed}|null  $baseline  what the screen was showing when it opened
      * @return list<Change>
      */
-    public static function changes(Model $role, Catalog $catalog, array $desired, ?array $narrowings = null): array
+    public static function changes(Model $role, Catalog $catalog, array $desired, ?array $narrowings = null, ?array $baseline = null): array
+    {
+        return self::plan($role, $catalog, $desired, $narrowings, $baseline)[0];
+    }
+
+    /**
+     * The difference between three things, not two.
+     *
+     * A payload is not an intent. It is what the store held when the screen
+     * opened PLUS whatever this person changed, and until this version nothing
+     * separated the two halves: every cell where the payload and the store
+     * disagreed was written, so a cell somebody else had moved in the meantime
+     * was quietly moved back. It ran in both directions and over every drawn
+     * cell, not only the ones this person touched.
+     *
+     * With the baseline the screen was showing, each cell answers two questions
+     * instead of one — did THIS person move it, and did the store move under
+     * them — and the four answers are four different outcomes:
+     *
+     * - untouched and undrifted: nothing to do, and it never reaches here.
+     * - untouched and drifted: somebody else's edit. Left alone and counted.
+     * - touched and undrifted: written.
+     * - touched and drifted: refused, and named.
+     *
+     * The fifth case needs no branch and that is worth saying, because its
+     * absence looks like an omission: two people who moved the same cell to the
+     * SAME value leave payload and store agreeing, so the guard above returns
+     * before any of this — no write, no complaint, nothing to report. Giving it
+     * a branch would make two people who agree annoy each other.
+     *
+     * A caller that passes no baseline is asserting a state outright rather
+     * than relaying a form somebody had open — a console script, a seeder, a
+     * test. There is no earlier screen to have drifted under, so every cell
+     * counts as touched, which is what this method did before there was a
+     * baseline at all.
+     *
+     * @param  array<string, array<string, string>>  $desired
+     * @param  array<string, array<string, mixed>>|null  $narrowings
+     * @param  array{stances?: mixed, narrowing?: mixed}|null  $baseline
+     * @return array{0: list<Change>, 1: SaveReport}
+     */
+    private static function plan(Model $role, Catalog $catalog, array $desired, ?array $narrowings, ?array $baseline): array
     {
         $current = self::of($role, $catalog);
+
+        $wasStances = $baseline === null ? null : State::stances($baseline);
+        $wasNarrowings = $baseline === null ? [] : State::narrowings($baseline);
+
         $changes = [];
+        $preserved = 0;
+        $refused = [];
 
         foreach (self::cells($catalog) as [$row, $action, $name, $entity]) {
             $stored = $current->narrowings[$row][$action] ?? Narrowing::all();
@@ -213,21 +265,49 @@ final class RoleGrants
 
             $moved = ! $stored->is($wanted);
 
-            if ($from !== $to || $moved) {
-                // What the browser sent decides WHETHER the rule moved; what the
-                // store holds decides WHAT gets written when it did not. The two
-                // are not the same object: `is()` compares payloads, and a
-                // payload carries every value as text — which is right for a
-                // screen that only knows text, and wrong as the source of a
-                // write. Reading it as both turns a condition stored as the
-                // string `'true'`, which matches nothing, into the boolean
-                // `true`, which matches every row, on a click that only meant to
-                // forbid instead of grant.
-                $changes[] = new Change($name, $entity, $to, $moved ? $wanted : $stored);
+            if ($from === $to && ! $moved) {
+                continue;
             }
+
+            if ($wasStances !== null) {
+                $was = self::stanceIn($wasStances, $row, $action);
+
+                // With the builder off the reach is not on offer, so it cannot
+                // have been touched; reading the baseline's as the wanted one
+                // takes that dimension out of both comparisons at once. And a
+                // baseline reach this version cannot rebuild is read the same
+                // way, deliberately: unable to tell whether they touched it, the
+                // safe answer is that they did not, which preserves rather than
+                // writes.
+                $wasNarrowing = $narrowings === null
+                    ? $wanted
+                    : (self::wanted($wasNarrowings[$row][$action] ?? null, $entity) ?? $wanted);
+
+                if ($was === $to && $wasNarrowing->is($wanted)) {
+                    $preserved++;
+
+                    continue;
+                }
+
+                if ($was !== $from || ! $wasNarrowing->is($stored)) {
+                    $refused[] = ['row' => $row, 'action' => $action];
+
+                    continue;
+                }
+            }
+
+            // What the browser sent decides WHETHER the rule moved; what the
+            // store holds decides WHAT gets written when it did not. The two
+            // are not the same object: `is()` compares payloads, and a payload
+            // carries every value as text — which is right for a screen that
+            // only knows text, and wrong as the source of a write. Reading it as
+            // both turns a condition stored as the string `'true'`, which matches
+            // nothing, into the boolean `true`, which matches every row, on a
+            // click that only meant to forbid instead of grant.
+            $changes[] = new Change($name, $entity, $to, $moved ? $wanted : $stored);
         }
 
-        return $changes;
+        return [$changes, new SaveReport(count($changes), $preserved, $refused)];
     }
 
     /**

@@ -4,16 +4,31 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages;
 
+use ElPandaPe\FilamentWarden\Catalog\Catalog;
+use ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Tables\RolesTable;
+use ElPandaPe\FilamentWarden\Grants\SaveReport;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
+use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
+use Filament\Panel;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class EditRole extends EditRecord
 {
+    /**
+     * How many refused cells are named before the rest become a tally.
+     *
+     * The same shape `Holders::LABELS` already uses, and for the same reason: a
+     * grid can refuse as many cells as it draws, and a notification that listed
+     * two hundred of them would say nothing.
+     */
+    private const int NAMED = 5;
+
     protected static string $resource = RoleResource::class;
 
     /**
@@ -74,5 +89,82 @@ class EditRole extends EditRecord
         }
 
         return $data;
+    }
+
+    /**
+     * What the save actually did, once somebody else can have been editing too.
+     *
+     * A save used to have one outcome. It now has three, and the notification is
+     * the one place they are said — the grid itself says nothing about the save
+     * and simply re-reads the store below, because a screen that draws a fact
+     * AND hands the same fact to the browser is a screen with two versions of it
+     * (AGENTS.md §6.24).
+     *
+     * `app()` is where the report is picked up rather than a property on this
+     * page, because the field writes it from inside `saveRelationshipsUsing()`
+     * and Filament rebuilds the schema — and every component in it — on each
+     * request. The binding lives exactly as long as the request that made it.
+     */
+    protected function getSavedNotification(): ?Notification
+    {
+        $report = app()->bound(SaveReport::class) ? app(SaveReport::class) : null;
+
+        if (! $report instanceof SaveReport || ! $report->metAnother()) {
+            return parent::getSavedNotification();
+        }
+
+        if ($report->refused === []) {
+            return Notification::make()
+                ->success()
+                ->title(__('filament-warden::ui.grid.concurrent.kept_title'))
+                ->body(trans_choice('filament-warden::ui.grid.concurrent.kept', $report->preserved));
+        }
+
+        return Notification::make()
+            ->warning()
+            ->title(__('filament-warden::ui.grid.concurrent.refused_title'))
+            ->body(__('filament-warden::ui.grid.concurrent.refused', ['cells' => $this->refusedCells($report)]));
+    }
+
+    /**
+     * The screen tells the truth again, whatever the save met.
+     *
+     * Without this the person is left looking at what the store held when they
+     * opened it, their next save collides on the very same cells, and nothing on
+     * screen explains why. Re-filling also re-stamps the baseline, so the second
+     * attempt starts from what is actually there.
+     */
+    protected function afterSave(): void
+    {
+        $this->fillForm();
+    }
+
+    /**
+     * The refused cells, in the grid's own words.
+     *
+     * Asking the catalogue again is free since `1.5.0` memoised it per panel,
+     * and it is what keeps one cell from having two names on one screen.
+     */
+    private function refusedCells(SaveReport $report): string
+    {
+        // Typed `?Panel` and never null in fact: it throws when there is no
+        // panel rather than answering nothing (AGENTS.md §6.12).
+        /** @var Panel $panel */
+        $panel = Filament::getCurrentOrDefaultPanel();
+
+        $catalog = Catalog::for($panel);
+
+        $named = array_map(
+            static fn (array $cell): string => GridView::cellLabel($catalog, $cell['row'], $cell['action']),
+            array_slice($report->refused, 0, self::NAMED),
+        );
+
+        $rest = count($report->refused) - count($named);
+
+        if ($rest > 0) {
+            $named[] = __('filament-warden::ui.grid.concurrent.more', ['count' => $rest]);
+        }
+
+        return implode(', ', $named);
     }
 }
