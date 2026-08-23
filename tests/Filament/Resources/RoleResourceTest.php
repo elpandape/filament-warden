@@ -868,6 +868,40 @@ test('the count column stays under the tenant you are in, unlike the delete rule
     });
 });
 
+/**
+ * The listing's own version of "a role held under another tenant is not
+ * offered for deletion" above: that test calls `RoleResource::isDeletable()`
+ * directly, which never exercises `RolesTable::assignedRoleIds()` — the
+ * batched, wide query "Que no cueste" (v1.5.0) built for the button's own
+ * `visible()` closure. Button AND server, not only one: `assertTableActionHidden()`
+ * proves the button is closed and the raw `mountAction`/`callMountedAction`
+ * call proves the write is refused too, the same "not only the check" shape
+ * `EditRole`'s protected-role test already uses. Both `viewAny` and `delete`
+ * are granted so the only thing left to close the button is `isDeletable()`
+ * itself — the previous test above grants only `viewAny`, which would hide
+ * the button on policy grounds alone and prove nothing about this batch.
+ */
+test('the delete button beside it reads wide, unlike the count column, even batched for the page', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $role = makeRole();
+
+    Warden::tenant()->onceTo(7, static function () use ($role): void {
+        Warden::assign($role)->to(makeUser('Holder'));
+    });
+
+    Warden::tenant()->onceTo(8, function () use ($role): void {
+        livewire(ListRoles::class)
+            ->assertTableActionHidden('delete', $role)
+            ->call('mountAction', 'delete', [], ['table' => true, 'recordKey' => recordKey($role)])
+            ->call('callMountedAction', []);
+    });
+
+    expect(roleClass()::query()->whereKey($role->getKey())->exists())->toBeTrue();
+});
+
 test("the listing's held-by column and delete button together cost 3 assigned_roles reads for 5 roles, capped at 5", function (): void {
     $user = signIn();
     Warden::allow($user)->to('viewAny', roleClass());
