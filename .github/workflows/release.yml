@@ -14,11 +14,19 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      # Full history and tags: the release title reads the pushed tag's own
-      # annotation, which a shallow checkout would not have.
+      # `fetch-depth: 0` is belt and braces, not a requirement: measured against
+      # the live remote, a depth-1 tag fetch already brings the annotated tag
+      # OBJECT down with its subject intact, and CHANGELOG.md with it. It is kept
+      # because a release is rare and one full clone is cheap, while the shallow
+      # path depends on an internal refspec of a third-party action.
+      #
+      # `persist-credentials: false` because nothing after this step uses git over
+      # the network — `gh` carries its own token — so there is no reason to leave a
+      # `contents: write` credential in `.git/config` for the rest of the job.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       # AGENTS.md §8: a release is the tag, the GitHub release with the CHANGELOG's
       # own notes for that version, and the Packagist check — never the tag alone.
@@ -50,8 +58,12 @@ jobs:
 
       # The title convention this project already uses by hand is
       # "<tag> — <headline>" (AGENTS.md §8, `gh release create ... --title`), and
-      # that headline lives nowhere but the annotated tag's own subject line — it
-      # is not in CHANGELOG.md.
+      # the annotated tag's subject is the only place a machine can read it from —
+      # CHANGELOG.md does not carry it. It is not, however, where the shipped
+      # titles came from: of the 26 tags that have a release, only 10 subjects match
+      # it — 11 differ by the case of one word and 5 completely, because they were
+      # typed by hand at `gh release create` time. From here on the annotation IS
+      # the title, so `git tag -a` has to carry the exact headline.
       #
       # The guard is on `%(objecttype)`, NOT on the subject coming back empty.
       # `%(contents:subject)` on a ref that points straight at a commit — which is
