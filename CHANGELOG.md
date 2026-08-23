@@ -36,7 +36,9 @@ the wrong owner.
 - **The account-search probe could raise on Postgres by asking `LIKE` of a column that cannot answer
   it.** Postgres raises when `LIKE` meets a column that is not a text type; MySQL and SQLite silently
   coerce instead. The search now keeps only the columns the new `Columns::texts()` names as
-  text-shaped, read from the schema's own type name rather than assumed from a name whitelist.
+  text-shaped, read from the schema's own type name. `ViewPermission`'s own `SEARCHABLE` name
+  whitelist is not gone — `accounts()` still intersects the two — this only narrows what it already
+  named, on top of it, rather than replacing it.
 
 - **A refused cell on a page this package does not own stayed refused forever.** `EditRole` recovers
   from a refusal by re-filling its whole form afterwards, which happens to re-stamp the grid's own
@@ -87,8 +89,11 @@ the wrong owner.
   question instead, outside the table.
 - **An audit gate for "a policy that never consults warden".** Undecidable without executing it: the
   signal such a gate would need is per class, while a screen's cells are per method, so the check has
-  structural false negatives — and at least three legitimate warden-consulting policy shapes would be
-  false positives.
+  structural false negatives — and it would be a false positive on any of these legitimate shapes: a
+  policy built on role checks (`Warden::is($user)->a('admin')`, or `$user->isA(...)` from warden's
+  `HasRolesAndPermissions`), which consults `assigned_roles` with no Gate and no `Resolver` in sight;
+  a policy calling this package's own `Support\Access::granted()`, which resolves the resolver out of
+  the container and injects nothing; and a policy composing a trait that provides `allows()`.
 - **The roles table's `granted` column, and a `DeleteBulkAction`.** Both recorded as deliberate
   decisions, not gaps.
 - **A fifth provenance badge, for "declared, but by another panel".** `Provenance::of()` and
