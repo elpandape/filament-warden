@@ -26,7 +26,7 @@
         "source": "https://github.com/elpandape/filament-warden"
     },
     "require": {
-        "php": "^8.5",
+        "php": "^8.4",
         "elpandape/warden": "^1.0",
         "filament/filament": "^5.7",
         "illuminate/auth": "^13.0",

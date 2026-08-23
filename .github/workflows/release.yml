@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # Full history and tags: the release title reads the pushed tag's own
+      # annotation, which a shallow checkout would not have.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # AGENTS.md §8: a release is the tag, the GitHub release with the CHANGELOG's
+      # own notes for that version, and the Packagist check — never the tag alone.
+      # This step supplies the notes half; a version with no matching CHANGELOG
+      # section fails the job instead of publishing an empty release.
+      - name: Extract this version's CHANGELOG section
+        id: notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          notes_file="$(mktemp)"
+
+          awk -v version="$version" '
+            BEGIN { gsub(/\./, "\\.", version) }
+            $0 ~ ("^## \\[" version "\\]") { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > "$notes_file"
+
+          # Keep a Changelog leaves a blank line on each side of a section; trim
+          # one from each end so the release body neither opens nor closes on it.
+          sed -i -e '1{/^$/d}' -e '${/^$/d}' "$notes_file"
+
+          if [ ! -s "$notes_file" ]; then
+            echo "::error::No CHANGELOG.md section '## [$version]' found — refusing to publish an empty release." >&2
+            exit 1
+          fi
+
+          echo "file=$notes_file" >> "$GITHUB_OUTPUT"
+
+      # The title convention this project already uses by hand is
+      # "<tag> — <headline>" (AGENTS.md §8, `gh release create ... --title`), and
+      # that headline lives nowhere but the annotated tag's own subject line — it
+      # is not in CHANGELOG.md. A lightweight tag has no subject; fall back to the
+      # bare tag name rather than fail the release over a missing headline.
+      - name: Read the release title from the tag
+        id: title
+        run: |
+          subject="$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents:subject)')"
+          echo "title=${subject:-$GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      # `-rc.` and other semver pre-release suffixes are marked as such, matching
+      # how this project's own v1.0.0-rc.1 release was flagged.
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease_flag=()
+          case "$GITHUB_REF_NAME" in
+            *-*) prerelease_flag=(--prerelease) ;;
+          esac
+
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --title "${{ steps.title.outputs.title }}" \
+            --notes-file "${{ steps.notes.outputs.file }}" \
+            "${prerelease_flag[@]}"

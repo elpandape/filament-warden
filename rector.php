@@ -8,7 +8,6 @@ use Rector\CodingStyle\Rector\ClassMethod\MakeInheritedMethodVisibilitySameAsPar
 use Rector\Config\RectorConfig;
 use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPublicMethodParameterRector;
 use Rector\Php55\Rector\String_\StringClassNameToClassConstantRector;
-use Rector\Php85\Rector\Property\AddOverrideAttributeToOverriddenPropertiesRector;
 use Rector\TypeDeclaration\Rector\StmtsAwareInterface\SafeDeclareStrictTypesRector;
 
 // `SafeDeclareStrictTypesRector` is skipped because Pint's `declare_strict_types` rule seeds
@@ -29,7 +28,6 @@ return RectorConfig::configure()
     ])
     ->withSkip([
         MakeInheritedMethodVisibilitySameAsParentRector::class,
-        AddOverrideAttributeToOverriddenPropertiesRector::class,
         SafeDeclareStrictTypesRector::class,
         // A policy method's parameters are its contract with the gate, used or not.
         RemoveUnusedPublicMethodParameterRector::class => [
