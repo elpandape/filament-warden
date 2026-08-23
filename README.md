@@ -432,10 +432,12 @@ The roles screen shows a grid where:
 > people can only ever have moved one the same way — and the field sends its own notice, because that
 > form is yours and there is no notification of ours to replace.
 >
-> One thing this still does not cover: if you embed `PermissionGrid` on a page of your own rather
+> Two things this still does not cover. If you embed `PermissionGrid` on a page of your own rather
 > than using the roles screen, the *protection* is in the field and works, but the *report* is not —
 > `EditRole` is what turns it into a notification, so on your page a refused cell is simply not
-> written and the save says nothing about it.
+> written and the save says nothing about it. And `RoleAssignment` keeps its copy beside its own
+> state, so a schema with **no state path at all** gives it nowhere to keep one: that page saves the
+> way every page did before `v1.7.0`, with no notice either way.
 
 > ⚡ **From `v1.5.0` a save writes in groups.** Cells that share an entity and a stance and have
 > nothing left to narrow go out in one warden call instead of one per cell. If you listen for

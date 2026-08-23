@@ -6,6 +6,7 @@ use ElPandaPe\FilamentWarden\Filament\Forms\RoleAssignment;
 use ElPandaPe\FilamentWarden\Grants\Assignment;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\AccountHost;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\AccountHostAction;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\AccountHostElsewhere;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\AccountHostFlat;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\AccountHostProtected;
@@ -327,9 +328,34 @@ test('a page with no state path of its own gets no baseline, and saves as before
 
     Warden::assign($role)->to($account);
 
-    livewire(AccountHostFlat::class, ['accountKey' => $account->getKey()])
-        ->set('roles', [])
-        ->call('save');
+    $screen = livewire(AccountHostFlat::class, ['accountKey' => $account->getKey()]);
+
+    // What the branch decides: with nothing to sit beside, the copy is not
+    // written INTO the list itself. A save alone cannot tell the two apart —
+    // both shapes end with the role retracted.
+    expect($screen->get('roles'))->not->toHaveKey(RoleAssignment::BASELINE);
+
+    $screen->set('roles', [])->call('save');
 
     expect(Assignment::of($account))->toBeEmpty();
+});
+
+test('the field inside an action modal leaves the mounted actions array alone', function (): void {
+    $signedIn = signIn();
+    Warden::allow($signedIn)->to('update', roleClass());
+
+    $account = makeUser();
+    $role = makeRole();
+
+    Warden::assign($role)->to($account);
+
+    $screen = livewire(AccountHostAction::class, ['accountKey' => $account->getKey()]);
+
+    $screen->call('mountAction', 'roles');
+
+    $page = $screen->instance();
+
+    // Filament indexes this array by position, and resolves the mounted
+    // schema's name from its last key.
+    expect($page instanceof AccountHostAction ? $page->mountedKeys() : null)->toBe([0]);
 });

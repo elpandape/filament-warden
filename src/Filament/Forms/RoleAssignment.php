@@ -114,10 +114,7 @@ final class RoleAssignment extends CheckboxList
         if ($holder !== null) {
             $livewire = $this->getLivewire();
 
-            /** @var array<string, mixed> $state */
-            $state = $livewire->{$holder};
-            $state[self::BASELINE] = $held;
-            $livewire->{$holder} = $state;
+            data_set($livewire, $holder.'.'.self::BASELINE, $held);
         }
     }
 
@@ -132,10 +129,7 @@ final class RoleAssignment extends CheckboxList
             return null;
         }
 
-        /** @var array<string, mixed> $state */
-        $state = $this->getLivewire()->{$holder};
-
-        $baseline = $state[self::BASELINE] ?? null;
+        $baseline = data_get($this->getLivewire(), $holder.'.'.self::BASELINE);
 
         if (! is_array($baseline)) {
             return null;
@@ -192,27 +186,31 @@ final class RoleAssignment extends CheckboxList
     }
 
     /**
-     * The property the copy sits in, or null when there is none to sit in.
+     * The state bag the copy sits in, or null when there is none to sit in.
      *
-     * Taken from this field's OWN state path rather than from the name `data`,
-     * and both halves of that matter. Filament's own pages do call it `data`,
-     * but a Livewire component written by hand — which is exactly what the
-     * README tells people to put this field in — may call it anything, and
-     * keying off the name left the fix silently switched off there while the
-     * screen still looked fixed.
+     * It is this field's own CONTAINER path — everything before the last
+     * segment — and both halves of that matter.
      *
-     * Reading the path rather than a name is also what keeps this from throwing.
-     * `property_exists()` answers true for a NON-public property, and reading one
-     * then goes through Livewire's `__get()`, which resolves only public ones and
-     * throws — so a field that looked for a property called `data` died on mount
-     * on a page that happened to keep a private one of its own, which is nobody's
-     * fault but this field's. The root of a state path cannot have that problem:
-     * it is the property Filament itself reads and writes, so it is public
-     * because the page works at all. `AccountHostProtected` is the fixture that
-     * holds that line — a private `$data` beside the form, and nothing breaks.
+     * Not a property called `data`: Filament's own pages call it that, but
+     * Filament itself mounts schemas under eight different roots (`data`,
+     * `filters`, `tableFilters`, `deferredFilters`, `settings`, `columnMap`,
+     * and more), so keying off the name left this field silently unprotected
+     * wherever that name was something else — the screen looking fixed while
+     * the defect stayed live on it.
      *
-     * A schema with no state path of its own leaves the field's path a bare name
-     * with nothing to sit beside, and then there is no baseline.
+     * And not the ROOT of that path either, which was the first correction and
+     * was worse: a field inside an action modal has the path
+     * `mountedActions.{i}.data.roles`, whose root is `mountedActions` — a public
+     * array Filament reads and writes, and still the wrong one. A string key in
+     * it breaks `array_key_last()` and `array_pop()`, and
+     * `getMountedActionSchemaName()` then resolves a schema that does not exist.
+     * The container path puts the copy inside the action's own state bag, which
+     * is where the field's own state already is.
+     *
+     * The bag has to be there already. A schema whose state path names something
+     * the component does not have would otherwise get a dynamic property created
+     * here, gone by the next request — the same `PropertyNotFoundException` this
+     * method exists to avoid, one layer over.
      */
     private function holder(): ?string
     {
@@ -222,9 +220,9 @@ final class RoleAssignment extends CheckboxList
             return null;
         }
 
-        $root = Str::before($path, '.');
+        $holder = Str::beforeLast($path, '.');
 
-        return is_array($this->getLivewire()->{$root}) ? $root : null;
+        return is_array(data_get($this->getLivewire(), $holder)) ? $holder : null;
     }
 
     /**

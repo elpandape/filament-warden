@@ -32,14 +32,18 @@ other screen that saves a whole set at once: handing roles out from an account.
   right. What was wrong was the conclusion drawn from it: a field can put a sibling key beside its
   own, and this one does. Measured before it was relied on rather than argued: the key survives the
   mount, a click and the save, and `Schema::getState()` does not return it, so it can never reach
-  `$record->update()` — checked on a real `EditRecord` and `CreateRecord`, not only on a test double.
+  `$record->update()`. That last part is checked by a test; the rest was measured on a real
+  `EditRecord` and `CreateRecord` in a throwaway probe and is not pinned by anything in the suite,
+  which is said here rather than implied.
 
-  The place it goes is the **root of this field's own state path**, not a property called `data`.
-  Filament's own pages do call it that; a Livewire component written by hand — which is what this
-  package's README tells you to put the field in — may call it anything, and keying off the name
-  would have left your screen looking fixed while the defect stayed live on it. It also would have
-  crashed a page that happened to keep a non-public `$data` of its own, because `property_exists()`
-  answers true for one and reading it then throws. A schema with no state path of its own leaves the
+  The place it goes is this field's own **container path**, not a property called `data`. Filament's
+  own resource pages do call it that, but Filament itself mounts schemas under seven other roots —
+  `filters`, `tableFilters`, `deferredTableFilters`, `columnMap`, `settings`, `data.multiFactor` and
+  `mountedActions.{i}.data` — so keying off the name would have left the field silently unprotected
+  wherever the name was something else, with the screen looking fixed. And keying off the *root* of
+  the path, which was the first correction, is worse than the name: an action modal's root is
+  `mountedActions`, a public array Filament reads and writes and still not a state bag, and a string
+  key in it breaks Filament's own action machinery. A schema with no state path of its own leaves the
   field nothing to sit beside, and then there is simply no baseline.
 
 - **Nothing is ever refused from this screen, and that is a property of a checkbox rather than a gap.**

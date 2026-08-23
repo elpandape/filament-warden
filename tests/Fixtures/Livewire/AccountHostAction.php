@@ -6,6 +6,7 @@ namespace ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire;
 
 use ElPandaPe\FilamentWarden\Filament\Forms\RoleAssignment;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
+use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
@@ -15,23 +16,23 @@ use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 /**
- * The same screen with its form state under a property of another name.
+ * The field inside an action modal, which is the second place anybody would put
+ * it and the one that broke.
  *
- * Filament's own pages call it `data`, and Filament itself mounts schemas under
- * seven other roots besides — `filters`, `tableFilters`, `deferredTableFilters`,
- * `columnMap`, `settings`, `data.multiFactor`, `mountedActions.{i}.data`. The
- * field has to protect this page exactly as well as one called `data`, and it
- * does only because it reads its own state path instead of a name.
+ * Filament gives an action's schema the state path `mountedActions.{i}.data`, so
+ * the ROOT of that path is `mountedActions` — a public array Filament reads and
+ * writes, and still not a state bag. A string key in it breaks
+ * `array_key_last()`, `array_pop()` and `getMountedActionSchemaName()`.
  *
  * @property-read Schema $form
  */
-final class AccountHostElsewhere extends Component implements HasActions, HasSchemas
+final class AccountHostAction extends Component implements HasActions, HasSchemas
 {
     use InteractsWithActions;
     use InteractsWithSchemas;
 
     /** @var array<string, mixed>|null */
-    public ?array $elsewhere = [];
+    public ?array $data = [];
 
     public int|string $accountKey = 0;
 
@@ -44,16 +45,23 @@ final class AccountHostElsewhere extends Component implements HasActions, HasSch
 
     public function form(Schema $schema): Schema
     {
-        return $schema
-            ->components([RoleAssignment::make('roles')])
-            ->record($this->account())
-            ->statePath('elsewhere');
+        return $schema->components([])->statePath('data');
     }
 
-    public function save(): void
+    public function rolesAction(): Action
     {
-        $this->form->getState();
-        $this->form->saveRelationships();
+        return Action::make('roles')
+            ->record($this->account())
+            ->schema([RoleAssignment::make('roles')])
+            ->action(function (): void {});
+    }
+
+    /**
+     * @return list<int|string>
+     */
+    public function mountedKeys(): array
+    {
+        return array_keys($this->mountedActions ?? []);
     }
 
     public function render(): View
