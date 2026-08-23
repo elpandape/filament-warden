@@ -11,6 +11,7 @@ use ElPandaPe\Warden\Tenancy\Tenancy;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use WeakMap;
 
 /**
  * Handing a role to an account, and taking it back.
@@ -53,45 +54,46 @@ final class Assignment
      * resource at all, which this class never writes to and never needs to
      * invalidate).
      *
-     * Keyed by entity — `getMorphClass().':'.getKey()`, never by object
-     * identity: a `WeakMap` keyed on the `$account` instance (`Holders`'
-     * own pattern, `Grants/Holders.php`) would miss the very case that makes
-     * memoising this risky at all. Livewire rehydrates a FRESH model
-     * instance for `ownerRecord` between two chained test calls
-     * (`->mountTableAction(...)->callMountedTableAction()` are two separate
-     * simulated requests, each reconstructing the component from a snapshot),
-     * so a write made through one instance and a read made through another
-     * would simply miss a `WeakMap` entirely — passing by accident, proving
-     * nothing about invalidation. Keying on the account's own identity
-     * instead means a write and a read against the SAME account share the
-     * SAME entry regardless of which PHP object carried it, so the memo can
-     * actually go stale, and the invalidation this class writes to
-     * (`give()`, `take()`, `apply()`, one `forgetAssignments()` call apiece
-     * right after a write commits) is the thing standing between that
-     * staleness and the answer a caller gets.
+     * A `WeakMap` on the `$account` instance, which is `Holders`' own
+     * pattern and is chosen here for the same reason: an entry dies with the
+     * object it was built for, so nothing has to guess when a request ended.
+     * A long-lived worker holds none of these between requests, and a second
+     * read reached through a different instance re-queries rather than
+     * answering from a snapshot somebody else's request took. What it does
+     * NOT do is cover a write and a read that share one instance — that is
+     * what `forgetAssignments()` is for, called by all three writers this
+     * class has (`give()`, `take()`, `apply()`) right after a write commits.
+     *
+     * The inner key is the tenant, because `assignments()` reads THROUGH
+     * warden's `TenantScope`: the same account genuinely answers differently
+     * depending on which tenant is active when it is asked, and one entry
+     * per account would freeze whichever context asked first. Measured with
+     * a role assigned under tenant 7 and no write in between — outside any
+     * tenant `of()` answers with it, inside `onceTo(8)` it answers empty —
+     * and pinned in `AssignmentTest.php`'s "the memo answers per tenant, not
+     * once for the account". The key comes off `Tenancy::readFilter()`,
+     * which is the whole of what that scope reads.
      *
      * The risk this was built to respect: memoising `assignments()` hands a
      * check made right after a write the row list from BEFORE that write,
-     * unless every writer clears it. Three writers reach it — `give()`,
-     * `take()`, and `apply()`, which reads `of()` once before its own
-     * transaction and would otherwise leave a caller who reads again right
-     * after it returns holding that same stale answer (pinned directly in
-     * `AssignmentTest.php`'s own "a key that arrives as text still names the
-     * same role", already in this file before this memo existed). Two tests
-     * exercise the risk end to end: `AssignmentTest.php`'s "give()/take()
-     * invalidate the assignments memo, a read right after a write sees it"
-     * reads, writes, and reads again against the very same `$account` object
-     * with no Livewire in between — the shape that would actually go stale
-     * if `give()` or `take()` forgot to invalidate — and
-     * `RolesRelationManagerTest.php`'s "assigning through the header action
-     * writes one row the store honours at once", which goes through `give()`
-     * from inside a mounted Livewire action and reads back through
-     * `Assignment::of($account)` afterwards, across the hydrate cycle
-     * described above.
+     * unless every writer clears it. `apply()` is the third writer and the
+     * least obvious one — it reads `of()` once before its own transaction,
+     * and would otherwise leave a caller who reads again right after it
+     * returns holding that same stale answer (pinned in `AssignmentTest.php`'s
+     * "a key that arrives as text still names the same role", which was
+     * already in that file before this memo existed).
      *
-     * @var array<string, Collection<int, Model>>
+     * The test that does NOT cover this, and reads as though it does:
+     * `AssignmentTest.php`'s "give() hands a role out and the store answers
+     * for it straight away" reads back through `Access::granted()` — warden's
+     * own resolver — and a raw row count, neither of which this memo can
+     * make stale. The one written for it is "give()/take() invalidate the
+     * assignments memo, a read right after a write sees it", which reads,
+     * writes and reads again against the very same `$account` object.
+     *
+     * @var WeakMap<Model, array<string, Collection<int, Model>>>
      */
-    private static array $assignmentsByEntity = [];
+    private static WeakMap $assignmentsByAccount;
 
     /**
      * Every role there is, by key, named the way a person would recognise it.
@@ -287,7 +289,7 @@ final class Assignment
 
         // The one writer of the three that does not clear the memo inline as
         // it goes: `self::of($account)` above already populated
-        // `$assignmentsByEntity` from BEFORE any of this transaction's
+        // `$assignmentsByAccount` from BEFORE any of this transaction's
         // writes, and every `isRestricted()`/`isElsewhere()` call inside the
         // loop deliberately keeps reading that same pre-write snapshot — each
         // role in the catalogue is visited once, so nothing in the loop ever
@@ -296,7 +298,7 @@ final class Assignment
         // be handed back; `AssignmentTest.php`'s "a key that arrives as text
         // still names the same role" reads `Assignment::of($account)`
         // straight after this method returns and is what pins it.
-        self::forgetAssignments($account);
+        self::forgetAssignments();
     }
 
     /**
@@ -356,7 +358,7 @@ final class Assignment
             // `isRestricted()`/`isElsewhere()`) for this same account right
             // after `give()` returns must see the row this just wrote, not
             // the snapshot from before it existed.
-            self::forgetAssignments($account);
+            self::forgetAssignments();
         }
 
         // Never actually false here: `offers()` already resolved this same
@@ -420,7 +422,7 @@ final class Assignment
             // Same reason as `give()`'s own call: the memo just read by
             // `offers()`/`isHeld()` above is now the row list from BEFORE
             // this delete, and has to go.
-            self::forgetAssignments($account);
+            self::forgetAssignments();
         }
 
         // Never actually false here, the same reason `give()`'s tail comment
@@ -451,11 +453,16 @@ final class Assignment
      * assignment rows. A suite raises a different one for every test case
      * and would otherwise read the one before — the same reason
      * `Conditions\Columns::forget()` exists, called from the same `setUp()`.
+     *
+     * The assignment half is a `WeakMap` and clears itself as instances go,
+     * so this is the catalogue's escape hatch first; the second line is what
+     * a test reaches for when it writes `assigned_roles` behind this class's
+     * back and then asks the SAME instance again.
      */
     public static function forget(): void
     {
         self::$rolesByKey = null;
-        self::$assignmentsByEntity = [];
+        self::$assignmentsByAccount = new WeakMap();
     }
 
     /**
@@ -565,18 +572,24 @@ final class Assignment
     }
 
     /**
-     * Memoised per account, by entity rather than by object: see
-     * `$assignmentsByEntity`'s own docblock for why identity is the wrong key
-     * here.
+     * Memoised per account instance and per tenant: see
+     * `$assignmentsByAccount`'s own docblock for both halves.
+     *
+     * Kept under warden's tenant scope on purpose (§6.24): this read
+     * INFORMS a screen about what exists here, and reading wide would offer
+     * an assignment `retract()` from this scope cannot remove.
      *
      * @return Collection<int, Model>
      */
     private static function assignments(Model $account): Collection
     {
-        $key = self::entityKey($account);
+        self::$assignmentsByAccount ??= new WeakMap();
 
-        if (array_key_exists($key, self::$assignmentsByEntity)) {
-            return self::$assignmentsByEntity[$key];
+        $tenant = self::tenantKey();
+        $memo = self::$assignmentsByAccount[$account] ?? [];
+
+        if (array_key_exists($tenant, $memo)) {
+            return $memo[$tenant];
         }
 
         /** @var Collection<int, Model> $assignments */
@@ -585,28 +598,46 @@ final class Assignment
             ->where('entity_id', $account->getKey())
             ->get();
 
-        return self::$assignmentsByEntity[$key] = $assignments;
+        $memo[$tenant] = $assignments;
+        self::$assignmentsByAccount[$account] = $memo;
+
+        return $assignments;
     }
 
     /**
-     * Drops one account's memoised assignment rows — called by every writer
-     * this class has (`give()`, `take()`, `apply()`) right after a write
-     * commits, never before.
+     * Drops EVERY memoised row list — called by every writer this class has
+     * (`give()`, `take()`, `apply()`) right after a write commits, never
+     * before.
+     *
+     * Not just the written account's entry, and not just the active tenant's.
+     * One account can be behind more than one live instance in a request —
+     * the object a screen was handed and the object a component rehydrated
+     * from its own snapshot are two different keys in this map for the same
+     * row in the store — so an invalidation aimed at the instance that
+     * carried the write would leave the others answering from before it. A
+     * write here is rare and a re-read is one query; being precise about
+     * which entry to drop buys nothing but a way to be wrong.
      */
-    private static function forgetAssignments(Model $account): void
+    private static function forgetAssignments(): void
     {
-        unset(self::$assignmentsByEntity[self::entityKey($account)]);
+        self::$assignmentsByAccount = new WeakMap();
     }
 
     /**
-     * The morph class plus the key, not the object: `getKey()` is `mixed`,
-     * and an account somehow keyless (never persisted) falls back to its own
-     * object id rather than colliding every such account onto one entry.
+     * The read context `assignments()` is memoised under. `readFilter()` is
+     * the single source of truth for what warden's tenant scope adds to a
+     * read, so it is the whole of what can make two reads of one account
+     * disagree: no filter at all, this tenant's rows plus the global ones,
+     * or the global ones alone.
      */
-    private static function entityKey(Model $account): string
+    private static function tenantKey(): string
     {
-        $key = $account->getKey();
+        $filter = app(Tenancy::class)->readFilter();
 
-        return $account->getMorphClass().':'.((is_int($key) || is_string($key)) ? $key : spl_object_id($account));
+        if ($filter === null) {
+            return '*';
+        }
+
+        return $filter[0].':'.($filter[1] ?? '');
     }
 }

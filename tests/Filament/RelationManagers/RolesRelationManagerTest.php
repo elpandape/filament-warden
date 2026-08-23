@@ -333,18 +333,21 @@ test('a role value that is not a key writes nothing through the header action', 
  * (`Select.php:155`), and `disableOptionWhen()` here is
  * `! Assignment::offers()`, which used to cost two unmemoised `assignments()`
  * reads per role — `isRestricted()` and `isElsewhere()` each looping it
- * fresh. `assignments()` is memoised per account now, invalidated by every
- * writer `Assignment` has (`give()`, `take()`, `apply()`), so every one of
- * those 400 calls for the SAME account shares the one query the first of
- * them makes. Measured against this exact 200-role fixture: 405 before, 2
- * after — one for that shared read, one unrelated to it (warden authorizing
- * the signed-in account's own `viewAny` on the resource, which this fix does
- * not touch). `AssignmentTest.php`'s "give()/take() invalidate the
- * assignments memo, a read right after a write sees it" is the test that
- * proves the memo does not go stale for the writes this class makes; this
- * one is the cost the fix was for.
+ * fresh. `assignments()` is memoised now, invalidated by every writer
+ * `Assignment` has (`give()`, `take()`, `apply()`), so every one of those 400
+ * calls against one account instance shares the one query the first of them
+ * makes. Measured against this exact 200-role fixture: 405 before, 3 after.
+ *
+ * Three and not two because this line is two simulated requests, not one —
+ * constructing the component and then mounting the action — and Livewire
+ * rehydrates a fresh `ownerRecord` for the second, which the memo answers by
+ * reading again rather than by trusting the first request's rows. That is the
+ * shape the memo was given deliberately, and the third statement is warden
+ * authorizing the signed-in account's own `viewAny` on the resource, which
+ * this fix does not touch. Measured flat: the same 3 for a 20-role catalogue
+ * and for a 200-role one, so the cap bounds the shape and not the fixture.
  */
-test('the assign modal costs 2 assigned_roles statements for 200 roles, capped at 5', function (): void {
+test('the assign modal costs 3 assigned_roles statements for 200 roles, capped at 5', function (): void {
     signInAsRoleManager();
 
     $account = makeUser();
@@ -394,16 +397,6 @@ test('retracting through the row action takes the role back', function (): void 
  * a real click would (§6.23). What this proves instead is that the check is
  * live, not cached from render time: mounting while the role is offered and
  * restricting it before calling still leaves the row untouched.
- *
- * `mountTableAction()` and `callMountedTableAction()` are two separate
- * simulated Livewire requests — the same two round-trips a real modal makes,
- * open then confirm — and in a real deployment each starts `Assignment`'s
- * per-account memo (v1.5.0, "Que no cueste") empty again: nothing outside
- * this test's own fixture writes `assigned_roles` between them. The
- * `Warden::assign()->on()->to()` call below stands in for whatever else
- * could have changed things in that gap, so `Assignment::forget()` follows
- * it — the same reset a fresh request gets for free — before the confirm
- * step reads the account again.
  */
 test('a raw retract call on a role restricted after it was mounted writes nothing', function (): void {
     signInAsRoleManager();
@@ -422,7 +415,6 @@ test('a raw retract call on a role restricted after it was mounted writes nothin
 
     $post = Post::query()->create(['title' => 'A post']);
     Warden::assign($role)->on($post)->to($account);
-    Assignment::forget();
 
     $test->callMountedTableAction();
 
@@ -445,12 +437,16 @@ test('a raw retract call on a role restricted after it was mounted writes nothin
  * instead directly against `Assignment::take()` in `AssignmentTest.php`'s
  * "take() writes nothing for a role not held".
  *
- * `Assignment::forget()` after the direct `retract()` call below is the same
- * request-boundary stand-in explained above the previous test: a real
- * `mountTableAction()`/`callMountedTableAction()` pair is two separate
- * requests, each with the per-account memo empty, and nothing in this
- * package writes `assigned_roles` outside `Assignment`'s own methods within
- * one request.
+ * `Assignment::forget()` below is for the LAST line, not for the call above
+ * it. `livewire(...)` is handed this test's own `$account` object and reads
+ * its assignments during that first render, which memoises them against that
+ * instance (v1.5.0, "Que no cueste"). The `retract()` beside it goes straight
+ * through warden, so no writer of `Assignment`'s empties anything, and the
+ * final `of($account)` — still that same object, which no real second request
+ * would be holding — would answer from the first render. Measured: without
+ * the call this test fails on that last line and on nothing else. The test
+ * above it does the same thing and does NOT need the reset, because the extra
+ * restricted row it writes does not change what `of()` answers.
  */
 test('a raw retract call on a role already gone by the time it runs notifies nothing', function (): void {
     signInAsRoleManager();
