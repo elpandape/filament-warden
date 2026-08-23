@@ -8,6 +8,86 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [1.6.0] - 2026-08-23
+
+Two people editing the same role stopped undoing each other's work. Nothing else moved.
+
+### Fixed
+
+- **A save wrote back over whatever somebody else had changed in the meantime, silently.** The grid
+  compared the store against the browser's payload and wrote every cell where the two disagreed —
+  but a payload is not an intent. It is what the store held when the screen opened plus whatever
+  this person changed, and nothing separated the two halves. So a cell somebody else had moved while
+  this page sat open was quietly moved back: what they revoked was granted again, what they granted
+  was revoked, and it applied to **every drawn cell**, not only the ones this person touched. There
+  was no error, no notice, and nothing on screen afterwards to say it had happened.
+
+  The screen now stamps what it was showing into its own state, and the save compares three things
+  instead of two. A cell this person did not move is left exactly as whoever did move it set it. A
+  cell this person moved, with nobody else in the way, is written as before. A cell both people moved
+  to **different** values is refused and named, rather than resolved in silence in favour of whoever
+  saved last — on a screen that decides who can do what, overwriting a colleague's deliberate change
+  is the defect, not a resolution of it. Two people who moved the same cell to the **same** value need
+  no branch and get none: their payload and the store already agree.
+
+  A save that met nobody else keeps the notification it has always had. One that did says which cells
+  were kept and which were refused, naming up to five and counting the rest — the same shape
+  `Holders::LABELS` already used. And the grid re-reads the store afterwards, so the next save starts
+  from what is actually there instead of colliding on the very same cells again.
+
+### Changed
+
+- **The grid field's state envelope gained a third key, `baseline`.** It is the same payload
+  `RoleState::toPayload()` already worked out at hydration — not a second derivation of the store
+  that could drift — and it travels in the state because it cannot be worked out later (by save time
+  the store answers about *now*) and cannot live on the component (Filament rebuilds the schema every
+  request). **Adding to a frozen surface is a minor by this package's own rule**: an application
+  reading `stances` or `narrowing` goes on working. `tests/FrozenTest.php` still turns red on the
+  addition, deliberately, so a new key is a line somebody typed rather than a diff nobody read.
+
+  The read-only screen is handed no baseline, and the test that keeps the two screens from drifting
+  now says so explicitly instead of being loosened: their shared halves must still match byte for
+  byte, and the extra key has to be a copy of that same payload.
+
+- **`RoleGrants::apply()` returns a `SaveReport`** instead of nothing, and takes an optional baseline
+  as its last argument. A caller that passes none — a console script, a seeder, a test — is asserting
+  a state outright rather than relaying a form somebody had open, so every cell counts as touched,
+  which is what this method did before there was a baseline at all. `Grants\` is not part of the
+  frozen surface.
+
+- **`GridView::cellLabel()` is new**, so a notification about a refused cell says the words the grid
+  says rather than inventing a second vocabulary for the same cell on the same screen. It reads the
+  catalogue, which `1.5.0` memoised per panel, so asking again costs nothing.
+
+- **A ninth thing runs under `make verify`.** The baseline survives the round trip only because both
+  of the grid script's state writes are spreads, which carry a key they know nothing about. Rewriting
+  either as `{ stances, narrowing }` reads like tidying up and would drop the baseline from the first
+  click onward — with no error, no failing PHP test and nothing on screen, because a payload with no
+  baseline is indistinguishable from a screen that never stamped one.
+  `verify/verify-baseline-survives.mjs` drives the real component under the real `@vue/reactivity`
+  Alpine pins, and does that rewrite by hand as its own control.
+
+### Not included
+
+- **Handing roles out from an account has the same defect and is not fixed here.** Measured, not
+  assumed: `Assignment::apply()` compares the same two things — `$isHeld` against `$isWanted` — so
+  the same lost update happens in both directions. It is not fixed because the baseline does not fit:
+  a `CheckboxList`'s state is a flat list with one slot, `RoleAssignment` is a frozen field so
+  turning it into a group with a hidden sibling is a major, a sibling field cannot be added because
+  the form belongs to the application, and a sentinel inside the list is a value the field's own
+  options and lock rules know nothing about. It goes to `1.7.0`, where the shape of that field can be
+  decided on its own terms. The window there is also far narrower: two people editing the **same
+  account** at once, rather than the same role.
+- **The roles relation manager is not touched, and does not need to be.** Its actions say "assign
+  *this* role", not "make the set equal this" — the vulnerable shape is the set diff, and that is the
+  thing worth naming.
+- **A cell is compared whole, and a cell is the unit.** Two people editing two different lines of the
+  same multi-line condition still collide as one cell.
+- **No history of who changed what.** That is a separate feature and it is not in this release.
+- **Everything under "Calidad" — the ten quality items this version was originally going to carry —
+  moves to `1.7.0`**, and with it the tag-subject shape check `release.yml` was promised. The headline
+  of a release should be one thing.
+
 ## [1.5.0] - 2026-08-23
 
 Nothing on screen changes. What changes is what the screens cost — and one correctness bug found on

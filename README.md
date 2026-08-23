@@ -418,6 +418,18 @@ The roles screen shows a grid where:
 > saying nothing at all. A protected role keeps its own stronger notice naming `roles.protected`;
 > the other two share this one, because neither route lets the package know *why* it cannot write.
 
+> 🤝 **From `v1.6.0` two people editing the same role no longer undo each other.** A save used to
+> compare the store against what your browser held and write every difference — so a cell somebody
+> else had changed while your page sat open was quietly changed back. It now compares three things,
+> including what your screen was showing when it opened. A cell you did not touch is left as they
+> set it. A cell you both moved to different values is refused and named, rather than resolved in
+> silence in favour of whoever saved last. The grid re-reads the store afterwards, so your next save
+> starts from what is actually there.
+>
+> Handing roles out from an account still has this defect — a `CheckboxList` has nowhere to carry
+> the extra state — and it is fixed in a later release. The window there is narrower: two people on
+> the same account, rather than the same role.
+
 > ⚡ **From `v1.5.0` a save writes in groups.** Cells that share an entity and a stance and have
 > nothing left to narrow go out in one warden call instead of one per cell. If you listen for
 > `GrantingPermission` or `ForbiddingPermission`, that is **one event per group carrying every name
@@ -720,7 +732,7 @@ Two different kinds of thing are in that list, and both matter for the same reas
 |---|---|
 | Permission prefixes | `page:`, `widget:`, `panel:` and `PermissionName`, which mints them and reads them back |
 | Plugin | `FilamentWardenPlugin`, its ID `filament-warden`, and its six methods: `make()`, `getId()`, `register()`, `boot()`, `roles()`, `permissions()` |
-| Fields | `PermissionGrid`, `PermissionGridEntry`, `ConditionBuilder`, `RoleAssignment`, and the `{stances, narrowing}` state envelope a form receives |
+| Fields | `PermissionGrid`, `PermissionGridEntry`, `ConditionBuilder`, `RoleAssignment`, and the `{stances, narrowing, baseline}` state envelope a form receives — `baseline` joined it in `v1.6.0`, and an addition is a minor |
 | Relation managers | `RolesRelationManager`'s class name — a consuming application's own `UserResource::getRelations()` stores it by name, so renaming the class breaks every installation that attached it |
 | Traits | `AuthorizesPageAccess`, `AuthorizesWidgetView`, `AccessesPanels` |
 | Authorization | `WardenPolicy`, `Access` |
