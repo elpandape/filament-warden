@@ -418,6 +418,14 @@ The roles screen shows a grid where:
 > saying nothing at all. A protected role keeps its own stronger notice naming `roles.protected`;
 > the other two share this one, because neither route lets the package know *why* it cannot write.
 
+> ⚡ **From `v1.5.0` a save writes in groups.** Cells that share an entity and a stance and have
+> nothing left to narrow go out in one warden call instead of one per cell. If you listen for
+> `GrantingPermission` or `ForbiddingPermission`, that is **one event per group carrying every name
+> in it**, and a listener that vetoes one now vetoes the whole group. Cells narrowed to "only what
+> it owns" or to conditions still go one at a time — warden's `where()` re-points every permission
+> in a chain at the same twin, so two cells asking for two different conditions can never share a
+> call.
+
 ### Permission Inspector
 
 Click any cell to see:
@@ -574,6 +582,12 @@ foreach ($entries as $entry) {
 }
 ```
 
+`Catalog::for()` reflects every Policy the panel declares and walks its resources, pages and widgets besides, so from `v1.5.0` it is built once per panel and kept for the life of the process. Nothing it derives from moves while that process runs: panels, Policies and `catalog.*` all come from code and config loaded at boot. The one thing that would go stale is an application rewriting `catalog.*` config at runtime — invisible until you drop the memo:
+
+```php
+Catalog::forget();
+```
+
 #### Custom Permissions
 
 ```php
@@ -710,7 +724,7 @@ Two different kinds of thing are in that list, and both matter for the same reas
 | Relation managers | `RolesRelationManager`'s class name — a consuming application's own `UserResource::getRelations()` stores it by name, so renaming the class breaks every installation that attached it |
 | Traits | `AuthorizesPageAccess`, `AuthorizesWidgetView`, `AccessesPanels` |
 | Authorization | `WardenPolicy`, `Access` |
-| Catalog | `Catalog::for()`, `Entry` and its `key()`, `Origin`, `Scope` |
+| Catalog | `Catalog` and its six public methods — `for()`, `relationManagers()`, `resourceClasses()`, `pageClasses()`, `widgetClasses()`, `forget()` — plus `Entry` and its `key()`, `Origin`, `Scope` |
 | Guard | `PanelIsOpen` |
 | Config | Every key path of `config/filament-warden.php` — all 27 of them, each pinned with the shape it holds. The pin stops at a key whose value is a list or an empty array: what goes inside those is your data, not our schema |
 | Translations | Every key path of `lang/*/ui.php`, in both locales |
