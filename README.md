@@ -426,13 +426,16 @@ The roles screen shows a grid where:
 > silence in favour of whoever saved last. The grid re-reads the store afterwards, so your next save
 > starts from what is actually there.
 >
-> Two things this does not cover, said plainly. Handing roles out from an account still has the
-> defect — a `CheckboxList` has nowhere to carry the extra state — and it is fixed in a later
-> release; the window there is narrower, two people on the same account rather than the same role.
-> And if you embed `PermissionGrid` on a page of your own rather than using the roles screen, the
-> *protection* is in the field and works, but the *report* is not: `EditRole` is what turns it into
-> a notification, so on your page a refused cell is simply not written and the save says nothing
-> about it.
+> **From `v1.7.0` the same holds when you hand roles out from an account.** `RoleAssignment` keeps
+> its own copy of what the store said, in a namespaced key beside its list, and leaves alone any role
+> you did not tick or untick. Nothing is ever *refused* there — a role is held or it is not, so two
+> people can only ever have moved one the same way — and the field sends its own notice, because that
+> form is yours and there is no notification of ours to replace.
+>
+> One thing this still does not cover: if you embed `PermissionGrid` on a page of your own rather
+> than using the roles screen, the *protection* is in the field and works, but the *report* is not —
+> `EditRole` is what turns it into a notification, so on your page a refused cell is simply not
+> written and the save says nothing about it.
 
 > ⚡ **From `v1.5.0` a save writes in groups.** Cells that share an entity and a stance and have
 > nothing left to narrow go out in one warden call instead of one per cell. If you listen for

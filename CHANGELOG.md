@@ -8,6 +8,64 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [1.7.0] - 2026-08-23
+
+`1.6.0` stopped two people editing the same role from undoing each other. This does the same for the
+other screen that saves a whole set at once: handing roles out from an account.
+
+### Fixed
+
+- **Saving an account's roles wrote back over whatever somebody else had changed in the meantime.**
+  `Assignment::apply()` compared the store against the browser's payload, exactly as the grid did
+  before `1.6.0`: a role somebody else handed out while this screen sat open was unticked back, and
+  one they took back was handed out again. Every role in the list was a potential write, not only the
+  ones this person clicked. `1.6.0` measured this and shipped without fixing it.
+
+  It now compares three things, and a role this person did not tick or untick is left exactly as
+  whoever did left it. The field says so afterwards and re-reads the store, so the next save starts
+  from what is actually there.
+
+### Changed
+
+- **The copy of what the store said travels in the page's own state array, under a namespaced key.**
+  A `CheckboxList` has one state slot and the set is in it — that part of `1.6.0`'s reasoning was
+  right. What was wrong was the conclusion drawn from it: a field can put a sibling key beside its
+  own, and this one does. Measured before it was relied on rather than argued: the key survives the
+  mount, a click and the save, and `Schema::getState()` does not return it, so it can never reach
+  `$record->update()`. A page that keeps its state somewhere other than `$data` simply gets no
+  baseline, and saves the way it did before there was one.
+
+- **Nothing is ever refused from this screen, and that is a property of a checkbox rather than a gap.**
+  A cell has three stances, so two people can move one to *different* values and genuinely collide. A
+  role is held or it is not. If the store and the payload disagree and the baseline also disagrees
+  with the payload, this person did not touch it; if the baseline agrees with the payload, whoever
+  moved the store moved it the same way. Both moving it to different values is unreachable — there is
+  no third value to differ about. `SaveReport::refused` stays empty here, always, and a test says so.
+
+- **`Assignment::apply()` returns a `SaveReport`** and takes an optional baseline as its last
+  argument. A caller that passes none is asserting a state outright rather than relaying a form
+  somebody had open, so every role counts as touched — what this method did before. `SaveReport`'s
+  `refused` widened from the grid's own cell keys to any map, so one report serves both screens
+  instead of two nearly identical ones.
+
+- **The field sends its own notification.** The grid leaves that to `EditRole`, which owns its page
+  and replaces the "Saved" notification outright; this field is one line inside a form the application
+  wrote, so there is nothing of ours to replace and saying nothing would be the silence this release
+  exists to end. It sends one beside whatever the page sends.
+
+### Not included
+
+- **The gap `1.6.0` disclosed for an embedded `PermissionGrid` is still open.** A page of your own that
+  embeds the grid gets the protection and not the report. This release shows the shape of the answer —
+  a field that speaks for itself — but applying it to the grid is a change to the roles screen, and
+  this release is about the account screen. It goes to `1.8.0`.
+- **The roles relation manager is untouched, and does not need touching.** Its actions say "assign
+  *this* role", not "make the set equal this".
+- **No history of who changed what**, and **no automatic resolution** in either direction.
+- **Everything under "Calidad" moves to `1.8.0`**, with the tag-subject shape check `release.yml` was
+  promised. `1.6.0` said those would be `1.7.0`; the second half of a data-loss fix earned the slot
+  instead, and a release headline should be one thing.
+
 ## [1.6.0] - 2026-08-23
 
 Two people editing the same role stopped undoing each other's work. Nothing else moved.
