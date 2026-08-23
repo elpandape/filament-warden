@@ -22,13 +22,22 @@ class RolesTable
     /**
      * Two closures below share a memo apiece — `$heldCounts` for the
      * informing column, `$assignedRoleIds` for the deciding button — each
-     * built from ONE grouped query the first row that needs it asks for, and
-     * reused by every row after (§6.24, "Que no cueste"). Before this,
+     * built from ONE query the first row that needs it asks for, and reused
+     * by every row after (§6.24, "Que no cueste"). Before this,
      * `assignmentCount()` and `RoleResource::isDeletable()`'s own `EXISTS`
      * each paid their own query PER ROW: measured for 5 roles, 11
-     * `assigned_roles` statements; after, 3 — the two grouped queries plus
-     * one unrelated to either (warden authorizing the signed-in user's own
+     * `assigned_roles` statements; after, 3 — those two queries plus one
+     * unrelated to either (warden authorizing the signed-in user's own
      * `delete`/`viewAny` on the resource, which this fix does not touch).
+     *
+     * Neither query is bounded by the PAGE, which is what a first draft of
+     * this docblock claimed: a column closure cannot reach the record set
+     * Filament paginated without going back through the table component.
+     * They are bounded by the ROLE CATALOGUE instead — `heldCounts()` groups
+     * and `assignedRoleIds()` is `distinct()`, so each returns at most one
+     * row per role however many assignment rows exist. That distinction is
+     * the whole cost of this screen: reading every row and reducing in PHP
+     * gives the same three statements and hydrates the entire table.
      *
      * Local variables captured by reference, not a class-level static
      * property: a fresh pair is born every time `configure()` runs — once
@@ -44,6 +53,11 @@ class RolesTable
      * wide there would show a number `retract()` issued from this screen
      * could not act on. Folding both into one query would silently pick one
      * of those two rules for both columns.
+     *
+     * Both ceilings live in `RoleResourceTest.php`, not only in this
+     * paragraph: one test counts the statements and one counts the rows
+     * Eloquent hydrates, because a statement counter reads 3 whichever
+     * shape these two queries take.
      */
     public static function configure(Table $table): Table
     {
@@ -192,19 +206,31 @@ class RolesTable
     }
 
     /**
-     * How many rows each role has in `assigned_roles`, scoped, for the whole
-     * page in one query — because a badge that informs keeps its scope
-     * (§6.24): counting every tenant's rows would show a number `retract()`
-     * issued from here could not act on. Read row by row rather than
-     * `groupBy('role_id')`: warden's own migration puts no cast on
-     * `assigned_roles`, and reducing in PHP keeps this the same shape as
-     * every other reader in this class rather than trusting a driver-specific
-     * aggregate's return type.
+     * How many rows each role has in `assigned_roles`, scoped, in one query
+     * that returns ONE ROW PER ROLE — because a badge that informs keeps its
+     * scope (§6.24): counting every tenant's rows would show a number
+     * `retract()` issued from here could not act on.
+     *
+     * The aggregate is what bounds this. Reading `role_id` for every row and
+     * reducing in PHP answers the same question and costs the whole table:
+     * measured against 200 assignment rows over 5 roles, the listing
+     * hydrated 400 `AssignedRole` models — this query and
+     * `assignedRoleIds()` below reading every row once each — against 10
+     * after, five apiece. Both numbers are what the listing's own
+     * `'reads bounded by the role catalogue'` test counts, through Eloquent's
+     * `retrieved` event; a statement counter sees 3 either way and cannot
+     * tell them apart.
+     *
+     * `count(*)` comes back typed by the driver — `int` under SQLite, a
+     * numeric string under some others — so it is narrowed with `is_numeric()`
+     * exactly like every other value this class reads off a row, rather than
+     * trusted. `AssignedRole` declares no `$casts` at all, so nothing on the
+     * model would have normalised it either.
      *
      * A holder restricted to a context is one more row with the same
      * `role_id` and counts here exactly like an unrestricted one — this
-     * column has never filtered on `restricted_to_type`, and grouping by row
-     * count does not change that.
+     * column has never filtered on `restricted_to_type`, and grouping does
+     * not change that.
      *
      * @return array<int|string, int>
      */
@@ -212,11 +238,18 @@ class RolesTable
     {
         $counts = [];
 
-        foreach (Context::resolve()->assignedRoleClass()::query()->get(['role_id']) as $row) {
-            $key = $row->getAttribute('role_id');
+        $rows = Context::resolve()->assignedRoleClass()::query()
+            ->select('role_id')
+            ->selectRaw('count(*) as held')
+            ->groupBy('role_id')
+            ->get();
 
-            if (is_int($key) || is_string($key)) {
-                $counts[$key] = ($counts[$key] ?? 0) + 1;
+        foreach ($rows as $row) {
+            $key = $row->getAttribute('role_id');
+            $held = $row->getAttribute('held');
+
+            if ((is_int($key) || is_string($key)) && is_numeric($held)) {
+                $counts[$key] = (int) $held;
             }
         }
 
@@ -229,24 +262,36 @@ class RolesTable
      * `RoleResource::isDeletable()`'s own single-record query already is:
      * the cascade that removes these rows on delete is blind to scope.
      *
+     * `distinct()` is what bounds it: without it this reads and hydrates
+     * every row of `assigned_roles` to learn a set that can never be larger
+     * than the role catalogue. See `heldCounts()` above for the measurement
+     * and for the test that counts it.
+     *
      * A set (`true` values, keyed by id) rather than a list: `isDeletable()`
      * does one `isset()` per row against this instead of an `in_array()`
-     * scan, and the id is cast to string on the way in for the same reason
-     * `Assignment::role()` compares keys as text — a key arriving from
-     * anywhere other than this class's own query is not guaranteed to share
-     * PHP's int/string type with the column.
+     * scan. No cast on the way in and none on the way out: PHP normalises a
+     * canonical numeric string array key back to `int`, so a set built from
+     * either type answers `isset()` for a key of either type. Measured:
+     * `$ids[(string) 5]` stores `int(5)`, and both `isset($ids[5])` and
+     * `isset($ids['5'])` are true. A `(string)` cast here would have been a
+     * no-op that made the declared key type wrong — which is what it was.
      *
-     * @return array<string, true>
+     * @return array<int|string, true>
      */
     private static function assignedRoleIds(): array
     {
+        $rows = Context::resolve()->assignedRoleClass()::query()
+            ->withoutGlobalScopes()
+            ->distinct()
+            ->get(['role_id']);
+
         $ids = [];
 
-        foreach (Context::resolve()->assignedRoleClass()::query()->withoutGlobalScopes()->get(['role_id']) as $row) {
+        foreach ($rows as $row) {
             $key = $row->getAttribute('role_id');
 
             if (is_int($key) || is_string($key)) {
-                $ids[(string) $key] = true;
+                $ids[$key] = true;
             }
         }
 

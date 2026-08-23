@@ -17,6 +17,7 @@ use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\DeleteAction;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 
 use function Pest\Livewire\livewire;
 
@@ -33,13 +34,23 @@ use function Pest\Livewire\livewire;
  * The count column used to be a second query per row alongside
  * `isDeletable()`'s own EXISTS behind the delete button — 11 `assigned_roles`
  * reads for 5 roles, capped at 13, before "Que no cueste" (v1.5.0) gave each
- * its own single grouped query for the whole page instead: one scoped
- * (`RolesTable::heldCounts()`) for the column that informs, one wide
- * (`RolesTable::assignedRoleIds()`) for the button that decides — never
- * folded into ONE query, because §6.24 ties each to a different scope rule.
- * 'the listing's held-by column and delete button together cost 3
- * assigned_roles reads for 5 roles, capped at 5' is what is measured and
- * capped now.
+ * one query of its own: one scoped (`RolesTable::heldCounts()`, grouped) for
+ * the column that informs, one wide (`RolesTable::assignedRoleIds()`,
+ * distinct) for the button that decides — never folded into ONE query,
+ * because §6.24 ties each to a different scope rule. 'the listing's held-by
+ * column and delete button together cost 3 assigned_roles reads for 5 roles,
+ * capped at 5' is what is measured and capped now.
+ *
+ * That statement count is HALF the guarantee, and on its own it is the
+ * comfortable half. Reading every row of `assigned_roles` and reducing in PHP
+ * also costs exactly three statements, and it was what this screen did for
+ * one commit: measured over a 200-row fixture, the listing hydrated 400
+ * `AssignedRole` models against 10 for the grouped shape, and head to head
+ * over 20 000 rows the whole-table pair took 0.439 s and 46 MB against
+ * 0.002 s and no measurable allocation. A statement counter cannot see any of
+ * that, so 'the listing's two reads are bounded by the role catalogue, not by
+ * the assignment table' counts rows instead, through Eloquent's own
+ * `retrieved` event.
  *
  * `AssignmentTest.php` already carries an `assignedRoleReads()` helper that
  * does exactly this counting — reused instead of duplicated everywhere else
@@ -916,13 +927,62 @@ test("the listing's held-by column and delete button together cost 3 assigned_ro
 
     livewire(ListRoles::class);
 
-    foreach (DB::getQueryLog() as $entry) {
-        if (str_contains($entry['query'], Context::resolve()->table('assigned_roles'))) {
-            dump($entry['query'], $entry['bindings']);
+    $reads = heldReads();
+    DB::disableQueryLog();
+
+    expect($reads)->toBeLessThanOrEqual(5);
+});
+
+/**
+ * The half a statement counter cannot see: 200 assignment rows over 5 roles,
+ * so a read bounded by the role catalogue and a read bounded by the table are
+ * two orders of magnitude apart while both stay at three statements. Measured
+ * on this exact fixture: 400 rows hydrated by the shape that read every row,
+ * 10 by the shape that groups and distincts — five roles, once per query.
+ * Capped at 20, which leaves room for warden's own reads of the signed-in
+ * account without leaving room for a per-row read of the fixture.
+ *
+ * The rows are written straight to the table rather than through
+ * `Warden::assign()`: the two queries under test read `role_id` and nothing
+ * else, and 200 accounts would measure the fixture builder instead.
+ */
+test("the listing's two reads are bounded by the role catalogue, not by the assignment table", function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $rows = [];
+    $entity = 1000;
+
+    for ($index = 0; $index < 5; $index++) {
+        $role = makeRole("role-{$index}");
+
+        for ($holder = 0; $holder < 40; $holder++) {
+            $rows[] = [
+                'role_id' => $role->getKey(),
+                'entity_type' => 'holder',
+                'entity_id' => $entity++,
+                'restricted_to_type' => null,
+                'restricted_to_id' => null,
+                'scope' => null,
+            ];
         }
     }
 
-    expect(heldReads())->toBeLessThanOrEqual(5);
+    DB::table(Context::resolve()->table('assigned_roles'))->insert($rows);
+
+    $hydrated = 0;
+
+    Event::listen(
+        'eloquent.retrieved: '.Context::resolve()->assignedRoleClass(),
+        static function () use (&$hydrated): void {
+            $hydrated++;
+        },
+    );
+
+    livewire(ListRoles::class);
+
+    expect($hydrated)->toBeLessThanOrEqual(20);
 });
 
 test('a role nobody holds says so in the delete warning', function (): void {
