@@ -27,7 +27,7 @@
     @unless ($cell->isLocked())
         x-bind:data-noted="narrowedAt(@js($cell->row), @js($cell->action)) ? 'true' : 'false'"
     @endunless
-    @if ($interactive && ! $cell->isLocked())
+    @if ($cell->isOperable($interactive))
         x-on:click="pick(@js($cell->row), @js($cell->action), @js($label), @js($cell->entry?->name), $event.shiftKey)"
         x-on:keydown.enter.prevent="pick(@js($cell->row), @js($cell->action), @js($label), @js($cell->entry?->name), $event.shiftKey)"
         x-on:keydown.space.prevent="pick(@js($cell->row), @js($cell->action), @js($label), @js($cell->entry?->name), $event.shiftKey)"
@@ -43,7 +43,7 @@
     <span
         class="fw-sr"
         x-text="reachedMark(@js($cell->row), @js($cell->action), @js($cell->entry?->name))"
-    >{{ $cell->drawn() === 'broader' ? $states['broader'] : '' }}</span>
+    >{{ $cell->isBroader() ? $states['broader'] : '' }}</span>
     @if ($cell->isLocked())
         {{-- Locked never changes in the browser, so it is written once and not bound. --}}
         <span class="fw-sr">{{ $states['locked'] }}</span>

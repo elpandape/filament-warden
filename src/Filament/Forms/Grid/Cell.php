@@ -92,4 +92,30 @@ final readonly class Cell
     {
         return ! $this->narrowing->isEditable();
     }
+
+    /**
+     * Whether a rule wider than this cell is what answers it.
+     *
+     * The template asked this by comparing `drawn()` against the literal
+     * `'broader'`, which put one of this class's own words in a file that is
+     * supposed to decide nothing — and left it to drift silently if the word
+     * ever changed.
+     */
+    public function isBroader(): bool
+    {
+        return $this->drawn() === 'broader';
+    }
+
+    /**
+     * Whether a person can work this cell at all.
+     *
+     * Two conditions, and the template was holding the `&&`: the screen has to
+     * be interactive — an application may have disabled the field, and the
+     * read-only page never is — and the cell has to be one this screen can
+     * draw. Neither half is a rendering decision.
+     */
+    public function isOperable(bool $interactive): bool
+    {
+        return $interactive && ! $this->isLocked();
+    }
 }
