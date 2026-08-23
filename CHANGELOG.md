@@ -8,6 +8,104 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [1.9.0] - 2026-08-23
+
+Seven changes, one thread running through all of them: whether a screen, a count, an audit or a
+notification tells the truth about what the store actually holds. A role deleted out from under a
+grant, a catalogue read from the wrong panel, a search aimed at a column that cannot answer it, a
+baseline gone stale after a refusal — and, on the notification side, a report that had drifted to
+the wrong owner.
+
+### Fixed
+
+- **Counting who holds a permission missed anyone whose role had since been deleted.** `Holders::of()`
+  counted roles from the labels its own query FOUND — `whereKey()` over the role class, which simply
+  has nothing to return for a key that no longer exists — rather than from the keys the grants
+  themselves carry. So a permission whose only grant pointed at a deleted role reported as held by
+  nobody, on the delete-confirmation modal whose entire job is to name who loses what. `Holders` now
+  keeps `$roleCount`, read from the keys, the same way `$accountCount` always was; `isOrphaned()` and
+  `total()` follow it, and so do `PermissionsTable::warning()` and the permission infolist.
+
+- **A multi-panel installation could watch its own audit disagree with its own screens.**
+  `PermissionsTable`, `PermissionInfolist` and `PermissionForm` all asked
+  `Catalog::for($currentPanel)` for provenance, so a row derived by a *different* panel's resource
+  drew as "Nothing declares it" while `filament-warden:audit` — which already read every panel — said
+  the opposite. The three now ask the new `Catalog::union()` over every panel, the same union the
+  audit already built.
+
+- **The account-search probe could raise on Postgres by asking `LIKE` of a column that cannot answer
+  it.** Postgres raises when `LIKE` meets a column that is not a text type; MySQL and SQLite silently
+  coerce instead. The search now keeps only the columns the new `Columns::texts()` names as
+  text-shaped, read from the schema's own type name rather than assumed from a name whitelist.
+
+- **A refused cell on a page this package does not own stayed refused forever.** `EditRole` recovers
+  from a refusal by re-filling its whole form afterwards, which happens to re-stamp the grid's own
+  baseline — a page that merely embeds `PermissionGrid` has no such hook. Without one, the stale
+  baseline made the very same cell read as touched on every later save, so it kept colliding with
+  itself until the page was reloaded. The field now re-reads the store and re-stamps its own baseline
+  at the end of its own save hook, on any page.
+
+### Added
+
+- **A ninth, informational audit bucket: grants whose authority no longer exists.** Warden's schema
+  puts a foreign key on exactly `assigned_roles.role_id` and `grants.permission_id` — never on either
+  polymorphic authority column — so deleting a role takes its assignments and leaves its own grants
+  behind, and nothing removes them: not warden, and not `warden:clean`, which prunes permissions
+  nothing points at, never grants pointing at nobody. Never red — there is nothing inside this
+  package that could cure it. An authority type this installation cannot even resolve is named too,
+  once per type.
+
+- **`filament-warden:catalog`**, a new command, with `--panel=`. Prints the catalogue as data — name,
+  entity, model, scope, origin — with a column saying whether the permissions table already has a row
+  for each entry. Kept out of `filament-warden:audit` on purpose: that command's contract is what is
+  wrong and nothing else, and a dump is neither.
+
+### Changed
+
+- **The concurrent-save notification belongs to the field now, not the page — which makes `1.6.0`'s
+  own CHANGELOG entry wrong, and it is corrected here rather than edited there.** That entry said the
+  notification "is `EditRole`'s" and that a foreign page embedding `PermissionGrid` would read
+  `SaveReport` off the container to say something of its own. Neither is true from this version:
+  `EditRole::getSavedNotification()` is gone, and `PermissionGrid::announce()` /
+  `RoleAssignment::announce()` send their own report through `Connection::afterCommit()`, so a message
+  can never describe a save a later failure undoes.
+
+  Two consequences worth knowing about. On `EditRole`, a concurrent save used to show ONE
+  notification — the report replacing Filament's own "Saved" outright — and now shows TWO, side by
+  side: Filament's "Saved" and the field's report. This is what the account screen already did, where
+  the field was never the page's to replace. And an application that subclassed `EditRole` and
+  overrode the now-deleted `protected getSavedNotification()` loses that hook outright — there is no
+  successor method to move the override to, because the notification no longer belongs to the page at
+  all.
+
+### Not included
+
+- **Phantom "not yet in the store" rows on the permissions listing.** Filament's tables are either a
+  query or a `records()` data source, never both — declaring one turns off filtering, searching,
+  sorting and pagination at the database, and would force `Provenance::applyTo()`'s SQL to be
+  rewritten in PHP, which is the same rule written twice. `filament-warden:catalog` answers this
+  question instead, outside the table.
+- **An audit gate for "a policy that never consults warden".** Undecidable without executing it: the
+  signal such a gate would need is per class, while a screen's cells are per method, so the check has
+  structural false negatives — and at least three legitimate warden-consulting policy shapes would be
+  false positives.
+- **The roles table's `granted` column, and a `DeleteBulkAction`.** Both recorded as deliberate
+  decisions, not gaps.
+- **A fifth provenance badge, for "declared, but by another panel".** `Provenance::of()` and
+  `::applyTo()` live glued together on purpose; a fifth badge would grow a branch in both, forever.
+- **The grid filter**, deferred to the next tag with the redesign it needs. The trap worth writing
+  down now, measured rather than assumed: a filter must never prune `state.stances`, because
+  `RoleGrants::plan()` walks the catalogue and not the payload, so a pruned cell would read as abstain
+  against an unpruned baseline and get WRITTEN — a mass revocation with a success notification on top
+  of it.
+- **Change events carrying an actor and a diff.** Warden's own events carry neither; this package
+  would have to invent both.
+- **A consumer testing guide — including a correction of what the backlog claimed for it.**
+  `Warden::fake()` does not cover what was promised: it is deny-by-default here, because for a policy
+  extending `WardenPolicy` the policy IS the caller, so an unscripted check is a hard deny — the
+  opposite of what a reader arriving from warden's own README would assume — and it cannot express
+  the authority, the wildcard, `only_owned`, conditions or tenancy at all.
+
 ## [1.8.0] - 2026-08-23
 
 Nine small things, and one gate. Nothing on screen moves, except a search that stops obeying a

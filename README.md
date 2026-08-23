@@ -38,6 +38,7 @@
 - [🛡️ Security](#️-security)
     - [The Guard](#the-guard)
     - [Audit](#audit)
+    - [Catalog Command](#catalog-command)
 - [🔧 Advanced](#-advanced)
     - [How Far a Permission Reaches](#how-far-a-permission-reaches)
     - [Multi-tenancy](#multi-tenancy)
@@ -510,7 +511,7 @@ Lists the `permissions` **table** — the rows warden has actually created — a
 - **Holders**: how many roles hold it, with denials counted apart
 - **Test bench**: ask warden about a real account, from the screen
 
-> ℹ️ **On a fresh install this screen is empty, and that is correct.** Warden creates a permission row the first time something is granted, so nothing exists until you hand something out. The roles screen is the one that shows the whole catalogue derived from your policies, row or no row.
+> ℹ️ **On a fresh install this screen is empty, and that is correct.** Warden creates a permission row the first time something is granted, so nothing exists until you hand something out. The roles screen is the one that shows the whole catalogue derived from your policies, row or no row. To see the catalogue itself — without opening a screen, and whether or not it has a row yet — run [`filament-warden:catalog`](#catalog-command).
 
 ---
 
@@ -542,7 +543,7 @@ php artisan filament-warden:audit
 php artisan filament-warden:audit --check
 ```
 
-It writes nothing, and reports eight things:
+It writes nothing, and reports nine things:
 
 - **screens nobody guards** — the same finding the guard throws on, which is how it reaches CI at all: no artisan command ever starts a panel;
 - **resources whose model has no policy** — the case Filament fails open on, told apart from a policy that declares nothing and from a resource pointing at a class that does not exist;
@@ -551,11 +552,24 @@ It writes nothing, and reports eight things:
 - **grants for actions nothing declares any more** — a renamed policy method, a typo in a seeder, a screen that was deleted: the silent mistake warden has no way to detect;
 - **whole entity types nothing declares** — a morph alias that moved, reported apart because the fix is the opposite one;
 - **models only a relation manager reaches**, with the `catalog.models` line that settles it;
-- **catalogue names carrying a dot** — Livewire splits a state path on dots, so such a name cannot be a cell and a role screen throws the moment it draws one. Rename the permission. New in `v1.8.0`: before it, the only way to find out was somebody opening the screen.
+- **catalogue names carrying a dot** — Livewire splits a state path on dots, so such a name cannot be a cell and a role screen throws the moment it draws one. Rename the permission. New in `v1.8.0`: before it, the only way to find out was somebody opening the screen;
+- **grants whose authority no longer exists** — *informational, same as the bucket above, and new in `v1.9.0`*. Warden's schema puts a foreign key on `assigned_roles.role_id` and on `grants.permission_id`, never on the two columns that name a grant's authority, so deleting a role takes its assignments and leaves its own grants behind — no listener picks them up, and `warden:clean` cannot see them either, because it prunes *permissions* nothing points at, not grants pointing at nobody. Reported once per surviving grant, and once per authority type this installation cannot even resolve.
 
-`--check` returns 1 for every finding above except the informational one.
+`--check` returns 1 for every finding above except the two informational ones.
 
-The word "orphaned" is wider on the permissions screen than it is here. The **Orphaned** filter there means what `warden:clean` means — no grant points at the row, declared or not — which is the whole of the third and fourth bullets together. This command splits that same population in two, because only half of it is worth failing a build over. Nothing on the screen is renamed: those rows are exactly the rows `warden:clean` will delete, and that is the meaning the screen exists to act on.
+The word "orphaned" now carries four meanings in this package. `warden:clean` and the permissions screen's **Orphaned** filter mean the same thing — no grant points at the row, declared or not — which is the whole of the third and fourth bullets above, together. This command's own **orphans** bucket only covers the declared half of that population, because the undeclared half (`forgotten`) is the one worth failing a build over. And **stranded** is not that population at all: it says nothing about a permission nobody uses — it says a *grant* points at an authority that has been deleted, which `warden:clean` cannot see and cannot fix.
+
+### Catalog Command
+
+```bash
+# Every panel
+php artisan filament-warden:catalog
+
+# One panel
+php artisan filament-warden:catalog --panel=admin
+```
+
+The catalogue as data: one row per ability every panel declares — name, entity, model, scope, origin — with a last column saying whether the permissions **table** already has a row for it. Nothing here is wrong or right, unlike `filament-warden:audit`; this is what a fresh install's empty permissions screen cannot show, because warden only mints a permission row the first time something is granted.
 
 ---
 
@@ -609,6 +623,8 @@ foreach ($entries as $entry) {
 ```php
 Catalog::forget();
 ```
+
+**`Catalog::union(array $panels): self`** merges more than one panel's catalogue into one, from `v1.9.0`. A multi-panel installation needs this for provenance, not `for()` alone: the permissions screen, its infolist and its form all ask every panel now, because asking only the current one used to draw a row derived in another panel as "Nothing declares it" while `filament-warden:audit` — which already read every panel — said the opposite.
 
 #### Custom Permissions
 
@@ -753,11 +769,11 @@ Two different kinds of thing are in that list, and both matter for the same reas
 | Relation managers | `RolesRelationManager`'s class name — a consuming application's own `UserResource::getRelations()` stores it by name, so renaming the class breaks every installation that attached it |
 | Traits | `AuthorizesPageAccess`, `AuthorizesWidgetView`, `AccessesPanels` |
 | Authorization | `WardenPolicy`, `Access` |
-| Catalog | `Catalog` and its six public methods — `for()`, `relationManagers()`, `resourceClasses()`, `pageClasses()`, `widgetClasses()`, `forget()` — plus `Entry` and its `key()`, `Origin`, `Scope` |
+| Catalog | `Catalog` and its seven public methods — `for()`, `relationManagers()`, `resourceClasses()`, `pageClasses()`, `widgetClasses()`, `union()`, `forget()` — plus `Entry` and its `key()`, `Origin`, `Scope` |
 | Guard | `PanelIsOpen` |
 | Config | Every key path of `config/filament-warden.php` — all 27 of them, each pinned with the shape it holds. The pin stops at a key whose value is a list or an empty array: what goes inside those is your data, not our schema |
 | Translations | Every key path of `lang/*/ui.php`, in both locales |
-| Commands | `filament-warden:assign` and `filament-warden:audit`, with their arguments |
+| Commands | `filament-warden:assign`, `filament-warden:audit` and `filament-warden:catalog`, with their arguments |
 
 **Adding to one of these — a translation key, a config key, a key in the grid's state envelope — is a minor, not a major**: nothing you wrote stops working. Only removing or renaming one is a break. Both pins list every path and compare in order, so on our side an addition also turns the build red — deliberately, so that a new key is a line somebody typed on purpose rather than a diff nobody read.
 
