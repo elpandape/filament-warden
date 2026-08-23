@@ -364,10 +364,16 @@ final readonly class Audit
         foreach ($byType as $type => $keys) {
             $class = Morph::model($type);
 
-            // A type that resolves to nothing is the morph map having moved,
-            // which `drifted` already reports against the catalogue. Counting
-            // it here too would say the same thing twice in two vocabularies.
+            // `drifted` reads permissions.entity_type, the ability's TARGET —
+            // a column `Catalog` builds from the resources it walks. This
+            // reads grants.entity_type, the grant's HOLDER, which the
+            // catalogue never touches at all. So an authority type that
+            // cannot be resolved is not told anywhere else: it is reported
+            // here, once for the type, because with no class to query there
+            // is no way to say which of its keys are still alive.
             if ($class === null) {
+                $findings[] = $type;
+
                 continue;
             }
 

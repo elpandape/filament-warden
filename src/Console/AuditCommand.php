@@ -26,7 +26,7 @@ use Illuminate\Console\Command;
  */
 final class AuditCommand extends Command
 {
-    protected $signature = 'filament-warden:audit {--check : Exit with 1 when an actionable finding is reported; the informational list never turns a build red}';
+    protected $signature = 'filament-warden:audit {--check : Exit with 1 when an actionable finding is reported; the informational lists never turn a build red}';
 
     protected $description = 'Report screens nobody guards, resources with no policy, unused permissions and grants nothing declares';
 

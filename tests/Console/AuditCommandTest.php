@@ -406,10 +406,10 @@ test('a grant whose authority is alive is not reported', function (): void {
     expect(Audit::run()->stranded)->toBeEmpty();
 });
 
-test('a grant behind a stray morph alias is drifted, not stranded twice over', function (): void {
+test('a grant behind a stray morph alias is reported here, because drifted cannot see it', function (): void {
     Warden::allow(makeRole())->to('viewAny', roleClass());
 
     Context::resolve()->grantClass()::query()->withoutGlobalScopes()->update(['entity_type' => 'gone.away']);
 
-    expect(Audit::run()->stranded)->toBeEmpty();
+    expect(Audit::run()->stranded)->toBe(['gone.away']);
 });
