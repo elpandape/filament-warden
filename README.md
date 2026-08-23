@@ -553,11 +553,11 @@ It writes nothing, and reports nine things:
 - **whole entity types nothing declares** — a morph alias that moved, reported apart because the fix is the opposite one;
 - **models only a relation manager reaches**, with the `catalog.models` line that settles it;
 - **catalogue names carrying a dot** — Livewire splits a state path on dots, so such a name cannot be a cell and a role screen throws the moment it draws one. Rename the permission. New in `v1.8.0`: before it, the only way to find out was somebody opening the screen;
-- **grants whose authority no longer exists** — *informational, same as the bucket above, and new in `v1.9.0`*. Warden's schema puts a foreign key on `assigned_roles.role_id` and on `grants.permission_id`, never on the two columns that name a grant's authority, so deleting a role takes its assignments and leaves its own grants behind — no listener picks them up, and `warden:clean` cannot see them either, because it prunes *permissions* nothing points at, not grants pointing at nobody. Reported once per stranded authority — the deduplicated `type:key` a whole cluster of grants can share — and once per authority type this installation cannot even resolve.
+- **grants whose authority no longer exists** — *informational, like the permissions-the-catalogue-declares-that-no-grant-points-at bucket above (third bullet): this one never turns `--check` red either, and is new in `v1.9.0`*. Warden's schema puts a foreign key on `assigned_roles.role_id` and on `grants.permission_id`, never on the two columns that name a grant's authority, so deleting a role takes its assignments and leaves its own grants behind — no listener picks them up, and `warden:clean` cannot see them either, because it prunes *permissions* nothing points at, not grants pointing at nobody. Reported once per stranded authority — the deduplicated `type:key` a whole cluster of grants can share — and once per authority type this installation cannot even resolve.
 
 `--check` returns 1 for every finding above except the two informational ones.
 
-The word "orphaned" now carries four meanings in this package. `warden:clean` and the permissions screen's **Orphaned** filter mean the same thing — no grant points at the row, declared or not — which is the whole of the third and fourth bullets above, together. This command's own **orphans** bucket only covers the declared half of that population, because the undeclared half (`forgotten`) is the one worth failing a build over. And **stranded** is not that population at all: it says nothing about a permission nobody uses — it says a *grant* points at an authority that has been deleted, which `warden:clean` cannot see and cannot fix.
+The word "orphaned" now carries two meanings in this package. `warden:clean` and the permissions screen's **Orphaned** filter mean the same thing — no grant points at the row, declared or not — which is the whole of the third and fourth bullets above, together. This command's own **orphans** bucket only covers the declared half of that population, because the undeclared half (`forgotten`) is the one worth failing a build over. **Stranded** is a different word for a different thing, not a third meaning of "orphaned": it says nothing about a permission nobody uses — it says a *grant* points at an authority that has been deleted, which `warden:clean` cannot see and cannot fix.
 
 ### Catalog Command
 
@@ -694,10 +694,13 @@ A protected role keeps its name and its grid: both are shown, neither can be edi
 
 > 🔎 **`probe` lets anyone who can view a permission search your accounts.** The bench needs an
 > account to test the permission against, so its picker searches whatever of `name`, `email` and
-> `title` that model has and shows up to twenty matches. That is a list of your people's names and
-> addresses, offered to everybody with `view` on a permission. It is off with one line if that is not
-> a trade you want. From `v1.8.0` a `%` in the box is looked for rather than obeyed, and a model with
-> none of those three columns returns nothing instead of the first twenty rows.
+> `title` that model has and is text-typed, and shows up to twenty matches. That is a list of your
+> people's names and addresses, offered to everybody with `view` on a permission. It is off with one
+> line if that is not a trade you want. From `v1.8.0` a `%` in the box is looked for rather than
+> obeyed, and a model with none of those three columns returns nothing instead of the first twenty
+> rows. From `v1.9.0` a column among the three that is not text-typed is left out the same way — a
+> `name` stored as an integer, say — because `LIKE` raises on Postgres against a column that is not
+> one; MySQL and SQLite would have coerced it silently.
 
 ### Catalog
 

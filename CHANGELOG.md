@@ -67,18 +67,19 @@ the wrong owner.
 - **The concurrent-save notification belongs to the field now, not the page — which makes `1.6.0`'s
   own CHANGELOG entry wrong, and it is corrected here rather than edited there.** That entry said the
   notification "is `EditRole`'s" and that a foreign page embedding `PermissionGrid` would read
-  `SaveReport` off the container to say something of its own. Neither is true from this version:
-  `EditRole::getSavedNotification()` is gone, and `PermissionGrid::announce()` /
+  `SaveReport` off the container to say something of its own. The first no longer holds; the second no
+  longer has to: `EditRole::getSavedNotification()` is gone, and `PermissionGrid::announce()` /
   `RoleAssignment::announce()` send their own report through `Connection::afterCommit()`, so a message
-  can never describe a save a later failure undoes.
+  can never describe a save a later failure undoes — the container binding stays, still reachable, for
+  a page that wants to read it by hand.
 
   Two consequences worth knowing about. On `EditRole`, a concurrent save used to show ONE
   notification — the report replacing Filament's own "Saved" outright — and now shows TWO, side by
   side: Filament's "Saved" and the field's report. This is what the account screen already did, where
   the field was never the page's to replace. And an application that subclassed `EditRole` and
-  overrode the now-deleted `protected getSavedNotification()` loses that hook outright — there is no
-  successor method to move the override to, because the notification no longer belongs to the page at
-  all.
+  overrode `getSavedNotification()` loses only what `parent::getSavedNotification()` used to hand
+  back — the package's own report. The hook itself is `EditRecord`'s, not this package's: it still
+  exists and still fires, there is just nothing of ours left inside it to call up to.
 
 ### Not included
 
