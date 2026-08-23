@@ -12,6 +12,16 @@ parameters:
 
     level: max
 
+    # PHPStan analyses at the RUNTIME PHP version unless told otherwise, so the
+    # single 8.5 job in `quality.yml` would verify nothing about the 8.4 floor.
+    # Measured both ways with `phpstan diagnose`: without this block it prints
+    # "PHP version for analysis: 8.5.9 (from runtime)" while already knowing
+    # "PHP composer.json required version: 8.4-8.5.99"; with it, "8.4-8.5.99
+    # (from config)".
+    phpVersion:
+        min: 80400
+        max: 80599
+
     reportUnmatchedIgnoredErrors: true
 
     # The dev container is `--rm`, so the default result cache under the system temp
