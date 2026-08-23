@@ -88,7 +88,24 @@ jobs:
             subject=""
           fi
 
-          echo "title=${subject:-$GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          title="${subject:-$GITHUB_REF_NAME}"
+
+          # The one half of the convention a machine can check. The other half —
+          # that it is in English — is not a question a workflow can answer, and
+          # AGENTS.md §8 says so; this is what is left, and it is worth having:
+          # five of the 26 tags that already have a release carry the headline
+          # with no version on the front, and from `1.5.0` on that string IS the
+          # release title, verbatim.
+          case "$title" in
+            "$GITHUB_REF_NAME — "*) ;;
+            "$GITHUB_REF_NAME") ;;
+            *)
+              echo "::error::The tag's subject is [$title]. It becomes the release title verbatim, so it has to read '$GITHUB_REF_NAME — <headline>'." >&2
+              exit 1
+              ;;
+          esac
+
+          echo "title=$title" >> "$GITHUB_OUTPUT"
 
       # `-rc.` and other semver pre-release suffixes are marked as such, matching
       # how this project's own v1.0.0-rc.1 release was flagged.

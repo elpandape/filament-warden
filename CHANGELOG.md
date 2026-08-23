@@ -8,6 +8,91 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [1.8.0] - 2026-08-23
+
+Nine small things, and one gate. Nothing on screen moves, except a search that stops obeying a
+wildcard. The headline is one thing: the package stops saying things about itself that are not true,
+and stops carrying weight nobody lifts.
+
+### Fixed
+
+- **The account picker on a permission's test bench searched for a wildcard instead of a word.** A
+  `%` typed in it is a LIKE wildcard, so the box was a way to page through your account table rather
+  than a way to find someone in it — and it is offered to everyone who may *view* a permission.
+  Escaping it needs the ESCAPE clause spelled out, which is the half worth measuring rather than
+  assuming: SQLite has no default escape character, so a backslashed term **without** the clause
+  matches nothing at all, and the search would have gone from too wide to permanently empty.
+
+  The other half of the same method: with an account model whose table has none of `name`, `email` or
+  `title`, the query had no condition at all and answered with the first twenty accounts, none of
+  them what was typed. It returns nothing now. And the README says what that bench exposes where the
+  switch that turns it off is documented, because it is a trade to make on purpose.
+
+- **`Tenants::mixing()` printed "this shows every tenant at once" when it was showing one tenant's
+  worth.** Without an active tenant, `warden.scope.null_behavior` decides what a read sees:
+  `'strict'` filters to the global rows and the factory `'all'` does not filter at all. Only the
+  second is every tenant. It asks warden's own `readFilter()` now.
+
+- **A permission name carrying a dot is found by `filament-warden:audit`.** Livewire splits a state
+  path on dots, so such a name cannot be a cell, and the grid throws when it meets one — a 500 on
+  somebody's role screen at the moment they open it. The audit walked the same catalogue and said
+  nothing. It has a bucket now and reddens `--check` with the rest.
+
+  The same rename found the guard was only half connected: the grid keys a **row** through
+  `StateKey`, and an entity's **columns** straight off the catalogue. A policy declaring `export.csv`
+  reached the browser as a nested state path that does not exist, quietly, while a model or loose
+  name with a dot threw. One guard covers both halves now.
+
+### Changed
+
+- **The grid script says how many rules it carries, and it is five rather than one.** It opened by
+  claiming it carried none of its own bar the clause cut. `drawn()`, `reached()`, `answers()` and
+  `reachOf()` each decide something PHP decides too, and each is there for the same honest reason: a
+  click has to redraw without a round trip. They cannot be collapsed, so both sides now name their
+  counterpart — the script lists its four, and `GridView` says four of its decisions are made again
+  there. A pair that has to move together should not have to be discovered.
+
+- **Three public methods are gone, and one turned out not to be dead.** `Stance::next()`/`previous()`
+  spelled the cycle out a second time, three lines under an `order()` whose own comment warns about
+  exactly that. `RoleState::locked()` was a second expression of `isEditable()`.
+  `Provenance::isDeclared()` had no reader. `StateKey::action()` looked like the fourth and was the
+  disconnected guard above.
+
+- **Six classes are `final`.** Sixteen were open with no reason written near them; the README names
+  which ten are open and why — the resources and their pages, so an application can experiment. The
+  other six build a form, an infolist or a table, and nothing was ever promised about those. The ten
+  keep their door open and now say so where a reader is.
+
+- **Two helpers written out six times each are one each.** `Support\Morph::model()` answers the
+  question every morph reader actually had — is this a model? — instead of six copies of
+  `getMorphedModel($x) ?? $x` each re-checking the result. `Support\Line` carries the two translation
+  fallbacks this package has, and says why they cannot be one: a key we ship must exist, a key named
+  after something your application owns may not.
+
+- **The grid's template stopped deciding two things.** It compared `drawn()` against the literal
+  `'broader'` — one of `Cell`'s own words, in the file that decides nothing — and held the `&&` for
+  whether a cell can be worked at all.
+
+- **"Did we write this title?" is asked in one place.** `PermissionName::generated()` answered for the
+  doors this package mints; the permission form asked warden's generator directly for everything
+  else. Same question, two families of row, one method now.
+
+### Added
+
+- **`release.yml` refuses a tag whose subject is not `<tag> — <headline>`.** From `1.5.0` that
+  subject *is* the release title, verbatim, and five of the 26 tags that already have a release carry
+  the headline with no version on the front. It is the one half of the convention a machine can
+  check; that it is in English is not, and AGENTS.md says so rather than pretending otherwise.
+
+### Not included
+
+- **Nothing about the grid or the account form.** Concurrent editing was closed in `1.6.0` and
+  `1.7.0`; this release does not touch either path.
+- **A page of your own embedding `PermissionGrid` still gets the protection and not the report.**
+  `1.7.0` showed the shape of the answer — a field that speaks for itself — and applying it to the
+  grid is still open.
+- **No major.** Every public method removed here lives in a namespace the README declares internal.
+
 ## [1.7.0] - 2026-08-23
 
 `1.6.0` stopped two people editing the same role from undoing each other. This does the same for the
