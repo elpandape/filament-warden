@@ -8,6 +8,176 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [1.5.0] - 2026-08-23
+
+Nothing on screen changes. What changes is what the screens cost — and one correctness bug found on
+the way there, in a transaction nobody was looking at.
+
+Every figure below was measured, in the unit it names, and the unit is not decoration: this release
+produced one fix that cut a listing from 11 statements to 3 while making it hydrate the whole
+`assigned_roles` table twice per render. A cap counting statements could not see it. So each number
+here says what it counts, and a projection says that it is a projection.
+
+### Changed
+
+- **The catalogue is built once per panel, not once per call.** `Catalog::for()` reflects every
+  Policy a panel declares — through `Gate::getPolicyFor()`, which the container resolves with no
+  cache of its own — and walks the panel's resources, pages and widgets besides. It is now memoised
+  per panel id, the shape `Conditions\Columns` already used for a model's schema. **Measured by
+  counting Policy constructions**, a real side effect rather than a counter invented in `src/`:
+  three calls to `Catalog::for()` on the same panel cost **3 policy instantiations → 1**.
+
+  Two consequences worth knowing. `catalog.models` and `catalog.custom` changed at runtime are
+  **invisible to an already-built catalogue until `Catalog::forget()`** — the same rule `Columns`
+  applies to a schema. And the memo stores the `Panel` beside its rows and compares it with `===`,
+  so a second `Panel` object that happens to reuse an old id rebuilds instead of being served the
+  first one's answers: an id alone can lie, and what a catalogue answers decides authorization.
+
+- **`Holders` is memoised per record, and the two lock checks ask a cheaper question.**
+  `PermissionInfolist` alone asked `Holders::of()` five times over the same record. Measured in
+  statements against the **`grants` table**: `EditPermission` on mount **14 → 3**; the
+  `ViewPermission` card **7 → 3**.
+
+  A ten-row permissions listing goes **27 → 17 total statements** — and here the unit is the whole
+  story: the listing's **`grants`-only** count did not move at all (**12 → 12**). The saving is ten
+  `roles`-table queries that the old `Holders::of()` made per held row for its labels, and that the
+  new `anyFor()` EXISTS never makes. Anyone re-measuring this with a `grants`-only filter will see
+  nothing move.
+
+  The memo is a `WeakMap` keyed on the model instance, not `once()`. `once()` called from a static
+  method is a trap: `Onceable::objectFromTrace()` finds no `object` frame for a `self::` call, so
+  `Once::value()` falls back to the one shared `Once` singleton in the process, disambiguated by a
+  hash folding in `spl_object_hash()` — a value PHP reuses the moment the object it named is
+  collected. A permission read, freed and replaced at the same address would inherit the first one's
+  holders, and `isDeletable()` would call a row with holders an orphan.
+
+- **A grid save writes in groups.** Cells that share an entity and a stance and have nothing left to
+  narrow now go out in one warden call. Measured in total statements around one
+  `RoleGrants::apply()`: five cells sharing an entity, all granted, **41 → 25**. One cell alone
+  **9 → 9**, unchanged — pinned by its own cap so grouping can never regress the case it cannot
+  help. A 20-resource, 7-action panel projects to **1121 → 641**, and that one is **arithmetic on a
+  formula both measurements satisfy exactly** (`old = 1 + 8N`, `new = 1 + 4G + 4N`), not a third
+  measurement; a re-save widens the gap rather than narrowing it, so the projection is conservative.
+
+  The honest promise is not "one write for the whole grid". It is that the up-to-five warden calls a
+  changed cell used to cost become up to five per **group**. Cells narrowed to "only what it owns" or
+  to conditions still run one at a time, and that is warden's limit rather than a choice:
+  `where()` goes through `reconstrain()`, which re-points **every** permission in the chain at the
+  same twin, so two cells asking for two different conditions can never share a call.
+
+- **Grouping changes the granularity of a veto, which is behaviour and not cost.**
+  `GrantsPermissions::to()` builds **one** `GrantingPermission` / `ForbiddingPermission` per call,
+  carrying every name in it, and `eventPermits()` decides on that list. An application that listened
+  for those events to veto one cell now vetoes every cell grouped with it. This exists only inside
+  `RoleGrants::apply()`; a `Warden::allow()` an application makes itself is untouched.
+
+  The revoke side moved too, more quietly and with nothing to veto — there is no pre-event there.
+  `PermissionRevoked` / `PermissionUnforbidden` and the cache bump are gated on whether the group's
+  `delete()` removed any row at all, and that gate now covers the whole group: a name with nothing to
+  revoke used to mean no event for it, and can now ride inside one fired because a sibling had a row
+  removed. The event's collection still names every permission the group resolved.
+
+  Ordering also became structural rather than habitual: revoke now runs to completion across the
+  whole batch before any grant runs, where the old per-cell path merely happened to do it in that
+  order each time.
+
+- **The two screens that read once per row now read once per page.** The assign modal at 200 roles:
+  **405 → 3** `assigned_roles` statements, and flat at both a 20-role and a 200-role catalogue.
+  `Assignment::descriptions()` over two held roles: **5 → 2**. `give()` and `apply()`: **6 / 47 →
+  4 / 5**.
+
+  The roles listing is the one that needs both numbers. Statements went **11 → 3** — and the first
+  shape that achieved it hydrated the whole `assigned_roles` table twice per render, bounded by
+  nothing where the old shape was bounded by the page size. Head to head at 20 000 assignment rows:
+  **0.439 s / 46 MB → 0.002 s / 0.0 MB** (peak allocation with both collections held). The shipped
+  shape is bounded by the role catalogue with `groupBy` and `distinct`: at 200 assignment rows,
+  **400 → 10 rows hydrated** while statements stayed **3 → 3**, which is precisely why the statement
+  cap was blind to it. The cap that replaced it counts rows, through Eloquent's `retrieved` event.
+
+  The §6.24 split survives the batching and is pinned through it: the "held by" column, which
+  **informs**, stays tenant-scoped; the delete button, which **decides**, reads wide.
+
+- **`RoleResource::canDelete()` and `::isDeletable()` gained an optional trailing parameter.** Both
+  are `public static` on a non-final class, so **a subclass that overrode either is now a fatal**.
+  The Stability section already says the screens are not an extension point; this is what that
+  sentence costs in practice, said out loud rather than left to be discovered.
+
+- **PHP `^8.5` → `^8.4`.** Not one line of 8.5-only syntax exists in this package — re-established
+  three ways, including a parser probe over all 163 files at target 8.4 — and no dependency asks for
+  it. The CI matrix goes from 2 to 4 combinations, adding 8.4 to both `prefer-lowest` and
+  `prefer-stable`.
+
+- **`make stan` runs PHPStan twice, at the ceiling and at the declared floor.** A single
+  `phpVersion: {min, max}` range does **not** report the union of the two ends:
+  `PhpVersionFactoryFactory::create()` takes `min` and hands that one version to every
+  version-dependent rule. Measured on a file carrying one 8.4 deprecation and two 8.5 ones — the
+  range reported only the 8.4 one, byte for byte what `phpVersion: 80400` reports, while the runtime
+  default reported all three. Both runs proved load-bearing in opposite directions: the ceiling
+  catches 8.5 deprecations the floor is blind to, the floor rejects 8.5 syntax the ceiling accepts.
+
+### Fixed
+
+- **The grid's transaction opened on the wrong connection, and that silently disabled a cache
+  invalidation.** `RoleGrants::apply()` and `Assignment::apply()` called `DB::transaction()`, which
+  uses the default connection, not `warden.connection`. On a single-connection install that is a
+  no-op. On a split-connection one it wrapped queries that never ran on it — and it turned off a
+  promise `BumpsCacheVersion` already made: that trait only registers its after-commit second bump
+  when **warden's own** connection reports `transactionLevel() > 0`, so that check read zero always
+  and the second bump never registered. That bump exists to orphan a payload a concurrent reader
+  rebuilt from pre-commit rows, so what was lost was not lock scope but a cache invalidation —
+  stale authorization answers, with no expiry and nothing to see. The comment claiming the trait
+  registered one became true only with this change.
+
+### Added
+
+- **`Catalog::forget(): void`**, and `Catalog`'s public surface is now frozen at exactly six methods
+  — `for()`, `relationManagers()`, `resourceClasses()`, `pageClasses()`, `widgetClasses()`,
+  `forget()` — pinned by `tests/FrozenTest.php` and named one by one in the README's Stability
+  table, because a promise that does not name its elements is a category and not a promise.
+- **`Holders::anyFor(Model): bool`** — a single `EXISTS` for the two lock checks that only ever
+  needed a yes or no — and **`Holders::forget(Model): void`**, the escape hatch for a caller that
+  writes a grant and re-reads the same instance. Nothing in `src/` calls `forget()` today; the test
+  that pins the invalidation rule does, and it is exercised rather than decorative.
+- **`.github/workflows/release.yml`.** A pushed `v*` tag now creates the GitHub release with that
+  version's CHANGELOG section as its body, and refuses to publish rather than publish an empty one
+  when no section matches. AGENTS.md §8 has asked for this since two tags shipped with no release
+  and had to be created by hand.
+- **`phpstan-floor.neon`**, the second half of the PHPStan gate, export-ignored like every other
+  development file at the root.
+- **Two gates in `tests/PackageTest.php`.** One pins the PHP floor across every file that states it
+  — `composer.json`, `phpstan-floor.neon`, the CI matrix, and the README's badge URL, its `alt`
+  fallback and its Requirements row — because lowering a floor is silent in all of them at once. The
+  other asks `git archive` what the distribution actually holds and compares it, per shipped
+  directory, against what git tracks: the first thing in this suite to read the tarball rather than
+  infer it from `.gitattributes`.
+
+### Not included
+
+- **Everything under "Calidad" in the plan moves to `1.6.0`, by a decision made before this tag was
+  planned rather than by omission.** The six JS rules the script re-implements against the one its
+  own comment claims, the publics only tests call, the two rules that live in Blade, the search
+  `ViewPermission::accounts()` ignores, `Tenants::mixing()` under `'strict'`, the stale title after a
+  rename, the helpers copied seven times, the 16 non-`final` resource classes, the dotted custom name
+  that 500s a role screen, and concurrent editing silently re-granting what another save revoked.
+  The headline of a release should be one thing; that is a different one.
+- **`Shape::Owned` cells are not grouped, although they provably could be.** Only `Shape::All` is.
+  Grouping ownership writes would work today and would leave a trap for whoever next touches the
+  narrowed path, where `reconstrain()` makes sharing a call unsafe.
+- **The release workflow has never produced a release.** Its title extraction, its CHANGELOG
+  extraction, its pre-release flag and its refusal on a missing section were exercised with `act`
+  against synthetic tag pushes on this repository's real history, and the command-injection fix was
+  demonstrated in both directions with the same payload. What no one has seen is an actual release
+  object on GitHub, or Packagist picking it up. `act` also skips `actions/checkout` by default, so
+  the checkout half was established by reading the action's own refspecs and by fetching the live
+  remote by hand, not by running a real runner.
+- **The 8.4 leg of the matrix has never run.** It cannot, without a push.
+- **The distribution gate has three limits, disclosed rather than closed.** A development file
+  somebody *tracks* inside `src/` is counted on both sides and ships; the oracle reads `HEAD` and
+  not the tag a consumer installs; and it is blind to a root file until that file is committed.
+- **The PHPStan ceiling is still whatever the runtime is**, stated independently in `compose.yaml`,
+  `quality.yml` and the analyser cache key with nothing crossing them. That is not new — the ceiling
+  was runtime-driven before this release too, and the net position is strictly better than it was.
+
 ## [1.4.0] - 2026-08-22
 
 `RoleAssignment`, since `v0.7.0`, has been the only way to hand a role out from a screen — a
