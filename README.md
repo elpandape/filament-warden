@@ -9,7 +9,7 @@
   <a href="https://packagist.org/packages/elpandape/filament-warden"><img src="https://img.shields.io/packagist/v/elpandape/filament-warden?style=flat-square&color=blue" alt="Packagist Version"></a>
   <a href="https://packagist.org/packages/elpandape/filament-warden"><img src="https://img.shields.io/packagist/dt/elpandape/filament-warden?style=flat-square&color=green" alt="Total Downloads"></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License"></a>
-  <a href="https://php.net"><img src="https://img.shields.io/badge/PHP-8.5-777BB4?style=flat-square&logo=php" alt="PHP 8.5"></a>
+  <a href="https://php.net"><img src="https://img.shields.io/badge/PHP-8.4-777BB4?style=flat-square&logo=php" alt="PHP 8.4"></a>
   <a href="https://laravel.com"><img src="https://img.shields.io/badge/Laravel-13-FF2D20?style=flat-square&logo=laravel" alt="Laravel 13"></a>
   <a href="https://filamentphp.com"><img src="https://img.shields.io/badge/Filament-5.7-4ade80?style=flat-square" alt="Filament 5.7"></a>
 </p>
@@ -71,7 +71,7 @@
 
 | Requirement | Version |
 |---|---|
-| PHP | `^8.5` |
+| PHP | `^8.4` |
 | Laravel | `^13.0` |
 | Filament | `^5.7` |
 | elpandape/warden | `^1.0` |
