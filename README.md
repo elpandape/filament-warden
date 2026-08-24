@@ -448,6 +448,17 @@ The roles screen shows a grid where:
 > in a chain at the same twin, so two cells asking for two different conditions can never share a
 > call.
 
+> 📱 **From `v1.10.0` the grid folds when the columns do not fit.** Below `55.9375rem` the table is
+> replaced by one card per entity, holding one disclosure per scope — read, write, withdraw,
+> irreversible — and one row per action inside it. It is not a second grid: every cell is the same
+> button, bound to the same state, so whatever one reading says the other says too. One thing does
+> not survive the fold: the per-row `read` / `all` / `none` shortcuts, which are revealed by hovering
+> a table row and have no row to hover.
+>
+> The inspector moved below the grid in the same release, and the rule-scope picker became a
+> segmented radiogroup — one tab stop, arrow keys that step over what cannot be picked, and only the
+> chosen mode's hint. If you publish this package's views, that is a re-merge.
+
 ### Permission Inspector
 
 Click any cell to see:

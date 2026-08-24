@@ -94,8 +94,10 @@ of room, and a three-of-one choice drawn as the tallest thing on the panel.
   four changes were driven in a real consuming panel, on a real role, with the package symlinked in.
   The table at full width, the entity column holding 224px from 1041px down to a 420px card, the fold
   turning over at 820px, the segmented rail with Alpine live, and its arrow keys moving the choice
-  and carrying focus and the tab stop with it. What is still owed is narrower than it was: dark mode,
-  a locked cell, and a screen reader.
+  and carrying focus and the tab stop with it — in both themes, and on a cell holding a rule the
+  screen can read and cannot draw, where the rail goes dashed-red and the hint slot carries the
+  stored sentence rather than indexing a map that has no entry for it. What is still owed is one
+  thing: a screen reader.
 
 ## [1.9.0] - 2026-08-23
 
