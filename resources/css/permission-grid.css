@@ -68,15 +68,16 @@
 /* The layout: the grid, and the panel that explains it ------------------- */
 
 /* One column, always. A fixed side column took 19rem off the grid at exactly
-   the width where the matrix needs it most: in a 1280px panel the form card
-   leaves 974px and the table saw 604 of them, and a grid folded all the way
-   down asks for 646 — it did not fit, by 42px, on the wide screen where there
-   should have been room to spare.
-   The explicit single track is not decorative: without it the implicit column
-   is `auto`, whose minimum is min-content, and the min-content of `.fw-main` is
-   a table far wider than the card it sits in. It is also what keeps
-   `.fw-builder`'s container query answering — `container-type: inline-size`
-   collapses its element to its own borders inside any content-sized track. */
+   the width where the matrix needs it most — and a wide matrix needs more than
+   what was left. The figures behind that were measured in a consuming panel
+   with its own navigation rail, which nothing in this repository builds, so
+   they are recorded in the CHANGELOG rather than restated here as if this file
+   could check them.
+   The explicit single track is what carries the layout, not a tidier way of
+   writing the default: the implicit track is `auto`, which sizes to content,
+   and the content is a table as wide as the matrix. It is also what keeps
+   `.fw-builder`'s container query answering — an element with `container-type:
+   inline-size` has nothing to measure inside a track that sizes to it. */
 .fw-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -240,8 +241,14 @@
 .fw-table {
     border-collapse: separate;
     border-spacing: 0;
+    /* And no maximum. A percentage here resolves against the scrollport, which
+       is itself already clamped to the card, so the table could never exceed it
+       — `overflow-x: auto` never engaged and the auto table algorithm took the
+       width back out of the only column that can give it. Measured in a 600px
+       card: the entity column went from its 240px cap to 135px and the rows
+       from 62px to 92px. Overflowing the scroller is the point — it is what the
+       pinned first column and its opaque background were written for. */
     inline-size: max-content;
-    max-inline-size: 100%;
 }
 
 .fw-table th,
@@ -955,7 +962,12 @@ tr:hover .fw-shortcuts,
         flex-wrap: nowrap;
     }
 
-    .fw-misfit {
+    /* Prefixed, like every other control in this row: the base `.fw-misfit` rule
+       is declared later in the file at equal specificity, and a media query
+       adds none — unprefixed, this reset lost the cascade and left the note
+       taking the row at `nowrap`, which is the exact pairing the comment above
+       says must not happen. */
+    .fw-condition .fw-misfit {
         flex-basis: auto;
     }
 }

@@ -505,8 +505,12 @@ function grid({ state, grid, interactive }) {
          * the only elements inside it are these.
          *
          * Disabled options are stepped over rather than landed on — an arrow
-         * that moves somewhere and does nothing reads as a broken keyboard — and
-         * when every one of them is disabled there is nothing to step to.
+         * that moves somewhere and does nothing reads as a broken keyboard.
+         *
+         * The empty case cannot arrive from the page: a group with all three
+         * disabled has no focusable child, so no keydown of ours fires on it.
+         * The guard is for the call, not for a defect the markup can produce —
+         * without it an empty list indexes to `undefined` and throws.
          */
         stepReach(group, step) {
             const open = Array.from(group.querySelectorAll('[role="radio"]')).filter((one) => ! one.disabled)

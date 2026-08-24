@@ -19,9 +19,11 @@
 //    and it is the failure a naive `(at + step) % 3` produces every time.
 // 3. stepReach() wraps in both directions, and never stops on the option the
 //    server refused.
-// 4. With every option disabled, stepReach() returns without writing — the
-//    guard is load-bearing, not decorative, and a locked cell would otherwise
-//    have its reach rewritten by an arrow key.
+// 4. With every option disabled, stepReach() returns without writing. The page
+//    cannot reach that call — a group with three disabled buttons has nothing
+//    to focus, so no arrow keydown of ours fires on it — so this checks the
+//    method, not a defect the markup can produce: without the guard an empty
+//    list indexes to undefined and throws.
 // 5. reachStop() puts the group's single tab stop on the chosen option, and
 //    moves it to the first reachable one when the store holds a reach this
 //    screen does not offer — so a radiogroup is never a region with no way in.
@@ -35,7 +37,7 @@
 //   node verify-reach-keyboard.mjs
 //
 // It IS part of `make ci`, as the seventh gate: the Docker image installs
-// nodejs and npm, and `make verify` runs this script and its two siblings.
+// nodejs and npm, and `make verify` runs this script and its three siblings.
 // They are the only executable evidence this package's JS behaves rather than
 // merely reading a certain way — a PHP test can assert that a guard is
 // WRITTEN, never that it runs. `/verify export-ignore` in .gitattributes keeps
@@ -180,7 +182,7 @@ console.log('\n=== 3. It walks all three when all three are open, and wraps ==='
 }
 
 // ---------------------------------------------------------------------------
-console.log('\n=== 4. With every option disabled it writes nothing — the guard is load-bearing ===')
+console.log('\n=== 4. With every option disabled it writes nothing — a state the page cannot produce ===')
 {
     const comp = freshGrid()
     select(comp, { locked: true, mode: 'elsewhere', note: 'this grant belongs to another tenant' })

@@ -17,9 +17,9 @@ of room, and a three-of-one choice drawn as the tallest thing on the panel.
 ### Changed
 
 - **The inspector moved below the grid.** `.fw-layout` reserved a fixed `19rem` right-hand column
-  above `64rem`. In a 1280px panel the form card leaves 974px, so the table saw 604 of them — and a
-  grid folded all the way down asks for 646. It did not fit, by 42px, on the wide screen where there
-  should have been room to spare. It is now one column at every width, with the inspector as a band
+  above `64rem`. Measured in a consuming panel of 1280px, whose own navigation rail this repository
+  does not build: the form card left 974px and the table saw 604 of them. It is now one column at
+  every width, with the inspector as a band
   under the grid. Three rules moved with it and are part of the same change, not decoration:
   `.fw-table` is `max-content` (at `100%` every spare pixel went to the one auto-width cell and the
   matrix read as a broken form), the entity column is capped at `14rem` **and wraps** — the cap alone
@@ -31,8 +31,8 @@ of room, and a three-of-one choice drawn as the tallest thing on the panel.
 - **The grid folds by row when the columns do not fit.** Below `55.9375rem` the table is replaced by
   one card per entity, holding one disclosure per scope — read, write, withdraw, irreversible — and
   one row per action inside it. It is not a second grid: every cell in it is the same
-  `box.blade.php` partial with the same arguments, so both readings bind to one state and cannot
-  drift. `Row::inScope()` is the one method added for it. The cut is a base plus a single query
+  `box.blade.php` partial with the same arguments, so neither reading can say something about a cell
+  that the other does not, and both bind to one state. `Row::inScope()` is the one method added for it. The cut is a base plus a single query
   rather than two disjoint ones: two thresholds look equivalent and are not, because between them
   neither fires and the grid is gone. And the hiding is `display: none` and nothing else — it is the
   only technique that takes the losing reading out of the accessibility tree and out of the tab

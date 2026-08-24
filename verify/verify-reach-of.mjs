@@ -48,9 +48,10 @@
 // resources/js/ (that is a registered Filament asset — `php artisan
 // filament:assets` copies it into every consuming application's public
 // directory, and a verification script has no business shipping there) and
-// not under tests/js/ (that would imply these are part of the Pest suite;
-// they are not — `make ci` never runs them). `/verify export-ignore` in
-// .gitattributes keeps this whole directory out of the distributed package.
+// not under tests/js/ (that would imply these are part of the Pest suite,
+// which they are not: `make verify` runs them, `vendor/bin/pest` never sees
+// them). `/verify export-ignore` in .gitattributes keeps this whole directory
+// out of the distributed package.
 
 import { reactive } from '@vue/reactivity'
 import gridComponent from '../resources/js/permission-grid.js'

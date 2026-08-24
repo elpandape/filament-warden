@@ -47,24 +47,30 @@
                     x-bind:disabled="! reachEnabled(mode)"
                     x-on:click="setMode(mode)"
                     x-text="grid.modes[mode].name"
+                    aria-describedby="{{ $ids }}-reach-hint"
                 ></button>
             </template>
         </div>
 
         {{--
-            One hint, the chosen mode's. A locked cell has no entry in `modes` —
-            `reachOf()` answers with the stored `Shape`, which has six cases to
-            that map's three — so the slot carries the stored note instead, which
-            is the sentence that says WHY it is locked. It is never null when
-            locked: the three editable shapes are the only ones built without a
-            reason.
+            One hint, the chosen mode's, pointed at by every option so that it is
+            announced with whichever one has focus — selection follows focus
+            here, so the shared paragraph always describes the focused radio.
+
+            A locked cell has no entry in `modes` — `reachOf()` answers with the
+            stored `Shape`, which has six cases to that map's three — so the slot
+            carries the stored note instead, which is the sentence that says WHY
+            it is locked. It is never null when locked: the three editable shapes
+            are the only ones built without a reason.
         --}}
-        <p class="fw-reach-hint" x-text="grid.modes[reachOf()] ? grid.modes[reachOf()].hint : narrowing.stored.note"></p>
+        <p class="fw-reach-hint" id="{{ $ids }}-reach-hint" x-text="grid.modes[reachOf()] ? grid.modes[reachOf()].hint : narrowing.stored.note"></p>
 
         {{--
-            And why an option cannot be picked lives out here, not inside it: a
-            disabled button cannot be focused, so said in there a keyboard would
-            never reach it.
+            And why an option cannot be picked lives out here, not inside it. A
+            disabled button keeps its text in the accessibility tree — a virtual
+            cursor still reads it — but it takes no focus, so in focus mode, and
+            to anyone walking the group with the arrow keys, the sentence inside
+            it is never reached. Out here it is read either way.
         --}}
         <p class="fw-reach-reason" x-show="narrowing.ownership.reason" x-text="narrowing.ownership.reason" x-cloak></p>
 

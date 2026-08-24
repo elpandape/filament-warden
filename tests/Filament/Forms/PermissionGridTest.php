@@ -171,9 +171,12 @@ test('the folded reading draws the same cell the table does, from the same parti
 
     $html = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
 
-    // Two wrappers over ONE cell, so the pair cannot drift: whatever the table
-    // says about a cell, the stack says byte for byte. Counting is the only way
-    // to see it — the two are identical, so `assertSee` cannot tell them apart.
+    // Two wrappers over ONE cell: both readings include the same partial with
+    // the same arguments, so neither can say something about a cell that the
+    // other does not. What is checked here is that the cell is drawn twice —
+    // counting is the only way to see it, since the two are identical and
+    // `assertSee` cannot tell them apart. That they are identical is a property
+    // of the include, not of this assertion.
     // The partial puts each attribute on its own line, so what separates them is
     // whitespace and not one space.
     $drawn = preg_match_all(
@@ -198,10 +201,17 @@ test('the folded reading carries the scopes, and the wildcard sits outside them'
     // groups rather than inside one — the same place the table's own column
     // gives it.
     $stack = mb_substr($html, (int) mb_strpos($html, 'class="fw-stack"'));
-    $manage = (int) mb_strpos($stack, 'data-fw-action="'.StateKey::MANAGE.'"');
-    $firstScope = (int) mb_strpos($stack, 'class="fw-stack-scope"');
 
-    expect($manage)->toBeLessThan($firstScope);
+    // Present BEFORE ordered: a missing needle is `false`, and `(int) false` is
+    // position zero — which reads as "first" and passes. Deleting the wildcard
+    // from the folded reading left this green.
+    expect($stack)->toContain('data-fw-action="'.StateKey::MANAGE.'"');
+
+    $manage = mb_strpos($stack, 'data-fw-action="'.StateKey::MANAGE.'"');
+    $firstScope = mb_strpos($stack, 'class="fw-stack-scope"');
+
+    expect($firstScope)->not->toBeFalse()
+        ->and((int) $manage)->toBeLessThan((int) $firstScope);
 });
 
 test('the grid hung on a record that is not a role asks it nothing about protection', function (): void {
@@ -600,7 +610,9 @@ test('what may be picked is answered once, and the arrows read the same answer',
 
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
         ->assertSee('x-bind:disabled="! reachEnabled(mode)"', escape: false)
-        ->assertDontSee('narrowing.ownership.available"', escape: false);
+        // The shape the predicate takes when it is spelled out in the markup
+        // instead of asked for, which is what it looked like before.
+        ->assertDontSee("mode === 'owned' && ! narrowing.ownership.available", escape: false);
 });
 
 test('why a reach cannot be picked is said outside the option, which cannot be focused', function (): void {
