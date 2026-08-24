@@ -8,6 +8,86 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [1.10.0] - 2026-08-24
+
+The grid's shape, in three places it did not fit: a side column that took width from the matrix at
+exactly the size the matrix needed it, a table that had no reading at all when the columns ran out
+of room, and a three-of-one choice drawn as the tallest thing on the panel.
+
+### Changed
+
+- **The inspector moved below the grid.** `.fw-layout` reserved a fixed `19rem` right-hand column
+  above `64rem`. In a 1280px panel the form card leaves 974px, so the table saw 604 of them — and a
+  grid folded all the way down asks for 646. It did not fit, by 42px, on the wide screen where there
+  should have been room to spare. It is now one column at every width, with the inspector as a band
+  under the grid. Three rules moved with it and are part of the same change, not decoration:
+  `.fw-table` is `max-content` (at `100%` every spare pixel went to the one auto-width cell and the
+  matrix read as a broken form), the entity column is capped at `14rem` **and wraps** — the cap alone
+  does not contain it while `white-space: nowrap` is in force, and that cell is sticky over an opaque
+  background only as wide as itself, so a long class name painted across the action columns
+  scrolling underneath — and `.fw-condition` stops wrapping above `56rem`, where there is no second
+  line to fall to.
+
+- **The grid folds by row when the columns do not fit.** Below `55.9375rem` the table is replaced by
+  one card per entity, holding one disclosure per scope — read, write, withdraw, irreversible — and
+  one row per action inside it. It is not a second grid: every cell in it is the same
+  `box.blade.php` partial with the same arguments, so both readings bind to one state and cannot
+  drift. `Row::inScope()` is the one method added for it. The cut is a base plus a single query
+  rather than two disjoint ones: two thresholds look equivalent and are not, because between them
+  neither fires and the grid is gone. And the hiding is `display: none` and nothing else — it is the
+  only technique that takes the losing reading out of the accessibility tree and out of the tab
+  order, which is what makes two copies of one button safe.
+
+- **The rule-scope picker is a segmented radiogroup.** It was three stacked cards, each carrying a
+  name and a hint. It is now one row of three with `role="radiogroup"`, a roving tabindex and arrow
+  keys that step OVER a disabled option rather than landing on one — an arrow that moves somewhere
+  and does nothing reads as a broken keyboard. Only the chosen mode's hint is shown; the other two
+  are read once and are noise from the second reading on. Why an option cannot be picked moved out
+  of that option and into a line below it: a disabled button cannot be focused, so said in there a
+  keyboard would never reach it. The rail asks its CONTAINER how wide it is, not the window — it
+  lives at two widths at once, and a window query answers "no need to stack" while the container is
+  narrow and the three labels truncate.
+
+- **A locked cell says why in the hint slot.** `reachOf()` answers with the stored `Shape` when a
+  cell cannot be changed, and that enum has six cases to the mode map's three — so the slot falls
+  through to the stored note, which is the sentence that says why. The separate locked paragraph
+  that carried it before is gone; it would now print twice.
+
+### Added
+
+- `Row::inScope(Scope $scope)` — the row's cells belonging to one scope, declared or not. The
+  wildcard cell is built with no scope at all, so it falls outside every group, which is where the
+  folded reading wants it.
+- `reachEnabled()`, `reachStop()` and `stepReach()` on the grid component. The disabled predicate
+  used to live only in the markup; the arrows and the buttons now read one answer rather than each
+  deriving it.
+- `verify/verify-reach-keyboard.mjs`, run by `make verify` as part of the seventh gate. It drives
+  the three new methods through the real `@vue/reactivity` proxy: a PHP test can assert that a guard
+  is written, never that it runs.
+
+### Not included
+
+- **No new translation keys.** The sketch this came from drew a per-entity and per-scope tally
+  ("3 of 7 · 1 forbidden") and scope bars. Both are cut. Every string in them would have been a new
+  frozen key, and a count composed in the browser would have been the first placeholder substitution
+  in a script whose whole discipline is that it only ever picks a word out of a map PHP filled in.
+  The cost is real and is stated rather than hidden: a collapsed scope in the folded reading gives
+  no hint of what is inside it until it is opened.
+- **The row presets are not in the folded reading.** `read` / `all` / `clear` are reachable only
+  from the three buttons inside the table's row header, revealed on hover of a `<tr>` — and there is
+  no `<tr>` in a disclosure. Carrying them over needs a second reveal arm or three buttons inside a
+  `<summary>`, where a click toggles the disclosure instead. It is a functional loss below
+  `55.9375rem`.
+- **No sticky `<thead>`, no touch-target block, no entity filter.** All three are in the sketch and
+  none is part of this change. The sticky header's token would also have failed the stylesheet gate:
+  its declaration regex stops before a digit, so `--fw-head-1` reads as used and never as declared.
+- **Nothing rendered a page.** None of the eight gates walks an accessibility tree or measures a
+  layout. The table reading, the fold, the cut at 895/896px and the capped entity column were each
+  checked in a browser against the real markup and the real stylesheet. The segmented rail was
+  **not**: it lives inside `<template x-if="offered()">`, so it needs Alpine running, and what
+  stands behind it is the verify script and the suite. A consuming panel in light and dark, with a
+  keyboard only, on a locked cell, is still owed.
+
 ## [1.9.0] - 2026-08-23
 
 Seven changes, one thread running through all of them: whether a screen, a count, an audit or a
