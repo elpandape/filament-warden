@@ -28,6 +28,14 @@ of room, and a three-of-one choice drawn as the tallest thing on the panel.
   scrolling underneath — and `.fw-condition` stops wrapping above `56rem`, where there is no second
   line to fall to.
 
+- **The table fills the card, and the spare width lands in a filler column.** `max-content` alone
+  left it ending mid-card with the row rules cut short — measured in a real panel, 696px of 1041 with
+  345 of blank beside it. `100%` alone was worse: the auto table algorithm handed the spare width to
+  the entity column, 224px to 521px, with every cell still bunched at the left. The pair, plus one
+  empty column at the end with no width of its own, keeps each column the size it asked for and still
+  reaches the edge. The entity column carries its 14rem from both sides — with only the cap declared
+  a 520px card took it back down to 94px, because in tables a declared width is a suggestion.
+
 - **The grid folds by row when the columns do not fit.** Below `55.9375rem` the table is replaced by
   one card per entity, holding one disclosure per scope — read, write, withdraw, irreversible — and
   one row per action inside it. It is not a second grid: every cell in it is the same
@@ -81,12 +89,13 @@ of room, and a three-of-one choice drawn as the tallest thing on the panel.
 - **No sticky `<thead>`, no touch-target block, no entity filter.** All three are in the sketch and
   none is part of this change. The sticky header's token would also have failed the stylesheet gate:
   its declaration regex stops before a digit, so `--fw-head-1` reads as used and never as declared.
-- **Nothing rendered a page.** None of the eight gates walks an accessibility tree or measures a
-  layout. The table reading, the fold, the cut at 895/896px and the capped entity column were each
-  checked in a browser against the real markup and the real stylesheet. The segmented rail was
-  **not**: it lives inside `<template x-if="offered()">`, so it needs Alpine running, and what
-  stands behind it is the verify script and the suite. A consuming panel in light and dark, with a
-  keyboard only, on a locked cell, is still owed.
+- **Nothing rendered a page — the gates, that is.** None of the eight walks an accessibility tree or
+  measures a layout, so everything visual here rests on somebody having looked. Somebody did: all
+  four changes were driven in a real consuming panel, on a real role, with the package symlinked in.
+  The table at full width, the entity column holding 224px from 1041px down to a 420px card, the fold
+  turning over at 820px, the segmented rail with Alpine live, and its arrow keys moving the choice
+  and carrying focus and the tab stop with it. What is still owed is narrower than it was: dark mode,
+  a locked cell, and a screen reader.
 
 ## [1.9.0] - 2026-08-23
 

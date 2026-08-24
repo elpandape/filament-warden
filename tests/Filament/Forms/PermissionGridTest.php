@@ -164,6 +164,21 @@ test('the field renders every tab of the catalogue at once', function (): void {
         ->assertSee('data-fw-action="'.StateKey::DOOR.'"', escape: false);
 });
 
+test('the table carries a filler column so the spare width lands nowhere real', function (): void {
+    $role = makeRole();
+
+    $html = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
+
+    // One in the head and one per body row: with the head alone the column has
+    // no cells to hold it open, and with the rows alone the header row is one
+    // cell short and every group heading shifts.
+    $rows = mb_substr_count($html, '<tr>') - mb_substr_count($html, '<th class="fw-filler"');
+
+    expect($html)->toContain('<th class="fw-filler" rowspan="2"></th>')
+        ->and(mb_substr_count($html, '<td class="fw-filler"></td>'))->toBeGreaterThan(0)
+        ->and($rows)->toBeGreaterThan(0);
+});
+
 test('the folded reading draws the same cell the table does, from the same partial', function (): void {
     $role = makeRole();
 

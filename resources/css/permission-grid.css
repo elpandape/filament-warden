@@ -226,29 +226,37 @@
 
 /* The matrix -------------------------------------------------------------- */
 
-/* Stops stretching with the table: with the container at 100% a `max-content`
-   table has nothing to be narrower than. */
 .fw-scroll {
     overflow-x: auto;
-    inline-size: fit-content;
-    max-inline-size: 100%;
 }
 
 /* What it NEEDS, not what there is. With the inspector gone from the side,
    `inline-size: 100%` handed every spare pixel to the one auto-width cell — the
    entity column — while the action cells stayed pinned at `1%`, and the matrix
    read as a broken form rather than as a matrix. */
+/* The full width, and never less than the matrix needs.
+ *
+ * `100%` alone let the auto table algorithm hand every spare pixel to one
+ * column — measured in a 1041px card, the entity column went from 224px to
+ * 521px while the cells stayed bunched at the left. `max-content` alone left
+ * the table ending mid-card with the row rules cut short. The pair, with the
+ * spare width falling into a filler column at the end, keeps every column the
+ * size it asked for AND reaches the edge.
+ *
+ * `min-inline-size` and not `max-inline-size`: below its own content the table
+ * must overflow the scroller rather than compress, which is what the pinned
+ * first column and its opaque background were written for. */
 .fw-table {
     border-collapse: separate;
     border-spacing: 0;
-    /* And no maximum. A percentage here resolves against the scrollport, which
-       is itself already clamped to the card, so the table could never exceed it
-       — `overflow-x: auto` never engaged and the auto table algorithm took the
-       width back out of the only column that can give it. Measured in a 600px
-       card: the entity column went from its 240px cap to 135px and the rows
-       from 62px to 92px. Overflowing the scroller is the point — it is what the
-       pinned first column and its opaque background were written for. */
-    inline-size: max-content;
+    inline-size: 100%;
+}
+
+/* Where the spare width goes. Empty on purpose and last on purpose: it is the
+   only cell with no width of its own, so the auto algorithm gives it what is
+   left over instead of taking it out of the entity column. */
+.fw-filler {
+    inline-size: auto;
 }
 
 .fw-table th,
@@ -288,6 +296,7 @@
        exists to prevent. Wrapped rather than truncated: an FQCN cut short with
        an ellipsis is not a shorter FQCN, it is a different one. */
     inline-size: 14rem;
+    min-inline-size: 14rem;
     max-inline-size: 14rem;
     overflow-wrap: anywhere;
 }
