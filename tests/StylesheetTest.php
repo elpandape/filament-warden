@@ -56,3 +56,32 @@ test('every custom property the sheet reads is one it declares, and none is decl
 
     expect($used)->toBe($declared);
 });
+
+test('one reading is painted at every width, and the pair turns over together', function (): void {
+    $sheet = stylesheet();
+
+    // Two disjoint queries look equivalent to a base plus one and are not:
+    // between their thresholds neither fires, and at that width the grid is
+    // gone. The stack is off by default and a single query flips both — so the
+    // fold is named in exactly one query, and never in a second one that would
+    // have to agree with it.
+    expect(declarationsOf('.fw-stack'))->toContain('display: none')
+        ->and(mb_substr_count($sheet, '@media (max-width: 55.9375rem)'))->toBe(1)
+        ->and(mb_substr_count($sheet, '.fw-stack {'))->toBe(2)
+        ->and(mb_substr_count($sheet, '.fw-scroll {'))->toBe(2);
+});
+
+test('the folded reading draws its small print with the muted token', function (): void {
+    expect(declarationsOf('.fw-stack-model'))->toContain('color: var(--fw-muted)')
+        ->and(declarationsOf('.fw-stack-action'))->toContain('color: var(--fw-muted)')
+        ->and(declarationsOf('.fw-reach-hint'))->toContain('color: var(--fw-muted)')
+        ->and(declarationsOf('.fw-reach-reason'))->toContain('color: var(--fw-muted)');
+});
+
+test('the reach rail asks its container how wide it is, not the window', function (): void {
+    // It lives at two widths at once — the whole inspector, and whatever a
+    // consuming application leaves it — and a window query answers "no need to
+    // stack" while the container is narrow and the labels truncate.
+    expect(declarationsOf('.fw-builder'))->toContain('container-type: inline-size')
+        ->and(stylesheet())->toContain('@container (max-width: 27rem)');
+});

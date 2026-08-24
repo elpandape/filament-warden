@@ -164,6 +164,46 @@ test('the field renders every tab of the catalogue at once', function (): void {
         ->assertSee('data-fw-action="'.StateKey::DOOR.'"', escape: false);
 });
 
+test('the folded reading draws the same cell the table does, from the same partial', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', roleClass());
+
+    $html = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
+
+    // Two wrappers over ONE cell, so the pair cannot drift: whatever the table
+    // says about a cell, the stack says byte for byte. Counting is the only way
+    // to see it — the two are identical, so `assertSee` cannot tell them apart.
+    // The partial puts each attribute on its own line, so what separates them is
+    // whitespace and not one space.
+    $drawn = preg_match_all(
+        '/data-fw-row="'.preg_quote(roleClass(), '/').'"\s+data-fw-action="viewAny"/',
+        $html,
+    );
+
+    expect($drawn)->toBe(2)
+        ->and($html)->toContain('class="fw-stack"')
+        ->and($html)->toContain('class="fw-stack-entity"');
+});
+
+test('the folded reading carries the scopes, and the wildcard sits outside them', function (): void {
+    $role = makeRole();
+
+    $html = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
+
+    expect($html)->toContain('class="fw-stack-scope" data-scope="read"')
+        ->and($html)->toContain('class="fw-stack-scope" data-scope="withdraw"');
+
+    // The wildcard is built with no scope at all, so it is drawn above the
+    // groups rather than inside one — the same place the table's own column
+    // gives it.
+    $stack = mb_substr($html, (int) mb_strpos($html, 'class="fw-stack"'));
+    $manage = (int) mb_strpos($stack, 'data-fw-action="'.StateKey::MANAGE.'"');
+    $firstScope = (int) mb_strpos($stack, 'class="fw-stack-scope"');
+
+    expect($manage)->toBeLessThan($firstScope);
+});
+
 test('the grid hung on a record that is not a role asks it nothing about protection', function (): void {
     $post = Post::query()->create(['title' => 'A post']);
     $stranger = makeUser('super-admin');
@@ -533,8 +573,53 @@ test('the buttons follow the store on a cell nobody may change', function (): vo
     $role = makeRole();
 
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
-        ->assertSee('x-bind:data-on="reachOf() === mode', escape: false)
-        ->assertDontSee('x-bind:data-on="modeOf() === mode', escape: false);
+        ->assertSee('x-bind:aria-checked="reachOf() === mode', escape: false)
+        ->assertDontSee('x-bind:aria-checked="modeOf() === mode', escape: false);
+});
+
+test('the reach picker is one tab stop, and the arrows walk it', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('role="radiogroup"', escape: false)
+        ->assertSee('role="radio"', escape: false)
+        ->assertSee('x-bind:tabindex="reachStop() === mode ? 0 : -1"', escape: false)
+        ->assertSee('stepReach($el, 1)', escape: false)
+        ->assertSee('stepReach($el, -1)', escape: false);
+});
+
+test('what may be picked is answered once, and the arrows read the same answer', function (): void {
+    $script = (string) file_get_contents(dirname(__DIR__, 3).'/resources/js/permission-grid.js');
+    $role = makeRole();
+
+    // The predicate lives in the script and the markup binds to it, rather than
+    // each of the two spelling it out: the arrows have to skip exactly what the
+    // buttons disable, and two copies of that rule inside one component is the
+    // half `make coverage` cannot see.
+    expect($script)->toContain("&& (mode !== 'owned' || this.narrowing.ownership.available)");
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('x-bind:disabled="! reachEnabled(mode)"', escape: false)
+        ->assertDontSee('narrowing.ownership.available"', escape: false);
+});
+
+test('why a reach cannot be picked is said outside the option, which cannot be focused', function (): void {
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('class="fw-reach-reason"', escape: false)
+        ->assertSee('x-text="narrowing.ownership.reason"', escape: false);
+});
+
+test('a locked cell says why in the hint slot, and says it once', function (): void {
+    $role = makeRole();
+
+    // `reachOf()` answers with the stored `Shape` when locked, and that enum has
+    // six cases to `grid.modes`' three — so the slot has to fall through to the
+    // stored note rather than index a map that has no entry for it.
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->assertSee('grid.modes[reachOf()] ? grid.modes[reachOf()].hint : narrowing.stored.note', escape: false)
+        ->assertDontSee('x-show="narrowing.stored.locked" x-text="narrowing.stored.note"', escape: false);
 });
 
 test('which reach lights branches on whether the store may be changed', function (): void {

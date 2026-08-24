@@ -18,29 +18,55 @@
 --}}
 <template x-if="offered()">
     <div class="fw-builder">
-        <div class="fw-field-label">{{ __('filament-warden::ui.conditions.scope') }}</div>
+        <div class="fw-field-label" id="{{ $ids }}-reach">{{ __('filament-warden::ui.conditions.scope') }}</div>
 
-        <div class="fw-modes">
+        {{--
+            A radiogroup and not three buttons: one tab stop, and the arrows walk
+            it. Which of the three can be reached is `reachEnabled()`, asked once
+            — the markup binds `disabled` to it and the arrow keys step over it,
+            so the rule is not written twice inside one component.
+        --}}
+        <div
+            class="fw-reach"
+            role="radiogroup"
+            aria-labelledby="{{ $ids }}-reach"
+            x-bind:data-locked="narrowing.stored.locked ? 'true' : 'false'"
+            x-on:keydown.arrow-right.prevent="stepReach($el, 1)"
+            x-on:keydown.arrow-down.prevent="stepReach($el, 1)"
+            x-on:keydown.arrow-left.prevent="stepReach($el, -1)"
+            x-on:keydown.arrow-up.prevent="stepReach($el, -1)"
+        >
             <template x-for="mode in ['all', 'owned', 'conditions']" :key="mode">
                 <button
                     type="button"
-                    class="fw-mode"
-                    x-bind:data-on="reachOf() === mode ? 'true' : 'false'"
-                    x-bind:disabled="! interactive || narrowing.stored.locked || (mode === 'owned' && ! narrowing.ownership.available)"
+                    class="fw-reach-option"
+                    role="radio"
+                    x-bind:data-fw-mode="mode"
+                    x-bind:aria-checked="reachOf() === mode ? 'true' : 'false'"
+                    x-bind:tabindex="reachStop() === mode ? 0 : -1"
+                    x-bind:disabled="! reachEnabled(mode)"
                     x-on:click="setMode(mode)"
-                >
-                    <span class="fw-mode-name" x-text="grid.modes[mode].name"></span>
-                    <span
-                        class="fw-mode-hint"
-                        x-text="mode === 'owned' && ! narrowing.ownership.available
-                            ? narrowing.ownership.reason
-                            : grid.modes[mode].hint"
-                    ></span>
-                </button>
+                    x-text="grid.modes[mode].name"
+                ></button>
             </template>
         </div>
 
-        <p class="fw-note fw-note-locked" x-show="narrowing.stored.locked" x-text="narrowing.stored.note" x-cloak></p>
+        {{--
+            One hint, the chosen mode's. A locked cell has no entry in `modes` —
+            `reachOf()` answers with the stored `Shape`, which has six cases to
+            that map's three — so the slot carries the stored note instead, which
+            is the sentence that says WHY it is locked. It is never null when
+            locked: the three editable shapes are the only ones built without a
+            reason.
+        --}}
+        <p class="fw-reach-hint" x-text="grid.modes[reachOf()] ? grid.modes[reachOf()].hint : narrowing.stored.note"></p>
+
+        {{--
+            And why an option cannot be picked lives out here, not inside it: a
+            disabled button cannot be focused, so said in there a keyboard would
+            never reach it.
+        --}}
+        <p class="fw-reach-reason" x-show="narrowing.ownership.reason" x-text="narrowing.ownership.reason" x-cloak></p>
 
         {{--
             The rule as the store has it, written out by PHP.

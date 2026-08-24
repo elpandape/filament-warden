@@ -168,6 +168,58 @@
                                     </tbody>
                                 </table>
                             </div>
+
+                            {{--
+                                The same grid read down the page, for when the
+                                columns do not fit across it. One reading is
+                                painted at a time — the stylesheet turns the pair
+                                over together with `display: none`, which is the
+                                only way of hiding that also takes the losing
+                                copy out of the accessibility tree and out of the
+                                tab order.
+
+                                Every cell here is the SAME partial, with the
+                                same arguments byte for byte, so both copies bind
+                                to one state and cannot drift apart. The notices,
+                                the tabs and the legend are not repeated: they
+                                sit above both readings, once.
+                            --}}
+                            <div class="fw-stack">
+                                @foreach ($tab->rows as $row)
+                                    <details class="fw-stack-entity" @if ($loop->first) open @endif>
+                                        <summary>
+                                            <span class="fw-stack-name">{{ $row->label }}</span>
+                                            <span class="fw-stack-model">{{ $row->model }}</span>
+                                        </summary>
+
+                                        <div class="fw-stack-rows">
+                                            @if ($row->manage instanceof \ElPandaPe\FilamentWarden\Filament\Forms\Grid\Cell)
+                                                <div class="fw-stack-row">
+                                                    <span class="fw-stack-label">{{ $row->manage->label }}<span class="fw-stack-action">{{ $row->manage->action }}</span></span>
+                                                    @include('filament-warden::box', ['cell' => $row->manage, 'label' => $row->label.' · '.$row->manage->label, 'interactive' => $interactive, 'states' => $states])
+                                                </div>
+                                            @endif
+
+                                            @foreach ($grid->groups as $group)
+                                                <details class="fw-stack-scope" data-scope="{{ $group->scope->value }}">
+                                                    <summary><span>{{ $group->label }}</span></summary>
+
+                                                    @foreach ($row->inScope($group->scope) as $cell)
+                                                        <div class="fw-stack-row">
+                                                            <span class="fw-stack-label">{{ $cell->label }}<span class="fw-stack-action">{{ $cell->action }}</span></span>
+                                                            @if ($cell->declared)
+                                                                @include('filament-warden::box', ['cell' => $cell, 'label' => $row->label.' · '.$cell->label, 'interactive' => $interactive, 'states' => $states])
+                                                            @else
+                                                                <span class="fw-void" title="{{ __('filament-warden::ui.grid.undeclared') }}"><span aria-hidden="true">·</span><span class="fw-sr">{{ $states['undeclared'] }}</span></span>
+                                                            @endif
+                                                        </div>
+                                                    @endforeach
+                                                </details>
+                                            @endforeach
+                                        </div>
+                                    </details>
+                                @endforeach
+                            </div>
                         @else
                             <ul class="fw-doors">
                                 @foreach ($tab->rows as $row)

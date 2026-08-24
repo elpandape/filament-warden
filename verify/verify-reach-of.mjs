@@ -38,11 +38,11 @@
 //   npm install
 //   node verify-reach-of.mjs
 //
-// Requires Node + npm on the HOST. Not part of `make ci` — the Docker image
-// behind it (php:8.5-cli-alpine) has neither Node nor npm, and this
-// package's JS has no gate at all (AGENTS.md §6.27, §7). This script, and
-// its sibling verify-select-sequencing.mjs, are the only executable
-// evidence this package's JS has; they are run by hand, not on every change.
+// It IS part of `make ci`, as the seventh gate: the image installs nodejs and
+// npm, and `make verify` runs this script and its siblings. They are the only
+// executable evidence this package's JS behaves rather than merely reading a
+// certain way — a PHP test can assert that a guard is WRITTEN, never that it
+// runs.
 //
 // This directory (verify/) lives at the repo root, on purpose, not under
 // resources/js/ (that is a registered Filament asset — `php artisan

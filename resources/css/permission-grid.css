@@ -19,8 +19,8 @@
  *     (`support/src/Colors/ColorManager.php`): light `--gray-600` is 7.73:1 on
  *     `--fw-surface` and 7.01:1 on `--fw-raised`; dark `--gray-400` is 6.74:1
  *     and 5.78:1. The floor is measured against the background the rule is
- *     painted on — `--gray-500` clears 4.5:1 on the surface and misses it on
- *     the raised head. A host theme that overrides the palette moves all of it.
+ *     painted on — `--gray-500` clears 4.5:1 on the surface and misses it on a
+ *     raised one. A host theme that overrides the palette moves all of it.
  *
  * Nothing here carries `!important`: a stylesheet shipped as a plain asset is
  * unlayered, so it already outranks every rule Filament puts in `@layer`.
@@ -67,33 +67,37 @@
 
 /* The layout: the grid, and the panel that explains it ------------------- */
 
+/* One column, always. A fixed side column took 19rem off the grid at exactly
+   the width where the matrix needs it most: in a 1280px panel the form card
+   leaves 974px and the table saw 604 of them, and a grid folded all the way
+   down asks for 646 — it did not fit, by 42px, on the wide screen where there
+   should have been room to spare.
+   The explicit single track is not decorative: without it the implicit column
+   is `auto`, whose minimum is min-content, and the min-content of `.fw-main` is
+   a table far wider than the card it sits in. It is also what keeps
+   `.fw-builder`'s container query answering — `container-type: inline-size`
+   collapses its element to its own borders inside any content-sized track. */
 .fw-layout {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
-    align-items: start;
-}
-
-@media (min-width: 64rem) {
-    .fw-layout {
-        grid-template-columns: minmax(0, 1fr) 19rem;
-    }
 }
 
 .fw-main {
     min-inline-size: 0;
 }
 
+/* A band under the grid, not a card beside it. The border, the radius and the
+   surface fill went together with the column: a full-width raised bar no longer
+   reads as this panel's own header, and `overflow: hidden` existed only to clip
+   that bar to the radius. */
 .fw-inspector {
-    border: 1px solid var(--fw-line);
-    border-radius: 0.5rem;
-    background: var(--fw-surface);
-    overflow: hidden;
+    border-block-start: 1px solid var(--fw-line);
+    padding-block-start: 1rem;
 }
 
 .fw-inspector-head {
-    padding: 0.75rem;
-    border-block-end: 1px solid var(--fw-hairline);
-    background: var(--fw-raised);
+    padding-block-end: 0.625rem;
 }
 
 .fw-inspector-title {
@@ -107,8 +111,13 @@
     overflow-wrap: anywhere;
 }
 
+/* Grid rather than block so the gap exists in one place. The explicit track is
+   what `.fw-builder`'s container query resolves against. */
 .fw-inspector-body {
-    padding: 0.75rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    min-inline-size: 0;
 }
 
 .fw-inspector-empty {
@@ -216,14 +225,23 @@
 
 /* The matrix -------------------------------------------------------------- */
 
+/* Stops stretching with the table: with the container at 100% a `max-content`
+   table has nothing to be narrower than. */
 .fw-scroll {
     overflow-x: auto;
+    inline-size: fit-content;
+    max-inline-size: 100%;
 }
 
+/* What it NEEDS, not what there is. With the inspector gone from the side,
+   `inline-size: 100%` handed every spare pixel to the one auto-width cell — the
+   entity column — while the action cells stayed pinned at `1%`, and the matrix
+   read as a broken form rather than as a matrix. */
 .fw-table {
     border-collapse: separate;
     border-spacing: 0;
-    inline-size: 100%;
+    inline-size: max-content;
+    max-inline-size: 100%;
 }
 
 .fw-table th,
@@ -234,8 +252,9 @@
     vertical-align: middle;
 }
 
-/* The action columns take what they need and no more, so the entity column keeps
-   the rest instead of the cells drifting apart across an empty table. */
+/* The action columns take what they need and no more. There is no "rest" for
+   the entity column to keep any more — the table is `max-content` — but a cell
+   that sized itself would still push the matrix apart. */
 .fw-table .fw-cell,
 .fw-table .fw-action,
 .fw-table .fw-manage {
@@ -254,8 +273,16 @@
     z-index: 1;
     background: var(--fw-surface);
     text-align: start;
-    inline-size: auto;
-    white-space: nowrap;
+    /* Capped AND wrapping, and the two are one change. The cap alone does not
+       contain the column while `white-space: nowrap` is still in force: the box
+       obeys it and the text does not, and because this cell is sticky over an
+       opaque background only as wide as itself, a long label paints across the
+       action columns scrolling underneath — the exact failure that background
+       exists to prevent. Wrapped rather than truncated: an FQCN cut short with
+       an ellipsis is not a shorter FQCN, it is a different one. */
+    inline-size: 14rem;
+    max-inline-size: 14rem;
+    overflow-wrap: anywhere;
 }
 
 .fw-group,
@@ -285,6 +312,7 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.6875rem;
     line-height: 1.3;
+    overflow-wrap: anywhere;
 }
 
 .fw-group[data-scope='withdraw'],
@@ -575,12 +603,169 @@ tr:hover .fw-shortcuts,
     letter-spacing: 0.04em;
 }
 
+/* The folded reading ------------------------------------------------------
+ *
+ * Not "the grid on a phone": the SAME grid read down the page, for when the
+ * columns do not fit across it. Every cell in here is the same `.fw-box` button
+ * the table draws, from the same partial, with the same `data-*` and the same
+ * handler — a second wrapper over one cell, never a second cell. That is the
+ * only reason this does not multiply the rules that already live written twice.
+ */
+
+.fw-stack {
+    display: none;
+}
+
+.fw-stack-entity {
+    border: 1px solid var(--fw-line);
+    border-radius: 0.5rem;
+    background: var(--fw-raised);
+}
+
+.fw-stack-entity > summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem;
+    padding: 0.625rem 0.75rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.fw-stack-entity > summary::-webkit-details-marker {
+    display: none;
+}
+
+.fw-stack-entity > summary:hover {
+    background: var(--fw-surface);
+}
+
+.fw-stack-entity > summary:focus-visible {
+    outline: 2px solid var(--fw-accent);
+    outline-offset: -2px;
+}
+
+.fw-stack-name {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+/* A long class name breaks wherever it has to: it cannot overflow the card or
+   push the summary off the screen. */
+.fw-stack-model {
+    color: var(--fw-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.6875rem;
+    overflow-wrap: anywhere;
+}
+
+.fw-stack-rows {
+    display: grid;
+    border-block-start: 1px solid var(--fw-line);
+}
+
+/* The scope is the fold, and it was already a first-class idea: read, write,
+   withdraw, irreversible are what the columns are grouped by across the table,
+   and they carry their colour down here unchanged. */
+.fw-stack-scope {
+    border-block-start: 1px solid var(--fw-hairline);
+}
+
+.fw-stack-scope > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.4375rem 0.75rem;
+    color: var(--fw-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    list-style: none;
+}
+
+.fw-stack-scope > summary::-webkit-details-marker {
+    display: none;
+}
+
+.fw-stack-scope > summary:focus-visible {
+    outline: 2px solid var(--fw-accent);
+    outline-offset: -2px;
+}
+
+.fw-stack-scope[data-scope='withdraw'] > summary {
+    color: var(--fw-noted);
+}
+
+.fw-stack-scope[data-scope='irreversible'] > summary {
+    color: var(--fw-no);
+}
+
+.fw-stack-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+}
+
+.fw-stack-row + .fw-stack-row {
+    border-block-start: 1px solid var(--fw-hairline);
+}
+
+.fw-stack-scope .fw-stack-row {
+    padding-inline-start: 1.5rem;
+}
+
+.fw-stack-label {
+    min-inline-size: 0;
+}
+
+.fw-stack-action {
+    display: block;
+    color: var(--fw-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.6875rem;
+    overflow-wrap: anywhere;
+}
+
+/* An action the policy does not declare is information, not a gap — the same
+   dot and the same legend entry as in the table. */
+.fw-stack-row .fw-void {
+    justify-self: end;
+}
+
+/* One reading at every width. The stack is off by default and this one query
+   turns the pair over together, so there is no width — integer, zoomed or
+   fractional — at which both are painted or neither is. Two disjoint queries
+   look equivalent and are not: between their thresholds neither fires.
+   `display: none` and nothing else: it is the only way of hiding that takes the
+   losing reading out of the accessibility tree AND out of the tab order, which
+   is what makes two copies of one button safe. */
+@media (max-width: 55.9375rem) {
+    .fw-scroll {
+        display: none;
+    }
+
+    .fw-stack {
+        display: grid;
+        gap: 0.5rem;
+    }
+}
+
 /* The condition builder --------------------------------------------------- */
 
+/* `container-type` because the rail below asks its CONTAINER how wide it is and
+   not the window: it lives at two widths at once — the whole inspector, and
+   whatever a consuming application leaves it — and a window query answers "no
+   need to stack" while the container is 19rem and the labels truncate. */
 .fw-builder {
     margin-block-start: 1rem;
     padding-block-start: 0.875rem;
     border-block-start: 1px solid var(--fw-hairline);
+    container-type: inline-size;
+    min-inline-size: 0;
 }
 
 .fw-field-label {
@@ -592,43 +777,103 @@ tr:hover .fw-shortcuts,
     letter-spacing: 0.04em;
 }
 
-.fw-modes {
+/* One of three, on one line. It was three stacked cards each carrying a name
+   AND a hint — the tallest thing on the panel for a choice between three, with
+   two explanations that are read once and are noise from the second reading on.
+   Only the chosen one's hint stays. */
+.fw-reach {
     display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+    inline-size: 100%;
+    padding: 0.1875rem;
+    border: 1px solid var(--fw-line);
+    border-radius: 0.5rem;
+    background: var(--fw-raised);
 }
 
-.fw-mode {
-    display: block;
-    padding: 0.4375rem 0.5625rem;
-    border: 1px solid var(--fw-line);
+.fw-reach-option {
+    flex: 1 1 0;
+    min-inline-size: 0;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid transparent;
     border-radius: 0.375rem;
     background: transparent;
-    color: inherit;
-    text-align: start;
+    color: var(--fw-muted);
+    font: inherit;
+    font-size: 0.8125rem;
+    text-align: center;
     cursor: pointer;
+    /* A control's label does not break in two: it reads as a styling fault, not
+       as a decision. The rail changes shape before that happens. */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.fw-mode[data-on='true'] {
-    border-color: var(--fw-accent);
-    background: color-mix(in oklab, var(--primary-500) 10%, transparent);
+.fw-reach-option:hover:not([disabled]) {
+    color: var(--fw-text);
 }
 
-.fw-mode[disabled] {
-    opacity: 0.55;
-    cursor: not-allowed;
+.fw-reach-option:focus-visible {
+    outline: 2px solid var(--fw-accent);
+    outline-offset: -1px;
 }
 
-.fw-mode-name {
-    display: block;
+.fw-reach-option:active:not([disabled]) {
+    background: color-mix(in oklab, var(--fw-text) 6%, transparent);
+}
+
+/* The chosen one lifts off the rail, which is what makes a segmented control
+   read as a switch rather than as three buttons pushed together. */
+.fw-reach-option[aria-checked='true'] {
+    border-color: var(--fw-line);
+    background: var(--fw-surface);
+    color: var(--fw-text);
     font-weight: 600;
 }
 
-.fw-mode-hint {
-    display: block;
-    margin-block-start: 0.125rem;
+.fw-reach-option[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* The whole rail locked is not "three buttons switched off": it is a control
+   that does not write, and the border says so as well as the opacity. */
+.fw-reach[data-locked='true'] {
+    border-style: dashed;
+    border-color: var(--fw-no);
+}
+
+.fw-reach-hint {
+    margin: 0.4375rem 0 0;
     color: var(--fw-muted);
     font-size: 0.75rem;
+}
+
+/* Why an option cannot be picked does NOT belong inside that option: it is
+   disabled, so it cannot be focused, and there a keyboard would never reach it. */
+.fw-reach-reason {
+    margin: 0.4375rem 0 0;
+    padding-inline-start: 0.5rem;
+    border-inline-start: 2px solid var(--fw-muted);
+    color: var(--fw-muted);
+    font-size: 0.75rem;
+}
+
+/* The threshold is the text, not a device: 27rem is where the three longest
+   labels stop fitting on one line. */
+@container (max-width: 27rem) {
+    .fw-reach {
+        flex-direction: column;
+        gap: 0.125rem;
+    }
+
+    .fw-reach-option {
+        /* `flex: 1 1 0` divides the MAIN axis, and once the rail is a column
+           that axis is its height: the three would split it between them and
+           `overflow: hidden` would clip them into each other. */
+        flex: 0 0 auto;
+        text-align: start;
+    }
 }
 
 .fw-conditions {
@@ -669,11 +914,9 @@ tr:hover .fw-shortcuts,
     font-size: 0.8125rem;
 }
 
-/* Each control is given its share by name. The inspector is a narrow column and
-   the row wraps: what is compared reads on the first line, what it is compared
-   against on the second — and the same way every time, or the list stops being
-   a list. Every one of these needs `.fw-condition` in front of it, or the shared
-   rule above outranks it. */
+/* Each control is given its share by name, and the same way every time, or the
+   list stops being a list. Every one of these needs `.fw-condition` in front of
+   it, or the shared rule above outranks it. */
 .fw-condition .fw-column {
     flex: 1 1 5rem;
 }
@@ -699,6 +942,22 @@ tr:hover .fw-shortcuts,
     flex: 0 0 3rem;
     font-family: ui-monospace, monospace;
     text-align: center;
+}
+
+/* The row was written to wrap inside a 19rem column. Across the whole width
+   there is no second line to fall to, and the misfit note has to come off its
+   own line with it: at `nowrap` a `flex-basis: 100%` note takes the row and
+   crushes the two controls the builder exists to operate.
+   Asked of the window and not of the container, because this row is also drawn
+   by the permission screen, which has no `.fw-builder` around it to ask. */
+@media (min-width: 56rem) {
+    .fw-condition {
+        flex-wrap: nowrap;
+    }
+
+    .fw-misfit {
+        flex-basis: auto;
+    }
 }
 
 .fw-drop {

@@ -473,6 +473,55 @@ function grid({ state, grid, interactive }) {
             return this.narrowing.stored.locked ? this.narrowing.stored.mode : this.modeOf()
         },
 
+        /**
+         * Which of the three a cell may be moved to.
+         *
+         * Asked once and read twice: the markup binds `disabled` to it and the
+         * arrow keys step over it, so the rule that decides is not the rule
+         * that skips.
+         */
+        reachEnabled(mode) {
+            return this.interactive
+                && ! this.narrowing.stored.locked
+                && (mode !== 'owned' || this.narrowing.ownership.available)
+        },
+
+        /**
+         * Which option holds the group's single tab stop.
+         *
+         * The chosen one, unless the store holds a reach this screen does not
+         * offer — then the first one still reachable, so a radiogroup is never
+         * a region with no way into it.
+         */
+        reachStop() {
+            const open = ['all', 'owned', 'conditions'].filter((mode) => this.reachEnabled(mode))
+
+            return open.includes(this.reachOf()) ? this.reachOf() : (open[0] ?? null)
+        },
+
+        /**
+         * The rendered buttons are the list, for the same reason `stepTab` reads
+         * them: a keydown on the group needs a focused element inside it, and
+         * the only elements inside it are these.
+         *
+         * Disabled options are stepped over rather than landed on — an arrow
+         * that moves somewhere and does nothing reads as a broken keyboard — and
+         * when every one of them is disabled there is nothing to step to.
+         */
+        stepReach(group, step) {
+            const open = Array.from(group.querySelectorAll('[role="radio"]')).filter((one) => ! one.disabled)
+
+            if (open.length === 0) {
+                return
+            }
+
+            const at = open.findIndex((one) => one.getAttribute('aria-checked') === 'true')
+            const next = open[(Math.max(at, 0) + step + open.length) % open.length]
+
+            this.setMode(next.dataset.fwMode)
+            next.focus()
+        },
+
         /* The two names the shared half reads. The grid keeps its own, older
            ones so nothing else has to move. */
         get words() {

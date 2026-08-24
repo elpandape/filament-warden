@@ -48,6 +48,23 @@ final readonly class Row
     }
 
     /**
+     * The row's cells that belong to one scope, declared or not.
+     *
+     * The wildcard cell is built with no scope at all, so a `=== $scope` filter
+     * leaves it outside every group — which is where the folded reading wants
+     * it: above them, not inside one.
+     *
+     * @return list<Cell>
+     */
+    public function inScope(Scope $scope): array
+    {
+        return array_values(array_filter(
+            $this->cells,
+            static fn (Cell $cell): bool => $cell->scope === $scope,
+        ));
+    }
+
+    /**
      * The reading half of the row, so the shortcut does not have to carry a copy
      * of the scope map into the browser.
      *

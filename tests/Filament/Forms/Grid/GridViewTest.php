@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
+use ElPandaPe\FilamentWarden\Catalog\Scope;
 use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Cell;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView;
@@ -424,4 +425,27 @@ test('a row the catalogue no longer declares is still named, not dropped', funct
     $catalog = Catalog::for(Panel::make()->id('labels-gone')->resources([PostResource::class]));
 
     expect(GridView::cellLabel($catalog, 'App\\Models\\Invoice', 'delete'))->toBe('Invoice · Delete');
+});
+
+test('a row hands out its cells by scope, and the wildcard belongs to none of them', function (): void {
+    $manage = new Cell('posts', StateKey::MANAGE, 'Everything', Stance::Abstain);
+    $view = new Cell('posts', 'viewAny', 'List', Stance::Granted, scope: Scope::Read);
+    $wipe = new Cell('posts', 'forceDelete', 'Delete for good', Stance::Abstain, scope: Scope::Irreversible);
+
+    $row = new Row('posts', 'posts', Post::class, [$view, $wipe], $manage);
+
+    expect($row->inScope(Scope::Read))->toBe([$view])
+        ->and($row->inScope(Scope::Irreversible))->toBe([$wipe])
+        ->and($row->inScope(Scope::Write))->toBeEmpty();
+});
+
+test('an undeclared cell keeps its scope, so the folded reading still draws its dot', function (): void {
+    // Without this the grey dot would fall out of every group and the action
+    // would read as absent rather than as one nobody can grant.
+    $absent = Cell::undeclared('posts', 'restore', 'Restore', Scope::Withdraw);
+
+    $row = new Row('posts', 'posts', Post::class, [$absent]);
+
+    expect($row->inScope(Scope::Withdraw))->toBe([$absent])
+        ->and($absent->declared)->toBeFalse();
 });
