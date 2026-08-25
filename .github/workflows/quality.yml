@@ -41,7 +41,7 @@ jobs:
       # version, so a stale entry cannot hide an error — the key below only decides how
       # often the cache is a hit.
       - name: Cache the analysers
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache
           key: analysers-${{ runner.os }}-php8.5-${{ hashFiles('composer.lock', 'pint.json', 'phpstan.neon', 'phpstan-floor.neon', 'rector.php') }}
