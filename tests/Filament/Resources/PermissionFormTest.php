@@ -284,3 +284,30 @@ test('two chains warden treats as the same twin are read as the same rule here',
     livewire(EditPermission::class, ['record' => $permission->getKey()])
         ->assertDontSee(__('filament-warden::ui.conditions.locked.rewrite'));
 });
+
+test('creating the same twin twice is refused on the field, not by the database', function (): void {
+    config()->set('filament-warden.permissions.create', true);
+    config()->set('filament-warden.catalog.models', [Post::class]);
+
+    $user = signIn();
+
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('create', permissionClass());
+
+    $rule = [
+        'name' => 'publish',
+        'entity_type' => new Post()->getMorphClass(),
+        'options' => ['mode' => 'conditions', 'rules' => [
+            ['logic' => 'and', 'kind' => 'value', 'column' => 'title', 'operator' => '=', 'value' => 'alpha'],
+        ]],
+    ];
+
+    livewire(CreatePermission::class)->fillForm($rule)->call('create')->assertHasNoFormErrors();
+
+    // `exists()` compares plain rows only — a twin is a row of its own and
+    // collides with nothing, which was true until warden 2.0 put a unique index
+    // on `(name, identity_key)` with a digest of the canonical conditions in it.
+    livewire(CreatePermission::class)->fillForm($rule)->call('create')->assertHasFormErrors(['name']);
+
+    expect(permissionClass()::query()->withoutGlobalScopes()->where('name', 'publish')->count())->toBe(1);
+});

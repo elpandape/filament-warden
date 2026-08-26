@@ -15,6 +15,8 @@ use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Validation\ValidationException;
 
 class EditPermission extends EditRecord
 {
@@ -153,6 +155,30 @@ class EditPermission extends EditRecord
     protected function afterSave(): void
     {
         Warden::refresh();
+    }
+
+    /**
+     * The catalogue's unique index, reported as a field error rather than a 500.
+     *
+     * The same guard `CreatePermission` carries, and the path that was measured
+     * is this one: a twin moved onto an entity that already has the plain row of
+     * the same name. Choosing the entity clears the conditions — deliberately,
+     * they named another table's columns — so the row being saved is no longer a
+     * twin, while `PermissionForm::exists()` had already excused it for being
+     * one when the rule ran. Before this it came back as a raw
+     * `UniqueConstraintViolationException`.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function handleRecordUpdate(Model $record, array $data): Model
+    {
+        try {
+            return parent::handleRecordUpdate($record, $data);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages([
+                'data.name' => __('filament-warden::ui.resources.permissions.fields.collides'),
+            ]);
+        }
     }
 
     private function text(mixed $value): string

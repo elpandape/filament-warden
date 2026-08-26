@@ -1129,3 +1129,29 @@ test('the probe searches only columns a like can compare', function (): void {
         ->and(Columns::texts(User::class))->not->toContain('id')
         ->and(ViewPermission::accounts('Amaru'))->not->toBeEmpty();
 });
+
+test('a save that collides with the catalogue index says so on the field', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+    config()->set('filament-warden.catalog.models', [Post::class, Comment::class]);
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    Warden::allow(makeRole())->to('view', Post::class);
+    Warden::allow(makeRole())->to('view', Comment::class)->where('id', '=', 1);
+
+    $twin = permissionClass()::query()->withoutGlobalScopes()
+        ->where('name', 'view')->whereNotNull('options')->orderByDesc('id')->firstOrFail();
+
+    // Choosing the entity clears the conditions, so the row being saved stops
+    // being a twin — and `exists()` had already excused it for being one. Before
+    // warden 2.0 there was no unique index and the duplicate was simply created;
+    // now the database refuses it, and without this guard the person gets a 500.
+    livewire(EditPermission::class, ['record' => $twin->getKey()])
+        ->fillForm(['entity_type' => new Post()->getMorphClass()])
+        ->call('save')
+        ->assertHasFormErrors(['name']);
+
+    expect($twin->refresh()->getAttribute('entity_type'))->toBe(new Comment()->getMorphClass());
+});

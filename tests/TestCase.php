@@ -7,7 +7,6 @@ namespace ElPandaPe\FilamentWarden\Tests;
 use BladeUI\Heroicons\BladeHeroiconsServiceProvider;
 use BladeUI\Icons\BladeIconsServiceProvider;
 use Carbon\Laravel\ServiceProvider as CarbonServiceProvider;
-use Composer\InstalledVersions;
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Conditions\Columns;
 use ElPandaPe\FilamentWarden\FilamentWardenServiceProvider;
@@ -16,6 +15,7 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Providers\BarePanelProvider;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Providers\LaxPanelProvider;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Providers\TestPanelProvider;
+use ElPandaPe\Warden\Testing\Schema as WardenSchema;
 use ElPandaPe\Warden\WardenServiceProvider;
 use Filament\Actions\ActionsServiceProvider;
 use Filament\Facades\Filament;
@@ -30,7 +30,6 @@ use Filament\Tables\TablesServiceProvider;
 use Filament\Widgets\WidgetsServiceProvider;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -38,7 +37,6 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as ApplicationTestCase;
-use RuntimeException;
 
 /**
  * The boot every test file asks for with `pest()->extend(TestCase::class)`, which resolves
@@ -151,28 +149,24 @@ abstract class TestCase extends ApplicationTestCase
     }
 
     /**
-     * Warden ships its schema as a publishable stub and never loads it from vendor, so the
-     * four tables are raised here by requiring the file and calling `up()` by hand.
+     * Warden ships its schema as a publishable stub and never loads it from vendor.
+     * Since warden `1.1.0` it also ships `Testing\Schema`, a loadable entry point to
+     * that same stub which honours `warden.tables` and `warden.connection` — so the
+     * four tables no longer need a vendor path resolved here by hand.
+     *
+     * `Schema::upgradeToV2()` is deliberately not called: warden publishes its
+     * creation stub already in the 2.0 shape, so this suite has no way to build a
+     * 1.x database to upgrade, and calling it would run against a catalogue that
+     * already has `identity_key`.
      *
      * The hook is `defineDatabaseMigrationsAfterDatabaseRefreshed()` and not
      * `defineDatabaseMigrations()`: testbench calls the second *before* refreshing the
      * database, and with sqlite in memory the refresh raises an empty one over everything
-     * created there. The symptom is a `no such table` halfway through the suite. The install
-     * path is resolved through Composer's runtime API rather than hardcoded, so a custom
-     * `vendor-dir` or a path repository does not break it.
+     * created there. The symptom is a `no such table` halfway through the suite.
      */
     protected function defineDatabaseMigrationsAfterDatabaseRefreshed(): void
     {
-        $installPath = InstalledVersions::getInstallPath('elpandape/warden');
-
-        if ($installPath === null) {
-            throw new RuntimeException('Could not resolve the install path of elpandape/warden.');
-        }
-
-        /** @var Migration $migration */
-        $migration = require $installPath.'/database/migrations/create_warden_tables.php.stub';
-
-        $migration->up(); // @phpstan-ignore method.notFound
+        WardenSchema::up();
 
         Schema::create('users', static function (Blueprint $table): void {
             $table->id();

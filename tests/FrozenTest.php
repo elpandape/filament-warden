@@ -260,6 +260,7 @@ test('the translation keys an application overrides are frozen', function (): vo
         'resources.permissions.fields.name_help_loose',
         'resources.permissions.fields.name_help_held',
         'resources.permissions.fields.taken',
+        'resources.permissions.fields.collides',
         'resources.permissions.fields.title',
         'resources.permissions.fields.title_help',
         'resources.permissions.fields.entity',

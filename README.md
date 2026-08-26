@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://repository-images.githubusercontent.com/1338877806/555f5626-51c1-4808-a8e6-ba7e98fe60bd" alt="Filament Warden" width="800">
+</p>
+
 <h1 align="center">Filament Warden</h1>
 
 <p align="center">
@@ -11,7 +15,7 @@
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License"></a>
   <a href="https://php.net"><img src="https://img.shields.io/badge/PHP-8.4-777BB4?style=flat-square&logo=php" alt="PHP 8.4"></a>
   <a href="https://laravel.com"><img src="https://img.shields.io/badge/Laravel-13-FF2D20?style=flat-square&logo=laravel" alt="Laravel 13"></a>
-  <a href="https://filamentphp.com"><img src="https://img.shields.io/badge/Filament-5.7-4ade80?style=flat-square" alt="Filament 5.7"></a>
+  <a href="https://filamentphp.com"><img src="https://img.shields.io/badge/Filament-5.7-orange?style=flat-square" alt="Filament 5.7"></a>
 </p>
 
 ---

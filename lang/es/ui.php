@@ -68,6 +68,7 @@ return [
                 'name_help_loose' => 'Lo eliges tú. Es lo que preguntará can().',
                 'name_help_held' => 'Alguien tiene esta fila, así que su nombre y su entidad están bloqueados. Reapuntarla movería lo que tienen, y nadie se lo diría.',
                 'taken' => 'El catálogo ya tiene un permiso con este nombre y esta entidad.',
+                'collides' => 'Warden ya tiene esta fila exacta: mismo nombre, entidad, registro, propiedad, tenant y condiciones. Cambia alguno, o edita la fila que ya está.',
                 'title' => 'Título',
                 'title_help' => 'Solo para leerlo. Warden lo escribe al crear el permiso y nunca más: renombrarlo deja el viejo en su sitio.',
                 'entity' => 'Entidad',
