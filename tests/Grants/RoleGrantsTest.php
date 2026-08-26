@@ -343,6 +343,28 @@ test('a record grant carries the rule written on it', function (): void {
         ->and($records[0]->reach())->toBe('conditions');
 });
 
+test('a narrowed record grant survives a save that clears the cell above it', function (): void {
+    $role = makeRole();
+    $post = Post::query()->create(['title' => 'A post']);
+
+    Warden::allow($role)->to('view', $post)->where('title', '=', 'A post');
+    Warden::allow($role)->to('view', Post::class);
+
+    // Clearing the class cell. The row pinned to a record answers no check this
+    // grid makes, so this screen neither draws it nor deletes it — and now that
+    // a save names twins by their model, forgetting that would take it with it.
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['view' => 'abstain']], []);
+
+    $state = RoleGrants::of($role, gridCatalog());
+
+    // Abstaining is the absence of a row, so the cell is gone from the map
+    // rather than set to a word.
+    expect($state->stances[Post::class]['view'] ?? null)->toBeNull()
+        ->and($state->records)->toHaveCount(1)
+        ->and($state->records[0]->narrowing->shape)->toBe(Shape::Conditions)
+        ->and(grantCount())->toBe(1);
+});
+
 test('a record grant over a model the panel does not show is left out', function (): void {
     $role = makeRole();
     $user = makeUser();
