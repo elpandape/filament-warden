@@ -25,29 +25,18 @@ use WeakMap;
  * `PermissionResource` ask `anyFor()` again on every field they gate — three
  * times over for `name` alone once Filament re-evaluates its `helperText()`.
  *
- * The tool is a `WeakMap<Model, self>` and not `once()` called from here,
- * because this is a static method and `once()` from a static context is a
- * trap, not a shortcut. `Onceable::objectFromTrace()` reads
- * `$trace[1]['object']` (`vendor/laravel/framework/src/Illuminate/Support/
- * Onceable.php:47-50`), and PHP's own backtrace carries an `object` entry
- * only for a `$this->method()` frame — a `self::method()` call has none. So
- * `Once::value()` falls back to `$onceable->object ?: $this`
- * (`Once.php:55`), where `$this` is the ONE shared `Once` singleton every
- * static call site in the process reaches through `Once::instance()`
- * (`Once.php:38-41`), and the per-call disambiguation is a hash folding in
- * `spl_object_hash($permission)` (`Onceable::hashFromTrace()`, `:71`) — a
- * value PHP is free to reuse the moment the object it named is collected. A
- * permission read, freed, and replaced at the same address by an unrelated
- * one would silently inherit the first one's holders. A `WeakMap` keys on
- * the object itself, never a recyclable string, and drops its entry the
- * instant the model it was built for is collected — nothing to reuse and
- * nothing to flush.
+ * A `WeakMap<Model, self>` and never `once()`, which is a trap from a static
+ * context: `Onceable::objectFromTrace()` reads `$trace[1]['object']`, which a
+ * `self::method()` frame does not carry, so `Once::value()` falls back to the
+ * one shared singleton and disambiguates on a hash folding in
+ * `spl_object_hash()` — a value PHP reuses once the object it named is
+ * collected. A permission read, freed and replaced at the same address would
+ * inherit the first one's holders. A `WeakMap` keys on the object itself and
+ * drops its entry when the model is collected.
  *
- * Nothing in this class ever writes a grant: every read here is pure, so for
- * as long as no other code writes one and hands this class the very same
- * `$permission` instance back, the memoised answer cannot go stale under a
- * caller. `forget()` is the escape hatch for the one case that would: it is
- * exercised, not decorative, in the test that pins this guarantee.
+ * Every read here is pure, so the answer can only go stale if other code
+ * writes a grant and hands back the same instance. `forget()` is the escape
+ * hatch for that, and it is exercised rather than decorative.
  */
 final class Holders
 {

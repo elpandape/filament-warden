@@ -92,16 +92,14 @@ final class RoleAssignment extends CheckboxList
     /**
      * The list, and beside it an untouched copy of what the store said.
      *
-     * A `CheckboxList` has ONE state slot and it holds the set, so the copy
-     * cannot go in it. It goes in the page's own state array as a sibling key —
-     * measured before it was relied on: it survives the mount, a click and the
-     * save, and `Schema::getState()` does not return it, so it can never reach
-     * `$record->update()`.
+     * A `CheckboxList` has ONE state slot and it holds the set, so the copy sits
+     * in the page's own state array as a sibling key: it survives the mount, a
+     * click and the save, and `Schema::getState()` does not return it, so it
+     * can never reach `$record->update()`.
      *
      * That array belongs to the application, so the key is namespaced and this
-     * is the only place that writes it. A page with nowhere to put it — see
-     * `holder()` — gets no baseline, and the save behaves as it did before there
-     * was one.
+     * is the only place that writes it. A page with nowhere to put it gets no
+     * baseline at all — see `holder()`.
      *
      * @param  list<int|string>  $held
      */
@@ -201,34 +199,25 @@ final class RoleAssignment extends CheckboxList
     }
 
     /**
-     * The one bag the copies sit in, or null when there is none to sit in.
+     * The one bag the copies sit in, or null when there is none.
      *
-     * It is the state path of this field's ROOT container — the outermost
-     * schema — and it took three wrong answers to get there, each of them
-     * correct about the last and wrong somewhere else:
+     * The state path of this field's ROOT container, which is the only
+     * candidate that is both a real state bag and outside every repeating item,
+     * so what goes there is pruned away exactly like the field's own state.
+     * Each of the three obvious alternatives is wrong somewhere, and each has a
+     * test:
      *
-     * - A property named `data`. Filament's resource pages call it that and
-     *   mount schemas under five more roots besides — `filters`,
-     *   `deferredFilters`, `tableFilters`, `tableDeferredFilters` and
-     *   `mountedActions.{i}.data` — so the field was silently unprotected
-     *   wherever the name differed, with the screen looking fixed.
-     * - The ROOT of the field's state path. An action modal's is
-     *   `mountedActions`, a public array Filament reads and writes and still not
-     *   a state bag: a string key in it breaks `array_key_last()`, `array_pop()`
-     *   and `getMountedActionSchemaName()`.
-     * - The field's immediate CONTAINER. Right for one field, wrong inside a
-     *   repeater: a repeating container validates on itself, so Laravel returns
-     *   the whole item as validated data and `pruneStateToMatchKeys()` keeps
-     *   whatever it finds there — the copy rode into `$record->update()`.
+     * - a property named `data` — Filament mounts schemas under five more roots
+     *   besides, so the field is unprotected wherever the name differs;
+     * - the ROOT of the state path — an action modal's is `mountedActions`, and
+     *   a string key in it breaks `array_key_last()`, `array_pop()` and
+     *   `getMountedActionSchemaName()`;
+     * - the immediate CONTAINER — a repeating one validates on itself, so
+     *   Laravel returns the whole item as validated data and the copy rides into
+     *   `$record->update()`.
      *
-     * The root container is the only candidate that is both a real state bag and
-     * outside every repeating item, so what goes there is pruned away exactly
-     * like the field's own state is. Two rows of a repeater still need two
-     * copies, so the bag is a map keyed by each field's full state path — which
-     * also covers two of these fields on one form.
-     *
-     * A schema with no state path of its own leaves nothing to sit beside, and
-     * then there is no baseline at all.
+     * Keyed by each field's full state path, so two rows of a repeater get two
+     * copies and two of these fields on one form do not collide.
      */
     private function holder(): ?string
     {

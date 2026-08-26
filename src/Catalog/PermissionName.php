@@ -60,28 +60,18 @@ final class PermissionName
      *
      * A row carrying one of these was nobody's writing and may be rewritten; a
      * row carrying anything else belongs to whoever wrote it. An installation
-     * upgraded from an older version still has the older shape in its rows:
-     * `0.9.1` wrote the bare screen name, `0.10.1` wrote one verb for all three
-     * kinds, and warden itself changed its generator in 2.0.
+     * upgraded from an older version still carries the older shapes.
      *
-     * CLOSED at `1.0.0`, and OPENED once, here, at `2.0.0`. Every entry added is
-     * a licence to rewrite rows in somebody else's database, so a fourth shape is
-     * a MAJOR and `tests/FrozenTest.php` is what says so. This one is not a
-     * change of mind about a verb: the list was supposed to GROW and it MUTATED,
-     * because one of its entries delegated to warden's generator LIVE instead of
-     * being written down. Warden 2.0 put a `Str::snake()` in that generator, so
-     * `ViewAny posts` and `Page:App\Filament\Pages\Settings` — titles warden
-     * itself wrote — silently stopped being recognised as generated, and rows an
-     * upgraded installation already carries stopped being rewritable. The entry
-     * that moved is now transcribed and frozen; nothing here delegates to a
-     * moving target again except warden's answer for TODAY, which is the one
-     * entry that is supposed to move.
+     * This list may only GROW: an entry added is a licence to rewrite rows in
+     * somebody else's database, so a new shape is a MAJOR and `FrozenTest` says
+     * so. Nothing here may delegate to a moving target either, except warden's
+     * answer for TODAY — one entry did, and warden 2.0 then replaced a shape
+     * rather than adding one, so titles warden itself wrote stopped being
+     * recognised.
      *
-     * A row this package did NOT mint gets warden's own answer for the row as
-     * it stands — one title, not three, because warden has only ever written the
-     * one. That branch is here rather than at the two call sites so that "did we
-     * write this?" is asked in one place for both families of row: the doors
-     * this package mints, and everything warden titles.
+     * A row this package did NOT mint still comes through here rather than
+     * being asked at the two call sites, so "did we write this?" has one answer
+     * for both families of row.
      *
      * @return list<string>
      */
@@ -105,11 +95,8 @@ final class PermissionName
     }
 
     /**
-     * Warden's own answer for this row, in every shape warden has written it.
-     *
-     * Deduplicated because most rows read the same under both generators — only
-     * a name `Str::snake()` moves comes out differently — and a list with the
-     * same title twice reads as a mistake.
+     * Warden's answer for this row, in every shape warden has written it.
+     * Deduplicated: most names read the same under both generators.
      *
      * @return list<string>
      */
@@ -122,26 +109,19 @@ final class PermissionName
     }
 
     /**
-     * Warden's generator as it stood before 2.0, transcribed here and FROZEN.
+     * Warden's generator as it stood before 2.0, transcribed and FROZEN.
      *
-     * Copied from `Support\Titles\PermissionTitle` at warden `1.3.0` — verified
-     * against the published archive, not remembered — and it must never be made
-     * to track warden again. Tracking it live is the defect this exists to undo:
-     * a row titled by an installation running warden 1.x keeps that title after
-     * the upgrade, so the only way to still recognise it is to have written the
-     * old rule down. If warden changes its generator a third time, a fifth shape
-     * gets transcribed beside this one; this method does not move.
+     * Copied from `PermissionTitle` at warden `1.3.0`, verified against the
+     * published archive. It must never be made to track warden again: a row
+     * titled under 1.x keeps that title after the upgrade, so the only way to
+     * recognise it is to have written the old rule down. A third generator gets
+     * a third transcription beside this one; this method does not move.
      *
-     * The two generators differ in exactly one place — 1.x spelled the action
-     * `Str::ucfirst(str_replace(['-', '_'], ' ', $name))` and 2.0 wrapped the
-     * name in `Str::snake($name, ' ')` first — but the whole shape is copied
-     * rather than the delta, because a delta has to be re-derived from whatever
-     * warden happens to say today, which is the very thing that broke.
+     * The whole shape is copied rather than the one-line delta, because a delta
+     * would have to be re-derived from whatever warden says today.
      *
-     * One arm of the original is left out: the one for a row pinned to a record
-     * (`$entityId !== null`). No caller here has an id to pass — the parameter
-     * does not exist on `generated()` — so transcribing it would be a branch no
-     * test could honestly reach, and `make coverage` is a 100 % line gate.
+     * The arm for a row pinned to a record is left out: `generated()` has no id
+     * parameter, so it would be a branch no test could honestly reach.
      */
     private static function beforeTwo(string $name, ?string $entityType, bool $onlyOwned): string
     {
@@ -166,8 +146,8 @@ final class PermissionName
     }
 
     /**
-     * Warden 1.x's entity word. Frozen with `beforeTwo()` — unchanged in 2.0,
-     * and copied anyway so the transcription stands on its own.
+     * Warden 1.x's entity word. Unchanged in 2.0, copied anyway so the
+     * transcription stands on its own.
      */
     private static function entity(string $entityType): string
     {
