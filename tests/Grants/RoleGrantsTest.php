@@ -670,7 +670,10 @@ test('an action over a model is left to warden, which titles it well already', f
         ->where('name', 'viewAny')
         ->firstOrFail();
 
-    expect($permission->getAttribute('title'))->toBe('ViewAny posts');
+    // Warden's own wording, pinned so that a third change to its generator is
+    // seen here rather than in somebody's catalogue. Before 2.0 this read
+    // `ViewAny posts`, which is the wart that made the question worth asking.
+    expect($permission->getAttribute('title'))->toBe('View any posts');
 });
 
 test('a loose name the application declared is left to warden, whose title is fine for it', function (): void {
@@ -845,6 +848,24 @@ test('flipping a stance keeps the rule exactly as the store wrote it', function 
     expect($after)->toBe($before)
         ->and(grantCount())->toBe(1)
         ->and(RoleGrants::of($role, gridCatalog())->stances[Post::class]['viewAny'])->toBe('forbidden');
+});
+
+test('a narrowed cell cycled back to granted is granted, not stuck forbidden', function (): void {
+    $role = makeRole();
+    $user = makeUser();
+    Warden::assign($role)->to($user);
+
+    $alpha = Post::query()->create(['title' => 'alpha']);
+
+    $narrowing = [Post::class => ['update' => conditionOn('title', 'alpha')]];
+
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['update' => 'granted']], $narrowing);
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['update' => 'forbidden']], $narrowing);
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['update' => 'granted']], $narrowing);
+
+    expect(RoleGrants::of($role, gridCatalog())->stances[Post::class]['update'])->toBe('granted')
+        ->and(Access::granted($user, 'update', $alpha))->toBeTrue()
+        ->and(grantCount())->toBe(1);
 });
 
 test('a rule the browser really changed is written as the browser sent it', function (): void {

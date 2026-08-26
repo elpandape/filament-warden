@@ -271,14 +271,21 @@ test('a name this package minted reads back into something a person recognises',
 ]);
 
 test('a name this package never minted gets wardens own answer, not an empty one', function (): void {
-    // One question, two families of row. A door this package mints has three
-    // shapes because two older versions wrote different ones; everything else
-    // has warden's single title for the row as it stands, which is the same
-    // comparison the permission form was making on its own.
+    // One question, two families of row. A door this package mints has four
+    // shapes because two older versions of this package and one of warden wrote
+    // different ones; everything else has warden's title for the row as it
+    // stands, which is the same comparison the permission form was making on its
+    // own — plus the one warden wrote before 2.0, when the two differ. They do
+    // not for `view`, and the list says so by not repeating it.
     expect(PermissionName::generated('export-reports'))->toBe(['Export reports'])
         ->and(PermissionName::generated('view', 'post'))->toBe([PermissionTitle::generate('view', 'post', null, false)])
         ->and(PermissionName::generated('page:App\\Filament\\Pages\\Reports'))
-        ->toBe(['Page:App\\Filament\\Pages\\Reports', 'Reports', 'Access Reports']);
+        ->toBe([
+            'Page: app\\ filament\\ pages\\ reports',
+            'Page:App\\Filament\\Pages\\Reports',
+            'Reports',
+            'Access Reports',
+        ]);
 });
 
 test('the verb is the question filament asks: a widget is seen, a page is entered', function (): void {

@@ -152,6 +152,28 @@ test('every stance a cell can take has a word too', function (): void {
     }
 });
 
+test('every cause warden can answer with has a sentence, in both languages', function (): void {
+    $causes = array_map(
+        static fn (ElPandaPe\FilamentWarden\Grants\Cause $cause): string => $cause->value,
+        ElPandaPe\FilamentWarden\Grants\Cause::cases(),
+    );
+
+    foreach (['en', 'es'] as $locale) {
+        $declared = [];
+
+        foreach (array_keys(translations($locale)) as $key) {
+            if (str_starts_with($key, 'explain.causes.')) {
+                $declared[] = mb_substr($key, mb_strlen('explain.causes.'));
+            }
+        }
+
+        sort($declared);
+        sort($causes);
+
+        expect($declared)->toBe($causes, "[{$locale}] the cause map and the Cause enum disagree");
+    }
+});
+
 test('every reason the builder can be locked with has a sentence, in both languages', function (): void {
     $form = (string) file_get_contents(dirname(__DIR__).'/src/Filament/Resources/Permissions/Schemas/PermissionForm.php');
     $narrowing = (string) file_get_contents(dirname(__DIR__).'/src/Conditions/Narrowing.php');

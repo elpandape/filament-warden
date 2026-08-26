@@ -143,15 +143,39 @@ test('a query that cannot run is a reason, not a fatal', function (): void {
 
     documents();
 
-    // Ownership resolved through a column the table does not have: warden emits
-    // the SQL anyway and the database refuses it.
-    Warden::ownedVia(Document::class, 'not_a_column');
-    Warden::allow($account)->toOwn(Document::class, 'view');
+    // A stored condition naming a column the table does not have. Warden
+    // compiles it into the query and the database refuses the statement.
+    //
+    // Ownership used to reach this branch and no longer does: warden's `1.1.0`
+    // put a `hasColumn()` in front of it (`Checks/Queries/WhereCan.php`,
+    // `ownershipAttribute()`), so that half now fails closed instead of
+    // throwing — pinned by the test below. This branch is still live, and
+    // `make coverage` is a 100 % line gate, so it needs a trigger that still
+    // throws rather than a `@codeCoverageIgnore`.
+    Warden::allow($account)->to('view', Document::class)->where('not_a_column', '=', 1);
 
     $reach = Reach::of(reachedPermission(), $account);
 
     expect($reach->available)->toBeFalse()
         ->and($reach->sentence())->toContain('Could not be counted');
+});
+
+test('ownership through a column the table lacks answers nothing, and does not throw', function (): void {
+    $account = makeUser();
+
+    documents();
+
+    Warden::ownedVia(Document::class, 'not_a_column');
+    Warden::allow($account)->toOwn(Document::class, 'view');
+
+    $reach = Reach::of(reachedPermission(), $account);
+
+    // Warden's own answer since `1.1.0`, pinned here because nothing else in
+    // this package pins it: a grant it cannot express in SQL grants no rows,
+    // rather than emitting a statement the database refuses.
+    expect($reach->available)->toBeTrue()
+        ->and($reach->matched)->toBe(0)
+        ->and($reach->total)->toBe(3);
 });
 
 test('a row with no readable name is not asked about', function (): void {

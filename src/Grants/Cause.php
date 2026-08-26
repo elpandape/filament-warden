@@ -7,7 +7,7 @@ namespace ElPandaPe\FilamentWarden\Grants;
 use ElPandaPe\Warden\Checks\Explain\Cause as WardenCause;
 
 /**
- * The eight reasons a check resolves the way it does, with a sentence a person
+ * The nine reasons a check resolves the way it does, with a sentence a person
  * can read.
  *
  * Warden's own enum carries no labels and its `__toString()` is hard-coded
@@ -34,6 +34,8 @@ enum Cause: string
     case ForbiddenViaRole = 'forbidden-via-role';
 
     case ForbiddenToEveryone = 'forbidden-to-everyone';
+
+    case ConditionsNotMet = 'conditions-not-met';
 
     case NoMatchingGrant = 'no-matching-grant';
 

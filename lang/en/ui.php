@@ -155,6 +155,7 @@ return [
             'forbidden-directly' => 'Explicitly forbidden by the permission :permission, held by the role itself.',
             'forbidden-via-role' => 'Explicitly forbidden by the permission :permission, through the role :role.',
             'forbidden-to-everyone' => 'Explicitly forbidden by the permission :permission, applied to everyone.',
+            'conditions-not-met' => 'A permission matches, :permission, but its conditions did not hold. Warden abstains and your application policies decide.',
             'no-matching-grant' => 'No grant matches. Warden abstains and your application policies decide.',
             'not-applicable' => 'Not a question for warden: the entity is not a model.',
         ],
@@ -255,7 +256,7 @@ return [
         'add_column' => '+ compare with the account',
         'empty' => 'With no conditions this grant is back to every row.',
         'warning' => 'With conditions, this grant only answers with a record in front of it. A class check — the one a listing makes when it asks viewAny — fails closed.',
-        'no_model' => 'This permission has no model behind it. A condition on it would be stored, shown, and would never grant anything.',
+        'no_model' => 'This permission has no model behind it, so a condition on it can never be tested. As a grant it never grants; as a prohibition it always forbids. Warden refuses to write one, and this screen will not touch the ones already there.',
         'no_ownership' => 'The table :table has no :column column, which is where ownership would resolve.',
         'boolean' => 'A true or false value only matches a column the model casts to boolean. This one is not cast, so the condition would be stored and would never match.',
         'modes' => [

@@ -412,8 +412,23 @@ final class RoleGrants
      *
      * And a cell holds one rule, so every shape the store could be holding it in
      * comes off first. `to()` and `toOwn()` are disjoint revokes — warden filters
-     * hard on `only_owned` — so both are needed; and `to()` is the one that also
-     * takes the grants of every twin sharing the name.
+     * hard on `only_owned` — so both are needed.
+     *
+     * A NAME no longer reaches a narrowed row, and that is the one thing here
+     * that is not a habit: `findPermissions()` resolves a name against the plain
+     * row only (`Concerns/ResolvesPermissions.php`, `whereNull('options')`), so
+     * every twin survived a revoke made by name. Switching a narrowed cell off
+     * deleted nothing and reported success — the access stayed granted — and
+     * widening one left the old twin's grant standing beside the new plain one,
+     * two rows of the same polarity, which `resolve()` can only draw as
+     * `Shape::Tangled` from then on. The way through is the one warden's own
+     * comment names: a twin is reached by its MODEL. So the batch carries both
+     * — the names, for the plain and the owned rows, and the twin models this
+     * role actually holds for those names.
+     *
+     * Read from the store rather than carried on the `Change`, and the
+     * difference matters: this takes away what IS there, not what the screen
+     * believed was there. Two queries per save, not per cell.
      *
      * Grouped by entity rather than run once per changed cell:
      * `RevokesPermissions::revoke()` (`Actions/RevokesPermissions.php:69-107`)
@@ -444,21 +459,83 @@ final class RoleGrants
         /** @var array<string, list<string>> $byEntity */
         $byEntity = [];
 
+        // The entity is carried beside the group rather than read back out of
+        // the key: an array key is a plain string, and reconstructing the class
+        // from one launders `class-string<Model>|null` into `string|null`.
+        /** @var array<string, class-string<Model>|null> $entities */
+        $entities = [];
+
         foreach ($changes as $change) {
-            $byEntity[$change->entity ?? ''][] = $change->name;
+            $key = $change->entity ?? '';
+
+            $byEntity[$key][] = $change->name;
+            $entities[$key] = $change->entity;
         }
 
-        foreach ($byEntity as $key => $names) {
-            $entity = $key === '' ? null : $key;
+        $twins = self::twinsHeld($role);
 
-            Warden::disallow($role)->to($names, $entity);
-            Warden::unforbid($role)->to($names, $entity);
+        foreach ($byEntity as $key => $names) {
+            $entity = $entities[$key];
+
+            $targets = [...$names, ...self::twinsFor($twins, $entity, $names)];
+
+            Warden::disallow($role)->to($targets, $entity);
+            Warden::unforbid($role)->to($targets, $entity);
 
             if ($entity !== null) {
                 Warden::disallow($role)->toOwn($entity, $names);
                 Warden::unforbid($role)->toOwn($entity, $names);
             }
         }
+    }
+
+    /**
+     * Every narrowed row this role holds a grant for, once each.
+     *
+     * `held()` yields one entry per grant, so a permission both granted and
+     * forbidden arrives twice; naming it twice in one revoke would be harmless
+     * and reads as a bug.
+     *
+     * @return list<Model>
+     */
+    private static function twinsHeld(Model $role): array
+    {
+        $twins = [];
+
+        foreach (self::held($role) as [$permission]) {
+            if ($permission->getAttribute('options') === null) {
+                continue;
+            }
+
+            $twins[self::identifier($permission->getKey())] = $permission;
+        }
+
+        return array_values($twins);
+    }
+
+    /**
+     * The twins among them that belong to this entity and one of these names.
+     *
+     * The entity is matched as warden matches it — by morph alias, which is
+     * what the column holds and what `entityAttributes()` writes — never by
+     * class name. A row pinned to a record is left alone: it answers no check
+     * this grid makes, so this screen neither draws it nor deletes it.
+     *
+     * @param  list<Model>  $twins
+     * @param  class-string<Model>|null  $entity
+     * @param  list<string>  $names
+     * @return list<Model>
+     */
+    private static function twinsFor(array $twins, ?string $entity, array $names): array
+    {
+        $morph = $entity === null ? null : (new $entity)->getMorphClass();
+
+        return array_values(array_filter(
+            $twins,
+            static fn (Model $twin): bool => $twin->getAttribute('entity_type') === $morph
+                && $twin->getAttribute('entity_id') === null
+                && in_array($twin->getAttribute('name'), $names, true),
+        ));
     }
 
     /**

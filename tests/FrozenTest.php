@@ -60,8 +60,13 @@ test('the permission name prefixes are frozen', function (): void {
         ->toBe('panel:test');
 });
 
-test('a title this package generated is one of exactly three shapes', function (): void {
+test('a title this package generated is one of exactly four shapes', function (): void {
+    // Four since `2.0.0`, and the fourth is the one that was always supposed to
+    // be here: warden's own answer used to be taken live, so warden 2.0's new
+    // `Str::snake()` did not add a shape to this list — it REPLACED one, and
+    // every row an installation had already been titled with fell out.
     expect(PermissionName::generated('page:App\Filament\Pages\Settings'))->toBe([
+        'Page: app\ filament\ pages\ settings',
         'Page:App\Filament\Pages\Settings',
         'Settings',
         'Access Settings',
@@ -315,6 +320,7 @@ test('the translation keys an application overrides are frozen', function (): vo
         'explain.causes.forbidden-directly',
         'explain.causes.forbidden-via-role',
         'explain.causes.forbidden-to-everyone',
+        'explain.causes.conditions-not-met',
         'explain.causes.no-matching-grant',
         'explain.causes.not-applicable',
         'explain.empty',

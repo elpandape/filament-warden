@@ -112,7 +112,7 @@ test('a role that holds another role is explained through it, and it is named', 
         ->and($explanation->summary)->toContain($explanation->role);
 });
 
-test('a narrowed cell says why nothing matched, which explain cannot', function (): void {
+test('a narrowed cell says more than the cause, which assumes a record', function (): void {
     $role = makeRole();
 
     Warden::allow($role)->to('update', Post::class)->where('id', 1);
@@ -120,7 +120,7 @@ test('a narrowed cell says why nothing matched, which explain cannot', function 
     $stored = RoleGrants::of($role, postCatalog());
     $explanation = why($role, 'update', $stored->narrowed());
 
-    expect($explanation->cause)->toBe(Cause::NoMatchingGrant)
+    expect($explanation->cause)->toBe(Cause::ConditionsNotMet)
         ->and($explanation->narrowed)->not->toBeNull()
         ->and($explanation->narrowed)->toContain('with a record in front of it');
 });

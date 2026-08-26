@@ -487,7 +487,7 @@ test('renaming regenerates a title warden wrote, and leaves one a person wrote',
 
     $permission = heldRow();
 
-    expect($permission->getAttribute('title'))->toBe('ViewAny posts');
+    expect($permission->getAttribute('title'))->toBe('View any posts');
 
     livewire(EditPermission::class, ['record' => $permission->getKey()])
         ->fillForm(['name' => 'delete'])
@@ -967,7 +967,10 @@ test('renaming a door regenerates its title the same way', function (): void {
 
     $door = makePermission('page:App\\Filament\\Pages\\Reports');
 
-    expect($door->getAttribute('title'))->toBe('Page:App\\Filament\\Pages\\Reports');
+    // What warden 2.0 makes of a name it has no way to read. It is mangled, and
+    // that is the whole reason `PermissionName` is the only place that mints
+    // these names AND the only one that reads them back.
+    expect($door->getAttribute('title'))->toBe('Page: app\\ filament\\ pages\\ reports');
 
     livewire(EditPermission::class, ['record' => $door->getKey()])
         ->fillForm(['name' => 'widget:App\\Filament\\Widgets\\Summary'])

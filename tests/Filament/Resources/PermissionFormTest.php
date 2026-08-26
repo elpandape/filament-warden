@@ -93,17 +93,25 @@ test('a stored rule naming a column the table no longer has is left alone too', 
 test('a rule with no model behind it is left alone by the screen that cannot check its columns', function (): void {
     signInToEditPermissions();
 
-    Warden::allow(makeRole())->to('export-reports')->where('id', '=', 1);
+    // Written by hand because warden will no longer mint one: since its `1.3.0`,
+    // `GrantsPermissions` throws a `ConfigurationException` rather than store a
+    // condition it can never test. The row still has to be READABLE — an
+    // installation upgraded from an older warden is carrying them, and warden's
+    // own refusal does nothing about the ones already written.
+    $permission = makePermission('export-reports');
+    $permission->update(['options' => [
+        'v' => 1,
+        'g' => ['t' => 'group', 'i' => [['and', ['t' => 'value', 'c' => 'id', 'o' => '=', 'v' => 1]]]],
+    ]]);
 
-    $permission = narrowedRow('export-reports');
-    $before = $permission->getAttribute('options');
+    $before = $permission->refresh()->getAttribute('options');
 
     expect($permission->getAttribute('entity_type'))->toBeNull()
         ->and($before)->not->toBeNull();
 
     livewire(EditPermission::class, ['record' => $permission->getKey()])
         ->assertFormFieldDisabled('options')
-        ->assertSee('A condition on it would be stored, shown, and would never grant anything')
+        ->assertSee('as a prohibition it always forbids')
         ->fillForm(['title' => 'Export the reports'])
         ->call('save')
         ->assertHasNoFormErrors();

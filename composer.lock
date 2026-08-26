@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4014b240f743675f1073220108612015",
+    "content-hash": "0d6b90f764b21a8dd0df527a631a5449",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -991,16 +991,16 @@
         },
         {
             "name": "elpandape/warden",
-            "version": "v1.0.0",
+            "version": "v2.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/elpandape/warden.git",
-                "reference": "8b9a91d07febbbe9f7e0d7476b28ed465a8c7a05"
+                "reference": "1fe7f9ec481c3b8873bc9df2a8438b922ffe5a07"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/elpandape/warden/zipball/8b9a91d07febbbe9f7e0d7476b28ed465a8c7a05",
-                "reference": "8b9a91d07febbbe9f7e0d7476b28ed465a8c7a05",
+                "url": "https://api.github.com/repos/elpandape/warden/zipball/1fe7f9ec481c3b8873bc9df2a8438b922ffe5a07",
+                "reference": "1fe7f9ec481c3b8873bc9df2a8438b922ffe5a07",
                 "shasum": ""
             },
             "require": {
@@ -1071,7 +1071,7 @@
                 "issues": "https://github.com/elpandape/warden/issues",
                 "source": "https://github.com/elpandape/warden"
             },
-            "time": "2026-08-18T19:35:07+00:00"
+            "time": "2026-08-25T20:09:34+00:00"
         },
         {
             "name": "filament/actions",

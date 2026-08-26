@@ -155,6 +155,7 @@ return [
             'forbidden-directly' => 'Prohibido explícitamente por el permiso :permission, en poder del propio rol.',
             'forbidden-via-role' => 'Prohibido explícitamente por el permiso :permission, a través del rol :role.',
             'forbidden-to-everyone' => 'Prohibido explícitamente por el permiso :permission, aplicado a todo el mundo.',
+            'conditions-not-met' => 'Un permiso casa, :permission, pero sus condiciones no se cumplieron. Warden se abstiene y deciden las Policies de tu aplicación.',
             'no-matching-grant' => 'Ninguna concesión casa. Warden se abstiene y deciden las Policies de tu aplicación.',
             'not-applicable' => 'No es una pregunta para warden: la entidad no es un modelo.',
         ],
@@ -255,7 +256,7 @@ return [
         'add_column' => '+ comparar con la cuenta',
         'empty' => 'Sin condiciones, esta concesión vuelve a valer para todas las filas.',
         'warning' => 'Con condiciones, esta concesión solo responde con una fila delante. Una comprobación de clase —la que hace un listado al preguntar viewAny— falla cerrada.',
-        'no_model' => 'Este permiso no tiene ningún modelo detrás. Una condición aquí quedaría guardada, visible, y no concedería nada nunca.',
+        'no_model' => 'Este permiso no tiene ningún modelo detrás, así que una condición aquí no se puede comprobar nunca. Como concesión no concede jamás; como prohibición prohíbe siempre. Warden se niega a escribir una, y esta pantalla no toca las que ya estén.',
         'no_ownership' => 'La tabla :table no tiene la columna :column, que es por donde se resolvería la propiedad.',
         'boolean' => 'Un valor true o false solo casa con una columna que el modelo castee a booleano. Esta no lo está, así que la condición se guardaría y no casaría nunca.',
         'modes' => [
