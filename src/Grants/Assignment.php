@@ -43,59 +43,24 @@ final class Assignment
     private static ?array $rolesByKey = null;
 
     /**
-     * One account's rows off `assigned_roles`, memoised — added in v1.5.0
-     * ("Que no cueste"), where `byKey()` above was memoised a version earlier
-     * (v1.4.0). Before this, `disableOptionWhen()` re-ran this query once per
-     * option with no memo of its own, and `offers()` reads it twice
-     * (`isRestricted()`, `isElsewhere()`): measured opening the assign modal
-     * against 200 roles, 405 `assigned_roles` statements. After: 3, and the
-     * same 3 against a 20-role catalogue, so what is left does not scale with
-     * the option count. Two of those are this memo reading once for each of
-     * the two simulated requests that opening a modal takes — the component
-     * is constructed, then the action is mounted, and Livewire rehydrates a
-     * fresh `ownerRecord` in between. The third is warden resolving whether
-     * the SIGNED-IN account may `viewAny` on the role resource at all, which
-     * this class never writes to and never needs to invalidate.
+     * One account's rows off `assigned_roles`, memoised. Without it
+     * `disableOptionWhen()` re-runs the query once per option and `offers()`
+     * reads it twice: 405 statements to open the assign modal against 200
+     * roles, against 3 with the memo, and the same 3 against 20.
      *
-     * A `WeakMap` on the `$account` instance, which is `Holders`' own
-     * pattern and is chosen here for the same reason: an entry dies with the
-     * object it was built for, so nothing has to guess when a request ended.
-     * A long-lived worker holds none of these between requests, and a read
-     * reached through a different instance re-queries rather than answering
-     * from a snapshot somebody else's request took — which is the second of
-     * those three statements, and is the honest price of not having a
-     * request boundary to hook.
-     *
-     * What the map cannot do for itself is notice a write. That is
-     * `forgetAssignments()`, called by all three writers this class has
-     * (`give()`, `take()`, `apply()`) right after a write commits.
+     * A `WeakMap` on the instance, the pattern `Holders` uses: an entry dies
+     * with the object it was built for, so nothing has to guess when a request
+     * ended — and a read through a different instance re-queries rather than
+     * answering from somebody else's snapshot.
      *
      * The inner key is the tenant, because `assignments()` reads THROUGH
      * warden's `TenantScope`: the same account genuinely answers differently
-     * depending on which tenant is active when it is asked, and one entry
-     * per account would freeze whichever context asked first. Measured with
-     * a role assigned under tenant 7 and no write in between — outside any
-     * tenant `of()` answers with it, inside `onceTo(8)` it answers empty —
-     * and pinned in `AssignmentTest.php`'s "the memo answers per tenant, not
-     * once for the account". The key comes off `Tenancy::readFilter()`,
-     * which is the whole of what that scope reads.
+     * depending on which tenant is active, and one entry per account would
+     * freeze whichever context asked first.
      *
-     * The risk this was built to respect: memoising `assignments()` hands a
-     * check made right after a write the row list from BEFORE that write,
-     * unless every writer clears it. `apply()` is the third writer and the
-     * least obvious one — it reads `of()` once before its own transaction,
-     * and would otherwise leave a caller who reads again right after it
-     * returns holding that same stale answer (pinned in `AssignmentTest.php`'s
-     * "a key that arrives as text still names the same role", which was
-     * already in that file before this memo existed).
-     *
-     * The test that does NOT cover this, and reads as though it does:
-     * `AssignmentTest.php`'s "give() hands a role out and the store answers
-     * for it straight away" reads back through `Access::granted()` — warden's
-     * own resolver — and a raw row count, neither of which this memo can
-     * make stale. The one written for it is "give()/take() invalidate the
-     * assignments memo, a read right after a write sees it", which reads,
-     * writes and reads again against the very same `$account` object.
+     * What the map cannot notice is a write. That is `forgetAssignments()`,
+     * called by all three writers here — `give()`, `take()` and `apply()` —
+     * once a write commits.
      *
      * @var WeakMap<Model, array<string, Collection<int, Model>>>
      */
@@ -354,45 +319,19 @@ final class Assignment
     }
 
     /**
-     * Hands one role to an account — the entry point a row or header action
-     * reaches for, never `apply()`.
+     * Hands one role to an account — what a row or header action reaches for,
+     * never `apply()`, which is a set diff over the whole catalogue and is the
+     * right shape only for a `CheckboxList` that cannot say what changed. A row
+     * action already knows which role it touched.
      *
-     * `apply()` is a set diff over the WHOLE catalogue: `byKey()` plus
-     * `mayHandOut()`/`isRestricted()`/`isElsewhere()` per role. `byKey()` and
-     * `assignments()` (behind the latter two) are both memoised now, one
-     * query apiece for the whole call regardless of catalogue size — before,
-     * `apply()` read `assigned_roles` 47 times over a 21-role catalogue
-     * reaching the same state `give()` reached in 6; after, 5 and 4 (both
-     * measured in `AssignmentTest.php`'s own comparison test, which is what
-     * still has to keep `give()` cheaper, not a hardcoded number for either
-     * side). That is the right shape for `RoleAssignment`'s `CheckboxList`, which hands
-     * over the entire wanted state and has no way to say what changed. A row
-     * action already knows exactly which role it touched, so paying for every
-     * other role in the catalogue on every click would defeat the reason this
-     * screen exists — the 200-role installation a `CheckboxList` cannot serve.
-     * `offers()` is checked once, and only a role already offered but not yet
-     * held is written: the header action's `Select` lists the whole catalogue
-     * unfiltered, and a role already held is still "offered" by that check.
-     * Writing again would NOT insert a duplicate row — `AssignsRoles::to()`
-     * writes through `firstOrCreate()`, which finds the existing one — but it
-     * WOULD still call `bumpCacheVersion()` unconditionally, invalidating
-     * every cached check at that scope for nothing changed. `isHeld()` is what
-     * stops that, and its own docblock has the measurement.
+     * `offers()` here is the sole server-side authorization for WHICH role goes
+     * out. A `->visible()` decides whether the button exists, never what was
+     * submitted, and `disableOptionWhen()` is UX: removing this check would
+     * open the write to any value that reaches the action.
      *
-     * This `offers()` check is the sole server-side authorization for WHICH
-     * role gets handed out through this class — CORRECTED, an earlier version
-     * of this paragraph said the header action has no `->visible()` at all,
-     * which stopped being true once it gained one gating `isReadOnly()`
-     * (`RolesRelationManager.php`). That `->visible()` decides only whether
-     * the button exists on the page at all; it says nothing about which role
-     * was submitted, on any page. The `Select`'s `disableOptionWhen()` is UX
-     * for that question, not a guard, so removing this check on the grounds
-     * that "the screen already checks" would open the write to anyone who can
-     * reach the action, whatever value they submit.
-     *
-     * Returns whether it actually wrote something: `offers()` alone does not
-     * exclude a role already held, so a caller that reports success on the
-     * strength of "no exception was thrown" would report success for a no-op.
+     * Returns whether it wrote anything, because `offers()` does not exclude a
+     * role already held and a caller reporting success on "no exception" would
+     * report it for a no-op.
      */
     public static function give(Model $account, int|string $role): bool
     {
@@ -424,41 +363,16 @@ final class Assignment
     }
 
     /**
-     * Takes one role back from an account — the entry point a row action
-     * reaches for, never `apply()`. See `give()` for the cost this avoids.
+     * Takes one role back — what a row action reaches for, never `apply()`.
      *
-     * A guard against "not held at all" is added here, for a different reason
-     * than `give()`'s "already held" one: `offers()` does not distinguish
-     * "held, unrestricted, this scope" from "not held at all" —
-     * `isRestricted()`/`isElsewhere()` both loop `assignments()` looking for a
-     * row that matches this role, and both answer `false` when no row matches
-     * at all, same as when one matches and clears. Without this, a caller
-     * that already checked `offers()` and got `true` could still call
-     * `retract()->from()` on nothing and have this method report success
-     * (`true`) for a write that never happened — `retract()->from()` itself
-     * deletes nothing silently, and warden bumps no cache version either
-     * (unlike `to()`, it only bumps when a row was actually removed, so past
-     * this guard there is nothing left to waste). `isHeld()` is reused here
-     * inverted, and its own docblock explains why the check is cheap: it is
-     * `Assignment::of()`, already computed to answer `offers()`'s own
-     * `isRestricted()`/`isElsewhere()` a line above.
+     * `offers()` here is the sole server-side authorization for taking a role
+     * back through this class: the row action carries no repeated check, so
+     * this is where the guarantee lives.
      *
-     * NOT reachable through `RolesRelationManager`'s row action, though — see
-     * `retractAction()`'s docblock for the measurement. Kept for `take()`'s
-     * own correctness as a public method other callers reach for, and pinned
-     * directly here, bypassing Livewire, in `AssignmentTest.php`'s "take()
-     * writes nothing for a role not held".
-     *
-     * This `offers()` check is the sole server-side authorization for taking a
-     * role back through this class: `RolesRelationManager`'s row action
-     * carries no repeated check of its own — measured unreachable, see
-     * `retractAction()`'s docblock — so this is where the guarantee actually
-     * lives, and it must not be removed on the grounds that a screen's
-     * `->visible()` already checked.
-     *
-     * Returns whether it actually wrote something, for the same reason
-     * `give()` does: a caller that reports success on "no exception was
-     * thrown" would report success for a no-op.
+     * `! isHeld()` is a second guard for a different reason than `give()`'s:
+     * `offers()` cannot tell "held here and unrestricted" apart from "not held
+     * at all", and `retract()->from()` deletes nothing silently, so without it
+     * a no-op would report success.
      */
     public static function take(Model $account, int|string $role): bool
     {
@@ -521,30 +435,10 @@ final class Assignment
      * Whether the account already holds this role, compared as text: a key
      * arriving from a `Select` is a string even where the column is not.
      *
-     * Two callers, opposite polarity. In `give()`, NOT because a second
-     * `assign()->to()` would insert a duplicate row — it would not. Warden's
-     * own `AssignsRoles::to()` writes through `firstOrCreate()`, and
-     * `Query\Builder::where()` redirects a `null` value to `whereNull()`, so a
-     * search array carrying `restricted_to_type: null` FINDS the existing
-     * unrestricted row rather than missing it — the same Laravel behaviour
-     * AGENTS.md §6.24 already corrected once, in the opposite direction. What
-     * `to()` does unconditionally, found row or new one, is
-     * `bumpCacheVersion($scope)` — so a `give()` on an already-held role would
-     * still invalidate every cached check at that scope for nothing changed.
-     * That is the real saving this guard buys there, pinned in
-     * `AssignmentTest.php`'s "give() does not bump the cache version for a
-     * role already held".
-     *
-     * In `take()`, inverted (`! isHeld()`): `offers()` cannot tell "held,
-     * unrestricted, this scope" apart from "not held at all", so without this
-     * a caller that had already checked `offers()` could still get a `true`
-     * report for a `retract()->from()` that matched and deleted nothing. NOT
-     * reachable through `RolesRelationManager`'s row action — measured, see
-     * `retractAction()`'s docblock — because that screen's own record
-     * resolution already requires the role to be held before the closure can
-     * run at all. Kept for `take()`'s own correctness as a public method, and
-     * pinned directly against it, bypassing Livewire, in `AssignmentTest.php`'s
-     * "take() writes nothing for a role not held".
+     * In `give()` it is not about a duplicate row — `AssignsRoles::to()` writes
+     * through `firstOrCreate()` and finds the existing one. It is about the
+     * `bumpCacheVersion()` that runs unconditionally either way, invalidating
+     * every cached check at that scope for nothing changed.
      */
     private static function isHeld(Model $account, int|string $role): bool
     {

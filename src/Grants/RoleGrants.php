@@ -58,18 +58,11 @@ final class RoleGrants
             $name = $permission->getAttribute('name');
             $id = $permission->getAttribute('entity_id');
 
-            // Pinned to one row. It stays ahead of the wildcard branch below on
-            // purpose, and that is the behaviour of v1.0.2 preserved rather than
-            // changed: the guard this replaces dropped every row with an id
-            // before the wildcard branch could see it. Warden never writes a `*`
-            // row with a key on it, and counting one as wider would draw a tick,
-            // and raise a tally, for a rule nobody can produce.
-            //
-            // `is_string($name)` shares this line with `$id !== null` rather than
-            // guarding on its own: `name` is `NOT NULL` in warden's schema, so the
-            // check can never fail on its own — only PHPStan needs it — and a
-            // branch nothing can reach is a branch coverage cannot ask a test to
-            // hit honestly.
+            // Ahead of the wildcard branch on purpose: warden never writes a
+            // `*` row with a key on it, so counting one as wider would draw a
+            // tick for a rule nobody can produce. `is_string($name)` shares the
+            // line because `name` is NOT NULL — only PHPStan needs it, and a
+            // branch nothing reaches is one coverage cannot honestly ask for.
             if (! is_string($name) || $id !== null) {
                 if (is_string($name) && is_string($type) && isset($models[$type])) {
                     $records[] = new RecordGrant(
@@ -414,21 +407,11 @@ final class RoleGrants
      * comes off first. `to()` and `toOwn()` are disjoint revokes — warden filters
      * hard on `only_owned` — so both are needed.
      *
-     * A NAME no longer reaches a narrowed row, and that is the one thing here
-     * that is not a habit: `findPermissions()` resolves a name against the plain
-     * row only (`Concerns/ResolvesPermissions.php`, `whereNull('options')`), so
-     * every twin survived a revoke made by name. Switching a narrowed cell off
-     * deleted nothing and reported success — the access stayed granted — and
-     * widening one left the old twin's grant standing beside the new plain one,
-     * two rows of the same polarity, which `resolve()` can only draw as
-     * `Shape::Tangled` from then on. The way through is the one warden's own
-     * comment names: a twin is reached by its MODEL. So the batch carries both
-     * — the names, for the plain and the owned rows, and the twin models this
-     * role actually holds for those names.
-     *
-     * Read from the store rather than carried on the `Change`, and the
-     * difference matters: this takes away what IS there, not what the screen
-     * believed was there. Two queries per save, not per cell.
+     * A name reaches the plain row only — `findPermissions()` filters on
+     * `whereNull('options')` — so the batch also carries the twin MODELS the
+     * role holds, which is the one way to reach them. Read from the store and
+     * not from the `Change`: this takes away what is there, not what the screen
+     * believed was there.
      *
      * Grouped by entity rather than run once per changed cell:
      * `RevokesPermissions::revoke()` (`Actions/RevokesPermissions.php:69-107`)
@@ -459,9 +442,8 @@ final class RoleGrants
         /** @var array<string, list<string>> $byEntity */
         $byEntity = [];
 
-        // The entity is carried beside the group rather than read back out of
-        // the key: an array key is a plain string, and reconstructing the class
-        // from one launders `class-string<Model>|null` into `string|null`.
+        // Carried beside the group: an array key is a plain string, and
+        // reconstructing the class from one launders the type away.
         /** @var array<string, class-string<Model>|null> $entities */
         $entities = [];
 
@@ -490,11 +472,9 @@ final class RoleGrants
     }
 
     /**
-     * Every narrowed row this role holds a grant for, once each.
-     *
-     * `held()` yields one entry per grant, so a permission both granted and
-     * forbidden arrives twice; naming it twice in one revoke would be harmless
-     * and reads as a bug.
+     * Every narrowed row this role holds a grant for, deduplicated: `held()`
+     * yields one entry per grant, so a row both granted and forbidden is there
+     * twice.
      *
      * @return list<Model>
      */
@@ -514,12 +494,9 @@ final class RoleGrants
     }
 
     /**
-     * The twins among them that belong to this entity and one of these names.
-     *
-     * The entity is matched as warden matches it — by morph alias, which is
-     * what the column holds and what `entityAttributes()` writes — never by
-     * class name. A row pinned to a record is left alone: it answers no check
-     * this grid makes, so this screen neither draws it nor deletes it.
+     * Matched by morph alias, which is what the column holds, never by class
+     * name. A row pinned to a record is left out: it answers no check this grid
+     * makes, so this screen neither draws it nor deletes it.
      *
      * @param  list<Model>  $twins
      * @param  class-string<Model>|null  $entity
