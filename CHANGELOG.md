@@ -8,6 +8,99 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.0.1] - 2026-08-26
+
+Six guarantees this package makes had been carried as open for between three and nine releases,
+re-checked by hand at each one and never written down. Re-checking them had come to cost more than
+pinning them, so this release pins them. Nothing under `src/` changed and no key was added: the
+whole diff is eleven tests and the reasoning that goes with them.
+
+Each one was broken on purpose afterwards, committed first and reverted with a named
+`git checkout`, and what went red is recorded below. Where a mutation reddens tests that already
+existed, that is said too — a new test whose only evidence is "the suite went red" has not shown
+what it adds.
+
+### Added
+
+- **The three `modalDescription` calls on the permission side had nothing proving they are wired to
+  an action.** The role side got that pin in `1.4.0`; the permission side never did. What existed
+  was a test calling `PermissionsTable::warning()` statically, which proves the sentence and says
+  nothing about whether any action reads it. `assertSee()` after `mountAction` cannot close the gap
+  either — the modal's markup is not part of `Testable::html()` — so each of the six new tests
+  resolves the action object and reads `getModalDescription()` off it. Measured by deleting one
+  `->modalDescription(...)` line at a time: each deletion reddens exactly the two tests for that
+  screen and nothing else, so a build now names the screen that lost it.
+
+- **Property 3 of the seven — "whoever may change a role hands out everything the panel declares,
+  the wildcard included and itself included" — had never been taken through a real screen.** Two
+  tests already wrote the `*` cell, but one drives `RoleGrants::apply()` directly and the other a
+  bare field harness; neither has a policy in front of it. The new test signs in, holds the role it
+  is editing, and grants the wildcard column through `EditRole`. It has to use `->set()` with the
+  raw dotted path: `fillForm()` normalises through `data_set()`, which reads `*` as a wildcard and
+  writes nothing, while the real wire treats it as an ordinary segment. Renaming the wildcard
+  permission reddens seven tests including this one, which alone does not show what it adds; the
+  measurement that does is a self-demotion guard — the "protect the admin from themselves" check
+  property 3 forbids — injected into the grid's save. That reddens two tests, and this is the one
+  that covers the wildcard column.
+
+- **`RoleGrants::writable()` compares its two scopes as text, and no test had ever handed it a
+  string.** Every existing one drives it with the integers 7 and 8. The column reads back as a
+  native PHP `int`, so the cast only earns its keep against a tenant resolver answering `'7'` —
+  which is what a UUID-keyed installation does, and not, as this was once described, a UUID in the
+  column: `scope` is `integer` on all four of warden's tables and could not hold one. Dropping both
+  casts for a bare `===` reddens this test and no other in the suite.
+
+- **`ui.conditions.locked.model` was a sentence no screen had ever drawn.** It appeared only in the
+  frozen key list, and every release since `1.3.0` re-checked it by hand and carried it forward.
+  Reaching it needs a divergence, because `PermissionForm::conditionsHelp()` asks two questions and
+  only one is live: the form's current `entity_type` decides whether `conditions.no_model` shadows
+  everything, and the record's stored one decides `locked.model`. So the row is saved against an
+  entity that no longer resolves and the live field is then moved, without saving, to one that does.
+  `fillForm()` suspends the field's own state-update hooks, so the `afterStateUpdated` that would
+  blank `options` never fires and the stored row survives to be read back. Changing that branch's
+  return reddens this test — and `LanguageTest`, which until now was the only thing standing behind
+  the key, and which only ever proved the literal exists in the source, never that anybody renders
+  it.
+
+- **The PHPStan ceiling was declared in four places and compared to none.** The floor has had a
+  manifest since `1.5.0` — `composer.json` — and a test cross-checking three files against it. The
+  ceiling had neither, and it drifts silently in a way the floor does not: `phpstan.neon` carries no
+  `phpVersion` on purpose so that half of the gate analyses at the runtime, and the runtime is the
+  dev image, so an image that drifts from the workflow stops checking the newer version's
+  deprecations while every gate stays green. The manifest is `compose.yaml`'s build arg, not
+  `docker/Dockerfile`'s `ARG` default — `make build` is `docker compose build php`, which shadows
+  that default on every path this project takes. The test cross-checks the Dockerfile, both of
+  `quality.yml`'s version strings, the matrix's top end in `run-tests.yml`, and **the absence** of a
+  `phpVersion` in `phpstan.neon`, which is the assertion that protects the mechanism rather than the
+  number. Measured leaf by leaf: each of the six goes red on its own mutation and on no other.
+
+- **The README's way back was not compared against anything that runs.** `1.0.2` recorded three
+  plugin methods that do not exist shipping twice because nothing read the README; the recovery
+  recipe is the passage where that would cost most, since it is what somebody locked out of the
+  panel follows. The command's registered name and the argument order its own definition declares
+  are now read off the command rather than typed a second time, so the README and the code cannot
+  disagree quietly. Swapping the README's two arguments reddens it; so does swapping the command's.
+
+### Not included
+
+- **Nothing under `src/`, deliberately.** The release was scoped as tests only, and a defect found
+  while writing one would have gone to its own tag. None was found: all six held, and what was
+  missing was the evidence, not the behaviour.
+- **The `everything();` line of the recipe is pinned more weakly than the other two, and the
+  difference is written down rather than glossed.** It is compared against a second literal here;
+  what makes that worth doing is that it is byte-identical to the line `AssignRoleCommandTest`
+  executes, so a README that drifts leaves that test demonstrating a recipe the README no longer
+  prints. `Warden::role([...])` and `$role->save()` get less than that — the suite reaches role
+  creation through a helper — and nothing here can do more for them than notice the README still
+  says it.
+- **There is no negative beside the string-tenant test, and the reason is measured, not assumed.**
+  Reading a row of a genuinely different tenant back would look like the obvious other half, but
+  `RoleGrants::held()` queries through warden's own `TenantScope`, so such a row is filtered out in
+  SQL before `writable()` runs at all: asking for it throws on a missing array key rather than
+  answering `Shape::Elsewhere`. The case that `writable()` could answer wrong unconditionally is
+  already covered by an existing test reading with no tenant active.
+- **Nobody opened a browser.** This release changes no rendered surface.
+
 ## [2.0.0] - 2026-08-26
 
 Warden 2.0. The dependency moved and this package moves with it — but the version number is not
