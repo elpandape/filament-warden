@@ -118,8 +118,18 @@ final readonly class Audit
     }
 
     /**
-     * The exit code's only source of truth, and `orphans` is deliberately not in
-     * it.
+     * The exit code's only source of truth, and `orphans` and `unwalkable` are
+     * deliberately not in it.
+     *
+     * `unwalkable` names a relation manager whose model this cannot reach. Nothing
+     * an operator does clears it unless the manager declares `$relatedResource`,
+     * and this package's own `RolesRelationManager` cannot: pointing it at
+     * `RoleResource` leaks that resource's `edit` and `delete` into the tab through
+     * `flatActions`, which is why it was set back to null. So the integration the
+     * README documents turned `--check` red the moment anybody wired it, for good,
+     * and the line it printed named a remedy that never applied. A term correct use
+     * can never clear is not a gate. It is the only one of these buckets with that
+     * shape: every other term names something the operator can go and fix.
      *
      * A permission the catalogue declares that nobody holds is what normal use of
      * the grid leaves behind on every cell turned off: warden's `revoke()` deletes
@@ -139,7 +149,6 @@ final readonly class Audit
             && $this->forgotten === []
             && $this->strays === []
             && $this->drifted === []
-            && $this->unwalkable === []
             && $this->unkeyable === [];
     }
 
@@ -152,7 +161,7 @@ final readonly class Audit
      */
     public function isSilent(): bool
     {
-        return $this->isClean() && $this->orphans === [] && $this->stranded === [];
+        return $this->isClean() && $this->orphans === [] && $this->stranded === [] && $this->unwalkable === [];
     }
 
     /**
@@ -259,7 +268,7 @@ final readonly class Audit
         foreach (Catalog::resourceClasses($panel) as $resource) {
             foreach (Catalog::relationManagers($resource) as $manager) {
                 if ($manager::getRelatedResource() === null) {
-                    $findings[] = "{$manager}: its model is not in the catalogue — declare it in `catalog.models`";
+                    $findings[] = "{$manager}: it declares no \$relatedResource, so the walk stops here — `catalog.models` puts the model in the catalogue, it does not clear this line";
                 }
             }
         }

@@ -117,8 +117,9 @@ php artisan filament:assets
 Warden 2.0 adds an `identity_key` column to `permissions` and a unique index over `(name, identity_key)`, and it stamps that key on every save. A database still in the 1.x shape gets `no column named identity_key` the first time anything writes a permission — the grid, the permission screen, a seeder. Composer resolves without complaint and the application breaks on first use.
 
 ```bash
-# 1. Publish and run warden's migration
-php artisan vendor:publish --tag=warden-migrations
+# 1. Publish and run warden's UPGRADE migration — not `warden-migrations`,
+#    which is the CREATE migration and fails on tables you already have
+php artisan vendor:publish --tag=warden-migrations-v2
 php artisan migrate
 
 # 2. If the migration stops on duplicates, clear them and run it again
@@ -128,6 +129,8 @@ php artisan migrate
 # 3. Re-copy the assets, as with any upgrade
 php artisan filament:assets
 ```
+
+The tag matters. `warden-migrations` publishes `create_warden_tables`, whose `Schema::create()` calls carry no `hasTable` guard, so on a database that already has warden's tables `php artisan migrate` stops on the first one and the `identity_key` column never arrives. `warden-migrations-v2` publishes `upgrade_warden_to_v2`, which adds the column, backfills every row and then puts the unique index on. It is safe to run again: it stops before the index while rows still collide, so the run after a `warden:clean --duplicates` finishes the job.
 
 `php artisan filament-warden:audit --check` reports an unmigrated catalogue as its own finding and exits 1, so a deploy pipeline goes red before the deploy rather than after it. That bucket stays permanently empty afterwards, which is what it is supposed to do.
 
@@ -352,6 +355,11 @@ public static function getRelations(): array
     return [RolesRelationManager::class];
 }
 ```
+
+It will show up in `filament-warden:audit` under *models only a relation manager reaches*, and that is
+expected: it declares no `$relatedResource` on purpose, because pointing it at `RoleResource` leaks that
+resource's own edit and delete actions into the tab. The finding is informational and never turns
+`--check` red.
 
 That is the whole of it. Everything else — who may assign or retract which role — is decided by
 the package, the same way `RoleAssignment` below decides it for the field.
@@ -614,7 +622,7 @@ It writes nothing, and reports nine things:
 - **permissions nothing declares that no grant points at** — a rename left them behind: they can never match again, and nothing will ever create them;
 - **grants for actions nothing declares any more** — a renamed policy method, a typo in a seeder, a screen that was deleted: the silent mistake warden has no way to detect;
 - **whole entity types nothing declares** — a morph alias that moved, reported apart because the fix is the opposite one;
-- **models only a relation manager reaches**, with the `catalog.models` line that settles it;
+- **models only a relation manager reaches** — *informational: this one never turns `--check` red*. Reaching one means running the relationship, which is not safe to do from a command, so they are named instead. A relation manager that declares `$relatedResource` is walked for free; one that cannot stays listed for good, and `RolesRelationManager` below is deliberately one of them. `catalog.models` is what puts the model in the catalogue — it does not clear the line;
 - **catalogue names carrying a dot** — Livewire splits a state path on dots, so such a name cannot be a cell and a role screen throws the moment it draws one. Rename the permission — otherwise the only way to find out is somebody opening the screen;
 - **grants whose authority no longer exists** — *informational, like the permissions-the-catalogue-declares-that-no-grant-points-at bucket above (third bullet): this one never turns `--check` red either*. Warden's schema puts a foreign key on `assigned_roles.role_id` and on `grants.permission_id`, never on the two columns that name a grant's authority, so no database cascade reaches them. Warden 2.0 sweeps some: `CacheInvalidations::markCascade()` deletes the grants of a deleted role, but only when the model's class is exactly the configured role class — an account, a role subclass, and anything deleted by query builder or raw SQL are all left behind, because it hangs off `eloquent.deleted`. `warden:clean --stranded` sweeps the rest, and it is opt-in. This bucket reports what is left over. Reported once per stranded authority — the deduplicated `type:key` a whole cluster of grants can share — and once per authority type this installation cannot even resolve.
 

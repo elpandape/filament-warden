@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Catalog\Audit;
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
+use ElPandaPe\FilamentWarden\Filament\RelationManagers\RolesRelationManager;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\BrokenPolicyResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\ClosureGroupResource;
@@ -346,14 +347,45 @@ test('a policy that declares nothing is not the same finding as no policy', func
     expect(Audit::of([$panel])->unpoliced[0])->toContain('declares no action');
 });
 
-test('a relation manager that cannot be walked is named, with the line that settles it', function (): void {
+test('a relation manager that cannot be walked is named, and says what would settle it', function (): void {
     $panel = Panel::make()->id('scratch')->resources([LedgerResource::class]);
 
     $findings = Audit::of([$panel])->unwalkable;
 
     expect($findings)->toHaveCount(1)
         ->and($findings[0])->toContain('LedgerRelationManager')
-        ->and($findings[0])->toContain('catalog.models');
+        ->and($findings[0])->toContain('$relatedResource');
+});
+
+test('declaring the model in catalog.models does not clear the line, whatever the line says', function (): void {
+    $panel = Panel::make()->id('scratch')->resources([LedgerResource::class]);
+
+    config()->set('filament-warden.catalog.models', [Post::class]);
+
+    expect(Audit::of([$panel])->unwalkable)->toHaveCount(1);
+});
+
+test('wiring this package own relation manager, as the readme says to, leaves check green', function (): void {
+    $owner = new class extends Resource
+    {
+        protected static ?string $model = Post::class;
+
+        public static function getRelations(): array
+        {
+            return [RolesRelationManager::class];
+        }
+    };
+
+    Filament::getPanel('test')->resources([$owner::class]);
+
+    $audit = Audit::run();
+
+    expect($audit->unwalkable)->toContain(
+        RolesRelationManager::class.': it declares no $relatedResource, so the walk stops here'
+            .' — `catalog.models` puts the model in the catalogue, it does not clear this line',
+    )
+        ->and($audit->isSilent())->toBeFalse()
+        ->and(audit(check: true))->toBe(0);
 });
 
 test('a screen nobody guards reaches the audit, which is how the guard reaches CI', function (): void {

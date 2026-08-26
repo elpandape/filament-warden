@@ -41,7 +41,7 @@ final class AuditCommand extends Command
         $this->report(__('filament-warden::ui.console.audit.forgotten'), $audit->forgotten);
         $this->report(__('filament-warden::ui.console.audit.strays'), $audit->strays);
         $this->report(__('filament-warden::ui.console.audit.drifted'), $audit->drifted);
-        $this->report(__('filament-warden::ui.console.audit.unwalkable'), $audit->unwalkable);
+        $this->report(__('filament-warden::ui.console.audit.unwalkable'), $audit->unwalkable, red: false);
         $this->report(__('filament-warden::ui.console.audit.unkeyable'), $audit->unkeyable);
         $this->report(__('filament-warden::ui.console.audit.stranded'), $audit->stranded, red: false);
 

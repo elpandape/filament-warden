@@ -223,7 +223,7 @@ return [
 
     'console' => [
         'audit' => [
-            'unmigrated' => 'El catálogo de warden sigue en su forma anterior a la 2.0: no tiene columna `identity_key`. Publica y ejecuta la migración de warden —`php artisan vendor:publish --tag=warden-migrations` y después `php artisan migrate`— o el primer permiso que alguien guarde fallará. Si la migración se para en duplicados, ejecuta antes `php artisan warden:clean --duplicates`.',
+            'unmigrated' => 'El catálogo de warden sigue en su forma anterior a la 2.0: no tiene columna `identity_key`. Publica y ejecuta la migración de warden —`php artisan vendor:publish --tag=warden-migrations-v2` y después `php artisan migrate`— o el primer permiso que alguien guarde fallará. Si la migración se para en duplicados, ejecuta antes `php artisan warden:clean --duplicates`.',
             'open' => 'Pantallas que no deciden quién entra. Filament contesta que sí por ellas, así que están abiertas a cualquiera que llegue al panel.',
             'unpoliced' => 'Recursos cuyo modelo no tiene Policy. Es el caso en el que Filament falla abierto.',
             'orphans' => 'Permisos a los que no apunta ninguna concesión. Nada los consulta. Quien los borra es `warden:clean`.',
@@ -231,7 +231,7 @@ return [
             'strays' => 'Concesiones a acciones que ya no declara nadie: un método de Policy renombrado, una errata en un seeder, una pantalla borrada.',
             'drifted' => 'Tipos de entidad que nadie declara. Un alias de morph entero dejó de casar: el mapa se movió y todas sus filas se callaron.',
             'unkeyable' => 'Nombres del catálogo con un punto. Livewire parte las rutas de estado por puntos, así que no pueden ser una celda: una pantalla de rol lanza en cuanto dibuja una. Renombra el permiso.',
-            'unwalkable' => 'Modelos a los que solo llega un relation manager, y que no se pueden recorrer sin ejecutar la relación.',
+            'unwalkable' => 'Modelos a los que solo llega un relation manager. Llegar a uno exige ejecutar la relación, que aquí no es seguro hacer, así que se nombran en vez de resolverse. Un relation manager que declara `\$relatedResource` se recorre gratis; uno que no puede declararlo se queda en esta lista para siempre —el `RolesRelationManager` de este paquete es uno, a propósito—. `catalog.models` es lo que mete el modelo en el catálogo; no quita la línea.',
             'stranded' => 'Concesiones cuya autoridad ya no existe. Ninguna cascada de la base las alcanza. Warden barre un ROL borrado por evento de modelo; una cuenta, una subclase de rol y todo lo borrado por SQL crudo quedan atrás. Ejecuta `warden:clean --stranded` para quitarlas.',
             'clean' => 'Nada que informar.',
         ],

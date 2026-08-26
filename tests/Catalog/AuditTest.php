@@ -15,10 +15,13 @@ use Filament\Panel;
  *
  * `isClean()` is a flat conjunction and the only thing `--check` consults, so a
  * bucket left out of it is a finding every build swallows: a change that looks
- * done, passes every other test, and fixes nothing. And two buckets are out of
+ * done, passes every other test, and fixes nothing. And three buckets are out of
  * it on purpose — a permission the catalogue declares that nobody holds is what
- * every grid save that turns a cell off leaves behind, and a grant whose
- * authority is gone has no cure this package can write.
+ * every grid save that turns a cell off leaves behind, a grant whose authority is
+ * gone has no cure this package can write, and a relation manager that declares
+ * no `$relatedResource` cannot be walked to by anybody: this package's own
+ * `RolesRelationManager` is one deliberately, so the integration the README
+ * documents used to redden `--check` the moment it was wired, for good.
  *
  * Every parameter of the constructor has a default, so a further bucket added
  * without touching this file is legal PHP and clean at `level: max`. Nothing
@@ -37,7 +40,7 @@ pest()->extend(TestCase::class);
  */
 function gateBuckets(): array
 {
-    return ['open', 'unpoliced', 'forgotten', 'strays', 'drifted', 'unwalkable', 'unkeyable', 'unmigrated'];
+    return ['open', 'unpoliced', 'forgotten', 'strays', 'drifted', 'unkeyable', 'unmigrated'];
 }
 
 /**
@@ -90,6 +93,11 @@ test('the stranded bucket is reported and never reddens the build', function ():
         ->and(auditWith('stranded')->isSilent())->toBeFalse();
 });
 
+test('the unwalkable bucket is reported and never reddens the build', function (): void {
+    expect(auditWith('unwalkable')->isClean())->toBeTrue()
+        ->and(auditWith('unwalkable')->isSilent())->toBeFalse();
+});
+
 test('the gate reads exactly the buckets this file names, no more and no fewer', function (): void {
     $reaching = array_values(array_filter(
         declaredBuckets(),
@@ -97,7 +105,7 @@ test('the gate reads exactly the buckets this file names, no more and no fewer',
     ));
 
     expect($reaching)->toBe(gateBuckets())
-        ->and(declaredBuckets())->toHaveCount(count(gateBuckets()) + 2);
+        ->and(declaredBuckets())->toHaveCount(count(gateBuckets()) + 3);
 });
 
 test('this file puts a finding in every bucket the audit carries', function (string $bucket): void {

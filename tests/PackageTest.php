@@ -73,6 +73,16 @@
  * package's own definition of the command, rather than against a second literal
  * typed by hand.
  *
+ * The upgrade-tag test exists because following the sentence it guards did not work.
+ * Warden registers the CREATE migration under `warden-migrations` and the UPGRADE one
+ * under `warden-migrations-v2`, and this package's own upgrade note, plus the audit's
+ * own pre-flight line in both languages, all named the first. `create_warden_tables`
+ * has no `hasTable` guard on its `Schema::create()` calls, so an installation that
+ * already has warden's tables — every installation this note is written for — gets a
+ * failed `migrate` and no `identity_key`. Measured against a real consumer on the day
+ * `2.0.1` shipped. The tag is read off warden's provider rather than typed a second
+ * time, so the day warden renames it the three places that print it go red together.
+ *
  * The export test asks `git archive` what the tarball holds instead of reading
  * `.gitattributes` and inferring. Inference was tried and thrown away: it stayed green
  * while `README.md export-ignore` or `/src export-ignore` emptied the package, and it
@@ -164,6 +174,30 @@ test('the recovery recipe in the readme names the real command, in the order and
     expect($readme)->toContain('Warden::allow($role)->everything();')
         ->and(array_keys($assign->getDefinition()->getArguments()))->toBe(['role', 'authority'])
         ->and($readme)->toContain(sprintf('php artisan %s super-admin "App\Models\User:1"', $assign->getName()));
+});
+
+test('the publish tag the upgrade tells people to run is the one that ships the upgrade', function (): void {
+    $root = dirname(__DIR__);
+
+    $provider = (string) file_get_contents($root.'/vendor/elpandape/warden/src/WardenServiceProvider.php');
+
+    $upgrade = preg_match(
+        "/upgrade_warden_to_v2\.php\.stub.*?\], '([a-z0-9-]+)'/s",
+        $provider,
+        $parts,
+    );
+
+    expect($upgrade)->toBe(1);
+
+    /** @var array{non-falsy-string, non-falsy-string} $parts */
+    $tag = $parts[1];
+
+    expect((string) file_get_contents($root.'/README.md'))
+        ->toContain(sprintf('php artisan vendor:publish --tag=%s', $tag))
+        ->and((string) file_get_contents($root.'/lang/en/ui.php'))
+        ->toContain(sprintf('--tag=%s`', $tag))
+        ->and((string) file_get_contents($root.'/lang/es/ui.php'))
+        ->toContain(sprintf('--tag=%s`', $tag));
 });
 
 test('the distribution ships ten top-level entries and every tracked file under them', function (): void {

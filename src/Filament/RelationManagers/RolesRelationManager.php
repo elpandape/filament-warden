@@ -69,6 +69,11 @@ class RolesRelationManager extends RelationManager
      * Everything it bought for free is bought back explicitly rather than
      * left to a caller noticing what went quiet: `canViewForRecord()` below,
      * and the two model labels in `table()`.
+     *
+     * The price is that `Audit::unwalkable()` lists this class for as long as it
+     * exists, since that finding asks exactly this question. It is why that
+     * bucket informs rather than reddens `--check`: an installation following
+     * the README cannot clear it, and should not have to.
      */
     protected static ?string $relatedResource = null;
 
