@@ -86,24 +86,11 @@ class EditPermission extends EditRecord
             $data['only_owned'] = $record->getAttribute('only_owned');
         }
 
-        // Half of what closes this builder is not mirrored above:
-        // `PermissionForm::conditionsWritable()` also disables it — for a
-        // corrupt blob, a shape the builder will not draw, an entity that no
-        // longer resolves to a model, a column the table dropped, or a rule
-        // that cannot be written back exactly as it is stored — and that
-        // predicate is private to the form on purpose, the same reason
-        // `ownable()` below is a private copy
-        // rather than a public one. It is not duplicated here too. Its
-        // ~25 lines of `Narrowing`/`Columns`/`Ownership` reads would not buy
-        // a real floor: `EditRecord::save()` calls `$this->form->getState()`
-        // BEFORE this method ever runs, against a schema rebuilt fresh for
-        // this record on this request, so BOTH clauses of `disabled()` are
-        // re-evaluated ahead of `$data` — no payload, forged or raced, can
-        // carry `options` past a builder `conditionsWritable()` is closing.
-        // Only removing `disabled()` itself could, and that is a mutation,
-        // not a gap a duplicate here would close: it would only be able to
-        // drift silently from the original, trading a provably unreachable
-        // branch for a real one.
+        // The form's own `conditionsWritable()` closes this builder for reasons
+        // this line does not mirror, and is not duplicated here: `getState()`
+        // runs before this method against a schema rebuilt for this request, so
+        // `disabled()` is re-evaluated ahead of `$data` and no payload can carry
+        // `options` past it. A copy could only drift.
         if (! PermissionResource::mayEditConditions($record)) {
             $data['options'] = $record->getAttribute('options');
         }
@@ -223,13 +210,9 @@ class EditPermission extends EditRecord
      * `only_owned` over an attribute that is not a column does not fail closed,
      * it emits invalid SQL and throws when the query runs.
      *
-     * A private copy on purpose: making the form's own predicate public would be
-     * new API surface and 1.0.2 is a patch. It is the fifth copy of the
-     * morph-to-class idiom in this package — `Reach`, `Probe`, `Holders`,
-     * `PermissionForm` and here — and folding the five into one reader is a
-     * 1.1.0 item. Until then the two that must agree are held to account
-     * together by 'switching the entity gives up an ownership it cannot
-     * resolve', which asserts the screen and the column in one test.
+     * A private copy rather than making the form's predicate public. The two
+     * that must agree are held together by 'switching the entity gives up an
+     * ownership it cannot resolve', which asserts both in one test.
      */
     private function ownable(?string $entityType): bool
     {

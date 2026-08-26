@@ -37,24 +37,14 @@ final class StateKey
     /**
      * The same guard, for a caller holding a bare name rather than an entry.
      *
-     * There was an `action(Entry)` here that applied it and that nothing called,
-     * while the two places that build an action key did so without it. Both go
-     * through this now. (`RoleGrants::of()` builds one bare as well, on the READ
-     * half: a stored name with a dot lands in the state map, is drawn by
-     * nothing, is emitted by nothing and counted by nothing, so it is left
-     * alone rather than made to throw on a screen that is only reading.)
-     * Routing them is defence in depth rather than a hole closed, and the
-     * difference is worth writing down because the first version of this comment
-     * claimed the hole: **an action name cannot carry a dot today**. Those names
-     * come from `ReflectionMethod::getName()` on a policy, and
-     * `public function export.csv()` is a PHP parse error; a `catalog.scopes`
-     * entry that no policy declares never reaches a column, because both loops
-     * in `GridView::groups()` gate on the reflected set.
+     * Defence in depth on the action half, not a hole closed: an action name
+     * comes from `ReflectionMethod::getName()` on a policy, and
+     * `public function export.csv()` is a parse error. What IS reachable is a
+     * loose `catalog.custom` name with a dot, which arrives as a ROW key.
      *
-     * What IS reachable is a loose `catalog.custom` name with a dot, which
-     * arrives as a ROW key and has always thrown here. `filament-warden:audit`
-     * finds that one before a screen does, which is the part of this that
-     * changed something.
+     * `RoleGrants::of()` builds one bare on the READ half on purpose: a stored
+     * name with a dot is drawn by nothing and counted by nothing, so a screen
+     * that is only reading is not made to throw over it.
      */
     public static function of(string $key): string
     {

@@ -20,44 +20,23 @@ use Illuminate\Database\Eloquent\Model;
 final class RolesTable
 {
     /**
-     * Two closures below share a memo apiece — `$heldCounts` for the
-     * informing column, `$assignedRoleIds` for the deciding button — each
-     * built from ONE query the first row that needs it asks for, and reused
-     * by every row after (§6.24, "Que no cueste"). Before this,
-     * `assignmentCount()` and `RoleResource::isDeletable()`'s own `EXISTS`
-     * each paid their own query PER ROW: measured for 5 roles, 11
-     * `assigned_roles` statements; after, 3 — those two queries plus one
-     * unrelated to either (warden authorizing the signed-in user's own
-     * `delete`/`viewAny` on the resource, which this fix does not touch).
+     * A memo apiece for the two closures below — `$heldCounts` for the
+     * informing column, `$assignedRoleIds` for the deciding button — each one
+     * query the first row asks for and every row after reuses.
      *
-     * Neither query is bounded by the PAGE: a column closure cannot reach the
-     * record set Filament paginated without going back through the table
-     * component. Both are bounded by the ROLE CATALOGUE instead —
-     * `heldCounts()` groups and `assignedRoleIds()` is `distinct()`, so each
-     * returns at most one row per role however many assignment rows exist.
-     * That is the whole cost of this screen, and it is invisible to a
-     * statement count: reading every row and reducing in PHP gives the same
-     * three statements and hydrates the entire table.
+     * Neither is bounded by the PAGE: a column closure cannot reach the record
+     * set Filament paginated. Both are bounded by the CATALOGUE instead, one
+     * row per role however many assignments exist — which a statement count
+     * cannot see, so `RoleResourceTest` counts hydrated rows as well.
      *
-     * Local variables captured by reference, not a class-level static
-     * property: a fresh pair is born every time `configure()` runs — once
-     * per table build, i.e. once per request — so there is nothing to reset
-     * between test cases the way `Assignment::forget()` has to reset its own
-     * memo, and nothing here can outlive the render it was built for.
+     * Never merged into one query: they answer different questions under
+     * different scope rules. `$assignedRoleIds` reads wide because it feeds a
+     * DELETE and the cascade is blind to tenancy; `$heldCounts` keeps the
+     * active tenant because it only INFORMS, and a wider number is one
+     * `retract()` could not act on from here.
      *
-     * The two memos answer DIFFERENT questions under DIFFERENT scope rules,
-     * on purpose, and are never merged into one query: `$assignedRoleIds` is
-     * wide (`withoutGlobalScopes()`) because it feeds a DELETE decision and
-     * the cascade that decision triggers is blind to tenancy; `$heldCounts`
-     * keeps the active tenant's scope because it only INFORMS, and reading
-     * wide there would show a number `retract()` issued from this screen
-     * could not act on. Folding both into one query would silently pick one
-     * of those two rules for both columns.
-     *
-     * Both ceilings live in `RoleResourceTest.php`, not only in this
-     * paragraph: one test counts the statements and one counts the rows
-     * Eloquent hydrates, because a statement counter reads 3 whichever
-     * shape these two queries take.
+     * Local variables rather than static properties: a fresh pair per
+     * `configure()`, so nothing outlives the render or leaks between tests.
      */
     public static function configure(Table $table): Table
     {
@@ -147,18 +126,13 @@ final class RolesTable
     }
 
     /**
-     * Who holds it, resolved from rows the CALLER already scoped: a pure
-     * transform, so the one decision that matters — wide for a delete warning,
-     * tenant-scoped for `ViewRole`'s own informational section — stays entirely
-     * in the caller's query and never leaks in here. Public for the same
-     * reason `warning()` is: `ViewRole` reads its own rows and hands them here
-     * to name them.
+     * Who holds it, from rows the CALLER already scoped: a pure transform, so
+     * the decision that matters — wide for a delete warning, tenant-scoped for
+     * an informational section — stays in the caller's query.
      *
-     * Shaped after `Holders::labels()`/`accounts()`, with one thing simpler:
-     * `assigned_roles.entity_type` and `.entity_id` are both `NOT NULL`
-     * columns (the warden migration stub), unlike the nullable `grants` ones
-     * `Holders` reads — so there is no "granted to everyone" bucket here, and
-     * no line only a null value would reach.
+     * Simpler than `Holders::labels()` in one way: `assigned_roles`'s two
+     * authority columns are `NOT NULL`, unlike the `grants` ones, so there is
+     * no "granted to everyone" bucket and no line only a null would reach.
      *
      * @param  Collection<int, Model>  $rows
      * @return list<string>
@@ -206,35 +180,18 @@ final class RolesTable
     }
 
     /**
-     * How many rows each role has in `assigned_roles`, scoped, in one query
-     * that returns ONE ROW PER ROLE — because a badge that informs keeps its
-     * scope (§6.24): counting every tenant's rows would show a number
-     * `retract()` issued from here could not act on.
+     * How many rows each role has in `assigned_roles`, scoped, one row per
+     * role: a badge that informs keeps its scope, or it shows a number
+     * `retract()` from this screen could not act on.
      *
-     * The aggregate is what bounds this. Reading `role_id` for every row and
-     * reducing in PHP answers the same question and costs the whole table:
-     * measured against 200 assignment rows over 5 roles, the listing
-     * hydrated 400 `AssignedRole` models — this query and
-     * `assignedRoleIds()` below reading every row once each — against 10
-     * after, five apiece. The test `'the listing's two reads are bounded by
-     * the role catalogue, not by the assignment table'` counts the 10,
-     * through Eloquent's `retrieved` event, and caps it; the 400 is what the
-     * unbounded bodies produce on the same fixture. A statement counter sees
-     * 3 either way and cannot tell them apart.
+     * The aggregate is what bounds it — reducing in PHP answers the same
+     * question and hydrates the whole table, which a statement count cannot
+     * see. A holder restricted to a context counts like any other.
      *
-     * `count(*)` is whatever the driver hands back, and nothing normalises it
-     * on the way through: `AssignedRole` declares no `$casts` at all, so an
-     * aggregate has no cast to fall into. Measured here, under SQLite, it
-     * arrives as `int`; what another driver returns is not something this
-     * suite can measure, so it is narrowed with `is_numeric()` rather than
-     * assumed. The other row values this class reads are keys, not
-     * aggregates, and take a different narrowing (`is_int() || is_string()`)
-     * for that reason.
-     *
-     * A holder restricted to a context is one more row with the same
-     * `role_id` and counts here exactly like an unrestricted one — this
-     * column has never filtered on `restricted_to_type`, and grouping does
-     * not change that.
+     * `count(*)` is whatever the driver hands back and `AssignedRole` declares
+     * no casts, so it is narrowed with `is_numeric()` rather than assumed. The
+     * other values this class reads are keys, not aggregates, and take
+     * `is_int() || is_string()`.
      *
      * @return array<int|string, int>
      */
@@ -261,24 +218,15 @@ final class RolesTable
     }
 
     /**
-     * Every role id with at least one assignment row, ANY tenant — the
-     * DECIDING half of §6.24's split, read wide for the same reason
-     * `RoleResource::isDeletable()`'s own single-record query already is:
-     * the cascade that removes these rows on delete is blind to scope.
+     * Every role id with at least one assignment row, ANY tenant: this decides
+     * a DELETE, and the cascade that removes those rows is blind to scope.
      *
-     * `distinct()` is what bounds it: without it this reads and hydrates
-     * every row of `assigned_roles` to learn a set that can never be larger
-     * than the role catalogue. See `heldCounts()` above for the measurement
-     * and for the test that counts it.
+     * `distinct()` is what bounds it to the catalogue rather than the
+     * assignment table.
      *
-     * A set (`true` values, keyed by id) rather than a list: `isDeletable()`
-     * does one `isset()` per row against this instead of an `in_array()`
-     * scan. No cast on the way in and none on the way out: PHP normalises a
-     * canonical numeric string array key back to `int`, so a set built from
-     * either type answers `isset()` for a key of either type. Measured:
-     * `$ids[(string) 5]` stores `int(5)`, and both `isset($ids[5])` and
-     * `isset($ids['5'])` are true. A cast here would be a no-op that made
-     * the declared key type wrong.
+     * A set rather than a list, so `isDeletable()` does one `isset()` per row.
+     * No cast either way: PHP normalises a canonical numeric string key back to
+     * `int`, so a set built from either type answers for either.
      *
      * @return array<int|string, true>
      */

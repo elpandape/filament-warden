@@ -21,12 +21,9 @@ use Throwable;
  * Asked of the model's own connection and not of the `Schema::` facade, which
  * would resolve the default one.
  *
- * Kept as `getColumns()` rather than `getColumnListing()` because the rows it
- * answers with carry the schema's type name, and one caller needs it: `LIKE`
- * raises in postgres against a column that is not a text type. The BOOLEAN
- * question is a different one and still goes to the model's casts — sqlite has
- * no boolean type at all, and an uncast postgres `boolean` column still comes
- * back as `1`.
+ * `getColumns()` rather than `getColumnListing()` because the rows carry the
+ * schema's type name, which `texts()` needs. `booleans()` is a different
+ * question and asks the model's casts instead.
  */
 final class Columns
 {
@@ -51,10 +48,9 @@ final class Columns
      * model — has to drop what it cannot compare, or the screen throws on one
      * engine and works on the others.
      *
-     * Matched on the schema's own type name by substring, because the spelling
-     * is the driver's: `varchar`, `character varying`, `bpchar`, `text`,
-     * `longtext`, `citext`. Anything that names neither is left out, which
-     * fails towards a narrower search and never towards a raise.
+     * Matched on the schema's type name by substring, because the spelling is
+     * the driver's. Anything unrecognised is left out, which fails towards a
+     * narrower search rather than towards a raise.
      *
      * @param  class-string<Model>  $model
      * @return list<string>
