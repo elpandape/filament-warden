@@ -231,7 +231,7 @@ return [
             'strays' => 'Grants for actions nothing declares any more — a renamed policy method, a typo in a seeder, a screen that was deleted.',
             'drifted' => 'Entity types nothing declares at all. A whole morph alias stopped matching: the map moved, and every row of it went quiet.',
             'unkeyable' => 'Catalogue names carrying a dot. Livewire splits a state path on dots, so these cannot be a cell: a role screen throws the moment it draws one. Rename the permission.',
-            'unwalkable' => 'Models only a relation manager reaches. Reaching one means running the relationship, which is not safe to do here, so they are named instead. A relation manager declaring `\$relatedResource` is walked for free; one that cannot declare it stays on this list for good — this package\'s own `RolesRelationManager` is one, deliberately. `catalog.models` is what puts the model in the catalogue; it does not clear the line.',
+            'unwalkable' => 'Models only a relation manager reaches. Reaching one means running the relationship, which is not safe to do here, so they are named instead. A relation manager declaring `$relatedResource` is walked for free; one that cannot declare it stays on this list for good — this package\'s own `RolesRelationManager` is one, deliberately. `catalog.models` is what puts the model in the catalogue; it does not clear the line.',
             'stranded' => 'Grants whose authority no longer exists. No database cascade reaches them. Warden sweeps a deleted ROLE through a model event; an account, a role subclass, and anything deleted by raw SQL are left behind. Run `warden:clean --stranded` to remove them.',
             'clean' => 'Nothing to report.',
         ],

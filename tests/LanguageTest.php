@@ -247,6 +247,14 @@ test('no line fakes a plural with a parenthesis', function (): void {
     }
 });
 
+test('no line carries a backslash a single-quoted string would print', function (): void {
+    foreach (['en', 'es'] as $locale) {
+        foreach (translations($locale) as $key => $line) {
+            expect(str_contains($line, '\\$'))->toBeFalse("[{$locale}] {$key} prints a stray backslash");
+        }
+    }
+});
+
 test('the two sentences about a class check say it the same way', function (): void {
     $closings = ['en' => 'fails closed', 'es' => 'falla cerrada'];
 

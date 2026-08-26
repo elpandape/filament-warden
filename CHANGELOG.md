@@ -8,6 +8,31 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.0.3] - 2026-08-26
+
+`2.0.2` rewrote two audit headings and shipped a stray backslash in both of them. Found by running
+the command on a real installation rather than by reading the diff, which is the same way `2.0.2`
+itself was found.
+
+### Fixed
+
+- **Two headings printed `` `\$relatedResource` `` with a backslash in front.** In a single-quoted
+  PHP string `\$` is two characters, not an escape — the finding rows underneath were right, because
+  those are built in a double-quoted string where `\$` does escape. `en` and `es` both.
+
+### Added
+
+- **A guard so no translated line can carry one again**, since `\$` in a single-quoted string is
+  always a mistake. It was written decorative first and that is worth recording: `toContain` in Pest
+  is **variadic**, so `->not->toContain($needle, $message)` reads the message as a SECOND needle and
+  passes the moment either is absent — the negation could never fail. Caught by breaking it on
+  purpose and watching it stay green; it now asserts `str_contains(...)` is false, which does take a
+  message, and goes red naming the key.
+
+### Not included
+
+- **Nothing else.** No behaviour, no key, no surface.
+
 ## [2.0.2] - 2026-08-26
 
 Installing `2.0.1` on a real application and following its own upgrade note found three things, and
