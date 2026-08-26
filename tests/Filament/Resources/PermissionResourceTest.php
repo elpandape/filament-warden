@@ -16,12 +16,38 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
+use Filament\Actions\DeleteAction;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
+/**
+ * `assertSee()` after `mountAction` never renders a modal's body in this
+ * harness — the modal markup is not part of `Testable::html()`, confirmed by
+ * dumping the full HTML of a mounted delete action and finding no `fi-modal`
+ * in it at all. The only way to prove a `modalDescription` closure is WIRED to
+ * a given action, rather than merely correct in isolation (which the direct
+ * `PermissionsTable::warning()` calls elsewhere in this file already cover),
+ * is to resolve the action object itself and read `getModalDescription()` off
+ * it: `assertActionExists()` for a page's own action,
+ * `assertTableActionExists(..., record: $permission)` for the listing's.
+ *
+ * `PermissionForm::conditionsHelp()` asks two different questions and only
+ * one of them is live. `self::model($get)` reads the FORM's current
+ * `entity_type` and answers `ui.conditions.no_model` the moment it does not
+ * resolve — including the row's own starting value, which shadows every
+ * other reason. `lockedReason($record)`, reached only once that live entity
+ * DOES resolve, reads the RECORD's stored `entity_type` instead and answers
+ * `locked.model` when THAT one does not. So the only way to see `locked.model`
+ * is to store a row against an entity that no longer resolves and then, in
+ * the open form and without saving, move the live field to one that does.
+ * `fillForm()` disables the field's own state-update hooks for the duration
+ * (`disableSchemaStateUpdateHooksForTesting`), so the `afterStateUpdated` that
+ * would otherwise blank `options` on a live entity change never fires, and the
+ * stored row survives to be read back by `lockedReason()`.
+ */
 pest()->extend(TestCase::class);
 
 function heldRow(string $name = 'viewAny'): Model
@@ -340,6 +366,108 @@ test('the modal says who loses it, because the cascade leaves no trace', functio
 
 test('a permission nobody holds says so instead', function (): void {
     expect(PermissionsTable::warning(makePermission('viewAny')))->toContain('Nobody holds');
+});
+
+test("the edit screen's delete modal says what it takes with it too", function (): void {
+    config()->set('filament-warden.permissions.delete', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+    Warden::allow($user)->to('delete', permissionClass());
+
+    Warden::allow(makeRole('editor'))->to('viewAny', Post::class);
+
+    $held = heldRow('viewAny');
+
+    livewire(EditPermission::class, ['record' => $held->getKey()])
+        ->assertActionExists(
+            'delete',
+            checkActionUsing: fn (DeleteAction $action): bool => is_string($description = $action->getModalDescription()) && str_contains($description, 'roles: 1'),
+        );
+});
+
+test('a permission nobody holds says so on the edit screen too', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+    Warden::allow($user)->to('delete', permissionClass());
+
+    $permission = makePermission('viewAny');
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->assertActionExists(
+            'delete',
+            checkActionUsing: fn (DeleteAction $action): bool => is_string($description = $action->getModalDescription()) && str_contains($description, 'Nobody holds this permission'),
+        );
+});
+
+test("the listing's delete modal says what it takes with it too", function (): void {
+    config()->set('filament-warden.permissions.delete', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('delete', permissionClass());
+
+    Warden::allow(makeRole('editor'))->to('viewAny', Post::class);
+
+    $held = heldRow('viewAny');
+
+    livewire(ListPermissions::class)
+        ->assertTableActionExists(
+            'delete',
+            record: $held,
+            checkActionUsing: fn (DeleteAction $action): bool => is_string($description = $action->getModalDescription()) && str_contains($description, 'roles: 1'),
+        );
+});
+
+test('a permission nobody holds says so on the listing too', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('delete', permissionClass());
+
+    $permission = makePermission('viewAny');
+
+    livewire(ListPermissions::class)
+        ->assertTableActionExists(
+            'delete',
+            record: $permission,
+            checkActionUsing: fn (DeleteAction $action): bool => is_string($description = $action->getModalDescription()) && str_contains($description, 'Nobody holds this permission'),
+        );
+});
+
+test("the view screen's delete modal says what it takes with it too", function (): void {
+    config()->set('filament-warden.permissions.delete', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+    Warden::allow($user)->to('delete', permissionClass());
+
+    Warden::allow(makeRole('editor'))->to('viewAny', Post::class);
+
+    $held = heldRow('viewAny');
+
+    livewire(ViewPermission::class, ['record' => $held->getKey()])
+        ->assertActionExists(
+            'delete',
+            checkActionUsing: fn (DeleteAction $action): bool => is_string($description = $action->getModalDescription()) && str_contains($description, 'roles: 1'),
+        );
+});
+
+test('a permission nobody holds says so on the view screen too', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+    Warden::allow($user)->to('delete', permissionClass());
+
+    $permission = makePermission('viewAny');
+
+    livewire(ViewPermission::class, ['record' => $permission->getKey()])
+        ->assertActionExists(
+            'delete',
+            checkActionUsing: fn (DeleteAction $action): bool => is_string($description = $action->getModalDescription()) && str_contains($description, 'Nobody holds this permission'),
+        );
 });
 
 test('deleting a permission takes its grants with it', function (): void {
@@ -1120,6 +1248,26 @@ test('a rule naming a column the table no longer has says which cause it is', fu
     livewire(EditPermission::class, ['record' => $permission->getKey()])
         ->assertSee(__('filament-warden::ui.conditions.locked.column'))
         ->assertDontSee(__('filament-warden::ui.conditions.locked.shape'));
+});
+
+test('a row stored against an entity that no longer resolves says so once the live entity does', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $permission = makePermission('view');
+    $permission->update([
+        'entity_type' => 'App\\Models\\Gone',
+        'options' => [
+            'v' => 1,
+            'g' => ['t' => 'group', 'i' => [['and', ['t' => 'value', 'c' => 'title', 'o' => '=', 'v' => 'x']]]],
+        ],
+    ]);
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->fillForm(['entity_type' => new Post()->getMorphClass()])
+        ->assertSee(__('filament-warden::ui.conditions.locked.model'))
+        ->assertDontSee(__('filament-warden::ui.conditions.no_model'));
 });
 
 test('the probe searches only columns a like can compare', function (): void {

@@ -1,9 +1,10 @@
 <?php
 
 /**
- * The `preg_match` below is assigned before it is asserted on: Rector rewrites
- * `expect(preg_match(...))->toBe(1)` into `expect($subject)->toMatch(...)` and
- * takes the captures with it.
+ * The `preg_match` calls below are assigned before they are asserted on: Rector
+ * rewrites `expect(preg_match(...))->toBe(1)` into `expect($subject)->toMatch(...)`
+ * and takes the captures with it. Both the floor test and the ceiling test depend
+ * on the captures surviving that.
  *
  * The floor test names four files because each answers a different question and none
  * can see the others. `composer.json` is what an installer resolves against.
@@ -29,6 +30,49 @@
  * pin the number, not the behaviour: a matrix that keeps the literal and adds an
  * `exclude:` for the floor still passes.
  *
+ * The ceiling test is the floor test's mirror, and drifts the other way: silently,
+ * because nothing compared these four files to anything before it. `compose.yaml`'s
+ * build arg is the manifest, not `docker/Dockerfile`'s `ARG` default —
+ * `make build` is `docker compose build php`, and compose hands its own value to the
+ * build as the arg, shadowing the Dockerfile default on every path this project
+ * actually takes; the default only fires for a bare `docker build` nobody runs here.
+ * AGENTS.md §6.35 names the failure this test exists to catch: `phpstan.neon` carries
+ * no `phpVersion` on purpose, so that half of the gate analyses at the runtime rather
+ * than a pinned number, and the runtime is the dev image. Let the image drift from
+ * the workflow's `setup-php` version and that half silently stops seeing the newer
+ * version's deprecations — the floor run keeps passing regardless, because it always
+ * pins `80400` and never reads the image at all. The absence is what protects the
+ * mechanism, so it is the assertion that matters, checked as the literal
+ * `phpVersion:`, colon included: the file's own comment names `phpVersion` in prose
+ * to explain the absence, and a bare `not->toContain('phpVersion')` would already be
+ * red, failed by the sentence that documents the very thing it is meant to confirm.
+ * The two cache-key lines in `quality.yml` read the same text, `php8.5-`, so each is
+ * asserted with its own line prefix (`key:` / `restore-keys:`) — a single check
+ * against the bare version number would pass with one of the two gone stale, because
+ * the other still contains it.
+ *
+ * AGENTS.md §6.24 records three plugin methods that do not exist shipping twice in
+ * the README because nothing read it against anything real. The recovery-recipe test
+ * below does not fix that generally — it only reaches the one recipe a sibling test
+ * already runs, `AssignRoleCommandTest`'s 'the recipe the readme prints opens the
+ * panel door it promises to open' — and it is deliberately asymmetric about it. The
+ * command's registered name (`getName()`, never a typed-out literal) and the argument
+ * order the command's own definition declares (`role` then `authority`) are checked
+ * against the command itself, so those two go red the moment the README and the code
+ * disagree. The `Warden::allow($role)->everything();` line is weaker than that and the
+ * difference is worth naming: it is compared against a second literal typed here, and
+ * what makes it worth typing is that it is byte-identical to the line
+ * `AssignRoleCommandTest.php` executes — so a README that drifts away from it leaves
+ * the sibling test demonstrating a recipe the README no longer prints. That is a
+ * transitive guarantee, not a direct one. `Warden::role(['name' =>
+ * 'super-admin']);` and `$role->save();` are not checked that way: the suite reaches
+ * role creation through the `makeRole()` helper, never through those two lines
+ * verbatim, so nothing here can do more for them than notice the README still prints
+ * that text. A future reader dropping the `getName()`/argument-order half of the test
+ * loses the only two assertions in this file that check the README against the
+ * package's own definition of the command, rather than against a second literal
+ * typed by hand.
+ *
  * The export test asks `git archive` what the tarball holds instead of reading
  * `.gitattributes` and inferring. Inference was tried and thrown away: it stayed green
  * while `README.md export-ignore` or `/src export-ignore` emptied the package, and it
@@ -48,6 +92,7 @@
 
 declare(strict_types=1);
 
+use ElPandaPe\FilamentWarden\Console\AssignRoleCommand;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use Illuminate\Support\ServiceProvider;
 
@@ -87,6 +132,38 @@ test('the PHP floor is the same number everywhere that states it', function (): 
         ->and((string) file_get_contents($root.'/README.md'))->toContain(sprintf('badge/PHP-%s-', $floor))
         ->toContain(sprintf('alt="PHP %s"', $floor))
         ->toContain(sprintf('| PHP | `%s` |', $declared));
+});
+
+test('the PHP ceiling is the same number everywhere that states it, and phpstan.neon never pins one', function (): void {
+    $root = dirname(__DIR__);
+
+    $compose = (string) file_get_contents($root.'/compose.yaml');
+    $matched = preg_match('/PHP_VERSION: "(\d+)\.(\d+)"/', $compose, $parts);
+
+    expect($matched)->toBe(1);
+
+    /** @var array{non-falsy-string, numeric-string, numeric-string} $parts */
+    $ceiling = $parts[1].'.'.$parts[2];
+
+    expect((string) file_get_contents($root.'/docker/Dockerfile'))
+        ->toContain(sprintf('ARG PHP_VERSION=%s', $ceiling))
+        ->and((string) file_get_contents($root.'/.github/workflows/quality.yml'))
+        ->toContain(sprintf("php-version: '%s'", $ceiling))
+        ->toContain(sprintf('key: analysers-${{ runner.os }}-php%s-', $ceiling))
+        ->toContain(sprintf('restore-keys: analysers-${{ runner.os }}-php%s-', $ceiling))
+        ->and((string) file_get_contents($root.'/.github/workflows/run-tests.yml'))
+        ->toContain(sprintf("'%s']", $ceiling))
+        ->and((string) file_get_contents($root.'/phpstan.neon'))
+        ->not->toContain('phpVersion:');
+});
+
+test('the recovery recipe in the readme names the real command, in the order and shape it declares', function (): void {
+    $readme = (string) file_get_contents(dirname(__DIR__).'/README.md');
+    $assign = app(AssignRoleCommand::class);
+
+    expect($readme)->toContain('Warden::allow($role)->everything();')
+        ->and(array_keys($assign->getDefinition()->getArguments()))->toBe(['role', 'authority'])
+        ->and($readme)->toContain(sprintf('php artisan %s super-admin "App\Models\User:1"', $assign->getName()));
 });
 
 test('the distribution ships ten top-level entries and every tracked file under them', function (): void {

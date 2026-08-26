@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView;
+use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\CreateRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\EditRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ListRoles;
@@ -86,6 +87,19 @@ use function Pest\Livewire\livewire;
  * modal..." — and their three "nobody holds" siblings, because leaving even
  * one untested is exactly the shape §6.30 warns about: every other test stays
  * green if that one `->modalDescription(...)` line is deleted.
+ *
+ * The wildcard column has to be addressed with `->set()` and its raw dotted
+ * path, never through `fillForm()`. `fillForm()` normalises with `Arr::undot`
+ * and writes with `data_set()`, which reads `*` as a WILDCARD: on the empty row
+ * it just created it writes nothing at all, and on a populated one it
+ * overwrites every key. Down the real wire the same character is an ordinary
+ * segment — `HandleComponents::updateProperty()` does a plain `explode('.')` —
+ * so `->set('data.permissions.stances.<row>.'.StateKey::MANAGE, …)` is what the
+ * browser does and what 'the wildcard cell on the roles row reaches the account
+ * through the role it holds' does. That test is the only one in this suite that
+ * takes the wildcard through a real resource page: its two siblings elsewhere
+ * drive `RoleGrants::apply()` and the bare field harness, neither of which has a
+ * policy in front of it.
  */
 pest()->extend(TestCase::class);
 
@@ -257,6 +271,26 @@ test('whoever may change a role hands out what it does not hold, itself included
         ->assertHasNoFormErrors();
 
     expect(Access::granted($user, 'delete', roleClass()))->toBeTrue();
+});
+
+test('the wildcard cell on the roles row reaches the account through the role it holds', function (): void {
+    $user = signIn();
+    $role = makeRole('editor');
+    Warden::assign($role)->to($user);
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    expect(Access::granted($user, 'view', roleClass()))->toBeFalse()
+        ->and(Access::granted($user, 'delete', roleClass()))->toBeFalse();
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->set('data.permissions.stances.'.roleClass().'.'.StateKey::MANAGE, 'granted')
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(Access::granted($user, 'view', roleClass()))->toBeTrue()
+        ->and(Access::granted($user, 'delete', roleClass()))->toBeTrue();
 });
 
 test('a role is created with its name and its title', function (): void {

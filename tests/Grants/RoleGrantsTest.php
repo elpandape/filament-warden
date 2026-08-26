@@ -47,6 +47,18 @@ use Illuminate\Support\Facades\Event;
  * only the stance moves` depend on `changes()` picking the value from the
  * stored `Narrowing` when nothing moved, rather than from what `is()` alone
  * could tell apart.
+ *
+ * `writable()`'s `(string)` cast on both sides was untested: every other test
+ * here drives it with two integers. `grants.scope` reads back as a native PHP
+ * `int`, so the cast only earns its keep against a tenant resolver handing
+ * back a numeric string. There is no matching negative next to `'a row scoped
+ * as an integer is still this screen's to write under a string tenant id'`:
+ * `held()` queries through warden's own `TenantScope`, so a row stamped for a
+ * genuinely different tenant is invisible before `writable()` ever runs —
+ * asking for it throws on the missing array key rather than answering
+ * `Shape::Elsewhere`. The existing `'a grant that belongs to another tenant
+ * is shown, marked and left alone'` already covers a stub `writable()`
+ * returning unconditionally true.
  */
 pest()->extend(TestCase::class);
 
@@ -773,6 +785,20 @@ test('a role grant kept global by configuration is writable under a tenant', fun
 
         expect($state->narrowings[Post::class]['viewAny']->shape)->toBe(Shape::All)
             ->and(RoleGrants::changes($role, $catalog, []))->toHaveCount(1);
+    });
+});
+
+test("a row scoped as an integer is still this screen's to write under a string tenant id", function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    Warden::tenant()->onceTo(7, static function () use ($role): void {
+        Warden::allow($role)->to('viewAny', Post::class);
+    });
+
+    Warden::tenant()->onceTo('7', function () use ($role, $catalog): void {
+        expect(RoleGrants::of($role, $catalog)->narrowings[Post::class]['viewAny']->shape)
+            ->toBe(Shape::All);
     });
 });
 
