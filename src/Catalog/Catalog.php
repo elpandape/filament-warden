@@ -26,27 +26,17 @@ use Throwable;
  * panel may still be missing half its components, and `Plugin::boot()` never runs
  * at all outside an HTTP request.
  *
- * `for()` is memoised per panel id, the same shape `Conditions\Columns` already
- * uses for a model's schema: a single private `read()` fills a static array, and
- * `forget()` empties it. What earns the memo here is the same thing that earns it
- * there — every call reflects a Policy afresh (`Abilities::of()`, in turn
- * `Gate::getPolicyFor()`, which the container resolves with no cache of its own,
- * §6.9) and walks a panel's resources, pages and widgets besides, and none of
- * that changes while the process serving it keeps running.
+ * `for()` is memoised per panel id, the shape `Conditions\Columns` uses for a
+ * model's schema. Every call otherwise reflects a Policy afresh — the container
+ * resolves one with no cache of its own — and walks a panel's resources, pages
+ * and widgets besides, none of which changes while the process runs.
  *
- * Safe under Octane for the same reason `Columns` is: a panel's resources,
- * pages, widgets and Policies come from code loaded once at boot, and
- * `catalog.models` / `catalog.custom` come from config loaded once at boot —
- * neither is request state. What WOULD invalidate it, named rather than waved
- * away: an application that calls `config(['filament-warden.catalog...' => …])`
- * mid-worker — which nothing in this package does, and which is already an
- * Octane anti-pattern the framework itself warns against, config being meant to
- * answer the same way for the life of a worker — or code that edits a
- * `Panel`'s resource list on an object already handed to `for()`, which
- * `Panel`'s own fluent methods return `static` for and this package never holds
- * a reference to past the call. Neither claim was exercised on a live Octane
- * worker; both were checked by reading `PanelRegistry::register()` and
- * `Panel`'s fluent setters, not by running one.
+ * Safe under Octane for the same reason `Columns` is: panels, Policies and the
+ * `catalog.*` config all come from code loaded once at boot, none of it request
+ * state. Two things would invalidate it and neither happens here — setting
+ * `catalog.*` config mid-worker, or editing the resource list of a `Panel`
+ * object already handed to `for()`. Read from `PanelRegistry::register()` and
+ * `Panel`'s fluent setters rather than exercised on a live worker.
  */
 final class Catalog
 {
@@ -194,30 +184,14 @@ final class Catalog
     }
 
     /**
-     * NOT what protects a suite that rebuilds `Panel::make()->id('scratch')`
-     * with a different resource list for every test case — that guarantee is
-     * `read()`'s `===` check, not this method. Verified by emptying this
-     * method's body and running the whole suite sequentially, non-parallel,
-     * the worst case for static state bleeding across test functions in one
-     * process: all 805 tests, including both invalidation tests below, stayed
-     * green. The reason is Testbench, not this method: it boots a fresh
-     * application per test, so a panel provider's `panel()` method constructs
-     * a genuinely new `Panel` object every time, even under the same id — and
-     * the identity check rejects a stale entry the moment the object differs,
-     * with or without a call here.
+     * NOT what protects a suite rebuilding a panel under the same id per test:
+     * that is `read()`'s `===` check, and emptying this body leaves the whole
+     * suite green even run sequentially.
      *
-     * What this bounds instead: the memo holds at most one entry per distinct
-     * id it has ever been asked about (a later `Panel` sharing an id
-     * overwrites the earlier one's slot in `read()`, it does not add a
-     * second), the same way `Columns` bounds itself by distinct model
-     * classes. An application declares a small, fixed set of panel ids, so in
-     * production nothing needs to call this for that bound to matter. It
-     * exists for a long-running process that mints many short-lived ids
-     * regardless — and, called from `TestCase::setUp()`, as defence in depth
-     * against a fixture shape that does not exist today: a test reusing the
-     * very same `Panel` object across two cases with different config, which
-     * would defeat the identity check on purpose and is the one thing this
-     * would still notice.
+     * What it bounds is how many entries a long-running process minting
+     * short-lived ids can accumulate. And it is the one thing that would notice
+     * a test reusing the very same `Panel` object across two cases with
+     * different config, which defeats the identity check by construction.
      */
     public static function forget(): void
     {
@@ -238,21 +212,13 @@ final class Catalog
      * contract and no value-equality of its own to fall back on, so identity
      * is the only honest comparison available.
      *
-     * The assignment below also keeps a STRONG reference to `$panel` for as
-     * long as its id's slot survives. That is what makes the `===` check
-     * trustworthy rather than merely convenient: PHP can only recycle an
-     * object's identity — the handle a spl_object_id()/spl_object_hash() style
-     * comparison would rely on — once nothing holds it live, and this memo
-     * itself holds it live. A weak reference here would reopen exactly the
-     * handle-reuse hole `Holders`' own `once()` warning names elsewhere in
-     * this release; this memo does not have it because the reference is
-     * strong, not because objects happen not to collide.
+     * The slot keeps a STRONG reference to `$panel`, which is what makes `===`
+     * trustworthy: PHP recycles an object handle only once nothing holds it
+     * live, and this memo does. A weak one would reopen the handle-reuse hole
+     * `Holders` names.
      *
-     * A later `Panel` sharing an id replaces the earlier slot outright
-     * (`self::$memo[$id] = …` below is an assignment, never an append), so a
-     * third panel under one id does not accumulate rows from the second —
-     * growth is bounded by distinct ids, the same way `Columns` is bounded by
-     * distinct model classes.
+     * A later `Panel` under the same id replaces the slot rather than adding
+     * one, so growth is bounded by distinct ids.
      */
     private static function read(Panel $panel): self
     {

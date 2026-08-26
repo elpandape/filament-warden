@@ -70,29 +70,21 @@ final class RoleForm
      * The protected names this form refuses: every one but the record's own.
      *
      * `roles.protected` matches by name, so the list is a door that locks behind
-     * whoever walks onto it. A role holding one of those names can no longer be
-     * renamed, deleted, or have its grid touched — and nothing was asking on the
-     * way in: the name field is only disabled for a role that is ALREADY
-     * protected, and the create screen has no record to ask about at all. Both
-     * screens share this schema, and validation runs on the server, so one rule
-     * closes both doors. Going the other way — a protected role renaming its way
-     * OFF the list — is the opposite movement and is held in `EditRole`.
+     * whoever walks onto it — and nothing asked on the way IN, because the name
+     * field is only disabled for a role that is already protected and the create
+     * screen has no record to ask about. Both screens share this schema, so one
+     * rule closes both. Renaming a protected role OFF the list is the opposite
+     * movement and is held in `EditRole`.
      *
-     * The record's own name is exempt for the same reason `unique()` takes
-     * `ignoreRecord: true`. A protected role has this field disabled, and a
-     * disabled field is still VALIDATED — `isValidatedWhenNotDehydrated` defaults
-     * to true — so refusing its own name outright would stop it saving the title
-     * it is still allowed to change. When that name is the only one listed the
-     * result is `Rule::notIn([])`, which compiles to `not_in:` and parses through
-     * `str_getcsv('')` to a single null parameter: a rule with no opinion, not an
-     * error.
+     * The record's own name is exempt, as `unique(ignoreRecord: true)` is: a
+     * disabled field is still VALIDATED, so refusing it would stop the role
+     * saving the title it is still allowed to change. Left as the only entry it
+     * compiles to `Rule::notIn([])` — `not_in:` with one null parameter, a rule
+     * with no opinion rather than an error.
      *
-     * The sentence is this package's own, wired on `not_in` — Filament builds a
-     * `Rule::notIn()` object and Laravel snake-cases its basename to look the
-     * custom message up. It carries no placeholder on purpose: the list it would
-     * interpolate is unbounded, and with only the record's own name on it the
-     * rule compiles to `not_in:` with a single null parameter, passes, and the
-     * sentence is never rendered at all.
+     * The sentence is wired on `not_in`, the snake-cased basename of the rule
+     * object, and carries no placeholder: the list is unbounded, and in the
+     * empty case above the rule passes and the sentence never renders.
      *
      * @return list<string>
      */

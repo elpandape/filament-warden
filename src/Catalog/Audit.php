@@ -270,41 +270,29 @@ final readonly class Audit
     /**
      * A permission no grant points at, in two severities.
      *
-     * The predicate is `warden:clean`'s, unchanged: the screen, the console and
-     * warden still agree on which rows are unused, and still without the global
-     * scopes, because a row nobody uses belongs to no tenant. What is new is the
-     * split. Turning a grid cell off revokes the grant and leaves the row behind,
-     * because `revoke()` only touches `grants` — so a declared, unheld row is what
-     * normal use of the grid produces, on every save. It is reported and it is not
-     * red: a build that failed on it would fail forever, and the only way to stop
-     * it failing would be to stop using the grid.
+     * The predicate is `warden:clean`'s, without the global scopes, because a
+     * row nobody uses belongs to no tenant. The split is this class's: turning a
+     * grid cell off revokes the grant and leaves the row, so a DECLARED unheld
+     * row is what normal use produces on every save. Reported, never red — a
+     * build failing on it could only be fixed by not using the grid.
      *
-     * Red needs a row that can be PROVEN undeclared, and the proof needs a string
-     * name, no wildcard on either side, and no `entity_id`. Those are the three
-     * shapes `strays()` skips outright, and they are decided here the same way and
-     * for the same reasons — but they land informational rather than silent,
-     * because unlike a stray these rows really are unused and `warden:clean`
-     * really will delete them, so saying nothing would be a lie:
+     * Red needs a row that can be PROVEN undeclared, which needs a string name,
+     * no wildcard on either side and no `entity_id`. Those three land
+     * informational rather than silent — unlike a stray, these rows really are
+     * unused and `warden:clean` really will delete them:
      *
-     * - a row clamped to one record cannot be looked up at all: the catalogue
-     *   holds classes and never rows, so a class-keyed map would call every
-     *   record-pinned row undeclared;
-     * - the widest rule in the store is not a mistake, and `everything()` writes
-     *   `*` as the entity type on purpose;
-     * - a name that is not a string could match nothing anyway, and `label()`
-     *   already shows it as `?` — calling it undeclared would add a red build and
-     *   no action.
+     * - a row clamped to one record cannot be looked up: the catalogue holds
+     *   classes, so a class-keyed map would call every one of them undeclared;
+     * - `everything()` writes `*` as the entity type on purpose;
+     * - a name that is not a string matches nothing anyway.
      *
-     * `$declared` is the union of every panel's catalogue, built by `of()`. It has
-     * to be the union: the catalogue is per panel, so a name one panel declares
-     * would read as unknown against another and a two-panel installation would go
-     * red on rows both panels are happy with.
+     * `$declared` is the UNION of every panel's catalogue: it is per panel, so a
+     * name one declares would read as unknown against another and a two-panel
+     * installation would go red on rows both are happy with.
      *
-     * The correlated column is qualified by the model and not by the configured
-     * table name. The outer query already selects from `$model->getTable()`, so
-     * the table half agreed by accident; the key half is only called `id` until
-     * an installation swaps the model. Taking both off one instance is what
-     * makes them unable to disagree.
+     * The correlated column is qualified off the model, not off the configured
+     * table name: the table half agrees either way, and the key half is only
+     * called `id` until an installation swaps the model.
      *
      * @param  array<string, bool>  $declared
      * @return array{0: list<string>, 1: list<string>}

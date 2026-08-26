@@ -166,20 +166,12 @@ class PermissionResource extends Resource
      * the same reason: a grant in another tenant is a person relying on this row
      * whatever tenant is active while somebody edits it.
      *
-     * The question is asked last, so it is skipped wherever `mayEdit()` already
-     * says no — a derived row under `'loose'`, or anything under `false` or
-     * `'title'` — and it is also skipped under `'all'`, which short-circuits on
-     * its own clause before `Holders::anyFor()` runs. It is NOT skipped for the
-     * shipped default's most common row: a loose permission (no entity) under
-     * the shipped `'loose'` rule, where `mayEdit()` returns `true` and this
-     * clause reads `grants` every time it is asked. It used to be asked through
-     * `Holders::of($record)->isOrphaned()`, which built the full roles/accounts
-     * breakdown for a boolean nothing here reads; `anyFor()` answers the same
-     * question with one `EXISTS`, and — like `of()` — memoises it by the exact
-     * `$record` instance, so Filament re-evaluating this on every field it
-     * gates pays for the query once per record, not once per evaluation. See
-     * 'the lock's grant reads are capped …' in `PermissionResourceTest.php`
-     * for the measured count.
+     * Asked last, so both short-circuits skip it — `mayEdit()` saying no, and
+     * `'all'` saying yes on its own clause. It is NOT skipped for the shipped
+     * default's commonest row, a loose permission under `'loose'`, which reads
+     * `grants` every time it is asked. `anyFor()` is one `EXISTS` memoised by
+     * the `$record` instance, so Filament re-evaluating this on every field it
+     * gates pays once per record rather than once per evaluation.
      */
     public static function mayEditName(Model $record): bool
     {
