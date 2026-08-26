@@ -538,11 +538,9 @@ final class RoleGrants
      * `GrantingPermission`/`ForbiddingPermission` event per call, carrying
      * every name it resolved (`grant()`, `:134-171`, its insert loop
      * `:148-157`), not one event per name. An application listening for that
-     * event to veto a single cell now vetoes the whole group its cell
-     * happened to land in — that is observable behaviour a consumer can
-     * depend on, and it did not exist before this version. Pinned by
-     * `RoleGrantsTest.php`'s "a veto scoped to one name in the list kills
-     * every name grouped with it".
+     * event to veto a single cell vetoes the whole group its cell landed in.
+     * Pinned by "a veto scoped to one name in the list kills every name
+     * grouped with it".
      *
      * @param  list<Change>  $changes
      */

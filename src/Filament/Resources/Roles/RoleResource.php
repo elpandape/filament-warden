@@ -160,18 +160,12 @@ class RoleResource extends Resource
      * table, `Grants\Reach::restricted()` and `Grants\Assignment::assignments()`,
      * are of the second kind and keep their scopes on purpose.
      *
-     * `$assignedRoleIds`, when given, is `RolesTable`'s own doing (v1.5.0,
-     * "Que no cueste"): a role id set built ONCE per render from a single
-     * wide `distinct()` query — one row per role that anybody holds, never
-     * one per assignment row, and never restricted to the ids the listing
-     * paginated — so this method answers from an array lookup instead of
-     * paying its own `EXISTS` per row. `null` —
-     * every caller outside that one table, including `EditRole`'s and
-     * `ViewRole`'s own single-record delete buttons and every direct call in
-     * `RoleResourceTest.php` — keeps the exact query below, unchanged: this
-     * method's own freshness guarantee for a single record was never the
-     * thing that needed fixing, and batching it for callers who only ever
-     * ask about one record at a time would only add a branch nothing exercises.
+     * `$assignedRoleIds`, when given, is the listing's own set: one wide
+     * `distinct()` query per render, one row per role anybody holds, so this
+     * answers from an array lookup rather than an `EXISTS` per row. `null` —
+     * every caller outside that table, the single-record delete buttons
+     * included — keeps the query below, because batching for a caller that
+     * asks about one record would add a branch nothing exercises.
      *
      * The key is looked up as it comes, uncast: PHP normalises a canonical
      * numeric string array key back to `int`, so the set and this lookup
