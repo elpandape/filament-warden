@@ -20,8 +20,10 @@ use ElPandaPe\Warden\Facades\Warden;
 use Filament\Facades\Filament;
 use Filament\Panel;
 use Filament\Resources\Resource;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * `warden:clean` deletes every unused permission, declared or not, so both of the
@@ -412,4 +414,35 @@ test('a grant behind a stray morph alias is reported here, because drifted canno
     Context::resolve()->grantClass()::query()->withoutGlobalScopes()->update(['entity_type' => 'gone.away']);
 
     expect(Audit::run()->stranded)->toBe(['gone.away']);
+});
+
+test('a catalogue still in its pre-2.0 shape turns the build red before anybody writes to it', function (): void {
+    $table = new (Context::resolve()->permissionClass())()->getTable();
+
+    // The index goes first: sqlite rebuilds the table to drop a column and
+    // refuses while an index still names it.
+    Schema::table($table, static function (Blueprint $blueprint): void {
+        $blueprint->dropUnique('permissions_identity_unique');
+    });
+
+    Schema::table($table, static function (Blueprint $blueprint): void {
+        $blueprint->dropColumn('identity_key');
+    });
+
+    $audit = Audit::run();
+
+    expect($audit->unmigrated)->toBe([$table])
+        ->and($audit->isClean())->toBeFalse();
+
+    // The assertion that carries the guarantee is this one, never the count of
+    // terms in `isClean()`: swapping one bucket for another leaves that count
+    // exactly where it was.
+    /** @var Illuminate\Testing\PendingCommand $pending */
+    $pending = $this->artisan('filament-warden:audit', ['--check' => true]);
+
+    $pending->assertExitCode(1);
+});
+
+test('a migrated catalogue reports nothing at all about its own schema', function (): void {
+    expect(Audit::run()->unmigrated)->toBeEmpty();
 });

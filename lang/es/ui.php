@@ -223,6 +223,7 @@ return [
 
     'console' => [
         'audit' => [
+            'unmigrated' => 'El catálogo de warden sigue en su forma anterior a la 2.0: no tiene columna `identity_key`. Publica y ejecuta la migración de warden —`php artisan vendor:publish --tag=warden-migrations` y después `php artisan migrate`— o el primer permiso que alguien guarde fallará. Si la migración se para en duplicados, ejecuta antes `php artisan warden:clean --duplicates`.',
             'open' => 'Pantallas que no deciden quién entra. Filament contesta que sí por ellas, así que están abiertas a cualquiera que llegue al panel.',
             'unpoliced' => 'Recursos cuyo modelo no tiene Policy. Es el caso en el que Filament falla abierto.',
             'orphans' => 'Permisos a los que no apunta ninguna concesión. Nada los consulta. Quien los borra es `warden:clean`.',

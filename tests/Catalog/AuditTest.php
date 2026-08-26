@@ -20,7 +20,7 @@ use Filament\Panel;
  * every grid save that turns a cell off leaves behind, and a grant whose
  * authority is gone has no cure this package can write.
  *
- * Every parameter of the constructor has a default, so a tenth bucket added
+ * Every parameter of the constructor has a default, so a further bucket added
  * without touching this file is legal PHP and clean at `level: max`. Nothing
  * goes red on its own: what catches it is `'this file puts a finding in every
  * bucket the audit carries'`, which walks the constructor by reflection.
@@ -28,13 +28,16 @@ use Filament\Panel;
 pest()->extend(TestCase::class);
 
 /**
- * The buckets that reach the gate, in the order `isClean()` reads them.
+ * The buckets that reach the gate, in CONSTRUCTOR order — which is what
+ * `declaredBuckets()` walks and what the comparison below is against, not the
+ * order `isClean()` happens to read them in nor the order the command prints
+ * them in. The three agreed until `unmigrated` was appended.
  *
  * @return list<string>
  */
 function gateBuckets(): array
 {
-    return ['open', 'unpoliced', 'forgotten', 'strays', 'drifted', 'unwalkable', 'unkeyable'];
+    return ['open', 'unpoliced', 'forgotten', 'strays', 'drifted', 'unwalkable', 'unkeyable', 'unmigrated'];
 }
 
 /**
@@ -64,6 +67,7 @@ function auditWith(string $bucket): Audit
         unwalkable: $bucket === 'unwalkable' ? $finding : [],
         unkeyable: $bucket === 'unkeyable' ? $finding : [],
         stranded: $bucket === 'stranded' ? $finding : [],
+        unmigrated: $bucket === 'unmigrated' ? $finding : [],
     );
 }
 

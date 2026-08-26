@@ -35,6 +35,7 @@ final readonly class Audit
      * @param  list<string>  $unwalkable  models only a relation manager reaches
      * @param  list<string>  $unkeyable  catalogue names the grid cannot key, which throw when a role screen renders
      * @param  list<string>  $stranded  grants whose authority no longer exists
+     * @param  list<string>  $unmigrated  what warden's own schema is missing
      */
     public function __construct(
         public array $open = [],
@@ -46,6 +47,7 @@ final readonly class Audit
         public array $unwalkable = [],
         public array $unkeyable = [],
         public array $stranded = [],
+        public array $unmigrated = [],
     ) {}
 
     public static function run(): self
@@ -111,6 +113,7 @@ final readonly class Audit
             unwalkable: array_values(array_unique($unwalkable)),
             unkeyable: array_values(array_unique($unkeyable)),
             stranded: self::stranded(),
+            unmigrated: self::unmigrated(),
         );
     }
 
@@ -131,6 +134,7 @@ final readonly class Audit
     public function isClean(): bool
     {
         return $this->open === []
+            && $this->unmigrated === []
             && $this->unpoliced === []
             && $this->forgotten === []
             && $this->strays === []
@@ -149,6 +153,46 @@ final readonly class Audit
     public function isSilent(): bool
     {
         return $this->isClean() && $this->orphans === [] && $this->stranded === [];
+    }
+
+    /**
+     * Whether warden's catalogue is still in its pre-2.0 shape.
+     *
+     * Warden 2.0 added `permissions.identity_key` and a unique index over
+     * `(name, identity_key)`, and stamps that key on every save. An installation
+     * that took the composer update without publishing and running the migration
+     * gets `no column named identity_key` the first time anybody writes a
+     * permission — from the grid, from the permission screen, from a seeder. The
+     * dependency resolves cleanly and the application breaks on first use.
+     *
+     * Red, unlike the other two additions of recent versions, and for a reason
+     * that is about WHEN rather than about severity: a bucket that lands in a
+     * later release arrives after everybody has already hit the error. Here it
+     * can turn a deploy pipeline red before the deploy.
+     *
+     * Permanently empty once migrated, which is correct and is said in the
+     * README, because an empty bucket looks like dead code to whoever reads this
+     * class next.
+     *
+     * The index is not asked about on sqlite through `hasIndex()` alone: the
+     * column is what every write touches, and a catalogue carrying the column
+     * without the index is a hand-built database rather than a missed migration.
+     *
+     * @return list<string>
+     */
+    private static function unmigrated(): array
+    {
+        $context = Context::resolve();
+        $permissions = new ($context->permissionClass());
+
+        $schema = $permissions->getConnection()->getSchemaBuilder();
+        $table = $permissions->getTable();
+
+        if (! $schema->hasTable($table) || $schema->hasColumn($table, 'identity_key')) {
+            return [];
+        }
+
+        return [$table];
     }
 
     /**

@@ -34,6 +34,7 @@ final class AuditCommand extends Command
     {
         $audit = Audit::run();
 
+        $this->report(__('filament-warden::ui.console.audit.unmigrated'), $audit->unmigrated);
         $this->report(__('filament-warden::ui.console.audit.open'), $audit->open);
         $this->report(__('filament-warden::ui.console.audit.unpoliced'), $audit->unpoliced);
         $this->report(__('filament-warden::ui.console.audit.orphans'), $audit->orphans, red: false);

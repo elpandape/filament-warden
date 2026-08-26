@@ -223,6 +223,7 @@ return [
 
     'console' => [
         'audit' => [
+            'unmigrated' => 'Warden\'s catalogue is still in its pre-2.0 shape: no `identity_key` column. Publish and run warden\'s migration — `php artisan vendor:publish --tag=warden-migrations` then `php artisan migrate` — or the first permission anybody saves fails. If the migration stops on duplicates, run `php artisan warden:clean --duplicates` first.',
             'open' => 'Screens that do not decide who gets in. Filament answers true for these, so they are open to anybody who reaches the panel.',
             'unpoliced' => 'Resources whose model has no policy. This is the case Filament fails open on.',
             'orphans' => 'Permissions no grant points at. Nothing consults them. `warden:clean` is what removes them.',
