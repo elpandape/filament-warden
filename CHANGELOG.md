@@ -8,6 +8,123 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.0.0] - 2026-08-26
+
+Warden 2.0. The dependency moved and this package moves with it — but the version number is not
+about a signature: it is about a database. Warden 2.0 adds `permissions.identity_key` and a unique
+index over `(name, identity_key)`, and stamps that key on every save, so an installation whose
+catalogue is still in the 1.x shape gets `no column named identity_key` the first time anything
+writes a permission. Composer resolves without complaint and the application breaks on first use.
+
+**Before you upgrade**, publish and run warden's migration. `php artisan warden:clean --duplicates`
+first if the migration stops on duplicates. The README has the sequence, and
+`filament-warden:audit --check` now reports an unmigrated catalogue as its own finding.
+
+### Requirements
+
+- **`elpandape/warden` moves from `^1.0` to `^2.0`.** This package skipped warden's `1.1.0`, `1.2.0`
+  and `1.3.0` on the way, and two of the changes below come from those rather than from 2.0.
+
+### Fixed
+
+- **Switching a narrowed cell off did nothing, and said it had worked.** Warden's
+  `findPermissions()` now resolves a name against the plain row only — `whereNull('options')` — so a
+  name no longer reaches a twin. Three symptoms, all measured: clearing a narrowed cell deleted no
+  grant and left the access granted; widening one left the old twin's grant standing beside the new
+  plain row, two of the same polarity, which the grid can only draw as `Shape::Tangled` from then on;
+  and a granted → forbidden → granted cycle left the cell forbidden for good. A twin is reached by
+  its **model**, which is what warden's own comment says, so a save now carries the twin models the
+  role holds alongside the names. Read from the store rather than from the diff, so it takes away
+  what is there rather than what the screen believed was there.
+
+- **A condition on a permission with no model behind it is not inert, and the screen said it was.**
+  Since warden `1.3.0`, `passesConstraints()` returns the pass flag rather than `false` when there
+  is no instance: as a grant such a row never grants, and **as a prohibition it always forbids**.
+  `ui.conditions.no_model` promised it "would never grant anything" — true and dangerously
+  incomplete on a security screen. Dated by reading warden 1.0.1 through 1.3.0 one at a time.
+
+- **A catalogue collision came back as a 500.** Two paths reach warden's new unique index without
+  `PermissionForm::exists()` seeing them, both reproduced through the real screens: building the
+  same twin twice on the create screen, and moving a twin onto an entity that already holds the
+  plain row of the same name — choosing the entity clears the conditions, so what gets saved is no
+  longer a twin, while the rule had already excused it for being one. Both now report on the `name`
+  field.
+
+- **A record-pinned grant could be swept up by a save.** New guard, and it needed its own test: the
+  first version of it was a claim with nothing behind it, and removing it left all 918 tests green.
+
+### Changed
+
+- **The list of titles this package recognises grows to four shapes, which is why this is a major.**
+  `PermissionName::generated()` delegated one of its entries to warden's generator **live**, so
+  warden 2.0's new `Str::snake()` did not add a shape — it **replaced** one. `ViewAny posts` and
+  `Page:App\Filament\Pages\Settings`, titles warden itself wrote, stopped being recognised as
+  generated, and rows an upgraded installation already carries stopped being rewritable. Warden 1.x's
+  generator is now transcribed and frozen in this package, verified against the published `1.3.0`
+  archive rather than remembered. Its own docblock had said a fourth shape would be a major since
+  `1.0.0`.
+
+- **Warden titles differently, and does not retitle what is already there.** `viewAny` on `Post` is
+  `View any posts` now, where 1.x wrote `ViewAny posts`. An upgraded catalogue shows mixed wording
+  until somebody renames each row, and warden ships no command for it. This package still recognises
+  both.
+
+- **The stranded bucket's sentence, in all three places it is written.** Warden 2.0 sweeps some of
+  those grants — `CacheInvalidations::markCascade()` deletes the grants of a deleted role, but only
+  when the model's class is exactly the configured role class, and only through `eloquent.deleted`.
+  An account, a role subclass and anything deleted by query builder or raw SQL are still left behind,
+  and `warden:clean --stranded` is opt-in. The bucket keeps its job, narrower and true.
+
+- **The suite raises warden's schema through `Testing\Schema::up()`**, which warden has shipped
+  since `1.1.0`, instead of resolving a vendor path and requiring the stub by hand.
+  `upgradeToV2()` is deliberately not called: warden publishes its creation stub already in the 2.0
+  shape, so this suite has no 1.x database to upgrade.
+
+### Added
+
+- **A ninth cause: `ConditionsNotMet`.** Warden 2.0 answers it with the rejected row attached, where
+  before the cause was indistinguishable from "there is no such grant". `Cause::of()` is a `from()`,
+  so the missing case was a `ValueError` rather than a gap — five tests died on it. New keys
+  `ui.explain.causes.conditions-not-met` in both languages, plus a map-against-enum test for causes
+  of the same mould `Shape` and `Stance` already had. The package keeps its own narrowed line:
+  warden's wording names a record, and a role grid asks about a class.
+
+- **`filament-warden:audit` reports an unmigrated catalogue, and `--check` exits 1 for it.** Red, and
+  in this release rather than a later one for a reason about *when*: a bucket that ships afterwards
+  arrives after everybody has already hit the error. It stays permanently empty once migrated, which
+  is correct.
+
+- **`ui.resources.permissions.fields.collides`**, the sentence the new backstop reports.
+
+- **A testing section in the README**, which is only writable now: warden 2.0's fake can name an
+  authority, ownership, a scope and conditions, and `Warden::fake()` rebinds the very
+  `Contracts\Resolver` that `Access` and every policy here resolve. Two tests hold it up — until
+  today nothing in this suite had ever touched the fake.
+
+- **A test pinning warden's new fail-closed answer** for ownership through a column the table does
+  not have. Warden `1.1.0` put a `hasColumn()` in front of it, so that half no longer throws; nothing
+  pinned the new behaviour.
+
+### Not included
+
+- **The eight `Warden::refresh()` calls stay.** Warden 2.0 invalidates model writes itself, per
+  scope, where ours is a global flush — so six of them are now redundant. Removing a defence needs
+  its own measurement and its own deliberate breakage, not a line inside an upgrade diff. What this
+  release does do is correct the docblocks that justified them with measurements that now invert.
+
+- **`PermissionForm::exists()` is not aligned with the unique index.** It compares columns and skips
+  rows carrying conditions, so it is both stricter than the index under a tenant and blind to a
+  duplicate twin. Doing it properly needs the value `options` is *about* to take, which the builder's
+  dehydration and `mutateFormDataBeforeSave()` settle after that rule has run. The backstop above
+  covers every path meanwhile.
+
+- **`ConstraintSerializer::sameRule()`, `Ownership::of()`'s ordering, and `Assignment::take()`'s
+  inference.** All three are things warden can now do for us; all three change behaviour rather than
+  adapt to it.
+
+- **Unlocking `Shape::Tangled`.** It was locked for want of precise revocation, which this release
+  restores — but the unlock deserves its own measurement and its own release.
+
 ## [1.10.0] - 2026-08-24
 
 The grid's shape, in three places it did not fit: a side column that took width from the matrix at
