@@ -24,6 +24,7 @@
 
 - [✨ Features](#-features)
 - [📋 Requirements](#-requirements)
+- [⬆️ Upgrading to 2.0](#upgrading-to-20-from-1x)
 - [🚀 Installation](#-installation)
 - [⚡ Quick Start](#-quick-start)
 - [🔌 Setup](#-setup)
@@ -34,6 +35,7 @@
     - [Assign Roles to Users](#assign-roles-to-users)
     - [Query Permissions Manually](#query-permissions-manually)
     - [Permission Names](#permission-names)
+- [🧪 Testing Your Authorization](#testing-your-authorization)
 - [🖥️ The Screens](#-the-screens)
     - [The Permission Grid](#the-permission-grid)
     - [Permission Inspector](#permission-inspector)
@@ -79,7 +81,7 @@
 | PHP | `^8.4` |
 | Laravel | `^13.0` |
 | Filament | `^5.7` |
-| elpandape/warden | `^1.0` |
+| elpandape/warden | `^2.0` |
 
 ---
 
@@ -107,6 +109,29 @@ php artisan filament:assets
 ```
 
 > 💡 **Tip:** Add `php artisan filament:assets` to Composer's `post-autoload-dump` so it runs on every deploy.
+
+### Upgrading to 2.0 from 1.x
+
+`filament-warden 2.x` requires `elpandape/warden ^2.0`, and that is the whole reason this release is a major. **Run warden's migration before anybody uses the panel.**
+
+Warden 2.0 adds an `identity_key` column to `permissions` and a unique index over `(name, identity_key)`, and it stamps that key on every save. A database still in the 1.x shape gets `no column named identity_key` the first time anything writes a permission — the grid, the permission screen, a seeder. Composer resolves without complaint and the application breaks on first use.
+
+```bash
+# 1. Publish and run warden's migration
+php artisan vendor:publish --tag=warden-migrations
+php artisan migrate
+
+# 2. If the migration stops on duplicates, clear them and run it again
+php artisan warden:clean --duplicates
+php artisan migrate
+
+# 3. Re-copy the assets, as with any upgrade
+php artisan filament:assets
+```
+
+`php artisan filament-warden:audit --check` reports an unmigrated catalogue as its own finding and exits 1, so a deploy pipeline goes red before the deploy rather than after it. That bucket stays permanently empty afterwards, which is what it is supposed to do.
+
+**Existing titles are not rewritten.** Warden 2.0 changed how it generates a title — `viewAny` on `Post` is `View any posts` now, where 1.x wrote `ViewAny posts` — and neither warden nor this package retitles rows already in the catalogue. An upgraded installation shows mixed wording until somebody renames each row, and warden ships no command for it. What this package does guarantee is that it still RECOGNISES the old wording: a title either generator has ever written is still treated as nobody's writing, so renaming a permission still regenerates it.
 
 ### Optional publishes
 
@@ -389,6 +414,33 @@ Access::granted($otherUser, 'view', $invoice);
 
 That last row is why `Access` exists. Warden ships that switch so an application can register its own gate callback, and the day one does, every `$user->can('export-reports')` starts answering `false` with no error to read — a loose permission has no policy to answer for it, so if warden's hook is gone there is nobody left. `Access` goes straight to the resolver, and picks the account up through `Filament::auth()`, which is not necessarily the default guard.
 
+### Testing Your Authorization
+
+`Warden::fake()` replaces the `Contracts\Resolver` binding, and that is the one thing everything in this package asks: `Access` resolves it out of the container, and every policy it ships takes it by constructor. So scripting the fake scripts this package's answers too, with no tables and no cache.
+
+```php
+use ElPandaPe\Warden\Facades\Warden;
+
+it('lets an editor update their own posts and nobody else touch them', function () {
+    $fake = Warden::fake();
+
+    $fake->allow('update', Post::class)->for($editor);
+
+    expect(Filament\get_authorization_response('update', $post)->allowed())->toBeTrue();
+
+    $fake->assertChecked('update');
+});
+```
+
+Four things to know before you write one:
+
+- **The fake abstains, and abstention is a denial here.** `WardenPolicy::allows()` folds it into `false`, so a check you did not script is a hard deny, not a fall-through. Script the negative case as an assertion on `false`, not as an absence.
+- **Assert with `Filament\get_authorization_response()`, never `Gate::allows()`.** They agree in every case but one, and that one is the case a security test exists for: with no policy registered and strict authorization off, `get_authorization_response()` returns `allow()` without looking at anything. The assertion that carries the guarantee is the negative one.
+- **The wildcard is expressible.** `$fake->allow('*', '*')` answers a class check, a loose name and an instance alike — which is how you script the account the roles screen hands everything to.
+- **It decides authorization; it does not populate the grid.** The permission grid reads the store, so a screen test still needs rows. Use the fluent API for those and keep the fake for policy behaviour.
+
+Scriptable narrowings: `->for($authority)`, `->owned()`, `->inScope($tenant)`, `->where($column, $operator, $value)` and `->whereColumn(...)`. Assertions: `assertChecked`, `assertNotChecked`, `assertNothingChecked`, `assertGranted`, `assertForbidden`.
+
 ### Permission Names
 
 ```php
@@ -437,12 +489,12 @@ The roles screen shows a grid where:
 > people can only ever have moved one the same way — and the field sends its own notice, because that
 > form is yours and there is no notification of ours to replace.
 >
-> Two things this still does not cover. If you embed `PermissionGrid` on a page of your own rather
-> than using the roles screen, the *protection* is in the field and works, but the *report* is not —
-> `EditRole` is what turns it into a notification, so on your page a refused cell is simply not
-> written and the save says nothing about it. And `RoleAssignment` keeps its copy beside its own
-> state, so a schema with **no state path at all** gives it nowhere to keep one: that page saves the
-> way every page did before `v1.7.0`, with no notice either way.
+> An embedded `PermissionGrid` is covered too, and has been since `v1.9.0`: the field sends its own
+> notification through `afterCommit()` and re-fills its own state from the store, so a page this
+> package does not own says the same thing the roles screen does. What is still not covered is a
+> schema with **no state path at all** — `RoleAssignment` keeps its baseline beside its own state and
+> has nowhere to put one there, so such a page saves the way every page did before `v1.7.0`, with no
+> notice either way.
 
 > ⚡ **From `v1.5.0` a save writes in groups.** Cells that share an entity and a stance and have
 > nothing left to narrow go out in one warden call instead of one per cell. If you listen for
