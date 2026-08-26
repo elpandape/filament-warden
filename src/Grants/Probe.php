@@ -20,8 +20,10 @@ use Illuminate\Database\Eloquent\Model;
  * a real row — rather than about a class with nothing in front of it.
  *
  * Which is also why it is worth having: a narrowed rule can never match a class
- * check, so the grid can only ever say "nothing matched" about one. Here it can
- * be proved either way.
+ * check. Warden 2.0 at least NAMES that — `ConditionsNotMet` carries the row it
+ * consulted and rejected, where before the cause was indistinguishable from
+ * "there is no such grant" — but naming it is not the same as answering it. On
+ * a class check the conditions were never tested; here they are.
  */
 final readonly class Probe
 {

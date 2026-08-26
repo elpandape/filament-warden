@@ -68,8 +68,13 @@ final readonly class Reach
             // just above.
             $matched = $model::query()->whereCan($authority, $name)->count();
         } catch (Throwable $throwable) {
-            // `only_owned` on a model whose ownership attribute is not a column
-            // does not fail closed — it emits invalid SQL and throws at execution.
+            // A stored condition naming a column the table does not have is
+            // compiled into the query, and the database refuses the statement.
+            //
+            // Ownership used to land here too and no longer does: warden's
+            // `1.1.0` put a `hasColumn()` in front of it in
+            // `Checks/Queries/WhereCan.php`, so that half now fails closed and
+            // answers no rows instead of throwing.
             return new self(false, reason: self::line('failed', ['message' => $throwable->getMessage()]));
         }
 

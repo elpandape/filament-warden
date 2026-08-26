@@ -317,19 +317,27 @@ final readonly class Audit
     /**
      * Grants whose authority is gone.
      *
-     * Nothing cascades these: warden's schema puts foreign keys on exactly two
-     * columns — `assigned_roles.role_id` and `grants.permission_id` — and both
-     * polymorphic authority pairs are plain columns with an index and no
-     * constraint. So deleting a role takes its assignments and leaves its own
-     * grants behind, and no listener picks them up: `IsRole::bootIsRole()`
-     * dispatches `RoleDeleted` and warden ships nothing that listens for it.
-     * `warden:clean` cannot help either — it prunes permissions NO grant points
-     * at, so a stranded row actually protects its permission from the pruner.
+     * The database still cascades nothing: warden's schema puts foreign keys on
+     * exactly two columns — `assigned_roles.role_id` and `grants.permission_id`
+     * — and both polymorphic authority pairs are plain columns with an index
+     * and no constraint.
      *
-     * Informational, never red. The only cure is upstream, in the schema or in
-     * a listener warden would have to ship; turning somebody's build red over a
-     * row this package can neither write nor delete is the noisy gate this
-     * command already demoted a bucket for once.
+     * What warden 2.0 added is a listener, and it is narrower than it sounds.
+     * `CacheInvalidations::markCascade()` calls `sweepStrandedGrants()`, which
+     * returns immediately unless the deleted model's class is EXACTLY
+     * `Context::roleClass()`: an account, any other authority, and a role
+     * SUBCLASS are all left behind. And it hangs off `eloquent.deleted`, so a
+     * `delete()` on a query builder, raw SQL and a truncate never reach it.
+     * `warden:clean --stranded` sweeps the rest, but it is opt-in and it is a
+     * command somebody has to run.
+     *
+     * So this bucket still has work, and the work is what is left over: the
+     * authority that went away without a model event, or that was never a role
+     * to begin with.
+     *
+     * Informational, never red — a row this package can neither write nor
+     * delete is the noisy gate this command already demoted a bucket for once,
+     * and the cure that exists now is a command, not a code change here.
      *
      * Read across every tenant, for the same reason `Holders` does: an
      * authority is gone or it is not, and that question has no scope.

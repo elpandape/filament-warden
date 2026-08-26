@@ -18,11 +18,13 @@ use Illuminate\Database\Eloquent\Model;
  *   - It tells "explicitly forbidden" apart from "warden abstains and your
  *     policies decide". `allowed()` is the only helper warden ships and it
  *     conflates them, which is exactly the distinction this panel exists for.
- *   - It says a rule is narrowed. `explain()` skips a permission whose
- *     conditions do not pass and reports "nothing matched" — and on a role grid,
- *     where cells are asked about a class with no record in front of them, a
- *     narrowed rule can never match. Left alone it would read as if the rule were
- *     not there.
+ *   - It says a rule is narrowed, and says WHY it could not have matched.
+ *     Warden 2.0 answers `ConditionsNotMet` with the rejected row attached, so
+ *     it no longer reads as "there is no such grant" — but its own sentence
+ *     names a record ("did not hold for this record"), and on a role grid there
+ *     is none: a cell is asked about a class, and a narrowed rule fails closed
+ *     before any condition is evaluated. That distinction is this package's to
+ *     draw.
  *   - It says when the screen and the store disagree, because the answer is
  *     always about what is stored and the person may have cycled the cell.
  */
@@ -62,10 +64,13 @@ final readonly class Explanation
             default => Stance::Abstain,
         };
 
-        // Both are null in different causes, and not symmetrically: the permission
-        // is null in both abstaining causes, the role in six of the eight. And a
-        // role only carries name, title and scope — reading anything else off it
-        // throws under strict mode.
+        // Both are null in different causes, and not symmetrically. The role is
+        // null in seven of the nine — only the two via-a-role causes carry one.
+        // The permission is null in `NoMatchingGrant` and `NotApplicable`, and
+        // since warden 2.0 it is NOT null in the third abstaining cause:
+        // `ConditionsNotMet` hands back the very row whose conditions rejected
+        // the check. And a role only carries name, title and scope — reading
+        // anything else off it throws under strict mode.
         $permission = self::label($why->permission);
         $roleName = self::label($why->role);
 
@@ -137,7 +142,7 @@ final readonly class Explanation
 
     /**
      * The title if warden generated one, the name if it did not, and nothing at
-     * all when there is no row — which is both abstaining causes.
+     * all when there is no row.
      */
     private static function label(?Model $model): ?string
     {

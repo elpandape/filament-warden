@@ -230,7 +230,7 @@ return [
             'drifted' => 'Entity types nothing declares at all. A whole morph alias stopped matching: the map moved, and every row of it went quiet.',
             'unkeyable' => 'Catalogue names carrying a dot. Livewire splits a state path on dots, so these cannot be a cell: a role screen throws the moment it draws one. Rename the permission.',
             'unwalkable' => 'Models only a relation manager reaches, which cannot be walked without running the relationship.',
-            'stranded' => 'Grants whose authority no longer exists. Nothing cascades these: deleting a role leaves its own grants behind, and neither warden nor `warden:clean` removes them.',
+            'stranded' => 'Grants whose authority no longer exists. No database cascade reaches them. Warden sweeps a deleted ROLE through a model event; an account, a role subclass, and anything deleted by raw SQL are left behind. Run `warden:clean --stranded` to remove them.',
             'clean' => 'Nothing to report.',
         ],
         'catalog' => [
