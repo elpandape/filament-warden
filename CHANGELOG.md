@@ -8,6 +8,67 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.0.2] - 2026-08-26
+
+Installing `2.0.1` on a real application and following its own upgrade note found three things, and
+the first one means the upgrade instruction in `2.0.0` did not work. If you have not upgraded yet,
+this is the release to read. If you have, and your `migrate` failed, the fix is one word.
+
+### Fixed
+
+- **The upgrade note named the wrong publish tag, so following it broke the migration it was there
+  to run.** Warden registers its CREATE migration under `warden-migrations` and its UPGRADE
+  migration under `warden-migrations-v2`. This package's upgrade note, and the audit's own pre-flight
+  line in both languages, all named the first. `create_warden_tables` carries no `hasTable` guard on
+  its `Schema::create()` calls, so on a database that already has warden's tables — every database
+  the note is written for — `php artisan migrate` stops on the first table and `identity_key` never
+  arrives. The note's own step 2, `warden:clean --duplicates`, does not help: the problem is not
+  duplicates. Measured on a consumer running the published `2.0.1`. The tag is now read off warden's
+  provider by a test rather than typed a second time, so the day warden renames it, the three places
+  that print it go red together.
+
+- **`filament-warden:audit` told people to do something that cannot clear the finding it was
+  attached to.** The *models only a relation manager reaches* line said "declare it in
+  `catalog.models`", while the condition behind it asks whether the relation manager declares
+  `$relatedResource`. They are separate mechanisms that never meet: `catalog.models` injects a
+  model's abilities into the catalogue directly and never touches `$relatedResource`, and the
+  finding never reads `catalog.models`. Measured on a real installation with the model already
+  declared and the finding still firing. The line now says what actually stops the walk, and says
+  that `catalog.models` remains the right fix for the underlying gap without clearing the line.
+
+- **Wiring this package's own relation manager, exactly as the README says to, turned
+  `filament-warden:audit --check` red for good.** `unwalkable` was one of the terms of `isClean()`,
+  and `RolesRelationManager` declares no `$relatedResource` **on purpose**: pointing it at
+  `RoleResource` makes `makeTable()` run that resource's `configureTable()`, which caches its `edit`
+  and `delete` into `flatActions` where `recordActions()` does not reach them — that was tried, and
+  reverted in `1.4.0` for exactly this reason. So the finding was uncloseable by design for the one
+  integration the README documents, and had been since `1.4.0` without anybody noticing. It moves to
+  the informational set, beside *permissions no grant points at* and *grants whose authority is
+  gone*: still reported, still printed, never red. It is the only one of the buckets with that
+  shape — every other term names something an operator can go and fix.
+
+### Changed
+
+- **Two sentences change under keys that are frozen, which is allowed and worth saying.** The
+  pre-flight line and the *models only a relation manager reaches* heading both change wording in
+  `en` and `es`. `FrozenTest` pins key paths, not strings. An installation that PUBLISHED its
+  translations keeps its own copy — `FileLoader::loadNamespaceOverrides()` merges recursively — so
+  it will go on printing the wrong publish tag until it updates that copy. If you published
+  translations and are about to upgrade, read the note here rather than the one your panel prints.
+
+### Not included
+
+- **`RolesRelationManager` still declares no `$relatedResource`, and will not.** The two leaks it
+  closes were measured and are pinned by tests. What changed is that the audit no longer punishes
+  the consumer for it.
+- **The audit still cannot resolve a relation manager's model.** Reaching it means instantiating the
+  owner and running the relationship, which can hit an abstract class, a `booted()` that throws, or
+  a relation that reads request state — and a `MorphTo` answers with the OWNER's model without
+  failing at all. It is named rather than resolved, which is why the finding exists; what this
+  release fixes is what the finding SAYS and what it COSTS, not what it can see.
+- **No behaviour of the grid, the screens or the guard changed.** The only executable change outside
+  the audit is which conjunction one array is read in.
+
 ## [2.0.1] - 2026-08-26
 
 Six guarantees this package makes had been carried as open for between three and nine releases,
