@@ -372,7 +372,7 @@ about below.
 
 #### From a Field
 
-For a small installation. Frozen since `v0.7.0`, and still the right answer there:
+For a small installation, and still the right answer there:
 
 ```php
 use ElPandaPe\FilamentWarden\Filament\Forms\RoleAssignment;
@@ -382,8 +382,8 @@ RoleAssignment::make('roles')->columnSpanFull(),
 
 > 🚫 **Don't use `CheckboxList::make('roles')->relationship(...)`**. That saves through `sync()`, and `sync()`, `attach()` and `detach()` all **skip** warden's cache bump — only warden's own actions make it. A role handed out that way goes on answering the old way, silently and with no expiry. `RoleAssignment` writes through warden's fluent API instead.
 
-> 🔒 **A role assigned outside the tenant you are viewing from cannot be handed back here, from
-> `v1.3.0`.** Warden's own tenant scope reads a role as held from *global or this tenant*, so a
+> 🔒 **A role assigned outside the tenant you are viewing from cannot be handed back here.**
+> Warden's own tenant scope reads a role as held from *global or this tenant*, so a
 > globally assigned role shows as ticked from inside any tenant — but a retract targets one exact
 > scope. Unticking that box now locks instead of quietly deleting nothing (and reporting success)
 > or, worse, deleting a real tenant-scoped row while the global one keeps it looking held. Switch
@@ -468,35 +468,32 @@ The roles screen shows a grid where:
 - ⌨️ **Arrow keys** move between tabs; every cell and tab carries a name a screen reader can
   announce on its own, not one shared word for all seven states.
 
-> 🚫 **A grid that cannot be operated says so.** From `v1.1.0`, a protected role's grid, a field
+> 🚫 **A grid that cannot be operated says so.** A protected role's grid, a field
 > your application called `->disabled()` on, and the read-only screen (`ViewRole`) all print one
 > sentence above the table — "This grid cannot be changed from here: its cells select, they do not
 > cycle." — instead of silently accepting clicks that never save or, on the read-only screen,
 > saying nothing at all. A protected role keeps its own stronger notice naming `roles.protected`;
 > the other two share this one, because neither route lets the package know *why* it cannot write.
 
-> 🤝 **From `v1.6.0` two people editing the same role no longer undo each other.** A save used to
-> compare the store against what your browser held and write every difference — so a cell somebody
-> else had changed while your page sat open was quietly changed back. It now compares three things,
-> including what your screen was showing when it opened. A cell you did not touch is left as they
-> set it. A cell you both moved to different values is refused and named, rather than resolved in
-> silence in favour of whoever saved last. The grid re-reads the store afterwards, so your next save
-> starts from what is actually there.
+> 🤝 **Two people editing the same role do not undo each other.** A save compares three things —
+> the store, what your browser holds, and what your screen was showing when it opened — rather than
+> two. A cell you did not touch is left as they set it. A cell you both moved to different values is
+> refused and named, rather than resolved in silence in favour of whoever saved last. The grid
+> re-reads the store afterwards, so your next save starts from what is actually there.
 >
-> **From `v1.7.0` the same holds when you hand roles out from an account.** `RoleAssignment` keeps
+> **The same holds when you hand roles out from an account.** `RoleAssignment` keeps
 > its own copy of what the store said, in a namespaced key beside its list, and leaves alone any role
 > you did not tick or untick. Nothing is ever *refused* there — a role is held or it is not, so two
 > people can only ever have moved one the same way — and the field sends its own notice, because that
 > form is yours and there is no notification of ours to replace.
 >
-> An embedded `PermissionGrid` is covered too, and has been since `v1.9.0`: the field sends its own
-> notification through `afterCommit()` and re-fills its own state from the store, so a page this
-> package does not own says the same thing the roles screen does. What is still not covered is a
-> schema with **no state path at all** — `RoleAssignment` keeps its baseline beside its own state and
-> has nowhere to put one there, so such a page saves the way every page did before `v1.7.0`, with no
-> notice either way.
+> An embedded `PermissionGrid` is covered too: the field sends its own notification through
+> `afterCommit()` and re-fills its own state from the store, so a page this package does not own says
+> the same thing the roles screen does. What is **not** covered is a schema with no state path at
+> all — `RoleAssignment` keeps its baseline beside its own state and has nowhere to put one there, so
+> such a page saves with no notice either way.
 
-> ⚡ **From `v1.5.0` a save writes in groups.** Cells that share an entity and a stance and have
+> ⚡ **A save writes in groups.** Cells that share an entity and a stance and have
 > nothing left to narrow go out in one warden call instead of one per cell. If you listen for
 > `GrantingPermission` or `ForbiddingPermission`, that is **one event per group carrying every name
 > in it**, and a listener that vetoes one now vetoes the whole group. Cells narrowed to "only what
@@ -504,7 +501,7 @@ The roles screen shows a grid where:
 > in a chain at the same twin, so two cells asking for two different conditions can never share a
 > call.
 
-> 📱 **From `v1.10.0` the grid folds when the columns do not fit.** Below `55.9375rem` the table is
+> 📱 **The grid folds when the columns do not fit.** Below `55.9375rem` the table is
 > replaced by one card per entity, holding one disclosure per scope — read, write, withdraw,
 > irreversible — and one row per action inside it. It is not a second grid: every cell is the same
 > button, bound to the same state, so whatever one reading says the other says too. One thing does
@@ -539,17 +536,17 @@ Example conditions:
 name = editor OR (scope >= 2 AND title = account.name)
 ```
 
-> 🔒 **A locked cell lights none of the three.** From `v1.1.0`, a cell the grid cannot let you set
-> — more than one rule for the same action, a condition it cannot parse, or a grant that belongs to
-> another tenant — draws its actual reach and highlights none of "Every row", "Only owned" or "With
-> conditions", instead of defaulting to "Every row" as it did before. The inspector names which of
-> the three it is and, when there is a stored rule, shows it read-only underneath the note. A row
+> 🔒 **A locked cell lights none of the three.** A cell the grid cannot let you set — more than one
+> rule for the same action, a condition it cannot parse, or a grant that belongs to another tenant —
+> draws its actual reach and highlights none of "Every row", "Only owned" or "With conditions". The
+> inspector names which of the three it is and, when there is a stored rule, shows it read-only
+> underneath the note. A row
 > that is both "only what it owns" **and** carries conditions is drawn the same way: read-only, with
 > its stored rule shown, never silently narrowed to plain ownership.
 
 > ⚠️ **A grant pinned to a single record is not a cell.** Warden filters a check made against a class down to `entity_id is null`, so a rule with a record key on it answers nothing the grid asks — and it is not a wider rule either. The grid lists those rules above the tabs, read-only: this screen shows them, and cannot remove them.
 
-> 🔒 **A rule the permission form cannot write back exactly locks there, from `v1.3.0`.** A value
+> 🔒 **A rule the permission form cannot write back exactly locks there.** A value
 > stored as the string `'2'`, `'2.5'`, `'true'` or `'false'` would read back as another type the
 > moment that screen's condition builder parses it, and a rule whose first line is `or` would read
 > back as `and` — both would change what the row means for everybody holding it. Instead, the field
@@ -559,12 +556,11 @@ name = editor OR (scope >= 2 AND title = account.name)
 > and in this grid's inspector alike — because that comparison is stored and then never matches a
 > single row.
 
-> ℹ️ **The grid never locks a cell for this, and from `v1.3.2` it stops making the type mismatch
-> worse.** A stance flip — grant to forbid, or back — used to re-type a mis-typed condition through
-> the browser's own casting rules as a side effect, on a click that only meant to change the stance:
-> the string `'true'` could come back as the boolean `true`, which matches every row the string
-> never did. Now the value survives untouched whenever the stance is all that moved. What the grid
-> still does not fix, because it is a different and lighter hazard: a rule whose first line reads
+> ℹ️ **The grid never locks a cell for this, and it does not make the mismatch worse either.** A
+> stance flip — grant to forbid, or back — leaves the stored value untouched: re-typing it through
+> the browser's own casting rules would turn the string `'true'` into the boolean `true`, which
+> matches every row the string never did, on a click that only meant to change the stance. What the
+> grid does **not** fix, because it is a different and lighter hazard: a rule whose first line reads
 > `or` still comes back as `and` on any grid save, stance-only or not — it changes no cell's answer,
 > only which permission row backs it, which shows up as an orphaned row in `filament-warden:audit`,
 > not as a wrong answer on screen.
@@ -586,7 +582,7 @@ Lists the `permissions` **table** — the rows warden has actually created — a
 
 ### The Guard
 
-From v0.8.0, the panel **refuses to boot** if it finds an unguarded page or widget. That is what stops a custom screen from being left open to everyone by accident.
+The panel **refuses to boot** if it finds an unguarded page or widget. That is what stops a custom screen from being left open to everyone by accident.
 
 It is on by default, and neither of the plugin's `roles()`/`permissions()` toggles (see [Plugin Options](#plugin-options)) touches it — those turn a resource on or off, never the guard. The guard's own switches are config keys, one per kind:
 
@@ -619,8 +615,8 @@ It writes nothing, and reports nine things:
 - **grants for actions nothing declares any more** — a renamed policy method, a typo in a seeder, a screen that was deleted: the silent mistake warden has no way to detect;
 - **whole entity types nothing declares** — a morph alias that moved, reported apart because the fix is the opposite one;
 - **models only a relation manager reaches**, with the `catalog.models` line that settles it;
-- **catalogue names carrying a dot** — Livewire splits a state path on dots, so such a name cannot be a cell and a role screen throws the moment it draws one. Rename the permission. New in `v1.8.0`: before it, the only way to find out was somebody opening the screen;
-- **grants whose authority no longer exists** — *informational, like the permissions-the-catalogue-declares-that-no-grant-points-at bucket above (third bullet): this one never turns `--check` red either, and is new in `v1.9.0`*. Warden's schema puts a foreign key on `assigned_roles.role_id` and on `grants.permission_id`, never on the two columns that name a grant's authority, so no database cascade reaches them. Warden 2.0 sweeps some: `CacheInvalidations::markCascade()` deletes the grants of a deleted role, but only when the model's class is exactly the configured role class — an account, a role subclass, and anything deleted by query builder or raw SQL are all left behind, because it hangs off `eloquent.deleted`. `warden:clean --stranded` sweeps the rest, and it is opt-in. This bucket reports what is left over. Reported once per stranded authority — the deduplicated `type:key` a whole cluster of grants can share — and once per authority type this installation cannot even resolve.
+- **catalogue names carrying a dot** — Livewire splits a state path on dots, so such a name cannot be a cell and a role screen throws the moment it draws one. Rename the permission — otherwise the only way to find out is somebody opening the screen;
+- **grants whose authority no longer exists** — *informational, like the permissions-the-catalogue-declares-that-no-grant-points-at bucket above (third bullet): this one never turns `--check` red either*. Warden's schema puts a foreign key on `assigned_roles.role_id` and on `grants.permission_id`, never on the two columns that name a grant's authority, so no database cascade reaches them. Warden 2.0 sweeps some: `CacheInvalidations::markCascade()` deletes the grants of a deleted role, but only when the model's class is exactly the configured role class — an account, a role subclass, and anything deleted by query builder or raw SQL are all left behind, because it hangs off `eloquent.deleted`. `warden:clean --stranded` sweeps the rest, and it is opt-in. This bucket reports what is left over. Reported once per stranded authority — the deduplicated `type:key` a whole cluster of grants can share — and once per authority type this installation cannot even resolve.
 
 `--check` returns 1 for every finding above except the two informational ones.
 
@@ -665,7 +661,7 @@ This package's resources declare `protected static bool $isScopedToTenant = fals
 
 It is written as the property and **never** through `scopeToTenant(false)`, which is static and would un-scope every resource of *your* application — a cross-tenant leak this package would have caused.
 
-**Deleting a role looks across every tenant.** From `v1.0.2`, `roles.delete => 'unassigned'` counts assignments with warden's tenant scope lifted. A role held only under a tenant you are not currently in would otherwise read as unassigned, and deleting it takes that tenant's `assigned_roles` and `grants` rows with it through the foreign key — which never looked at `scope`, and neither does `$record->delete()`.
+**Deleting a role looks across every tenant.** `roles.delete => 'unassigned'` counts assignments with warden's tenant scope lifted. A role held only under a tenant you are not currently in would otherwise read as unassigned, and deleting it takes that tenant's `assigned_roles` and `grants` rows with it through the foreign key — which never looked at `scope`, and neither does `$record->delete()`.
 
 ### Catalog
 
@@ -685,13 +681,13 @@ foreach ($entries as $entry) {
 }
 ```
 
-`Catalog::for()` reflects every Policy the panel declares and walks its resources, pages and widgets besides, so from `v1.5.0` it is built once per panel and kept for the life of the process. Nothing it derives from moves while that process runs: panels, Policies and `catalog.*` all come from code and config loaded at boot. The one thing that would go stale is an application rewriting `catalog.*` config at runtime — invisible until you drop the memo:
+`Catalog::for()` reflects every Policy the panel declares and walks its resources, pages and widgets besides, so it is built once per panel and kept for the life of the process. Nothing it derives from moves while that process runs: panels, Policies and `catalog.*` all come from code and config loaded at boot. The one thing that would go stale is an application rewriting `catalog.*` config at runtime — invisible until you drop the memo:
 
 ```php
 Catalog::forget();
 ```
 
-**`Catalog::union(array $panels): self`** merges more than one panel's catalogue into one, from `v1.9.0`. A multi-panel installation needs this for provenance, not `for()` alone: the permissions screen, its infolist and its form all ask every panel now, because asking only the current one used to draw a row derived in another panel as "Nothing declares it" while `filament-warden:audit` — which already read every panel — said the opposite.
+**`Catalog::union(array $panels): self`** merges more than one panel's catalogue into one. A multi-panel installation needs this for provenance, not `for()` alone: the permissions screen, its infolist and its form all ask every panel now, because asking only the current one used to draw a row derived in another panel as "Nothing declares it" while `filament-warden:audit` — which already read every panel — said the opposite.
 
 #### Custom Permissions
 
@@ -722,7 +718,7 @@ Catalog::forget();
 ],
 ```
 
-**A row somebody holds cannot be re-pointed.** From `v1.0.2`, the name and the entity of a permission that at least one role already holds are locked on its edit screen, and put back on the server if the payload says otherwise — at every setting of `update` except `'all'`. Moving them moves what those holders hold without revoking anything and without writing a single row to `grants`: the check they used to pass simply starts answering something else. `'loose'` still mints and edits the rows nobody holds yet, and the conditions and the ownership checkbox stay editable wherever they were before — those narrow what a row means, they do not re-point it.
+**A row somebody holds cannot be re-pointed.** The name and the entity of a permission that at least one role already holds are locked on its edit screen, and put back on the server if the payload says otherwise — at every setting of `update` except `'all'`. Moving them moves what those holders hold without revoking anything and without writing a single row to `grants`: the check they used to pass simply starts answering something else. `'loose'` still mints and edits the rows nobody holds yet, and the conditions and the ownership checkbox stay editable wherever they were before — those narrow what a row means, they do not re-point it.
 
 ### Roles (roles screen)
 
@@ -736,7 +732,7 @@ Catalog::forget();
 
 A protected role keeps its name and its grid: both are shown, neither can be edited, and it cannot be deleted. Its title is left editable — nothing resolves by it.
 
-**From `v1.0.2` a role cannot arrive at a protected name either.** Creating a role called `super-admin`, or renaming an ordinary one onto it, is refused by the form — before `1.0.2` both succeeded and the role was born protected, which is a way of minting an unremovable role by typing. The role that already carries the name keeps it: only the *arrival* is closed. From `v1.1.0` the refusal names which list the name is on, instead of the framework's generic validation wording.
+**A role cannot arrive at a protected name either.** Creating a role called `super-admin`, or renaming an ordinary one onto it, is refused by the form: otherwise the role is born protected, which is a way of minting an unremovable role by typing. The role that already carries the name keeps it: only the *arrival* is closed. The refusal names which list the name is on, rather than falling back to the framework's generic validation wording.
 
 > ⚠️ **The merge is shallow, on purpose.** Declaring `roles.protected => []` in your published config genuinely unprotects every role. A recursive merge would blend lists by index and silently keep `'super-admin'` in there — so it is not used, and a test holds that line.
 
@@ -763,9 +759,9 @@ A protected role keeps its name and its grid: both are shown, neither can be edi
 > account to test the permission against, so its picker searches whatever of `name`, `email` and
 > `title` that model has and is text-typed, and shows up to twenty matches. That is a list of your
 > people's names and addresses, offered to everybody with `view` on a permission. It is off with one
-> line if that is not a trade you want. From `v1.8.0` a `%` in the box is looked for rather than
-> obeyed, and a model with none of those three columns returns nothing instead of the first twenty
-> rows. From `v1.9.0` a column among the three that is not text-typed is left out the same way — a
+> line if that is not a trade you want. A `%` in the box is looked for rather than obeyed, and a
+> model with none of those three columns returns nothing instead of the first twenty rows. A column
+> among the three that is not text-typed is left out the same way — a
 > `name` stored as an integer, say — because `LIKE` raises on Postgres against a column that is not
 > one; MySQL and SQLite would have coerced it silently.
 
@@ -821,7 +817,7 @@ There's already a well-known permissions plugin for Filament, and for most proje
 
 ## 📦 Stability
 
-From `v1.0.0`, everything below is covered by **SemVer**: changing any of it is a **major release**. `tests/FrozenTest.php` is what says so — it fails when one of them moves.
+Everything below is covered by **SemVer**: changing any of it is a **major release**. `tests/FrozenTest.php` is what says so — it fails when one of them moves.
 
 Two different kinds of thing are in that list, and both matter for the same reason.
 
@@ -835,7 +831,7 @@ Two different kinds of thing are in that list, and both matter for the same reas
 |---|---|
 | Permission prefixes | `page:`, `widget:`, `panel:` and `PermissionName`, which mints them and reads them back |
 | Plugin | `FilamentWardenPlugin`, its ID `filament-warden`, and its six methods: `make()`, `getId()`, `register()`, `boot()`, `roles()`, `permissions()` |
-| Fields | `PermissionGrid`, `PermissionGridEntry`, `ConditionBuilder`, `RoleAssignment`, the `{stances, narrowing, baseline}` state envelope a form receives — `baseline` joined it in `v1.6.0`, and an addition is a minor — and the key `RoleAssignment` keeps beside its own list, `__filament_warden_roles_baseline`, which from `v1.7.0` sits in your page's state array |
+| Fields | `PermissionGrid`, `PermissionGridEntry`, `ConditionBuilder`, `RoleAssignment`, the `{stances, narrowing, baseline}` state envelope a form receives — adding a key to it is a minor — and the key `RoleAssignment` keeps beside its own list, `__filament_warden_roles_baseline`, which sits in your page's state array |
 | Relation managers | `RolesRelationManager`'s class name — a consuming application's own `UserResource::getRelations()` stores it by name, so renaming the class breaks every installation that attached it |
 | Traits | `AuthorizesPageAccess`, `AuthorizesWidgetView`, `AccessesPanels` |
 | Authorization | `WardenPolicy`, `Access` |
@@ -856,8 +852,8 @@ Five consequences worth saying out loud, because each one is a place the line is
 - **A published view is welded to those insides.** `filament-warden-views` is a real escape hatch and you are welcome to it, but your copy calls `$getGrid()` and walks a `GridView`, its tabs, rows and cells — all internal. Expect to re-merge it on a minor. If you want markup that keeps working, wrap the field rather than forking its view.
 - **The screens are not an extension point.** `RoleResource`, `PermissionResource` and their pages are left non-final so you can experiment, not because subclassing them is supported. They change whenever the screens change.
 - **`whereCan()` is warden's, not ours.** Its answer can disagree with the panel's, and it never consults the Gate or a policy.
-- **`DrawsThePermissionGrid` is not one of the frozen traits.** The three named in the table above are; this one is the shared insides of `PermissionGrid` and `PermissionGridEntry`, and it grows a method whenever those two learn a new fact about their own render. **v1.1.0 adds `gridInteracts(): bool` to it.** If you composed it into a class of your own, implement it — `return false;` if your screen does not write — or the upgrade is a fatal.
-- **The inspector's bridge is not an API.** `explainCell()` and `narrowingFor()` are exposed to the browser so the field's own script can ask them one cell at a time. What they answer is internal and it moves: from `1.1.0`, an empty array back from `explainCell()` means only *this grid cannot be asked that* — the inspector is switched off, or the cell is not in the catalogue. A record that has not been saved yet now gets a real explanation instead. If you call either method from your own component, read the answer, do not assume its shape.
+- **`DrawsThePermissionGrid` is not one of the frozen traits.** The three named in the table above are; this one is the shared insides of `PermissionGrid` and `PermissionGridEntry`, and it grows a method whenever those two learn a new fact about their own render. If you composed it into a class of your own, expect to implement new methods on it — an upgrade that adds one is a fatal otherwise. The CHANGELOG names each.
+- **The inspector's bridge is not an API.** `explainCell()` and `narrowingFor()` are exposed to the browser so the field's own script can ask them one cell at a time. What they answer is internal and it moves. An empty array back from `explainCell()` means only *this grid cannot be asked that* — the inspector is switched off, or the cell is not in the catalogue; a record that has not been saved yet gets a real explanation. If you call either method from your own component, read the answer, do not assume its shape.
 
 #### Not frozen: the word *account*
 
