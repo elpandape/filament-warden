@@ -17,6 +17,8 @@ use ElPandaPe\Warden\Constraints\ConstraintSerializer;
 use ElPandaPe\Warden\Constraints\Group;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Support\Titles\PermissionTitle;
+use ElPandaPe\Warden\Tenancy\Tenancy;
+use ElPandaPe\Warden\Tenancy\TenantScope;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -390,13 +392,27 @@ final class PermissionForm
     /**
      * Whether the tuple is already in the catalogue.
      *
-     * A permission is (action, entity, record, ownership) — four columns with no
-     * unique index behind them, so two rows agreeing on all four are creatable
-     * and nothing short of all four describes one. Since 0.6.0 the sentence this
+     * A permission is (action, entity, record, ownership, TENANT) — and warden
+     * has had a unique index over `(name, identity_key)` since its own 2.0,
+     * where that key is a digest of exactly those. Since 0.6.0 the sentence this
      * rule fires has promised "this name and entity"; the query compared the
      * name and stopped there, so the same action over two different models could
      * not coexist and a derived row could not be saved at all while a sibling
      * shared its name.
+     *
+     * It also read the catalogue with every scope dropped, which made it refuse
+     * a name another tenant held — a collision the index would never have
+     * raised. The scope is now part of the question, asked the way `stampScope()`
+     * decides it, which is what closes that half.
+     *
+     * The other half stays open on purpose. A DUPLICATE TWIN — two rows agreeing
+     * on all five AND on their conditions — is invisible here, because the digest
+     * needs the value `options` is about to take and this rule runs BEFORE the
+     * condition builder dehydrates and before `mutateFormDataBeforeSave()`. There
+     * is no honest answer to give at this point in the lifecycle, so the backstop
+     * on `CreatePermission`/`EditPermission` catches that one after the write and
+     * reports it on this same field. Two guards, one because the other cannot
+     * reach.
      *
      * The entity and the ownership are read from the form, because they are what
      * is about to be saved; the record's key is read from the row, because no
@@ -421,9 +437,25 @@ final class PermissionForm
         $entityType = self::entityType($get);
         $entityId = $record?->getAttribute('entity_id');
 
+        // The scope this row would be written at, asked the way warden asks it:
+        // `stampScope()` stamps a catalogue row with the active tenant unless
+        // `scope.only_relations` keeps the catalogue global, in which case every
+        // permission is written at NULL. Warden's unique index is over
+        // `(name, identity_key)` and that digest carries the tenant, so two rows
+        // of the same name at different tenants are two rows it admits — while a
+        // read with every scope dropped saw the neighbour's and refused a name
+        // the database would have taken.
+        $tenancy = app(Tenancy::class);
+        $scope = $tenancy->scopesCatalog() ? $tenancy->current() : null;
+
         return is_string($name) && $class::query()
-            ->withoutGlobalScopes()
+            ->withoutGlobalScope(TenantScope::class)
             ->where('name', $name)
+            ->when(
+                $scope === null,
+                static fn (mixed $query): mixed => $query->whereNull('scope'),
+                static fn (mixed $query): mixed => $query->where('scope', $scope),
+            )
             ->where('only_owned', (bool) $get('only_owned'))
             ->whereNull('options')
             // `Query\Builder::where()` already short-circuits a `null` value to

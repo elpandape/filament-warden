@@ -651,6 +651,32 @@ test('the catalogue cannot take the same permission twice', function (): void {
         ->assertHasFormErrors(['name']);
 });
 
+test('the same name under another tenant is another permission, as the index says', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    // Warden's unique index is over `(name, identity_key)`, and the digest
+    // carries the tenant — so this row and one named the same under tenant 6 are
+    // two rows the index admits side by side. The screen used to read the
+    // catalogue with every scope dropped, see this one, and refuse the rename
+    // for a collision the database would never have raised.
+    Warden::tenant()->onceTo(5, static fn (): Model => makePermission('taken'));
+
+    $mine = Warden::tenant()->onceTo(6, static fn (): Model => makePermission('other'));
+
+    Warden::tenant()->onceTo(6, function () use ($mine): void {
+        livewire(EditPermission::class, ['record' => $mine->getKey()])
+            ->fillForm(['name' => 'taken'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+    });
+
+    expect($mine->refresh()->getAttribute('name'))->toBe('taken');
+});
+
 test('the same name over another entity is another permission', function (): void {
     config()->set('filament-warden.permissions.update', 'all');
 
