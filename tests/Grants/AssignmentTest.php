@@ -614,7 +614,7 @@ test('take() leaves a restricted assignment alone', function (): void {
         ->and(assignmentCount())->toBe(1);
 });
 
-test('take() says no when the delete it asked for removed nothing', function (): void {
+test('take() refuses a role this scope could not delete anyway', function (): void {
     signInAsHandOut();
 
     $account = makeUser();
@@ -622,9 +622,12 @@ test('take() says no when the delete it asked for removed nothing', function ():
 
     Warden::assign($role)->to($account);
 
-    // Read under a tenant, warden answers "global or this one", so the role
-    // reads as held here. Written under a tenant, `retract()` targets that one
-    // exact scope — and this assignment is at none — so it deletes nothing.
+    // `isElsewhere()` inside `offers()` is what stops this, and it stops it
+    // BEFORE any write: it makes the same scope comparison `retract()` would,
+    // so a row it lets through is a row the delete will find. That is why
+    // `retractedCount()` buys no new guarantee here — it replaces a tautology
+    // with a real answer, and covers only a row that vanished between the read
+    // and the write, which no test can reach on purpose.
     $result = Warden::tenant()->onceTo(5, static fn (): bool => Assignment::take($account, roleKey($role)));
 
     expect($result)->toBeFalse()
