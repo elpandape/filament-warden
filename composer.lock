@@ -991,16 +991,16 @@
         },
         {
             "name": "elpandape/warden",
-            "version": "v2.0.0",
+            "version": "v2.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/elpandape/warden.git",
-                "reference": "1fe7f9ec481c3b8873bc9df2a8438b922ffe5a07"
+                "reference": "976be9bb4b431df0e174bdc2c57f5e844675e852"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/elpandape/warden/zipball/1fe7f9ec481c3b8873bc9df2a8438b922ffe5a07",
-                "reference": "1fe7f9ec481c3b8873bc9df2a8438b922ffe5a07",
+                "url": "https://api.github.com/repos/elpandape/warden/zipball/976be9bb4b431df0e174bdc2c57f5e844675e852",
+                "reference": "976be9bb4b431df0e174bdc2c57f5e844675e852",
                 "shasum": ""
             },
             "require": {
@@ -1071,7 +1071,7 @@
                 "issues": "https://github.com/elpandape/warden/issues",
                 "source": "https://github.com/elpandape/warden"
             },
-            "time": "2026-08-25T20:09:34+00:00"
+            "time": "2026-08-26T23:59:01+00:00"
         },
         {
             "name": "filament/actions",

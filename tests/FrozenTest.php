@@ -61,15 +61,23 @@ test('the permission name prefixes are frozen', function (): void {
 });
 
 test('a title this package generated is one of exactly four shapes', function (): void {
-    // Four since `2.0.0`, and the fourth is the one that was always supposed to
-    // be here: warden's own answer used to be taken live, so warden 2.0's new
-    // `Str::snake()` did not add a shape to this list — it REPLACED one, and
-    // every row an installation had already been titled with fell out.
-    expect(PermissionName::generated('page:App\Filament\Pages\Settings'))->toBe([
+    // Compared as a SET, sorted, because every consumer asks this list for
+    // membership — `in_array(…, true)` on the edit screen and `whereIn` on the
+    // grid's save. Warden hands its half back current-first, so pinning the
+    // order would go red on a warden release that reordered and decided
+    // nothing, and a pin that cries wolf is a pin somebody updates without
+    // reading. What must stay red is a shape LEAVING, which is how this broke
+    // twice: warden's answer for today was taken live, so `2.0`'s `Str::snake()`
+    // and `2.0.1`'s correction each REPLACED a shape rather than adding one, and
+    // rows an installation had already been titled with fell out of the list.
+    $shapes = PermissionName::generated('page:App\Filament\Pages\Settings');
+    sort($shapes);
+
+    expect($shapes)->toBe([
+        'Access Settings',
         'Page: app\ filament\ pages\ settings',
         'Page:App\Filament\Pages\Settings',
         'Settings',
-        'Access Settings',
     ]);
 });
 

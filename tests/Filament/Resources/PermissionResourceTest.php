@@ -16,6 +16,7 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
+use ElPandaPe\Warden\Support\Titles\PermissionTitle;
 use Filament\Actions\DeleteAction;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
@@ -1095,10 +1096,13 @@ test('renaming a door regenerates its title the same way', function (): void {
 
     $door = makePermission('page:App\\Filament\\Pages\\Reports');
 
-    // What warden 2.0 makes of a name it has no way to read. It is mangled, and
-    // that is the whole reason `PermissionName` is the only place that mints
-    // these names AND the only one that reads them back.
-    expect($door->getAttribute('title'))->toBe('Page: app\\ filament\\ pages\\ reports');
+    // Whatever warden makes of a name it has no way to read — asked of warden
+    // rather than written out, because the wording is warden's to change and it
+    // did between `2.0.0` and `2.0.1`. What this line pins is that the row
+    // starts out carrying warden's OWN answer, which is what the rename below
+    // has to recognise before it may rewrite it.
+    expect($door->getAttribute('title'))
+        ->toBe(PermissionTitle::generate('page:App\\Filament\\Pages\\Reports', null, null, false));
 
     livewire(EditPermission::class, ['record' => $door->getKey()])
         ->fillForm(['name' => 'widget:App\\Filament\\Widgets\\Summary'])

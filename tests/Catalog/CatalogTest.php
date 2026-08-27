@@ -277,14 +277,20 @@ test('a name this package never minted gets wardens own answer, not an empty one
     // stands, which is the same comparison the permission form was making on its
     // own — plus the one warden wrote before 2.0, when the two differ. They do
     // not for `view`, and the list says so by not repeating it.
+    // Sorted, and `toBe` rather than `toMatchArray`: warden hands its half back
+    // current-first, so the order is warden's to change and decides nothing here
+    // — but the COUNT is the guarantee, and `toMatchArray` would let a fifth
+    // shape appear unnoticed.
+    $door = PermissionName::generated('page:App\\Filament\\Pages\\Reports');
+    sort($door);
+
     expect(PermissionName::generated('export-reports'))->toBe(['Export reports'])
         ->and(PermissionName::generated('view', 'post'))->toBe([PermissionTitle::generate('view', 'post', null, false)])
-        ->and(PermissionName::generated('page:App\\Filament\\Pages\\Reports'))
-        ->toBe([
+        ->and($door)->toBe([
+            'Access Reports',
             'Page: app\\ filament\\ pages\\ reports',
             'Page:App\\Filament\\Pages\\Reports',
             'Reports',
-            'Access Reports',
         ]);
 });
 

@@ -64,10 +64,13 @@ final class PermissionName
      *
      * This list may only GROW: an entry added is a licence to rewrite rows in
      * somebody else's database, so a new shape is a MAJOR and `FrozenTest` says
-     * so. Nothing here may delegate to a moving target either, except warden's
-     * answer for TODAY — one entry did, and warden 2.0 then replaced a shape
-     * rather than adding one, so titles warden itself wrote stopped being
-     * recognised.
+     * so. Nothing here may delegate to a moving target — and "warden's answer
+     * for today" IS one. That exception used to be carved out here, and it cost
+     * the guarantee twice: warden `2.0` replaced a shape rather than adding one,
+     * and warden `2.0.1` then replaced it again, each time dropping the wording
+     * an installation already carried. Warden's half now comes from
+     * `PermissionTitle::generations()`, which is frozen per release on warden's
+     * side; the two shapes below are this package's own and are frozen here.
      *
      * A row this package did NOT mint still comes through here rather than
      * being asked at the two call sites, so "did we write this?" has one answer
@@ -96,64 +99,20 @@ final class PermissionName
 
     /**
      * Warden's answer for this row, in every shape warden has written it.
-     * Deduplicated: most names read the same under both generators.
+     *
+     * Asked of warden rather than transcribed here, which is the whole point:
+     * this list used to hold warden's answer for TODAY beside a frozen copy of
+     * `1.x`, and warden `2.0.1` then corrected `2.0.0`'s wording — so the shape
+     * `2.0.0` had already written into real catalogues fell out of the list and
+     * stopped being recognised as warden's. `generations()` is frozen per
+     * warden release and only ever grows, so the shape a row was titled with
+     * survives the generator moving on.
      *
      * @return list<string>
      */
     private static function wardens(string $name, ?string $entityType, bool $onlyOwned): array
     {
-        return array_values(array_unique([
-            PermissionTitle::generate($name, $entityType, null, $onlyOwned),
-            self::beforeTwo($name, $entityType, $onlyOwned),
-        ]));
-    }
-
-    /**
-     * Warden's generator as it stood before 2.0, transcribed and FROZEN.
-     *
-     * Copied from `PermissionTitle` at warden `1.3.0`, verified against the
-     * published archive. It must never be made to track warden again: a row
-     * titled under 1.x keeps that title after the upgrade, so the only way to
-     * recognise it is to have written the old rule down. A third generator gets
-     * a third transcription beside this one; this method does not move.
-     *
-     * The whole shape is copied rather than the one-line delta, because a delta
-     * would have to be re-derived from whatever warden says today.
-     *
-     * The arm for a row pinned to a record is left out: `generated()` has no id
-     * parameter, so it would be a branch no test could honestly reach.
-     */
-    private static function beforeTwo(string $name, ?string $entityType, bool $onlyOwned): string
-    {
-        return match (true) {
-            $name === '*' && $entityType === '*' && $onlyOwned => 'Manage everything owned',
-            $name === '*' && $entityType === '*' => 'All permissions',
-            $name === '*' && $entityType === null => 'All simple permissions',
-            $entityType === '*' && $onlyOwned => self::action($name).' everything owned',
-            $entityType === '*' => self::action($name).' everything',
-            $entityType !== null && $name === '*' => 'Manage '.Str::plural(self::entity($entityType)),
-            $entityType !== null => self::action($name).' '.Str::plural(self::entity($entityType)),
-            default => self::action($name),
-        };
-    }
-
-    /**
-     * Warden 1.x's action verb. Frozen with `beforeTwo()`.
-     */
-    private static function action(string $name): string
-    {
-        return $name === '*' ? 'Manage' : Str::ucfirst(str_replace(['-', '_'], ' ', $name));
-    }
-
-    /**
-     * Warden 1.x's entity word. Unchanged in 2.0, copied anyway so the
-     * transcription stands on its own.
-     */
-    private static function entity(string $entityType): string
-    {
-        $basename = Str::afterLast(Str::afterLast($entityType, '\\'), '.');
-
-        return Str::lower(Str::snake($basename, ' '));
+        return PermissionTitle::generations($name, $entityType, null, $onlyOwned);
     }
 
     /**
