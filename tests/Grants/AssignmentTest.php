@@ -622,12 +622,10 @@ test('take() refuses a role this scope could not delete anyway', function (): vo
 
     Warden::assign($role)->to($account);
 
-    // `isElsewhere()` inside `offers()` is what stops this, and it stops it
-    // BEFORE any write: it makes the same scope comparison `retract()` would,
-    // so a row it lets through is a row the delete will find. That is why
-    // `retractedCount()` buys no new guarantee here — it replaces a tautology
-    // with a real answer, and covers only a row that vanished between the read
-    // and the write, which no test can reach on purpose.
+    // Two independent defences hold this, and it took breaking each alone to
+    // find out: `isElsewhere()` refuses before any write, and `retractedCount()`
+    // refuses after one that removed nothing. Break either and this stays green;
+    // break both and a no-op reports success.
     $result = Warden::tenant()->onceTo(5, static fn (): bool => Assignment::take($account, roleKey($role)));
 
     expect($result)->toBeFalse()

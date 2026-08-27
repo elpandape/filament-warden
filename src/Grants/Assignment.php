@@ -379,11 +379,12 @@ final class Assignment
      * to end in `return $model instanceof Model` on a path that had already
      * resolved the role twice, so the return said nothing about the write.
      *
-     * And it buys no new guarantee: `isElsewhere()`, inside `offers()`, makes
-     * the same scope comparison `retract()` does, so a row that reaches here is
-     * a row the delete will find. What is left for the count to catch is a row
-     * that went between the read and the write. Defence in depth, said as that
-     * rather than as a fix.
+     * `isElsewhere()` inside `offers()` makes the same scope comparison, so the
+     * two overlap — but they are two INDEPENDENT defences of the same answer,
+     * measured by breaking each alone: with `isElsewhere()` gone the count still
+     * refuses a role at another scope, and with the count back to an inference
+     * `isElsewhere()` still does. Only removing both lets a no-op report
+     * success. Neither is the other's decoration.
      *
      * The null arm is STILL unreachable for the same reason it always was, and
      * is still written as a guarded block rather than an early return so no
