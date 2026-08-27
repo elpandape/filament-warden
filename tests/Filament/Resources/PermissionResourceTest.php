@@ -1200,6 +1200,26 @@ test('a condition whose value would come back as another type is not editable', 
         ->assertSee(__('filament-warden::ui.conditions.locked.rewrite'));
 });
 
+test('a rule whose first line reads or is not locked, because warden calls it the same rule', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    // `Narrowing::conditions()` normalises the first line's operator to `and`,
+    // so this row cannot be written back byte for byte and the screen used to
+    // close the builder over it. Warden's own `sameRule()` normalises the same
+    // way before comparing — `Group::passes()` ignores the first item's logic on
+    // every evaluation, so the two forms ARE one rule — and asking warden rather
+    // than a private copy of the comparison is what reopens the row.
+    $permission = permissionWithOptions(Post::class, [
+        'v' => 1,
+        'g' => ['t' => 'group', 'i' => [['or', ['t' => 'value', 'c' => 'title', 'o' => '=', 'v' => 'draft']]]],
+    ]);
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->assertDontSee(__('filament-warden::ui.conditions.locked.rewrite'));
+});
+
 test('a title-only save leaves a rule the screen cannot write back exactly as it was', function (): void {
     config()->set('filament-warden.permissions.update', 'all');
 

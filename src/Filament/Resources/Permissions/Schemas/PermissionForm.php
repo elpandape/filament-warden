@@ -336,7 +336,7 @@ final class PermissionForm
         // `LanguageTest` finds a reason by matching a plain return of a string
         // literal on one line, and a ternary wrapped around the multi-line call
         // above it would never put that text on a line by itself.
-        if ($group instanceof Group && self::sameRule(
+        if ($group instanceof Group && ConstraintSerializer::sameRule(
             ConstraintSerializer::serialize($group),
             $record->getAttribute('options'),
         )) {
@@ -344,39 +344,6 @@ final class PermissionForm
         }
 
         return 'rewrite';
-    }
-
-    /**
-     * The comparison warden makes when it decides whether two rows are the same
-     * twin, written a second time because `GrantsPermissions::optionsMatch()` is
-     * private.
-     *
-     * It has to be that comparison and not a plain `===`: engines may hand the
-     * JSON object keys back in another order, and warden accepts that as the same
-     * rule. Ordering the maps and leaving the lists alone is what makes this the
-     * same question — a reordered list IS a different rule.
-     *
-     * This is the second rule in the package written in two places; the first is
-     * the clause cut (`Narrowing::clauses()` and its copy in the script).
-     */
-    private static function sameRule(mixed $rebuilt, mixed $stored): bool
-    {
-        return self::ordered($rebuilt) === self::ordered($stored);
-    }
-
-    private static function ordered(mixed $value): mixed
-    {
-        if (! is_array($value)) {
-            return $value;
-        }
-
-        $ordered = array_map(self::ordered(...), $value);
-
-        if (! array_is_list($ordered)) {
-            ksort($ordered);
-        }
-
-        return $ordered;
     }
 
     private static function conditionsHelp(Get $get, ?Model $record): string
