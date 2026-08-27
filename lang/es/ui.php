@@ -260,6 +260,7 @@ return [
         'warning' => 'Con condiciones, esta concesión solo responde con una fila delante. Una comprobación de clase —la que hace un listado al preguntar viewAny— falla cerrada.',
         'no_model' => 'Este permiso no tiene ningún modelo detrás, así que una condición aquí no se puede comprobar nunca. Como concesión no concede jamás; como prohibición prohíbe siempre. Warden se niega a escribir una, y esta pantalla no toca las que ya estén.',
         'no_ownership' => 'La tabla :table no tiene la columna :column, que es por donde se resolvería la propiedad.',
+        'no_ownership_resolver' => 'Esta instalación no resuelve ninguna propiedad: no hay nada registrado con ownedVia() ni un atributo por defecto configurado, así que «solo lo que posee» no significa nada aquí.',
         'boolean' => 'Un valor true o false solo casa con una columna que el modelo castee a booleano. Esta no lo está, así que la condición se guardaría y no casaría nunca.',
         'modes' => [
             'all' => [

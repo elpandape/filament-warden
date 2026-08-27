@@ -152,10 +152,7 @@ trait DrawsThePermissionGrid
             'authority' => Columns::authority(),
             'ownership' => [
                 'available' => $ownership->available,
-                'reason' => $ownership->available ? null : self::line('filament-warden::ui.conditions.no_ownership', [
-                    'table' => new $model()->getTable(),
-                    'column' => $ownership->column ?? '',
-                ]),
+                'reason' => self::ownershipReason($ownership, $model),
             ],
             'stored' => self::stored($this->storedState()->narrowings[$row][$action] ?? Narrowing::all()),
         ];
@@ -231,6 +228,31 @@ trait DrawsThePermissionGrid
         }
 
         return null;
+    }
+
+    /**
+     * Why the reach cannot be offered, in the words of the actual refusal.
+     *
+     * A model whose table lacks the column and an installation that resolves no
+     * ownership at all are two different things to go and fix, and for the
+     * second there is no column to name.
+     *
+     * @param  class-string<Model>  $model
+     */
+    private static function ownershipReason(Ownership $ownership, string $model): ?string
+    {
+        if ($ownership->available) {
+            return null;
+        }
+
+        if (! $ownership->resolved) {
+            return self::line('filament-warden::ui.conditions.no_ownership_resolver');
+        }
+
+        return self::line('filament-warden::ui.conditions.no_ownership', [
+            'table' => new $model()->getTable(),
+            'column' => $ownership->column ?? '',
+        ]);
     }
 
     /**

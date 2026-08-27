@@ -400,6 +400,7 @@ test('the translation keys an application overrides are frozen', function (): vo
         'conditions.warning',
         'conditions.no_model',
         'conditions.no_ownership',
+        'conditions.no_ownership_resolver',
         'conditions.boolean',
         'conditions.modes.all.name',
         'conditions.modes.all.hint',

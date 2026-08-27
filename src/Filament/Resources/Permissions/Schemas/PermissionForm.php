@@ -262,12 +262,20 @@ final class PermissionForm
 
         $ownership = Ownership::of($model);
 
-        return $ownership->available
-            ? (string) __('filament-warden::ui.resources.permissions.fields.only_owned_help')
-            : (string) __('filament-warden::ui.conditions.no_ownership', [
-                'table' => new $model()->getTable(),
-                'column' => $ownership->column ?? '',
-            ]);
+        if ($ownership->available) {
+            return (string) __('filament-warden::ui.resources.permissions.fields.only_owned_help');
+        }
+
+        // Two refusals, two sentences. Naming a column when the installation
+        // registered no resolver at all points at the wrong thing to go and fix.
+        if (! $ownership->resolved) {
+            return (string) __('filament-warden::ui.conditions.no_ownership_resolver');
+        }
+
+        return (string) __('filament-warden::ui.conditions.no_ownership', [
+            'table' => new $model()->getTable(),
+            'column' => $ownership->column ?? '',
+        ]);
     }
 
     /**

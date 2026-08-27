@@ -519,6 +519,29 @@ test('the browser is told what a condition on this cell could be built from', fu
             && partOf($narrowing, 'stored')['mode'] === 'all');
 });
 
+test('the inspector says which of the two refusals it is, never a column for neither', function (): void {
+    config()->set('warden.ownership.default_attribute');
+    app()->forgetInstance(Context::class);
+
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'narrowingFor', [roleClass(), 'update'])
+        ->assertReturned(fn (array $narrowing): bool => partOf($narrowing, 'ownership')['available'] === false
+            && partOf($narrowing, 'ownership')['reason'] === __('filament-warden::ui.conditions.no_ownership_resolver'));
+});
+
+test('a cell whose model does resolve ownership carries no refusal at all', function (): void {
+    Warden::ownedVia(roleClass(), static fn (): bool => true);
+
+    $role = makeRole();
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'narrowingFor', [roleClass(), 'update'])
+        ->assertReturned(fn (array $narrowing): bool => partOf($narrowing, 'ownership')['available'] === true
+            && partOf($narrowing, 'ownership')['reason'] === null);
+});
+
 test('the cell inspector gets the same boolean list a condition may compare, never undefined', function (): void {
     $role = makeRole();
     $door = 'page:'.Reports::class;

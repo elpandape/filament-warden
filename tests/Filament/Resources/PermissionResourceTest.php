@@ -665,6 +665,7 @@ test('the same name under another tenant is another permission, as the index say
     // for a collision the database would never have raised.
     Warden::tenant()->onceTo(5, static fn (): Model => makePermission('taken'));
 
+    /** @var Model $mine */
     $mine = Warden::tenant()->onceTo(6, static fn (): Model => makePermission('other'));
 
     Warden::tenant()->onceTo(6, function () use ($mine): void {
@@ -1006,6 +1007,27 @@ test('ownership is offered where it could resolve, and refused where it could no
 
     livewire(EditPermission::class, ['record' => $notOwned->getKey()])
         ->assertSee('has no user_id column');
+});
+
+test('an installation resolving no ownership is told that, not that a column is missing', function (): void {
+    config()->set('filament-warden.permissions.update', 'all');
+    config()->set('warden.ownership.default_attribute');
+
+    app()->forgetInstance(Context::class);
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $permission = makePermission('view');
+    $permission->update(['entity_type' => new Comment()->getMorphClass()]);
+
+    // `Comment` HAS a `user_id` column, so the old wording would have been
+    // doubly wrong here: it would have named a column that is present as the
+    // thing that is missing.
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->assertSee(__('filament-warden::ui.conditions.no_ownership_resolver'))
+        ->assertDontSee('has no user_id column');
 });
 
 test('switching the entity gives up an ownership it cannot resolve', function (): void {

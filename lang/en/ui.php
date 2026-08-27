@@ -260,6 +260,7 @@ return [
         'warning' => 'With conditions, this grant only answers with a record in front of it. A class check — the one a listing makes when it asks viewAny — fails closed.',
         'no_model' => 'This permission has no model behind it, so a condition on it can never be tested. As a grant it never grants; as a prohibition it always forbids. Warden refuses to write one, and this screen will not touch the ones already there.',
         'no_ownership' => 'The table :table has no :column column, which is where ownership would resolve.',
+        'no_ownership_resolver' => 'This installation resolves no ownership: nothing is registered with ownedVia() and no default attribute is configured, so there is nothing for "only what it owns" to mean here.',
         'boolean' => 'A true or false value only matches a column the model casts to boolean. This one is not cast, so the condition would be stored and would never match.',
         'modes' => [
             'all' => [
