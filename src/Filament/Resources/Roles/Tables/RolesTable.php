@@ -9,7 +9,6 @@ use ElPandaPe\FilamentWarden\Grants\Holders;
 use ElPandaPe\FilamentWarden\Support\Config;
 use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Context;
-use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
@@ -75,12 +74,6 @@ final class RolesTable
                 EditAction::make(),
                 // The config and the protected list have their say before the
                 // policy does; the action disappears rather than failing later.
-                //
-                // The delete takes its assignments with it below Eloquent, and
-                // nothing in warden bumps the version for a write made through
-                // the model layer: without the hook every check goes on answering
-                // the old way, silently and with no expiry. Void on purpose —
-                // whatever `after()` returns stands in for the action's own result.
                 DeleteAction::make()
                     ->modalDescription(static fn (Model $record): string => self::warning($record))
                     ->visible(static function (Model $record) use (&$assignedRoleIds): bool {
@@ -93,9 +86,6 @@ final class RolesTable
                         }
 
                         return RoleResource::canDelete($record, $assignedRoleIds);
-                    })
-                    ->after(static function (): void {
-                        Warden::refresh();
                     }),
             ]);
     }

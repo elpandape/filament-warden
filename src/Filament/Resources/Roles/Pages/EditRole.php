@@ -6,7 +6,6 @@ namespace ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages;
 
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Tables\RolesTable;
-use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
@@ -31,10 +30,7 @@ class EditRole extends EditRecord
             // action's own result.
             DeleteAction::make()
                 ->modalDescription(static fn (Model $record): string => RolesTable::warning($record))
-                ->visible(fn (Model $record): bool => RoleResource::canDelete($record))
-                ->after(static function (): void {
-                    Warden::refresh();
-                }),
+                ->visible(fn (Model $record): bool => RoleResource::canDelete($record)),
         ];
     }
 

@@ -660,7 +660,7 @@ test('a protected role survives the delete action itself, not only the check', f
         ->and(roleClass()::query()->whereKey($plain->getKey())->exists())->toBeFalse();
 });
 
-test('deleting a role from the listing reaches the store, which nothing in warden invalidates', function (): void {
+test('deleting a role from the listing reaches the store, and warden invalidates it', function (): void {
     config()->set('cache.default', 'array');
     config()->set('filament-warden.roles.delete', 'all');
 

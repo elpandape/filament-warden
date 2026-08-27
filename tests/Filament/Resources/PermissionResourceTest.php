@@ -508,7 +508,7 @@ test('the config closes the delete action itself, not only the check', function 
     expect(permissionClass()::query()->whereKey($permission->getKey())->exists())->toBeTrue();
 });
 
-test('an edit made here reaches the store, which nothing in warden invalidates', function (): void {
+test('an edit made here reaches the store, which warden alone does not invalidate', function (): void {
     config()->set('cache.default', 'array');
     config()->set('filament-warden.permissions.update', 'all');
 
@@ -532,7 +532,7 @@ test('an edit made here reaches the store, which nothing in warden invalidates',
         ->and(Access::granted($holder, 'browse', Post::class))->toBeTrue();
 });
 
-test('deleting a permission from the listing reaches the store, which nothing in warden invalidates', function (): void {
+test('deleting a permission from the listing reaches the store, and warden invalidates it', function (): void {
     config()->set('cache.default', 'array');
     config()->set('filament-warden.permissions.delete', 'all');
 

@@ -102,18 +102,9 @@ final class PermissionsTable
                 // disappears rather than failing later. Overriding `canDelete()`
                 // alone would not close it: the action asks the authorization
                 // response directly.
-                //
-                // The delete takes its grants with it below Eloquent, and nothing
-                // in warden bumps the version for a write made through the model
-                // layer: without the hook every check goes on answering the old
-                // way, silently and with no expiry. Void on purpose — whatever
-                // `after()` returns stands in for the action's own result.
                 DeleteAction::make()
                     ->modalDescription(static fn (Model $record): string => self::warning($record))
-                    ->visible(static fn (Model $record): bool => PermissionResource::canDelete($record))
-                    ->after(static function (): void {
-                        Warden::refresh();
-                    }),
+                    ->visible(static fn (Model $record): bool => PermissionResource::canDelete($record)),
             ]);
     }
 
