@@ -371,8 +371,18 @@ final class Assignment
      *
      * `! isHeld()` is a second guard for a different reason than `give()`'s:
      * `offers()` cannot tell "held here and unrestricted" apart from "not held
-     * at all", and `retract()->from()` deletes nothing silently, so without it
-     * a no-op would report success.
+     * at all", so it is what decides whether the row action is offered at all.
+     * It is NOT what makes the answer honest — `retractedCount()` is. Warden
+     * reports how many rows the delete actually removed, and a retraction
+     * targets one exact scope, so a role held only at another one is deleted
+     * from nowhere and counted zero. What went away is the tautology: this used
+     * to end in `return $model instanceof Model` on a path that had already
+     * resolved the role twice, so the return said nothing about the write.
+     *
+     * The null arm is STILL unreachable for the same reason it always was, and
+     * is still written as a guarded block rather than an early return so no
+     * line exists that only the impossible branch reaches — the 100% gate ran
+     * red on exactly that when this was first written the other way round.
      */
     public static function take(Model $account, int|string $role): bool
     {
@@ -382,8 +392,10 @@ final class Assignment
 
         $model = self::role($role);
 
+        $retracted = 0;
+
         if ($model instanceof Model) {
-            Warden::retract($model)->from($account);
+            $retracted = Warden::retract($model)->from($account)->retractedCount();
 
             // Same reason as `give()`'s own call: the memo just read by
             // `offers()`/`isHeld()` above is now the row list from BEFORE
@@ -391,13 +403,7 @@ final class Assignment
             self::forgetAssignments();
         }
 
-        // Never actually false here, the same reason `give()`'s tail comment
-        // gives: `offers()` and `isHeld()` already resolved this same `$role`
-        // through `role()` twice over, so `$model` cannot be null on this
-        // path — and an explicit early return for that case would be a line
-        // only an impossible branch reaches, uncoverable under this project's
-        // 100% line gate.
-        return $model instanceof Model;
+        return $retracted > 0;
     }
 
     /**

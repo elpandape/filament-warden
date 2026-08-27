@@ -13,9 +13,15 @@ use Throwable;
 /**
  * Over how many rows a permission actually falls, for one account.
  *
- * Asked and never volunteered: one `whereCan()` is six queries with no
- * memoisation and no cache, and it hydrates the whole candidate catalogue every
- * time. Three calls in a request were measured at eighteen queries.
+ * Asked and never volunteered: one `whereCan()` costs a handful of queries with
+ * no memoisation and no cache, so a listing column would multiply it by every
+ * row on the page. The count is deliberately not written down as one number —
+ * it depends on the grant's shape, measured at seven for a plain one and nine
+ * for a `toOwn()`, whose ownership check asks the schema and pays twice for it
+ * on sqlite. It no longer hydrates the whole candidate catalogue: warden filters
+ * the candidates in SQL by name, entity type and a `whereExists` on the grant.
+ * That earlier sentence said six and said the catalogue was hydrated whole, and
+ * both halves were true when written and are not now.
  *
  * And the number is a LOWER BOUND, not the truth. `whereCan()` and the panel's
  * own checks do not answer the same thing, measured in both directions: a role
