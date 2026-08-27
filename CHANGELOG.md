@@ -8,6 +8,96 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.1.0] - 2026-08-26
+
+What warden already does. Every item here deletes something this package was carrying because warden
+could not yet do it — plus one that had to come first: `2.0.3` **does not work against warden 2.1.0**,
+which its own `^2.0` allowed. The dependency floor moves to `^2.1`.
+
+Each deletion was measured by breaking it on purpose, and where two guards covered one answer, by
+breaking each ALONE and then both. That distinction earned its keep: one item that looked like a
+tautology turned out to be an independent second defence.
+
+### Requirements
+
+- **`elpandape/warden` moves from `^2.0` to `^2.1`.** `PermissionTitle::generations()` is new there,
+  and it is what closes the defect below.
+
+### Fixed
+
+- **A title warden itself wrote stopped being recognised, twice.** `PermissionName::generated()` held
+  warden's answer for TODAY beside a frozen copy of `1.x`. Warden `2.0` changed that answer, and
+  warden `2.0.1` changed it again — and each time the wording an installation had ALREADY been
+  titled with fell out of the list, so `settleTitle()` and the rename-regenerates path stopped
+  treating those rows as warden's and left them alone for good. The list now comes from
+  `PermissionTitle::generations()`, frozen per warden release on warden's own side, and this
+  package's transcription of the `1.x` generator is deleted — 48 lines warden now owns. The two
+  shapes this package mints itself stay frozen here.
+
+- **The `taken` rule refused a name another tenant held.** Warden's unique index is over
+  `(name, identity_key)` and that digest carries the tenant, so the same name under two tenants is
+  two rows the database admits side by side. The rule read the catalogue with every scope dropped,
+  saw the neighbour's row, and reported a collision that could never have happened. It now asks
+  about the scope the row would be written at, the way `stampScope()` decides it.
+
+- **The ownership refusal named a column when no column was the problem.** With nothing registered
+  through `ownedVia()` and no default attribute configured, warden's `ownershipResolverFor()` falls
+  through to the EMPTY STRING — and reading that as a column name gave the right refusal for the
+  wrong reason. The toggle was correctly closed while the sentence beside it said the table had no
+  `` column. `Ownership` now carries `resolved`, asked of `Context::resolvesOwnershipFor()` before
+  the fallback can be mistaken for anything, and the two refusals get two sentences. On a model that
+  DOES have a `user_id` column the old wording was doubly wrong: it named a column that is there.
+
+- **The screens dropped every global scope, including an application's own.** Warden reads grants
+  through Eloquent, so a scope an application put on a swapped `grant` model applies to the resolver
+  too — and four reads here stepped over it, drawing rows the resolver will never answer with. They
+  now drop warden's `TenantScope` and nothing else.
+
+### Changed
+
+- **Deleting a role or a permission no longer refreshes the whole cache from here.** Warden has
+  predicted that cascade since its own `1.1.0` — including the foreign-key cascade that runs below
+  Eloquent and the polymorphic grants no key reaches — and its invalidation is per scope where this
+  package's was a global flush. Six `after()` hooks go. Measured by disabling warden's listener in
+  `vendor/`: exactly six tests go red, one per hook, which is what says both that warden does the
+  work and that those tests were exercising the cache at all.
+- **EDITING a permission still refreshes, and that is not an oversight.** Warden's `markFrom()` acts
+  only on `grants` and `assigned_roles` rows; a catalogue row edited through the model layer is
+  neither. Measured by removing that one too — one test red. The comment there now says which half
+  warden covers instead of saying it covers none.
+- **A rule whose first line reads `or` is no longer locked.** This package compared two serialised
+  rules with a private transcription of warden's comparison, and the transcription had drifted:
+  warden normalises the first item's logical operator before ordering, because `Group::passes()`
+  ignores it on every evaluation — so the two forms ARE one rule. Asking
+  `ConstraintSerializer::sameRule()` reopens those rows and deletes the second place this package
+  wrote that comparison.
+- **`Assignment::take()` reports what the retraction did.** It used to end in
+  `return $model instanceof Model`, a tautology on a path that had already resolved the role twice.
+  `retractedCount()` is warden's own answer. It overlaps with the `isElsewhere()` guard in front of
+  it, and the two were measured apart: break either and a no-op is still refused; break both and it
+  reports success.
+- **`Reach`'s cost sentence said six queries and said the candidate catalogue was hydrated whole.**
+  Both were true when written. Warden filters the candidates in SQL now, and the count is not one
+  number: seven for a plain grant, nine for a `toOwn()`, whose ownership check asks the schema and
+  pays twice for it on sqlite. The product decision does not move — still one call per row, so a
+  listing column is still wrong.
+
+### Added
+
+- `ui.conditions.no_ownership_resolver`, in both languages: the sentence for an installation that
+  resolves no ownership at all. A new key is a minor, which is what this release is.
+
+### Not included
+
+- **The other half of the `taken` rule stays open, with its reason.** A duplicate TWIN — two rows
+  agreeing on everything including their conditions — is still invisible to that rule, because the
+  identity digest needs the value `options` is about to take and the rule runs before the condition
+  builder dehydrates. There is no honest answer at that point in the lifecycle; the backstop added
+  in `2.0.0` catches it after the write and reports it on the same field.
+- **`CreatePermission::afterCreate()` still refreshes.** It was already redundant under warden `1.0`
+  and no test moves with it either way, so it is not something this upgrade earned the right to
+  decide. Its own tag.
+
 ## [2.0.3] - 2026-08-26
 
 `2.0.2` rewrote two audit headings and shipped a stray backslash in both of them. Found by running

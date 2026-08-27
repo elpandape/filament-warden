@@ -81,7 +81,7 @@
 | PHP | `^8.4` |
 | Laravel | `^13.0` |
 | Filament | `^5.7` |
-| elpandape/warden | `^2.0` |
+| elpandape/warden | `^2.1` |
 
 ---
 
@@ -112,7 +112,7 @@ php artisan filament:assets
 
 ### Upgrading to 2.0 from 1.x
 
-`filament-warden 2.x` requires `elpandape/warden ^2.0`, and that is the whole reason this release is a major. **Run warden's migration before anybody uses the panel.**
+`filament-warden 2.x` requires `elpandape/warden ^2.1`, and the jump to warden 2.x is the whole reason `2.0.0` was a major. **Run warden's migration before anybody uses the panel.**
 
 Warden 2.0 adds an `identity_key` column to `permissions` and a unique index over `(name, identity_key)`, and it stamps that key on every save. A database still in the 1.x shape gets `no column named identity_key` the first time anything writes a permission — the grid, the permission screen, a seeder. Composer resolves without complaint and the application breaks on first use.
 
@@ -134,7 +134,7 @@ The tag matters. `warden-migrations` publishes `create_warden_tables`, whose `Sc
 
 `php artisan filament-warden:audit --check` reports an unmigrated catalogue as its own finding and exits 1, so a deploy pipeline goes red before the deploy rather than after it. That bucket stays permanently empty afterwards, which is what it is supposed to do.
 
-**Existing titles are not rewritten.** Warden 2.0 changed how it generates a title — `viewAny` on `Post` is `View any posts` now, where 1.x wrote `ViewAny posts` — and neither warden nor this package retitles rows already in the catalogue. An upgraded installation shows mixed wording until somebody renames each row, and warden ships no command for it. What this package does guarantee is that it still RECOGNISES the old wording: a title either generator has ever written is still treated as nobody's writing, so renaming a permission still regenerates it.
+**Existing titles are not rewritten by the upgrade itself.** Warden 2.0 changed how it generates a title — `viewAny` on `Post` is `View any posts` now, where 1.x wrote `ViewAny posts` — and neither warden nor this package retitles rows in place when you upgrade, so an upgraded catalogue shows mixed wording until somebody converges it. `php artisan warden:retitle` is what does that, since warden 2.1: it rewrites a title an older warden generated, leaves a title a person typed alone, and leaves a `null` null. `--dry-run` reports the count first. Nothing here is urgent — what this package guarantees meanwhile is that it still RECOGNISES the old wording, asking warden which titles warden has ever written, so renaming a permission still regenerates it whichever generation the row carries.
 
 ### Optional publishes
 
