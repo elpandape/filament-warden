@@ -6,6 +6,7 @@ namespace ElPandaPe\FilamentWarden\Grants;
 
 use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Context;
+use ElPandaPe\Warden\Tenancy\TenantScope;
 use Illuminate\Database\Eloquent\Model;
 use WeakMap;
 
@@ -95,7 +96,7 @@ final class Holders
         self::$anyMemo ??= new WeakMap();
 
         return self::$anyMemo[$permission] ??= Context::resolve()->grantClass()::query()
-            ->withoutGlobalScopes()
+            ->withoutGlobalScope(TenantScope::class)
             ->where('permission_id', $permission->getKey())
             ->exists();
     }
@@ -164,7 +165,7 @@ final class Holders
         // It is the one place in this package that reads wider than warden would
         // answer, and the screen says so.
         $grants = $context->grantClass()::query()
-            ->withoutGlobalScopes()
+            ->withoutGlobalScope(TenantScope::class)
             ->where('permission_id', $permission->getKey())
             ->get();
 
@@ -255,7 +256,7 @@ final class Holders
         }
 
         $records = $class::query()
-            ->withoutGlobalScopes()
+            ->withoutGlobalScope(TenantScope::class)
             ->whereKey(array_slice($keys, 0, $limit))
             ->get();
 

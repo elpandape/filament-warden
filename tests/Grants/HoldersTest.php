@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Grants\Holders;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\ScopedGrant;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
@@ -195,6 +196,27 @@ test('anyFor() agrees with isOrphaned() for every shape this class builds', func
         ->and(Holders::anyFor($accountHeld))->toBeTrue()
         ->and(Holders::anyFor($everyoneHeld))->toBeTrue()
         ->and(Holders::anyFor($forbiddenOnly))->toBeTrue();
+});
+
+test('a scope the application put on its own grant model is honoured, not stepped over', function (): void {
+    config()->set('warden.models.grant', ScopedGrant::class);
+
+    // `Context` is a singleton built from config the first time anything asks
+    // for it, and booting the panel has already asked. Setting the key alone is
+    // too late; the instance has to go so the next `resolve()` rebuilds it.
+    app()->forgetInstance(Context::class);
+
+    $forbiddenOnly = makePermission('by-denial');
+
+    Warden::forbid(makeRole('editor'))->to($forbiddenOnly);
+
+    // `ScopedGrant` hides prohibitions, and warden reads grants through Eloquent,
+    // so the resolver cannot see this row either. A read that dropped EVERY
+    // global scope would see it and report the permission as held — a screen
+    // drawing a row nothing will ever answer with. Dropping only warden's own
+    // tenancy leaves the application's scope standing.
+    expect(Holders::anyFor($forbiddenOnly))->toBeFalse()
+        ->and(Holders::of($forbiddenOnly)->isOrphaned())->toBeTrue();
 });
 
 test('a memoised answer survives a grant made after it, until forget() is called', function (): void {

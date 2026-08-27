@@ -18,6 +18,7 @@ use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Exceptions\ConfigurationException;
 use ElPandaPe\Warden\Facades\Warden;
 use ElPandaPe\Warden\Tenancy\Tenancy;
+use ElPandaPe\Warden\Tenancy\TenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
@@ -657,7 +658,7 @@ final class RoleGrants
         }
 
         Context::resolve()->permissionClass()::query()
-            ->withoutGlobalScopes()
+            ->withoutGlobalScope(TenantScope::class)
             ->where('name', $change->name)
             ->whereNull('entity_type')
             // Every shape this package or warden has ever generated, because an
