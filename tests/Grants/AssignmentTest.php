@@ -614,6 +614,23 @@ test('take() leaves a restricted assignment alone', function (): void {
         ->and(assignmentCount())->toBe(1);
 });
 
+test('take() says no when the delete it asked for removed nothing', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::assign($role)->to($account);
+
+    // Read under a tenant, warden answers "global or this one", so the role
+    // reads as held here. Written under a tenant, `retract()` targets that one
+    // exact scope — and this assignment is at none — so it deletes nothing.
+    $result = Warden::tenant()->onceTo(5, static fn (): bool => Assignment::take($account, roleKey($role)));
+
+    expect($result)->toBeFalse()
+        ->and(assignmentCount())->toBe(1);
+});
+
 test('take() leaves a role alone this account may not hand out', function (): void {
     signIn();
 
