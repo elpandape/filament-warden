@@ -8,6 +8,58 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.3.0] - 2026-08-29
+
+What the audit can say. Three changes to what `--check` decides, made in one sitting on purpose:
+`Audit::isClean()` is a flat `&&` and the only source of the exit code, and this project has already
+measured that swapping one term for another leaves the count unchanged and no counting test can see
+it. Every test here is written over the exit code.
+
+### Added
+
+- **`filament-warden:audit --panel=`**, the option its sibling `filament-warden:catalog` has carried
+  since `1.9.0`. A name no panel answers to fails rather than quietly auditing everything, under a
+  key of the audit command's own — not the catalogue's, because a published translation may carry one
+  and not the other, and somebody chasing the sentence should land on the command that said it.
+
+- **A config entry this package reads and cannot use now turns a build red.** Four keys drop what
+  they cannot use and say nothing: `catalog.models`, `catalog.custom`, `catalog.scopes` and
+  `guard.panel`. The plan asked for the first two and made naming both a condition of doing either;
+  measuring found the other two share the shape exactly, and naming two of four would have been the
+  same mistake the condition was written to prevent. A typo in `catalog.models` takes a whole entity
+  out of every grid, and the only symptom was a screen quietly missing something. Red rather than
+  informational because it is clearable: nobody types one of these keys by accident, so the build is
+  telling its author about a line they wrote and got wrong.
+
+- **And one entry that does not vanish — it arrives wrong.** A `catalog.custom` scope that is not one
+  of the four names survives the filter, because a string is all that filter asks, and
+  `Catalog::fromCustom()` then falls back to `write` one layer down. A permission filed under the
+  wrong heading is worse than one that never appeared, so it is reported as its own finding with the
+  word it was given and the word it got.
+
+### Changed
+
+- **A panel that never registered this package is no longer told its screens are open.** A screen
+  with no `canAccess()` is open because Filament answers true for one — not because of anything this
+  package did — so on a panel that never asked for the grid it is somebody else's decision, and
+  reporting it turned an unrelated build red. This can only make such a build greener, which is the
+  safe direction for an audit and still a change worth stating.
+
+  **Scoped to that one bucket, and the reason is measured.** Skipping a pluginless panel's whole
+  contribution also drops its catalogue, and a permission only that panel declares then moves from
+  the informational *unused* list into the red *forgotten* one — a build going redder, which is the
+  opposite of the point. Ten other tests change meaning under that broader reading. Only the narrow
+  one was taken.
+
+### Not included
+
+- **A `guard.panel` key naming a panel that does not exist.** The four findings above are answered
+  from the config alone; that question needs the panel list, which is a different shape and would
+  make the finding depend on which panels happen to be booted.
+- **Detecting a policy that never consults warden.** Closed with reasons in `1.9.0` — undecidable
+  without running it, with three legitimate shapes measured that it would call false positives. Not
+  reopened without a new signal.
+
 ## [2.2.0] - 2026-08-26
 
 Untangling the cell. A cell the grid could not draw was stuck for the life of the installation: the
