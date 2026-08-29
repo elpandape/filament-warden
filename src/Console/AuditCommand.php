@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace ElPandaPe\FilamentWarden\Console;
 
 use ElPandaPe\FilamentWarden\Catalog\Audit;
+use Filament\Facades\Filament;
+use Filament\Panel;
 use Illuminate\Console\Command;
 
 /**
@@ -26,14 +28,23 @@ use Illuminate\Console\Command;
  */
 final class AuditCommand extends Command
 {
-    protected $signature = 'filament-warden:audit {--check : Exit with 1 when an actionable finding is reported; the informational lists never turn a build red}';
+    protected $signature = 'filament-warden:audit
+        {--check : Exit with 1 when an actionable finding is reported; the informational lists never turn a build red}
+        {--panel= : Only this panel, by id}';
 
     protected $description = 'Report screens nobody guards, resources with no policy, unused permissions and grants nothing declares';
 
     public function handle(): int
     {
-        $audit = Audit::run();
+        $panels = $this->panels();
 
+        if ($panels === null) {
+            return self::FAILURE;
+        }
+
+        $audit = Audit::of($panels);
+
+        $this->report(__('filament-warden::ui.console.audit.misconfigured'), $audit->misconfigured);
         $this->report(__('filament-warden::ui.console.audit.unmigrated'), $audit->unmigrated);
         $this->report(__('filament-warden::ui.console.audit.open'), $audit->open);
         $this->report(__('filament-warden::ui.console.audit.unpoliced'), $audit->unpoliced);
@@ -54,6 +65,36 @@ final class AuditCommand extends Command
         }
 
         return (bool) $this->option('check') ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * The panels to audit, or null when the name given matches none.
+     *
+     * The same shape `filament-warden:catalog` has carried since `1.9.0`, and it
+     * gets its own sentence rather than borrowing that command's: the two are
+     * separate keys because a published translation may have one and not the
+     * other, and a reader chasing "no panel with that id" should land on the
+     * command that said it.
+     *
+     * @return list<Panel>|null
+     */
+    private function panels(): ?array
+    {
+        $id = $this->option('panel');
+
+        if (! is_string($id) || $id === '') {
+            return array_values(Filament::getPanels());
+        }
+
+        $panel = Filament::getPanels()[$id] ?? null;
+
+        if (! $panel instanceof Panel) {
+            $this->components->error((string) __('filament-warden::ui.console.audit.unknown_panel', ['panel' => $id]));
+
+            return null;
+        }
+
+        return [$panel];
     }
 
     /**

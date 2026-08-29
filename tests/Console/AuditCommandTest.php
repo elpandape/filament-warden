@@ -5,6 +5,8 @@ declare(strict_types=1);
 use ElPandaPe\FilamentWarden\Catalog\Audit;
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Filament\RelationManagers\RolesRelationManager;
+use ElPandaPe\FilamentWarden\FilamentWardenPlugin;
+use ElPandaPe\FilamentWarden\Support\Config;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\BrokenPolicyResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\ClosureGroupResource;
@@ -388,8 +390,78 @@ test('wiring this package own relation manager, as the readme says to, leaves ch
         ->and(audit(check: true))->toBe(0);
 });
 
+test('--panel audits the one named and leaves the others out of it', function (): void {
+    Filament::getPanel('test')->resources([BrokenPolicyResource::class]);
+
+    // The finding belongs to `test`, so asking for `bare` has to come back with
+    // nothing — and asking for nothing at all has to still find it.
+    expect(Audit::of([Filament::getPanel('bare')])->unpoliced)->toBeEmpty()
+        ->and(Audit::run()->unpoliced)->not->toBeEmpty();
+
+    expect(Artisan::call('filament-warden:audit', ['--panel' => 'bare', '--check' => true]))->toBe(0)
+        ->and(Artisan::call('filament-warden:audit', ['--check' => true]))->toBe(1);
+});
+
+test('--panel with a name no panel answers to fails rather than auditing everything', function (): void {
+    Filament::getPanel('test')->resources([BrokenPolicyResource::class]);
+
+    expect(Artisan::call('filament-warden:audit', ['--panel' => 'nowhere', '--check' => true]))->toBe(1)
+        ->and(auditOutput())->toContain((string) __('filament-warden::ui.console.audit.unknown_panel', ['panel' => 'nowhere']));
+});
+
+test('a config entry this package cannot use turns the build red, in all four keys', function (): void {
+    config()->set('filament-warden.catalog.models', ['App\\Models\\Gone']);
+
+    expect(audit(check: true))->toBe(1)
+        ->and(Audit::run()->misconfigured)->toHaveCount(1);
+
+    config()->set('filament-warden.catalog.models', []);
+    config()->set('filament-warden.catalog.custom', ['export' => 42]);
+
+    expect(audit(check: true))->toBe(1);
+
+    config()->set('filament-warden.catalog.custom', []);
+    config()->set('filament-warden.catalog.scopes', ['read' => 'viewAny']);
+
+    expect(audit(check: true))->toBe(1);
+
+    config()->set('filament-warden.catalog.scopes', []);
+    config()->set('filament-warden.guard.panel', ['test' => '']);
+
+    expect(audit(check: true))->toBe(1);
+});
+
+test('a scope no column of the grid answers to is reported, because it is filed not dropped', function (): void {
+    // The other four vanish. This one SURVIVES `Config::custom()` — it is a
+    // string, which is all that filter asks — and `Catalog::fromCustom()` then
+    // falls back to `Scope::Write` one layer down. A permission under the wrong
+    // heading is worse than one that never appeared, so it says so separately.
+    config()->set('filament-warden.catalog.custom', ['export' => 'reed']);
+
+    expect(Config::custom())->toBe(['export' => 'reed'])
+        ->and(audit(check: true))->toBe(1)
+        ->and(Audit::run()->misconfigured[0])->toContain('filed under write instead');
+});
+
+test('a panel that never registered this package is not told its screens are open', function (): void {
+    $asked = Panel::make()->id('asked')->plugin(FilamentWardenPlugin::make())->pages([Reports::class]);
+    $never = Panel::make()->id('never')->pages([Reports::class]);
+
+    // The same screen, on two panels. Only the one that asked for this package
+    // hears about it — and a build that never installed the grid does not go red
+    // over Filament's own default answer.
+    expect(Audit::of([$asked])->open)->toBe(['asked: '.Reports::class])
+        ->and(Audit::of([$never])->open)->toBeEmpty()
+        ->and(Audit::of([$never])->isClean())->toBeTrue();
+});
+
 test('a screen nobody guards reaches the audit, which is how the guard reaches CI', function (): void {
-    $panel = Panel::make()->id('scratch')->pages([Reports::class]);
+    // The plugin is registered on purpose, and the test would be empty without
+    // it: since `2.3.0` this bucket only speaks for panels that asked for it,
+    // because a screen with no `canAccess()` is open by Filament's own default
+    // and reporting one on a panel that never registered this package turns
+    // somebody else's build red over a decision this package was not asked to make.
+    $panel = Panel::make()->id('scratch')->plugin(FilamentWardenPlugin::make())->pages([Reports::class]);
 
     expect(Audit::of([$panel])->open)->toBe(['scratch: '.Reports::class]);
 });

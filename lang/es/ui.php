@@ -223,6 +223,7 @@ return [
 
     'console' => [
         'audit' => [
+            'unknown_panel' => 'No hay ningún panel con el id [:panel].',
             'unmigrated' => 'El catálogo de warden sigue en su forma anterior a la 2.0: no tiene columna `identity_key`. Publica y ejecuta la migración de warden —`php artisan vendor:publish --tag=warden-migrations-v2` y después `php artisan migrate`— o el primer permiso que alguien guarde fallará. Si la migración se para en duplicados, ejecuta antes `php artisan warden:clean --duplicates`.',
             'open' => 'Pantallas que no deciden quién entra. Filament contesta que sí por ellas, así que están abiertas a cualquiera que llegue al panel.',
             'unpoliced' => 'Recursos cuyo modelo no tiene Policy. Es el caso en el que Filament falla abierto.',
@@ -233,6 +234,7 @@ return [
             'unkeyable' => 'Nombres del catálogo con un punto. Livewire parte las rutas de estado por puntos, así que no pueden ser una celda: una pantalla de rol lanza en cuanto dibuja una. Renombra el permiso.',
             'unwalkable' => 'Modelos a los que solo llega un relation manager. Llegar a uno exige ejecutar la relación, que aquí no es seguro hacer, así que se nombran en vez de resolverse. Un relation manager que declara `$relatedResource` se recorre gratis; uno que no puede declararlo se queda en esta lista para siempre —el `RolesRelationManager` de este paquete es uno, a propósito—. `catalog.models` es lo que mete el modelo en el catálogo; no quita la línea.',
             'stranded' => 'Concesiones cuya autoridad ya no existe. Ninguna cascada de la base las alcanza. Warden barre un ROL borrado por evento de modelo; una cuenta, una subclase de rol y todo lo borrado por SQL crudo quedan atrás. Ejecuta `warden:clean --stranded` para quitarlas.',
+            'misconfigured' => 'Entradas de configuración que este paquete lee y no puede usar. Cada una se descartó en silencio, así que lo que falta en una pantalla nunca dijo por qué. Corrige la línea o quítala.',
             'clean' => 'Nada que informar.',
         ],
         'catalog' => [

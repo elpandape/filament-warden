@@ -40,7 +40,7 @@ pest()->extend(TestCase::class);
  */
 function gateBuckets(): array
 {
-    return ['open', 'unpoliced', 'forgotten', 'strays', 'drifted', 'unkeyable', 'unmigrated'];
+    return ['open', 'unpoliced', 'forgotten', 'strays', 'drifted', 'unkeyable', 'unmigrated', 'misconfigured'];
 }
 
 /**
@@ -71,6 +71,7 @@ function auditWith(string $bucket): Audit
         unkeyable: $bucket === 'unkeyable' ? $finding : [],
         stranded: $bucket === 'stranded' ? $finding : [],
         unmigrated: $bucket === 'unmigrated' ? $finding : [],
+        misconfigured: $bucket === 'misconfigured' ? $finding : [],
     );
 }
 

@@ -6,6 +6,8 @@ namespace ElPandaPe\FilamentWarden\Catalog;
 
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Guard;
+use ElPandaPe\FilamentWarden\FilamentWardenPlugin;
+use ElPandaPe\FilamentWarden\Support\Config;
 use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Context;
 use Filament\Facades\Filament;
@@ -36,6 +38,7 @@ final readonly class Audit
      * @param  list<string>  $unkeyable  catalogue names the grid cannot key, which throw when a role screen renders
      * @param  list<string>  $stranded  grants whose authority no longer exists
      * @param  list<string>  $unmigrated  what warden's own schema is missing
+     * @param  list<string>  $misconfigured  config entries this package reads and drops
      */
     public function __construct(
         public array $open = [],
@@ -48,6 +51,7 @@ final readonly class Audit
         public array $unkeyable = [],
         public array $stranded = [],
         public array $unmigrated = [],
+        public array $misconfigured = [],
     ) {}
 
     public static function run(): self
@@ -69,8 +73,22 @@ final readonly class Audit
         $types = [];
 
         foreach ($panels as $panel) {
-            foreach (Guard::unguarded($panel) as $screen) {
-                $open[] = $panel->getId().': '.$screen;
+            // Only the panel that asked. A screen with no `canAccess()` is open
+            // because FILAMENT answers true for one, not because this package
+            // did anything — so on a panel that never registered the plugin it
+            // is somebody else's decision, and reporting it turns an unrelated
+            // build red over a screen this package was never asked to guard.
+            //
+            // Scoped to THIS bucket and no other, deliberately. Skipping a
+            // pluginless panel's whole contribution also drops its catalogue
+            // from `$declared`, and a permission only that panel declares then
+            // moves from the informational `orphans` bucket to the red
+            // `forgotten` one — measured. That would make a build REDDER, which
+            // is the opposite of what this change is for.
+            if ($panel->hasPlugin(FilamentWardenPlugin::make()->getId())) {
+                foreach (Guard::unguarded($panel) as $screen) {
+                    $open[] = $panel->getId().': '.$screen;
+                }
             }
 
             foreach (self::unpoliced($panel) as $finding) {
@@ -114,6 +132,7 @@ final readonly class Audit
             unkeyable: array_values(array_unique($unkeyable)),
             stranded: self::stranded(),
             unmigrated: self::unmigrated(),
+            misconfigured: self::misconfigured(),
         );
     }
 
@@ -149,7 +168,8 @@ final readonly class Audit
             && $this->forgotten === []
             && $this->strays === []
             && $this->drifted === []
-            && $this->unkeyable === [];
+            && $this->unkeyable === []
+            && $this->misconfigured === [];
     }
 
     /**
@@ -202,6 +222,87 @@ final readonly class Audit
         }
 
         return [$table];
+    }
+
+    /**
+     * Config entries this package reads and silently drops.
+     *
+     * Every one of these readers filters what it cannot use and says nothing, so
+     * a typo in `catalog.models` takes a whole entity out of every grid and the
+     * only symptom is a screen that is quietly missing something. Nobody types
+     * one of these keys by accident, so a build going red over one is a build
+     * telling its author about a line they wrote and got wrong — clearable, and
+     * therefore a gate rather than a permanent light (§6.39).
+     *
+     * All four are named because naming two would be the shape this package
+     * keeps paying for: `catalog.models` and `catalog.custom` are what the plan
+     * asked for, and `catalog.scopes` and `guard.panel` were measured to drop
+     * the same way. What is NOT here is a `guard.panel` key naming a panel that
+     * does not exist: that question needs the panel list, and this one is
+     * answered from the config alone.
+     *
+     * @return list<string>
+     */
+    private static function misconfigured(): array
+    {
+        $findings = [];
+
+        $models = Config::get('catalog.models');
+
+        foreach (is_array($models) ? $models : [] as $model) {
+            if (! is_string($model) || ! is_subclass_of($model, Model::class)) {
+                $findings[] = 'catalog.models: '.self::shown($model).' is not an Eloquent model class, so it declares nothing';
+            }
+        }
+
+        $custom = Config::get('catalog.custom');
+
+        foreach (is_array($custom) ? $custom : [] as $name => $scope) {
+            if (! is_string($name) || ! is_string($scope)) {
+                $findings[] = 'catalog.custom: '.self::shown($name).' => '.self::shown($scope).' is not a name and a scope, so it mints no permission';
+
+                continue;
+            }
+
+            // Not dropped — ACCEPTED and quietly downgraded one layer down, in
+            // `Catalog::fromCustom()`, where an unknown word falls back to
+            // `Scope::Write`. A permission filed under the wrong heading is
+            // worse than one that never appeared, so it is said separately.
+            if (Scope::tryFrom($scope) === null) {
+                $findings[] = 'catalog.custom: '.$name.' asks for the scope ['.$scope.'], which is not one of '
+                    .implode(', ', array_column(Scope::cases(), 'value')).' — it is filed under write instead';
+            }
+        }
+
+        $scopes = Config::get('catalog.scopes');
+
+        foreach (is_array($scopes) ? $scopes : [] as $scope => $actions) {
+            if (! is_string($scope) || ! is_array($actions)) {
+                $findings[] = 'catalog.scopes: '.self::shown($scope).' does not name a list of actions, so its column is empty';
+            }
+        }
+
+        $panels = Config::get('guard.panel');
+
+        foreach (is_array($panels) ? $panels : [] as $panel => $name) {
+            if (! is_string($name) || $name === '') {
+                $findings[] = 'guard.panel: '.self::shown($panel).' => '.self::shown($name).' is not a permission name, so that door keeps the generated one';
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * A config value as a person would recognise it in their own file.
+     */
+    private static function shown(mixed $value): string
+    {
+        return match (true) {
+            is_string($value) => '['.$value.']',
+            is_int($value) => '['.$value.']',
+            default => '['.get_debug_type($value).']',
+        };
     }
 
     /**
