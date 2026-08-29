@@ -116,6 +116,20 @@ final readonly class Cell
      */
     public function isOperable(bool $interactive): bool
     {
-        return $interactive && ! $this->isLocked();
+        return $interactive && (! $this->isLocked() || $this->isClearable());
+    }
+
+    /**
+     * Whether the only thing this cell will accept is being emptied.
+     *
+     * A tangled cell is drawn locked and still is: it carries no reach the
+     * builder can open and the browser is handed none. What it accepts is the
+     * one move that needs neither — going off — and the server is what holds
+     * that line, not this flag. Asked for anything else it writes nothing and
+     * the save says which cells it left alone.
+     */
+    public function isClearable(): bool
+    {
+        return $this->declared && $this->narrowing->isClearable();
     }
 }

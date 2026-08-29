@@ -204,6 +204,11 @@ final readonly class Narrowing
         return $this->shape->isEditable();
     }
 
+    public function isClearable(): bool
+    {
+        return $this->shape->isClearable();
+    }
+
     public function isNarrowed(): bool
     {
         return $this->shape->isNarrowed();

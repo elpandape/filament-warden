@@ -311,6 +311,10 @@ return [
             'refused' => 'Somebody else changed these while you had this open, so what you set was not written. Check what they hold now and set yours again: :cells',
             'more' => 'and :count more',
         ],
+        'tangled' => [
+            'title' => 'Saved, but two cells hold two rules each',
+            'body' => 'The store holds two rules for these, so this screen will not choose between them — it will only take both away. Switch them off, save, and set them again: :cells',
+        ],
         'mixing' => 'No tenant is active, so this shows every tenant at once — that is what the store answers right now. A row that belongs to another tenant is marked and cannot be changed from here.',
         'wider' => 'This role holds a rule wider than the grid can show, so every cell below is already answered:',
         'records' => 'This role also holds rules pinned to single records. They answer no check about the entity as a whole, so they own no cell below — and this screen cannot change them:',

@@ -228,18 +228,36 @@ final class RoleGrants
         $changes = [];
         $preserved = 0;
         $refused = [];
+        $unresolved = [];
 
         foreach (self::cells($catalog) as [$row, $action, $name, $entity]) {
             $stored = $current->narrowings[$row][$action] ?? Narrowing::all();
 
-            // A cell the grid cannot draw is a cell it must not write: rewriting
-            // it would round it off into something it is not.
-            if (! $stored->isEditable()) {
-                continue;
-            }
-
             $from = self::stanceIn($current->stances, $row, $action);
             $to = self::stanceIn($desired, $row, $action);
+
+            // A cell the grid cannot draw is a cell it must not write: rewriting
+            // it would round it off into something it is not. Emptying one is a
+            // different question — it reads no reach and rebuilds none — and for
+            // a tangled cell it is the only way out of the panel there has ever
+            // been. Anything else asked of a tangled cell is reported rather
+            // than skipped: the screen let the stance move, so silence would
+            // read as a save that worked.
+            if (! $stored->isEditable()) {
+                if (! $stored->isClearable() || $from === $to) {
+                    continue;
+                }
+
+                if ($to !== Stance::Abstain) {
+                    $unresolved[] = ['row' => $row, 'action' => $action];
+
+                    continue;
+                }
+
+                $changes[] = new Change($name, $entity, $to, Narrowing::all());
+
+                continue;
+            }
 
             // Abstaining is the absence of a row, and a row that does not exist
             // has no reach to narrow.
@@ -311,7 +329,7 @@ final class RoleGrants
             $changes[] = new Change($name, $entity, $to, $moved ? $wanted : $stored);
         }
 
-        return [$changes, new SaveReport(count($changes), $preserved, $refused)];
+        return [$changes, new SaveReport(count($changes), $preserved, $refused, $unresolved)];
     }
 
     /**

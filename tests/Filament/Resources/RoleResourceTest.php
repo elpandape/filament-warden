@@ -1173,6 +1173,49 @@ test('the screen re-reads the store after a save, so the next one does not colli
         ->assertSet('data.permissions.baseline.stances.'.roleClass().'.viewAny', 'granted');
 });
 
+test('a tangled cell is emptied from the screen, which is the only way out there has ever been', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    Warden::allow($role)->to('update', roleClass())->where('name', 'alpha');
+    Warden::allow($role)->to('update', roleClass());
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->set('data.permissions.stances.'.roleClass().'.update', 'abstain')
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(Access::granted($role, 'update', roleClass()))->toBeFalse();
+});
+
+test('a tangled cell asked for anything but off says so rather than going quiet', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    Warden::allow($role)->to('update', roleClass())->where('name', 'alpha');
+    Warden::allow($role)->to('update', roleClass());
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->set('data.permissions.stances.'.roleClass().'.update', 'forbidden')
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $sent = lastNotification();
+    $body = $sent?->getBody();
+
+    expect($sent?->getTitle())->toBe(__('filament-warden::ui.grid.tangled.title'))
+        ->and(is_string($body) ? $body : '')
+        ->toContain(GridView::cellLabel(catalogForRoles(), roleClass(), 'update'));
+});
+
 test('a save that refuses more cells than it names counts the rest', function (): void {
     $user = signIn();
     $role = makeRole();

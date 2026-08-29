@@ -434,6 +434,8 @@ test('the translation keys an application overrides are frozen', function (): vo
         'grid.concurrent.refused_title',
         'grid.concurrent.refused',
         'grid.concurrent.more',
+        'grid.tangled.title',
+        'grid.tangled.body',
         'grid.mixing',
         'grid.wider',
         'grid.records',

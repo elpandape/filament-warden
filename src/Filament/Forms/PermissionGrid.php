@@ -123,6 +123,21 @@ final class PermissionGrid extends Field
      */
     public function announce(SaveReport $report): void
     {
+        if (! $report->metAnother() && $report->unresolved === []) {
+            return;
+        }
+
+        if ($report->unresolved !== []) {
+            $this->sendAfterCommit(
+                Notification::make()
+                    ->warning()
+                    ->title(__('filament-warden::ui.grid.tangled.title'))
+                    ->body(__('filament-warden::ui.grid.tangled.body', [
+                        'cells' => $this->namedCells($report->unresolved),
+                    ])),
+            );
+        }
+
         if (! $report->metAnother()) {
             return;
         }
@@ -137,14 +152,7 @@ final class PermissionGrid extends Field
                 ->title(__('filament-warden::ui.grid.concurrent.refused_title'))
                 ->body(__('filament-warden::ui.grid.concurrent.refused', ['cells' => $this->refusedCells($report)]));
 
-        // `Model::getConnection()` returns the concrete `Connection`, which
-        // declares `afterCommit()`; `Builder::getConnection()` is typed
-        // `ConnectionInterface` and does not.
-        (new (Context::resolve()->grantClass()))->getConnection()->afterCommit(
-            static function () use ($notification): void {
-                $notification->send();
-            },
-        );
+        $this->sendAfterCommit($notification);
     }
 
     /**
@@ -170,26 +178,54 @@ final class PermissionGrid extends Field
 
     /**
      * The refused cells, in the grid's own words.
-     *
-     * Asking the catalogue again is free since it was memoised per panel, and
-     * it is what keeps one cell from having two names on one screen.
      */
     private function refusedCells(SaveReport $report): string
+    {
+        return $this->namedCells($report->refused);
+    }
+
+    /**
+     * A list of cells, in the grid's own words.
+     *
+     * Asking the catalogue again is free since it was memoised per panel, and
+     * it is what keeps one cell from having two names on one screen. Shared by
+     * the two lists a save can report, which name cells for different reasons
+     * and must not name them differently.
+     *
+     * @param  list<array{row: string, action: string}>  $cells
+     */
+    private function namedCells(array $cells): string
     {
         $catalog = $this->catalog();
 
         $named = array_map(
             fn (array $cell): string => GridView::cellLabel($catalog, $cell['row'], $cell['action']),
-            array_slice($report->refused, 0, self::NAMED),
+            array_slice($cells, 0, self::NAMED),
         );
 
-        $rest = count($report->refused) - count($named);
+        $rest = count($cells) - count($named);
 
         if ($rest > 0) {
             $named[] = (string) __('filament-warden::ui.grid.concurrent.more', ['count' => $rest]);
         }
 
         return implode(', ', $named);
+    }
+
+    /**
+     * A notification the grid sends once the write it describes is committed.
+     *
+     * `Model::getConnection()` returns the concrete `Connection`, which declares
+     * `afterCommit()`; `Builder::getConnection()` is typed `ConnectionInterface`
+     * and does not.
+     */
+    private function sendAfterCommit(Notification $notification): void
+    {
+        (new (Context::resolve()->grantClass()))->getConnection()->afterCommit(
+            static function () use ($notification): void {
+                $notification->send();
+            },
+        );
     }
 
     /**

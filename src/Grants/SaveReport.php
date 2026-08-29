@@ -35,11 +35,13 @@ final readonly class SaveReport
 {
     /**
      * @param  list<array{row: string, action: string}>  $refused
+     * @param  list<array{row: string, action: string}>  $unresolved
      */
     public function __construct(
         public int $written = 0,
         public int $preserved = 0,
         public array $refused = [],
+        public array $unresolved = [],
     ) {}
 
     /**

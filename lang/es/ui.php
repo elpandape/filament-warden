@@ -311,6 +311,10 @@ return [
             'refused' => 'Otra persona cambió estas mientras tenías esto abierto, así que lo tuyo no se ha escrito. Mira lo que tienen ahora y vuelve a ponerlo: :cells',
             'more' => 'y :count más',
         ],
+        'tangled' => [
+            'title' => 'Guardado, pero hay celdas con dos reglas',
+            'body' => 'La tienda guarda dos reglas para estas, así que esta pantalla no elige entre ellas: solo puede quitar las dos. Apágalas, guarda, y vuelve a ponerlas: :cells',
+        ],
         'mixing' => 'No hay ningún tenant activo, así que esto enseña todos a la vez — es lo que el almacén responde ahora mismo. Una fila de otro tenant sale marcada y no se puede cambiar desde aquí.',
         'wider' => 'Este rol tiene una regla más amplia de lo que la rejilla puede enseñar, así que cada celda de abajo ya está contestada:',
         'records' => 'Este rol tiene además reglas clavadas a registros concretos. No contestan ninguna comprobación sobre la entidad entera, así que no ocupan ninguna celda de abajo — y esta pantalla no las puede cambiar:',

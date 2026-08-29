@@ -599,17 +599,63 @@ test('a rule the table cannot hold leaves the store exactly as it was', function
         ->and(grantCount())->toBe(1);
 });
 
-test('two rows for one cell are shown, said out loud, and never written over', function (): void {
+test('two rows for one cell are shown, said out loud, and never chosen between', function (): void {
     $role = makeRole();
 
     Warden::allow($role)->to('update', Post::class)->where('title', 'alpha');
     Warden::allow($role)->to('update', Post::class);
 
-    $state = RoleGrants::of($role, gridCatalog());
+    $narrowing = RoleGrants::of($role, gridCatalog())->narrowings[Post::class]['update'];
 
-    expect($state->narrowings[Post::class]['update']->shape)->toBe(Shape::Tangled)
-        ->and($state->narrowings[Post::class]['update']->isEditable())->toBeFalse()
-        ->and(RoleGrants::changes($role, gridCatalog(), [], []))->toBeEmpty();
+    // Not editable and never was; what changed in `2.2.0` is that it is now
+    // CLEARABLE, which is a smaller permission than being writable — emptying
+    // reads no reach and rebuilds none. Asked to move to another stance it
+    // still writes nothing, and now says so instead of going quiet.
+    expect($narrowing->shape)->toBe(Shape::Tangled)
+        ->and($narrowing->isEditable())->toBeFalse()
+        ->and($narrowing->isClearable())->toBeTrue();
+
+    $before = grantCount();
+
+    $report = RoleGrants::apply($role, gridCatalog(), [Post::class => ['update' => 'forbidden']]);
+
+    expect($report->written)->toBe(0)
+        ->and(grantCount())->toBe($before)
+        ->and($report->unresolved)->toBe([['row' => Post::class, 'action' => 'update']]);
+});
+
+test('clearing a tangled cell takes both of its rules with it', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    Warden::allow($role)->to('update', Post::class)->where('title', 'alpha');
+    Warden::allow($role)->to('update', Post::class);
+
+    expect(RoleGrants::of($role, $catalog)->narrowings[Post::class]['update']->shape)
+        ->toBe(Shape::Tangled);
+
+    RoleGrants::apply($role, $catalog, []);
+
+    expect(grantCount())->toBe(0)
+        ->and(RoleGrants::of($role, $catalog)->stances)->toBeEmpty();
+});
+
+test('flipping a tangled cell does not widen it to every row', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+
+    Warden::allow($role)->to('update', Post::class)->where('title', 'alpha');
+    Warden::allow($role)->to('update', Post::class);
+
+    // The stance moves and NOTHING says anything about the reach — which is the
+    // shape a real click has, because the browser is never handed a tangled
+    // cell's narrowing to send back. A save that read that silence as "every
+    // row" would turn a rule that names one title into one that names none.
+    RoleGrants::apply($role, $catalog, [Post::class => ['update' => 'forbidden']]);
+
+    $narrowing = RoleGrants::of($role, $catalog)->narrowings[Post::class]['update'] ?? null;
+
+    expect($narrowing?->shape)->not->toBe(Shape::All);
 });
 
 test('an application that vetoes the grant is answered, not argued with', function (): void {
