@@ -9,6 +9,7 @@ use ElPandaPe\FilamentWarden\Catalog\Provenance;
 use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
 use ElPandaPe\FilamentWarden\Grants\Holders;
+use ElPandaPe\FilamentWarden\Support\Line;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\DeleteAction;
@@ -34,6 +35,21 @@ final class PermissionsTable
     {
         return $table
             ->defaultSort('name')
+            // A fresh install has no rows at all, and Filament's own default
+            // says only "No Permissions" — true, and no help: this store fills
+            // as roles are granted, never from this screen. The pointer names
+            // both ways to see the catalogue because an installation that
+            // called `->roles(false)` only has the second.
+            ->emptyStateHeading(__('filament-warden::ui.resources.permissions.empty.heading'))
+            // Filament draws the empty state on ANY render with no rows, a
+            // search or a filter that matches nothing included — and there the
+            // pointer would be a lie, since the catalogue is not empty. Asking
+            // for the indicators is Filament's own answer to "is anything
+            // narrowing this", covers search, per-column search and every
+            // filter, and costs no query.
+            ->emptyStateDescription(static fn (Table $table): ?string => $table->getFilterIndicators() === []
+                ? Line::of('filament-warden::ui.resources.permissions.empty.description')
+                : null)
             ->columns([
                 TextColumn::make('title')
                     ->label(__('filament-warden::ui.resources.permissions.columns.title'))

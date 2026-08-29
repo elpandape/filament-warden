@@ -1375,3 +1375,30 @@ test('a save that collides with the catalogue index says so on the field', funct
 
     expect($twin->refresh()->getAttribute('entity_type'))->toBe(new Comment()->getMorphClass());
 });
+
+test('an empty catalogue points at the two places that do show one', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+
+    $table = livewire(ListPermissions::class)->instance()->getTable();
+
+    expect($table->getEmptyStateHeading())
+        ->toBe(__('filament-warden::ui.resources.permissions.empty.heading'))
+        ->and($table->getEmptyStateDescription())
+        ->toBe(__('filament-warden::ui.resources.permissions.empty.description'))
+        ->and($table->getEmptyStateDescription())
+        ->toContain('filament-warden:catalog');
+});
+
+test('a table narrowed to nothing is not told the catalogue is empty', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+
+    $screen = livewire(ListPermissions::class)->set('tableSearch', 'nothing matches this');
+
+    expect($screen->instance()->getTable()->getEmptyStateDescription())->toBeNull();
+
+    $screen->assertCanSeeTableRecords([])
+        ->assertSee(__('filament-warden::ui.resources.permissions.empty.heading'))
+        ->assertDontSee('filament-warden:catalog');
+});

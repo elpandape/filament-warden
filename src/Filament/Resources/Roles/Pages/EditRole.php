@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages;
 
+use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Tables\RolesTable;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 
@@ -69,5 +71,24 @@ class EditRole extends EditRecord
     protected function afterSave(): void
     {
         $this->fillForm();
+    }
+
+    /**
+     * The plain "Saved" says a save happened; this says what it did.
+     *
+     * The words come from the field because the field is what computed them,
+     * and they hang on this page's own notification rather than arriving as a
+     * second toast — an ordinary save is the common case, and two notifications
+     * for it would be noise. What the save MET stays with the field, which
+     * sends its own only when there is something exceptional to say.
+     */
+    protected function getSavedNotification(): ?Notification
+    {
+        $notification = parent::getSavedNotification();
+        $body = PermissionGrid::savedBody();
+
+        return $notification instanceof Notification && $body !== null
+            ? $notification->body($body)
+            : $notification;
     }
 }

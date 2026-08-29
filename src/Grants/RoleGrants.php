@@ -329,7 +329,20 @@ final class RoleGrants
             $changes[] = new Change($name, $entity, $to, $moved ? $wanted : $stored);
         }
 
-        return [$changes, new SaveReport(count($changes), $preserved, $refused, $unresolved)];
+        $tally = array_count_values(array_map(
+            static fn (Change $change): string => $change->to->value,
+            $changes,
+        ));
+
+        return [$changes, new SaveReport(
+            count($changes),
+            $preserved,
+            $refused,
+            $unresolved,
+            $tally[Stance::Granted->value] ?? 0,
+            $tally[Stance::Forbidden->value] ?? 0,
+            $tally[Stance::Abstain->value] ?? 0,
+        )];
     }
 
     /**

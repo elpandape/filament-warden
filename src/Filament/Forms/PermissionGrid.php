@@ -112,6 +112,46 @@ final class PermissionGrid extends Field
     }
 
     /**
+     * What a save wrote, split by the stance each cell was moved to.
+     *
+     * A page hangs this on its own "Saved" rather than the field sending a
+     * second toast, because an ordinary save is the common case and two
+     * notifications for it would be noise. The exceptional halves stay with
+     * `announce()`: only the field can name a cell, and only it knows the ones
+     * a save met or refused.
+     *
+     * Static, and reading the report off the container, because the pages that
+     * want it are not the field and Filament rebuilds every component in the
+     * schema each request — the binding lives exactly as long as the request
+     * that made it. That is also the recipe the README hands to a page this
+     * package does not own.
+     *
+     * Null when nothing was written, so the sentence is ABSENT rather than a
+     * row of zeroes: a save that changed nothing has nothing to say, and the
+     * clauses are composed from the counts above zero for the same reason.
+     */
+    public static function savedBody(): ?string
+    {
+        $report = app()->bound(SaveReport::class) ? app(SaveReport::class) : null;
+
+        if (! $report instanceof SaveReport || $report->written < 1) {
+            return null;
+        }
+
+        $clauses = [];
+
+        foreach (['granted', 'forbidden', 'revoked'] as $stance) {
+            $count = $report->{$stance};
+
+            if ($count > 0) {
+                $clauses[] = trans_choice("filament-warden::ui.grid.saved.{$stance}", $count);
+            }
+        }
+
+        return $clauses === [] ? null : implode(', ', $clauses);
+    }
+
+    /**
      * What the save did, said once and in the grid's own words.
      *
      * Sent through `afterCommit` and not straight away, because this runs

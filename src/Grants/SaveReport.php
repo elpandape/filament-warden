@@ -24,12 +24,17 @@ namespace ElPandaPe\FilamentWarden\Grants;
  * words belong to the screen: the row and action keys the grid is drawn from, so
  * a caller looks their titles up in the catalogue it already has.
  *
+ * `granted`, `forbidden` and `revoked` split `written` by the stance each cell
+ * was moved TO, so a save can say what it did rather than how much of it there
+ * was. They are the grid's own breakdown and stay at zero on the account
+ * screen, where a role is held or it is not and no stance exists to count.
+ *
  * The account screen shares this class and never fills that list — a role is
  * held or it is not, so two people can only ever have moved one the same way,
  * and `Assignment::apply()` explains why the branch does not exist. The shape
- * stays the grid's for the reason a wider one cost: typed as any map, pushing a
- * key `EditRole::refusedCells()` does not read passes `level: max` and fails at
- * runtime instead. A shape no code produces is not worth a static guarantee.
+ * stays the grid's for the reason a wider one cost: typed as any map, pushing
+ * a key `PermissionGrid::refusedCells()` does not read passes `level: max` and
+ * fails at runtime instead. A shape no code produces is not worth a static guarantee.
  */
 final readonly class SaveReport
 {
@@ -42,6 +47,9 @@ final readonly class SaveReport
         public int $preserved = 0,
         public array $refused = [],
         public array $unresolved = [],
+        public int $granted = 0,
+        public int $forbidden = 0,
+        public int $revoked = 0,
     ) {}
 
     /**

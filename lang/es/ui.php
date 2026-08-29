@@ -62,6 +62,10 @@ return [
                 'held_yes' => 'En poder de alguien',
                 'held_no' => 'Huérfano',
             ],
+            'empty' => [
+                'heading' => 'Todavía no se ha concedido nada',
+                'description' => 'La tienda se llena conforme se dan permisos a los roles: abre un rol y usa su rejilla. Para ver lo que declaran los paneles antes de que nada esté guardado, ejecuta `php artisan filament-warden:catalog`.',
+            ],
             'fields' => [
                 'name' => 'Nombre',
                 'name_help_derived' => 'Lo escribe el método de la Policy que lo declara. Cambiarlo no rompe nada con ruido: desconecta la fila del código que la pregunta.',
@@ -316,6 +320,11 @@ return [
         'tangled' => [
             'title' => 'Guardado, pero hay celdas con dos reglas',
             'body' => 'La tienda guarda dos reglas para estas, así que esta pantalla no elige entre ellas: solo puede quitar las dos. Apágalas, guarda, y vuelve a ponerlas: :cells',
+        ],
+        'saved' => [
+            'granted' => '{1} 1 concedida|[2,*] :count concedidas',
+            'forbidden' => '{1} 1 prohibida|[2,*] :count prohibidas',
+            'revoked' => '{1} 1 revocada|[2,*] :count revocadas',
         ],
         'mixing' => 'No hay ningún tenant activo, así que esto enseña todos a la vez — es lo que el almacén responde ahora mismo. Una fila de otro tenant sale marcada y no se puede cambiar desde aquí.',
         'wider' => 'Este rol tiene una regla más amplia de lo que la rejilla puede enseñar, así que cada celda de abajo ya está contestada:',

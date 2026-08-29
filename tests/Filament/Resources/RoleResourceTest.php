@@ -5,6 +5,7 @@ declare(strict_types=1);
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
+use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\CreateRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\EditRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ListRoles;
@@ -422,7 +423,7 @@ test('a protected role shows its grid and does not let it be operated', function
     livewire(EditRole::class, ['record' => $role->getKey()])
         ->assertSchemaComponentExists(
             'permissions',
-            checkComponentUsing: fn (ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid $field): bool => $field->isDisabled(),
+            checkComponentUsing: fn (PermissionGrid $field): bool => $field->isDisabled(),
         )
         ->assertSee('fw-locked', escape: false)
         ->assertDontSee('x-on:click="cycle(', escape: false);
@@ -1265,4 +1266,68 @@ test('the screen shows the name that was actually written, not what was typed', 
         ->call('save')
         ->assertHasNoFormErrors()
         ->assertSet('data.name', 'super-admin');
+});
+
+test('an ordinary save says what it did, not only that it happened', function (): void {
+    $user = signIn();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole();
+
+    Warden::allow($role)->to('view', roleClass());
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->fillForm(['permissions' => ['stances' => [roleClass() => [
+            'viewAny' => 'granted',
+            'create' => 'granted',
+            'update' => 'forbidden',
+            'view' => 'abstain',
+        ]]]])
+        ->call('save')
+        ->assertHasNoFormErrors()
+        ->assertNotified(Notification::make()
+            ->success()
+            ->title(__('filament-panels::resources/pages/edit-record.notifications.saved.title'))
+            ->body('2 granted, 1 forbidden, 1 revoked'));
+});
+
+test('a save that changed nothing says nothing about what it did', function (): void {
+    $user = signIn();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole();
+
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->call('save')
+        ->assertHasNoFormErrors()
+        ->assertNotified(Notification::make()
+            ->success()
+            ->title(__('filament-panels::resources/pages/edit-record.notifications.saved.title')));
+
+    expect(PermissionGrid::savedBody())->toBeNull();
+});
+
+test('a role created with cells already ticked reports them too', function (): void {
+    $user = signIn();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('create', roleClass());
+
+    livewire(CreateRole::class)
+        ->fillForm([
+            'name' => 'auditor',
+            'permissions' => ['stances' => [roleClass() => ['viewAny' => 'granted']]],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors()
+        ->assertNotified(Notification::make()
+            ->success()
+            ->title(__('filament-panels::resources/pages/create-record.notifications.created.title'))
+            ->body('1 granted'));
 });

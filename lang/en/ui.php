@@ -62,6 +62,10 @@ return [
                 'held_yes' => 'Held',
                 'held_no' => 'Orphaned',
             ],
+            'empty' => [
+                'heading' => 'Nothing has been granted yet',
+                'description' => 'The store fills as roles are given permissions: open a role and use its grid. To see what the panels declare before any of it is stored, run `php artisan filament-warden:catalog`.',
+            ],
             'fields' => [
                 'name' => 'Name',
                 'name_help_derived' => 'The policy method that declares it writes this. Changing it does not break anything loudly — it disconnects the row from the code that asks for it.',
@@ -316,6 +320,11 @@ return [
         'tangled' => [
             'title' => 'Saved, but two cells hold two rules each',
             'body' => 'The store holds two rules for these, so this screen will not choose between them — it will only take both away. Switch them off, save, and set them again: :cells',
+        ],
+        'saved' => [
+            'granted' => '{1} 1 granted|[2,*] :count granted',
+            'forbidden' => '{1} 1 forbidden|[2,*] :count forbidden',
+            'revoked' => '{1} 1 revoked|[2,*] :count revoked',
         ],
         'mixing' => 'No tenant is active, so this shows every tenant at once — that is what the store answers right now. A row that belongs to another tenant is marked and cannot be changed from here.',
         'wider' => 'This role holds a rule wider than the grid can show, so every cell below is already answered:',

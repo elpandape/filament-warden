@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Filament\Forms\RoleAssignment;
 use ElPandaPe\FilamentWarden\Grants\Assignment;
+use ElPandaPe\FilamentWarden\Grants\SaveReport;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\AccountHost;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\AccountHostAction;
@@ -416,4 +417,35 @@ test('two rows of a repeater get a copy each, not one between them', function ()
     $bag = $screen->get('data.'.RoleAssignment::BASELINE);
 
     expect($bag)->toBeArray()->toHaveCount(2);
+});
+
+test('what the account save did stays reachable in the container, the same recipe the grid offers', function (): void {
+    $signedIn = signIn();
+    Warden::allow($signedIn)->to('update', roleClass());
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    livewire(AccountHost::class, ['accountKey' => $account->getKey()])
+        ->fillForm(['roles' => [$role->getKey()]])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(Assignment::of($account))->toContain($role->getKey())
+        ->and(app()->bound(SaveReport::class))->toBeTrue();
+
+    $report = app(SaveReport::class);
+
+    // All zero because `AccountHost::save()` saves relationships twice and the
+    // first pass re-fills the field from the store, exactly as `GridHost` does
+    // — the counts are the host's, not this screen's. What is being pinned is
+    // that a report is REACHABLE, so a page this package does not own can say
+    // more than the field's one notification. The three stance counts stay at
+    // zero on this screen whatever it wrote: a role is held or it is not.
+    expect($report->written)->toBe(0)
+        ->and($report->preserved)->toBe(0)
+        ->and($report->refused)->toBeEmpty()
+        ->and($report->granted)->toBe(0)
+        ->and($report->forbidden)->toBe(0)
+        ->and($report->revoked)->toBe(0);
 });

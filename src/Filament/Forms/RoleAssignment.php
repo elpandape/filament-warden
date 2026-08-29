@@ -80,6 +80,15 @@ final class RoleAssignment extends CheckboxList
             if ((! $component->isDisabled()) && $account instanceof Model) {
                 $report = Assignment::apply($account, $component->getState(), $component->baseline());
 
+                // Reachable for the rest of the request, so a page this package
+                // does not own can say more than this field's one notification
+                // — the same recipe the grid offers, and it is offered from
+                // both screens or the README cannot describe it as one thing.
+                // Thinner here on purpose: `refused` and `unresolved` are
+                // always empty from this screen, and no stance exists to split
+                // `written` by, so what a caller gets is the two counts.
+                app()->instance(SaveReport::class, $report);
+
                 // The screen tells the truth again, and the next save starts from
                 // what is actually there rather than colliding on the same roles.
                 $component->fillFrom(Assignment::of($account));
