@@ -96,9 +96,10 @@ final readonly class Probe
             ]),
             permission: $label,
             role: self::label($why->role),
-            // The gap warden cannot report: it skips a candidate whose conditions
-            // do not pass and answers "nothing matched", which reads exactly like
-            // "there is no such rule".
+            // The half warden's own cause cannot carry: it names the rejected
+            // row and says the conditions were not satisfied, which is true and
+            // is not the reason. Asked about a class there is nothing to satisfy
+            // them against, so the rule was never evaluated at all.
             note: Narrowing::of($permission)->isNarrowed() && ! $entity instanceof Model
                 ? Line::of('filament-warden::ui.probe.narrowed')
                 : null,

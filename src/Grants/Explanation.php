@@ -20,11 +20,13 @@ use Illuminate\Database\Eloquent\Model;
  *     conflates them, which is exactly the distinction this panel exists for.
  *   - It says a rule is narrowed, and says WHY it could not have matched.
  *     Warden 2.0 answers `ConditionsNotMet` with the rejected row attached, so
- *     it no longer reads as "there is no such grant" — but its own sentence
- *     names a record ("did not hold for this record"), and on a role grid there
- *     is none: a cell is asked about a class, and a narrowed rule fails closed
- *     before any condition is evaluated. That distinction is this package's to
- *     draw.
+ *     it no longer reads as "there is no such grant", and warden's own sentence
+ *     stopped naming a record in its `2.0.1` after this package reported that it
+ *     did. What stays this package's to draw is the half underneath: on a role
+ *     grid a cell is asked about a CLASS, so a narrowed rule fails closed before
+ *     a single condition is evaluated — "its conditions were not satisfied" is
+ *     true and still not the reason. That is what the separate narrowed line
+ *     says, and why it is not redundant with the cause.
  *   - It says when the screen and the store disagree, because the answer is
  *     always about what is stored and the person may have cycled the cell.
  */

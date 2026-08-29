@@ -8,6 +8,49 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.2.0] - 2026-08-26
+
+Untangling the cell. A cell the grid could not draw was stuck for the life of the installation: the
+save skipped it in silence, and nothing in the panel could take it away. It can be emptied now — and
+only emptied.
+
+### Added
+
+- **A tangled cell can be switched off.** Two rules of one polarity for one cell is a state the grid
+  cannot draw, so it must not rewrite it — but taking it away reads no reach and rebuilds none, and
+  warden has been able to reach both rows precisely since its `2.0.0` gave revocation by permission
+  model. That is why this arrives now and not earlier. `Shape::isClearable()` is a smaller permission
+  than `isEditable()` and only `Tangled` has it: `Elsewhere` is another tenant's row, where a write
+  targets one exact scope and would delete nothing while reporting success, and `Unreadable` is a rule
+  this version cannot parse — and a corrupt PROHIBITION fails closed, so taking it away would remove
+  protection nobody could read well enough to consent to losing.
+
+- **Asked for anything else, the save says which cells it left alone**, under two new keys of its
+  own. It could not borrow the concurrent-save sentence: that one says somebody else was editing, and
+  saying it when nobody was is the borrowed-sentence mistake this project has recorded going wrong
+  twice. The screen lets the stance move, so silence would have read as a save that worked.
+
+### Fixed
+
+- **Two comments in `src/` still quoted a sentence warden no longer says.** `Explanation`'s docblock
+  and an inline comment in `Probe` both carried warden's old `ConditionsNotMet` wording — "its
+  conditions did not hold for this record" — which warden changed in its own `2.0.1` after this
+  package reported it. The `Probe` one contradicted its own class docblock three lines above it.
+
+### Not included
+
+- **The inspector adopting what `ConditionsNotMet` brings, because it already did.** The plan listed
+  it for this release as something "this package has never been able to say". Measured against the
+  tree: `Explanation::of()` has read the rejected row generically since the inspector shipped, warden
+  2.0's new cause needed no change there beyond an enum case and a translated line, and a test has
+  been pinning it since. `git diff v2.1.0` on those two files is empty. What was left of that item
+  was the two stale comments above.
+- **Choosing between the two rules.** The screen empties a tangled cell; it does not offer to keep
+  one and drop the other. That needs the browser to be handed a reach it has never been sent and to
+  draw two rules where it draws one, which is a screen of its own, not a passenger here.
+- **Per-line conservation inside one cell.** Unchanged and still deferred, for the reason it has
+  been deferred twice already.
+
 ## [2.1.0] - 2026-08-26
 
 What warden already does. Every item here deletes something this package was carrying because warden
