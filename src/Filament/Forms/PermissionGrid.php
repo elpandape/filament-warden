@@ -126,15 +126,19 @@ final class PermissionGrid extends Field
      * that made it. That is also the recipe the README hands to a page this
      * package does not own.
      *
-     * Null when nothing was written, so the sentence is ABSENT rather than a
-     * row of zeroes: a save that changed nothing has nothing to say, and the
-     * clauses are composed from the counts above zero for the same reason.
+     * Only the counts above zero become clauses, and no clause means no
+     * sentence: a save that changed nothing says ABSENT rather than a row of
+     * zeroes. Guarding on `written` as well reads like a second defence and is
+     * not one — every change carries one of the three stances, so the counts
+     * sum to `written` by construction and the two questions have the same
+     * answer. Measured: with that guard in and the clause one out, nothing
+     * goes red; with the clause one in and it out, the sentence is right.
      */
     public static function savedBody(): ?string
     {
         $report = app()->bound(SaveReport::class) ? app(SaveReport::class) : null;
 
-        if (! $report instanceof SaveReport || $report->written < 1) {
+        if (! $report instanceof SaveReport) {
             return null;
         }
 

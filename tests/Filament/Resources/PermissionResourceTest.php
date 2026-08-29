@@ -1380,7 +1380,10 @@ test('an empty catalogue points at the two places that do show one', function ()
     $user = signIn();
     Warden::allow($user)->to('viewAny', permissionClass());
 
-    $table = livewire(ListPermissions::class)->instance()->getTable();
+    /** @var ListPermissions $page */
+    $page = livewire(ListPermissions::class)->instance();
+
+    $table = $page->getTable();
 
     expect($table->getEmptyStateHeading())
         ->toBe(__('filament-warden::ui.resources.permissions.empty.heading'))
@@ -1396,7 +1399,10 @@ test('a table narrowed to nothing is not told the catalogue is empty', function 
 
     $screen = livewire(ListPermissions::class)->set('tableSearch', 'nothing matches this');
 
-    expect($screen->instance()->getTable()->getEmptyStateDescription())->toBeNull();
+    /** @var ListPermissions $page */
+    $page = $screen->instance();
+
+    expect($page->getTable()->getEmptyStateDescription())->toBeNull();
 
     $screen->assertCanSeeTableRecords([])
         ->assertSee(__('filament-warden::ui.resources.permissions.empty.heading'))

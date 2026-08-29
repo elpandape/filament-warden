@@ -8,6 +8,80 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.4.0] - 2026-08-29
+
+Saying what happened. Two screens that stayed quiet where they had something to say, and the
+decision the first one answers for the second: if the save can report itself, a package-owned event
+is a public class frozen forever for a gap that is already covered.
+
+### Added
+
+- **A save says what it did, not only that it happened.** `RoleGrants::plan()` already built a list
+  of `Change`, each carrying the stance its cell was moved to, and threw the stances away —
+  `SaveReport` kept one number. It now keeps three beside it, tallied in the same pass with no extra
+  query, and the role screens hang them on their own "Saved": *3 granted, 1 forbidden, 2 revoked*.
+  Only the counts above zero become clauses, so a save that changed nothing says nothing — the body
+  is absent, not a row of zeroes.
+
+  Said by the page rather than as a second toast from the field, because an ordinary save is the
+  common case and two notifications for it would be noise. This is not a return to what `1.9.0`
+  removed: that was the refused-cell sentence, which names cells and needs the catalogue, and it
+  stays with the field along with everything else about what a save *met*.
+
+  Three keys, not the one or two this was scoped for. A clause per stance is what lets a count agree
+  with its adjective in Spanish and what lets a zero be skipped; one key with three placeholders can
+  do neither.
+
+- **The permissions listing points somewhere when it has nothing to show.** A fresh installation had
+  a heading — Filament's own "No Permissions", true and no help — and nothing else. The description
+  now names both places a catalogue can be seen, the role grid and `filament-warden:catalog`, because
+  an installation that called `->roles(false)` only has the second.
+
+  It is withheld the moment anything narrows the table. Filament draws the empty state on **any**
+  render with no rows, a search or a filter that matches nothing included, and there the sentence
+  would be a lie — the catalogue is not empty, the query is. `Table::getFilterIndicators()` is
+  Filament's own answer to *is anything narrowing this*, covers search, per-column search and every
+  filter, and costs no query.
+
+- **What a save did is now reachable from both screens, not one.** `app()->instance(SaveReport::class, …)`
+  had lived only in `PermissionGrid` since `1.9.0`; the account screen returned its report to nobody.
+  A recipe cannot be documented as one thing while being true on one screen, so the account screen
+  binds it too. Thinner there by construction, and said so: a role is held or it is not, so `refused`
+  and `unresolved` are always empty and the three stance counts stay at zero.
+
+- **A README recipe for reacting to a save**, which is the other half of the decision below. It names
+  warden's own events for *who* — since warden 2.0 the eight write events carry `?Model $actor`, so a
+  panel already leaves an audit trail with a name on it and no code from this package — and
+  `SaveReport` for *what*, with its request-scoped lifetime and its non-frozen status stated rather
+  than implied.
+
+### Changed
+
+- **`SaveReport` gained three properties**, `granted`, `forbidden` and `revoked`, after `unresolved`
+  and with defaults, so every existing construction still compiles. The class is not frozen and the
+  README says so.
+
+### Not included
+
+- **An event of this package's own, argued against and left out.** The measured gap over "warden's
+  events plus the report in the container" is real and narrow: warden's events are coarser than a
+  cell (one names every permission written in the same group), and a cell this screen *refused* fires
+  nothing at all, because nothing was written. Both of those the report already answers. What neither
+  answers is asynchronous delivery, and that is one gap, with no consumer asking for it, against a
+  public class this package would owe forever. Documented instead. Revisit when somebody needs a save
+  delivered to a queue.
+
+- **The plan claimed the actor fact "is said in the 2.0.0 README".** It is not: `grep -ni actor
+  README.md` returned nothing before this release, and the only CHANGELOG mention is a `1.9.0`
+  "Not included" note written before warden had an actor at all. The fact was true and undocumented,
+  which is why writing it down is scope here rather than something already on record.
+
+- **A guard that reads like a defence and is not one.** `savedBody()` was written with two: `written
+  < 1`, and then "no clauses, no sentence". Breaking the first alone changed nothing — every change
+  carries one of three stances, so the counts sum to `written` by construction and the two questions
+  have one answer. It was collapsed to the one that decides rather than kept for the look of it; the
+  measurement is in the docblock.
+
 ## [2.3.0] - 2026-08-29
 
 What the audit can say. Three changes to what `--check` decides, made in one sitting on purpose:

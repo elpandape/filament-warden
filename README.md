@@ -709,6 +709,35 @@ Catalog::forget();
 
 > 🚫 Custom names **cannot contain dots** (`.`) — they break Livewire state.
 
+### Reacting to a Save
+
+This package fires no event of its own, on purpose: it would be a public class frozen forever for a gap that two mechanisms already cover between them.
+
+**Who did it — warden's own events.** Since warden 2.0 its eight write events carry `?Model $actor`, resolved from the authenticated user, so a grid save already leaves an audit trail with a name on it and no code from this package:
+
+```php
+Event::listen(\ElPandaPe\Warden\Events\PermissionGranted::class, function ($event): void {
+    // $event->actor, $event->authority, $event->permissions
+});
+```
+
+They are coarser than a cell: one event names every permission written in the same group, and a cell this screen *refused* to write fires nothing at all, because nothing was written.
+
+**What the save did — the report in the container.** Both screens leave a `Grants\SaveReport` bound for the rest of the request, so a page of your own can say more than the field's own notification:
+
+```php
+protected function getSavedNotification(): ?Notification
+{
+    $report = app()->bound(SaveReport::class) ? app(SaveReport::class) : null;
+    // $report->written, ->granted, ->forbidden, ->revoked, ->preserved,
+    // ->refused, ->unresolved
+}
+```
+
+It is thinner from the account screen: a role is held or it is not, so `refused` and `unresolved` are always empty there and the three stance counts stay at zero.
+
+> ⚠️ `SaveReport` is **not frozen** (see Stability) and the binding lives exactly as long as the request that made it. Neither mechanism survives a queue — if you need a save delivered asynchronously, listen to warden's events and write your own record.
+
 ---
 
 ## ⚙️ Configuration Reference

@@ -103,7 +103,9 @@
 declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Console\AssignRoleCommand;
+use ElPandaPe\FilamentWarden\Grants\SaveReport;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
+use ElPandaPe\Warden\Events\PermissionGranted;
 use Illuminate\Support\ServiceProvider;
 
 pest()->extend(TestCase::class);
@@ -255,4 +257,20 @@ test('the distribution ships ten top-level entries and every tracked file under 
 
         expect($shipped)->toHaveSameSize($tracked);
     }
+});
+
+test('the two things the README tells an application to read after a save are there to read', function (): void {
+    // Nothing in this package fires a save event of its own, and the README
+    // says why. The two mechanisms it offers instead are somebody else's — one
+    // warden's, one the container's — so a silent rename upstream or here would
+    // leave a recipe that no longer runs, and no gate would see it: the README
+    // is prose that nothing else in this suite reads.
+    expect(property_exists(PermissionGranted::class, 'actor'))->toBeTrue();
+
+    $named = array_map(
+        static fn (ReflectionProperty $property): string => $property->getName(),
+        new ReflectionClass(SaveReport::class)->getProperties(ReflectionProperty::IS_PUBLIC),
+    );
+
+    expect($named)->toBe(['written', 'preserved', 'refused', 'unresolved', 'granted', 'forbidden', 'revoked']);
 });
