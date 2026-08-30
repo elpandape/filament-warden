@@ -55,11 +55,26 @@ the catalogue rather than the payload.
   fold hides a prohibition just as well as a grant. Drawn by the server and redrawn by the browser
   from the same count — `Row::answered()` and `answered()` — with a test pinning the two together.
 
-- **A head that stays put, and cells a finger can hit.** The two header rows stick to the top of the
-  scroll while the entity column keeps sticking to its side, with the corner beating both. Under a
-  coarse pointer every cell's real button grows to 2.75rem and takes the room back with a negative
-  margin, so the touch area grows and the drawing does not move. Wide reading only: below the
-  breakpoint the whole table is `display: none` in favour of the fold.
+- **A head that stays put, and cells a finger can hit.** The header sticks to the top of the scroll
+  while the entity column keeps sticking to its side, with the corner beating both. Under a coarse
+  pointer every cell's real button grows to 2.75rem and takes the room back with a negative margin,
+  so the touch area grows and the drawing does not move. Wide reading only: below the breakpoint the
+  whole table is `display: none` in favour of the fold.
+
+  **The sketch's version of this does not work, and neither did the first draft of ours.** Two
+  things were measured in a real browser rather than reasoned about, and both came back no:
+
+  - A sticky head needs something that scrolls, and `.fw-scroll` never did. `overflow-x: auto`
+    already makes it a scroll container, so the head sticks to IT rather than to the page — and with
+    no height cap it never scrolls vertically. Measured: the head travelled 589px to 205px on a
+    384px page scroll, a rule that drew nothing. It now caps at `60vh` and takes its own
+    `overflow-y`, which turns the grid into a window on a long catalogue and changes nothing on a
+    short one. Verified after: the head does not move a pixel across a 123px inner scroll.
+  - The sketch offsets the second header row by a declared first-row height, `2.25rem`. That height
+    is not this package's to declare — it comes out of the host theme's line-height, and measured
+    26px against the sketch's 36px, so a ten-pixel strip of body rows showed between two rows meant
+    to be flush. The `<thead>` is stuck whole instead: it travels as one element, there is no offset
+    to get wrong, and the gap is zero.
 
 ### Fixed
 
@@ -68,7 +83,8 @@ the catalogue rather than the payload.
   declaration side fails to match at all while the usage side captures a truncated name, so the token
   reads as used and never declared. Seen live, not reasoned about: adding `--fw-head-1` turned the
   gate red on a sheet with nothing wrong with it, 18 used against 17 declared. Widened to
-  `[a-z0-9-]+`, which is byte-identical on today's sheet and catches the next one too.
+  `[a-z0-9-]+`, which is byte-identical on today's sheet and catches the next one too. The token
+  that exposed it did not end up shipping (see below); the defect it exposed did.
 
 ### Changed
 
@@ -81,9 +97,11 @@ the catalogue rather than the payload.
   private and called once — so a single shared term is not a choice between two designs. Said here
   because it looked like one.
 
-- **`--fw-head-1` copied from the sketch's own `.fw-table` block.** That block also carries a width
-  strategy `StylesheetTest` pins the opposite of, so the token was added to the rule this package
-  already has. Copying the feature's whole selector would have been the easy version of this mistake.
+- **`--fw-head-1`, the token that started the fix above and did not survive it.** It was added to
+  this package's own `.fw-table` rule rather than by copying the sketch's block, which carries a
+  width strategy `StylesheetTest` pins the opposite of — and then it stopped existing altogether
+  when the head became one sticky element. The regex fix it exposed is kept: the defect is real and
+  measured, and the change is byte-identical on a sheet with no digit in any token name.
 
 ## [2.4.0] - 2026-08-29
 
