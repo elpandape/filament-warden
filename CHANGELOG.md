@@ -8,6 +8,81 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.6.0] - 2026-08-30
+
+A screen reader. An accessibility fix without the session that checks it is how this line stayed
+declared for nine versions, so the fix and the session ship together — and the session found two
+more defects than the fix set out to close.
+
+### Added
+
+- **A cell says what it just became.** Its accessible name already changed on its own: every
+  screen-reader span inside a cell is bound, so the browser rewrites the name in the click. What a
+  name changing under a focus that never moved does not do is get re-read. The grid now carries a
+  live region that says it.
+
+  It says the cell's own three words, through the same three methods the cell's own spans are bound
+  to and in the same order — so a cell cleared under a granting wildcard says *granted, reached by a
+  broader rule*, which is what it now answers, and not *no rule*, which is only what was written on
+  it. Taking it off the stance would have put two versions of one fact on one screen.
+
+  It fires on the **write**, so a preset, a keyboard cycle and a shift-click all announce — and, the
+  part that matters most, so does a click in an installation with `grid.explain` and
+  `grid.constraints` both switched off. That configuration returns before doing anything on the path
+  the inspector uses, so a click there used to say nothing at all, ever. The plan did not name that
+  case; measuring found it.
+
+  Empty from the first paint and never behind a condition, for the reason this package already had
+  written down beside the inspector's own region: a live region added to the page at the same moment
+  its content appears is not announced by NVDA or JAWS. One for the whole grid, not one per tab like
+  the filter's — only one cell can be clicked at a time. No new keys: the words are the ones the cell
+  already renders.
+
+### Fixed
+
+- **Every row of the grid was announced with its three preset buttons glued to its name** —
+  *"users App\Models\Security\User read all none"*. The row header was named by its contents and
+  the presets live inside it. It is named by its two spans now. Seen in an accessibility tree dump
+  against a real panel, not deduced.
+
+- **The spare-width column turned up as a column header with no name.** It heads nothing, which the
+  template has said in a comment since it was written, and now says in markup.
+
+- **Why a rule-scope option cannot be picked was pointed at by nothing.** All three options described
+  themselves with the shared hint, and the sentence giving the reason sat outside with no id. Its
+  docblock said "out here it is read either way" — true in browse mode, false in the focus mode a
+  radiogroup puts a reader in, where the arrows read a radio's name and its description and nothing
+  else. It is pointed at now by the one option it is about, and only while there is a reason to give.
+
+### Changed
+
+- **A test that would have gone green with the thing it guards broken.** `'the filter says out loud
+  what it took away'` asked whether `role="status"` appeared anywhere in a 900-character window. The
+  grid has other live regions — the inspector's since `1.1.0` — so this release's new one landing
+  near the filter would have kept it passing with the filter's own gone. It asks for the filter's own
+  node now, and was narrowed **before** the new region was added rather than after.
+
+### Not included
+
+- **The cell as a `role="radio"` triplet**, which the plan asked for by name, saying to reuse the
+  reach rail's pattern rather than invent another. The ARIA pattern is a real precedent; the cost is
+  not. A rail is one roomy widget with three mutually exclusive options; a cell is 24 by 24 pixels,
+  cycles on a single click with shift reversing it — an affordance with its own entry in the legend
+  — and there are hundreds of them in a grid that already scrolls sideways. It would be three times
+  the interactive nodes, a redesign of the cell's CSS, and the loss of the cycle. The live region
+  gets the same guarantee for none of that.
+
+- **A real screen reader.** Nobody has run NVDA, JAWS or VoiceOver against these screens. What was
+  run is the accessibility tree, in both themes, against a real panel — which establishes what role,
+  what name and what properties each node exposes, and establishes nothing about announcement order,
+  live-region timing or actual speech. That half is written down as pending rather than implied to be
+  done.
+
+- **A narrower account in front of the role assignment screen.** It was opened in a browser for the
+  first time in its life — it renders, its table names every column, its assign modal opens, and
+  there is not one console error in either theme — but the account it was opened with holds the
+  wildcard, so the disabled option a narrower one would see was never drawn.
+
 ## [2.5.0] - 2026-08-29
 
 Finding a row. The component's tag: four things that live in the same markup and the same state, and

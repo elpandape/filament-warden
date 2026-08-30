@@ -475,6 +475,11 @@ The roles screen shows a grid where:
 - ⇧ **Shift + click** → Cycle backward (useful for quick denials)
 - ⌨️ **Arrow keys** move between tabs; every cell and tab carries a name a screen reader can
   announce on its own, not one shared word for all seven states.
+- 🔊 **A cell says what it just became.** Its name already changed on its own — but a name that
+  changes under a focus that never moved is not one a screen reader re-reads, so the grid carries a
+  live region that says it, in the cell's own words. It fires on the write, so a preset, a keyboard
+  cycle and a shift-click all announce, and it keeps working with the inspector and the condition
+  builder both switched off — a configuration where a click used to say nothing at all.
 
 > 🚫 **A grid that cannot be operated says so.** A protected role's grid, a field
 > your application called `->disabled()` on, and the read-only screen (`ViewRole`) all print one
