@@ -512,13 +512,28 @@ The roles screen shows a grid where:
 > 📱 **The grid folds when the columns do not fit.** Below `55.9375rem` the table is
 > replaced by one card per entity, holding one disclosure per scope — read, write, withdraw,
 > irreversible — and one row per action inside it. It is not a second grid: every cell is the same
-> button, bound to the same state, so whatever one reading says the other says too. One thing does
+> button, bound to the same state, so whatever one reading says the other says too. ~~One thing does
 > not survive the fold: the per-row `read` / `all` / `none` shortcuts, which are revealed by hovering
-> a table row and have no row to hover.
+> a table row and have no row to hover.~~ Fixed in `2.5.0`: the fold carries its own copy of those
+> shortcuts, in the body of the disclosure rather than its summary, plus a count of what each folded
+> entity answers.
 >
 > The inspector moved below the grid in the same release, and the rule-scope picker became a
 > segmented radiogroup — one tab stop, arrow keys that step over what cannot be picked, and only the
 > chosen mode's hint. If you publish this package's views, that is a re-merge.
+
+### Finding a Row
+
+A catalogue with thirty entities is a long scroll. The box above the grid filters the rows by their
+title and their class name, in both readings at once, and says how many matched.
+
+> 🔒 It only decides what is **drawn**. Every row stays in the field's state, filtered out or not —
+> and that is a guarantee, not a detail: a save compares the payload against the catalogue, so an
+> entity missing from the payload is written as a deliberate revoke. `verify/verify-filter-keeps-state.mjs`
+> is the gate on it.
+
+> 📊 The tab counters keep counting the whole tab while a filter is on, and the line beside the box
+> says so. They answer "what does this role grant", which a filter does not change.
 
 ### Permission Inspector
 

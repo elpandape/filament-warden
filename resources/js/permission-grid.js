@@ -7,7 +7,7 @@
  * nothing could tell when the two copies disagreed.
  *
  * What does NOT arrive is the RULES below. This comment claimed there was one
- * of them, and then that there were five; counted properly there are seven with
+ * of them, and then that there were five; counted properly there are nine with
  * a counterpart in PHP and one without. They are here because a click has to
  * redraw without asking the server, so they cannot be collapsed — what they can
  * be is named, beside the file that decides the same thing on the server,
@@ -29,8 +29,22 @@
  * - `preview()` and `lineOf()`: the sentence a rule reads as, and its bracketing.
  *   PHP: `Narrowing::preview()` and `Conditions/Rule::text()`.
  *
+ * - `answered()`: what one row's cells answer, for the reading that folds them
+ *   away — granted and forbidden, one stance more than the tab counter.
+ *   PHP: `Row::answered()`.
+ * - `stackSummary()`: that count as the line a person reads, and the only place
+ *   this file puts a computed value inside a translated sentence.
+ *   PHP: `GridView::summaryOf()`, and a test pins the two together.
+ *
  * `booleanMisfit()` is the one with no counterpart: PHP ships the column list it
  * needs (`Columns::booleans()`) and decides nothing about it.
+ *
+ * `shown()`, `matched()`, `filterCount()` and `filterEmpty()` are not on either
+ * list, and that is the point of them: the filter decides what is DRAWN and the
+ * server decides nothing about it, because a filter the server knew about would
+ * be a filter that reaches the payload — and a payload with an entity missing is
+ * written as a deliberate revoke. `verify/verify-filter-keeps-state.mjs` drives
+ * that boundary.
  *
  * `cycle()` came off this list in `1.8.0`: PHP carried a second walker over the
  * same order until then. Now the order is declared once, in `Stance::order()`,

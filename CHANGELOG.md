@@ -8,6 +8,83 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.5.0] - 2026-08-29
+
+Finding a row. The component's tag: four things that live in the same markup and the same state, and
+one of them is the most dangerous change this plan has left — a filter, over a grid whose save walks
+the catalogue rather than the payload.
+
+### Added
+
+- **A box that finds a row.** It filters the entities by their title and their class name, in both
+  readings at once, and says how many matched. The tab counters keep counting the whole tab, and the
+  line beside the box says so: they answer what the role grants, which a filter does not change.
+
+  **It only decides what is drawn, and that is the whole feature.** A filter that pruned the field's
+  state would send a payload with an entity missing, and `RoleGrants::plan()` walks the CATALOGUE, so
+  every one of that entity's cells would arrive as an abstention against a baseline that still has
+  them — written as a deliberate revoke, with a success notification on top. Measured on purpose
+  before a line was written: two entities granted, one pruned from the payload, `written=1
+  revoked=1 refused=[] preserved=0`, and the grant gone.
+
+  It cannot be defended against downstream either. Clearing a cell DELETES its key, so "this person
+  cleared it" and "the payload never mentioned it" are byte for byte the same payload. Two tests in
+  `RoleGrantsTest` pin what that costs, named for the reason rather than for a wish, and
+  `verify/verify-filter-keeps-state.mjs` drives the boundary against the real `@vue/reactivity` —
+  with a control block that writes what a pruning filter would, so the check is known to
+  discriminate.
+
+  The box is announced as well as drawn, with the `role="status"` pattern the inspector line beside
+  it already uses. A filter that takes rows away without saying so is a change nobody who cannot see
+  the screen is told about.
+
+- **A second hazard of the same family, found while measuring the first and pinned with it.** A
+  `narrowing` map that is present but missing one cell's key widens that cell's condition to
+  unconditional — `wanted(null, …)` answers `Narrowing::all()`. A map that is absent altogether is
+  the safe half and keeps what the store holds, which is what makes the first a hazard rather than a
+  defect. Both halves are now pinned.
+
+- **The row shortcuts, in the folded reading.** `read` / `all` / `none` lived only inside the wide
+  table's `<tr>`, and the fold has no `<tr>` — so the reading a phone gets lost them the moment the
+  fold shipped in `1.10.0`, eight tags ago. They sit in the body of the disclosure and never in its
+  summary, where a click would toggle the fold instead. No new keys: `ui.grid.presets.*` already
+  existed.
+
+- **A count on each folded entity**, because a collapsed entity hides what it answers. It counts what
+  the cells ANSWER, like the tab counter, and one stance more than it: granted and forbidden, since a
+  fold hides a prohibition just as well as a grant. Drawn by the server and redrawn by the browser
+  from the same count — `Row::answered()` and `answered()` — with a test pinning the two together.
+
+- **A head that stays put, and cells a finger can hit.** The two header rows stick to the top of the
+  scroll while the entity column keeps sticking to its side, with the corner beating both. Under a
+  coarse pointer every cell's real button grows to 2.75rem and takes the room back with a negative
+  margin, so the touch area grows and the drawing does not move. Wide reading only: below the
+  breakpoint the whole table is `display: none` in favour of the fold.
+
+### Fixed
+
+- **`tests/StylesheetTest.php` could not read a token with a digit in it.** Both its regexes matched
+  `[a-z-]+`, which stops at the digit — and the two sides then disagree about the same token: the
+  declaration side fails to match at all while the usage side captures a truncated name, so the token
+  reads as used and never declared. Seen live, not reasoned about: adding `--fw-head-1` turned the
+  gate red on a sheet with nothing wrong with it, 18 used against 17 declared. Widened to
+  `[a-z0-9-]+`, which is byte-identical on today's sheet and catches the next one too.
+
+### Changed
+
+- **`.fw-scroll` gained `contain: layout`**, which is what keeps a browser from recomputing the whole
+  table's layout on every scroll now that the head is fixed above it.
+
+### Not included
+
+- **A filter per tab.** There is exactly one matrix tab by construction — `GridView::matrix()` is
+  private and called once — so a single shared term is not a choice between two designs. Said here
+  because it looked like one.
+
+- **`--fw-head-1` copied from the sketch's own `.fw-table` block.** That block also carries a width
+  strategy `StylesheetTest` pins the opposite of, so the token was added to the rule this package
+  already has. Copying the feature's whole selector would have been the easy version of this mistake.
+
 ## [2.4.0] - 2026-08-29
 
 Saying what happened. Two screens that stayed quiet where they had something to say, and the
