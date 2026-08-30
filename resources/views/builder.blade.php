@@ -47,6 +47,9 @@
                     x-bind:disabled="! reachEnabled(mode)"
                     x-on:click="setMode(mode)"
                     x-text="grid.modes[mode].name"
+                    x-bind:aria-describedby="mode === 'owned' && narrowing.ownership.reason
+                        ? '{{ $ids }}-reach-hint {{ $ids }}-reach-reason'
+                        : '{{ $ids }}-reach-hint'"
                     aria-describedby="{{ $ids }}-reach-hint"
                 ></button>
             </template>
@@ -70,9 +73,26 @@
             disabled button keeps its text in the accessibility tree — a virtual
             cursor still reads it — but it takes no focus, so in focus mode, and
             to anyone walking the group with the arrow keys, the sentence inside
-            it is never reached. Out here it is read either way.
+            it is never reached.
+
+            ~~Out here it is read either way.~~ Only in browse mode, which is not
+            the mode a radiogroup puts a reader in: walking the group with the
+            arrows reads each radio's name and its description and nothing else,
+            so out here on its own it was never reached either. It is pointed at
+            now — by the ONE option it is about, and only while there is a reason
+            to give, because describing "Every row" with why "Only what it owns"
+            cannot be picked would be worse than saying nothing.
+
+            An accessibility tree dump is what showed the three options all
+            pointing at the hint and nothing pointing here.
         --}}
-        <p class="fw-reach-reason" x-show="narrowing.ownership.reason" x-text="narrowing.ownership.reason" x-cloak></p>
+        <p
+            class="fw-reach-reason"
+            id="{{ $ids }}-reach-reason"
+            x-show="narrowing.ownership.reason"
+            x-text="narrowing.ownership.reason"
+            x-cloak
+        ></p>
 
         {{--
             The rule as the store has it, written out by PHP.

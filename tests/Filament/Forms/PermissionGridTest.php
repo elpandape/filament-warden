@@ -1222,3 +1222,17 @@ test('a row is named by its entity, not by the buttons that sit beside it', func
     // up as a column header with no name.
     expect($html)->toContain('class="fw-filler" rowspan="2" role="presentation"');
 });
+
+test('why an option cannot be picked is pointed at by the option it is about', function (): void {
+    $html = livewire(GridHost::class, ['roleKey' => makeRole()->getKey()])->html();
+
+    // A radiogroup puts a reader in focus mode, where the arrows read each
+    // radio's name and its description and nothing else — so a paragraph sitting
+    // outside with nothing pointing at it was never reached, which is what an
+    // accessibility tree dump showed. Only the option it is about points at it,
+    // and only while there is a reason: describing "every row" with why "only
+    // what it owns" cannot be picked would be worse than saying nothing.
+    expect($html)->toContain('-reach-reason"')
+        ->and($html)->toMatch('/x-bind:aria-describedby="[^"]*reach-reason/s')
+        ->and($html)->toMatch("/mode === 'owned' &&\s*narrowing\.ownership\.reason/");
+});
