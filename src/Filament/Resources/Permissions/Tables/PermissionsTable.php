@@ -126,8 +126,17 @@ final class PermissionsTable
 
     /**
      * What goes away with it. The grants are removed by a foreign key, below
-     * Eloquent and without an event of their own, so this is the only moment
-     * anybody is told.
+     * Eloquent and without a `Grant` model event, so an application watching a
+     * swapped grant model sees nothing.
+     *
+     * Warden does announce them: it reads the doomed rows unscoped before the
+     * delete and then dispatches one `PermissionRevoked` per row — or
+     * `PermissionUnforbidden` where the row was a prohibition — with the
+     * authority, the row's own scope and the resolved actor. But
+     * `warden.events_enabled` switches it off, it costs a query per row to
+     * hydrate the authority, and it goes only to a listener the application
+     * wrote. None of it reaches the person clicking Delete, so this is still the
+     * only moment they are told.
      */
     public static function warning(Model $record): string
     {

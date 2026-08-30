@@ -27,7 +27,7 @@ class EditPermission extends EditRecord
      * `getDeleteAuthorizationResponse()`, which goes straight to the policy, and
      * the orphan rule lives in `PermissionResource::canDelete()`, off that path.
      * The description is the table's own — the grants go with it by a foreign
-     * key, below Eloquent and with no event of their own.
+     * key, below Eloquent and with no `Grant` event of their own.
      *
      * @return array<Action>
      */
@@ -125,9 +125,11 @@ class EditPermission extends EditRecord
     }
 
     /**
-     * Nothing in warden invalidates the check cache for a write made through the
-     * model layer: only its own fluent actions bump the version, and the
-     * `PermissionCreated`/`PermissionDeleted` events have no listener anywhere.
+     * Warden does invalidate a write made through the model layer: its service
+     * provider listens on the wildcard `eloquent.*` events and feeds
+     * `CacheInvalidations`. What that listener never marks is a catalogue row —
+     * `CacheInvalidations::isWardenRow()` admits only the configured grant and
+     * assigned-role classes — so nothing bumps the version for this save.
      * Without this, every check goes on answering the old way — silently, and
      * with no expiry.
      */
@@ -198,9 +200,15 @@ class EditPermission extends EditRecord
      *
      * The same question `PermissionForm` asks to grey the toggle out, asked
      * again here because a greyed-out toggle sends nothing and the stored value
-     * would otherwise outlive the entity it was resolved against. §6.20: an
-     * `only_owned` over an attribute that is not a column does not fail closed,
-     * it emits invalid SQL and throws when the query runs.
+     * would otherwise outlive the entity it was resolved against.
+     *
+     * What it prevents is quiet, not loud: `WhereCan::ownershipAttribute()`
+     * answers null unless warden resolves ownership for the model, the resolver
+     * is a string and the column is really there, and the branch then goes
+     * through `WhereCan::inexpressible()` — skipped on the grant pass, and on
+     * the forbid pass blocking whatever the candidate had already pinned, which
+     * for a class-wide row is every row. Nothing throws; the row simply stops
+     * meaning what it says (§6.20).
      *
      * A private copy rather than making the form's predicate public. The two
      * that must agree are held together by 'switching the entity gives up an

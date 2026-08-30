@@ -103,8 +103,16 @@ final class ConditionBuilder extends Field
     }
 
     /**
-     * A permission with no model behind it can hold conditions, and they would
-     * never grant anything: the check that reaches them has no row to compare.
+     * A permission with no model behind it can hold conditions, and they can
+     * never be tested: with no instance to compare, `passesConstraints()`
+     * answers the polarity of the pass, so as a grant it never grants and as a
+     * prohibition it always forbids. Nothing upstream refuses the row: this
+     * screen writes `options` through Eloquent, never through the fluent chain,
+     * and that chain's own guard turns away only a permission with neither an
+     * entity nor ownership to test — while this answers null for the wildcard
+     * and for a morph alias that no longer resolves as well, both of which the
+     * guard lets through. This null is what refuses the row here; the ones
+     * already stored are read and left alone.
      *
      * @return class-string<Model>|null
      */

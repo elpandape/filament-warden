@@ -464,7 +464,7 @@ final readonly class Audit
      * — and both polymorphic authority pairs are plain columns with an index
      * and no constraint.
      *
-     * What warden 2.0 added is a listener, and it is narrower than it sounds.
+     * What warden 1.1.0 added is a listener, and it is narrower than it sounds.
      * `CacheInvalidations::markCascade()` calls `sweepStrandedGrants()`, which
      * returns immediately unless the deleted model's class is EXACTLY
      * `Context::roleClass()`: an account, any other authority, and a role

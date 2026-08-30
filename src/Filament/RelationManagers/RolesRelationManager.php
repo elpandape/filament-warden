@@ -39,9 +39,12 @@ use Illuminate\Database\Eloquent\Model;
  *
  * Reads through `Assignment::of()`, which already dedupes a role held both with
  * and without a context to one key (AGENTS.md §6.18), and writes through
- * `Assignment::give()`/`take()`, never `attach()`/`detach()`/`sync()`: those
- * three skip warden's cache bump and `detach()` ignores tenancy outright
- * (§6.18 again).
+ * `Assignment::give()`/`take()`, never `attach()`/`detach()`/`sync()`. The
+ * reasons are `Assignment`'s own, written on that class: the fluent actions are
+ * the only path that announces the write to a listener with an actor on it, the
+ * only one that reports how many rows a retraction actually removed, and the
+ * only one that reads the write scope at the moment of the write rather than
+ * when the relation was built.
  */
 class RolesRelationManager extends RelationManager
 {

@@ -16,15 +16,33 @@ use WeakMap;
 /**
  * Handing a role to an account, and taking it back.
  *
- * Written through warden's fluent API and never through the `roles()` relation.
- * `attach()`, `detach()` and `sync()` all skip the cache bump — only warden's own
- * action classes make it — so a role handed out through the relation goes on
- * answering the old way, silently and with no expiry. Measured: after an
- * `attach()`, a permission granted through the attached role still resolves to
- * false, even from a fresh resolver.
+ * Written through warden's fluent API and never through the `roles()` relation,
+ * for three reasons a pivot write cannot give back.
  *
- * `detach()` is worse than that: it ignores tenancy and restrictions, and removes
- * every assignment row for (authority, role) whatever its scope or context.
+ * The audit trail is the first and the largest. `AssignsRoles::to()` dispatches
+ * `AssigningRole` — which a listener may refuse, where the application leaves
+ * cancellable events on — and then `RoleAssigned` carrying whoever the
+ * registered `ActorResolver` names; `RetractsRoles::from()` does the same with
+ * `RetractingRole` and `RoleRetracted`. An `attach()`, `detach()` or `sync()`
+ * announces none of the four, so nothing downstream can say who moved the role,
+ * and nothing can decline the move.
+ *
+ * The second is the answer. `RetractsRoles::retractedCount()` reports how many
+ * rows the delete actually removed, which is what makes `take()` honest: a
+ * retraction targets one exact scope, so a role held only at another one is
+ * deleted from nowhere and has to be reported as such.
+ *
+ * The third is WHEN the scope is decided.
+ * `AppliesPivotTenancy::scopedMorphToMany()` reads `Tenancy::writeScope()` once,
+ * as the relation is built, and hands it to `ScopedMorphToMany::writingWithin()`;
+ * the fluent actions ask for it at the moment of the write. A relation object
+ * held across a tenant switch therefore writes at the scope it was born with.
+ *
+ * What does NOT separate the two paths is restrictions. `RetractsRoles::from()`
+ * filters `restricted_to_type`/`restricted_to_id` only when `on()` named a
+ * context, so a bare retraction takes every restricted row of the scope with it
+ * exactly as a detach would — which is why `isRestricted()` shows such a row and
+ * leaves it alone rather than trusting the writer.
  */
 final class Assignment
 {

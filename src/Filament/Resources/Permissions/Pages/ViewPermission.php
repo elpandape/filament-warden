@@ -224,7 +224,7 @@ class ViewPermission extends ViewRecord
     /**
      * The verdict, and — where it can be counted — how far it reaches.
      *
-     * The reach is worked out here and nowhere else: one `whereCan()` is six
+     * The reach is worked out here and nowhere else: one `whereCan()` is seven
      * queries with no cache, so it happens when somebody asks and never on a
      * render.
      */

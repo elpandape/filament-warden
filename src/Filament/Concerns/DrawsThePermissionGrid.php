@@ -56,10 +56,13 @@ trait DrawsThePermissionGrid
     /**
      * Why one cell is the way it is — asked for, never volunteered.
      *
-     * `explain()` costs three to seven queries with no cache and no batching, so
-     * a grid that explained every cell on render would spend more than a hundred
-     * on a screen nobody may ask a question about. It answers one cell at a time,
-     * and `#[Renderless]` keeps the click from re-rendering the whole page.
+     * `explain()` costs three to six queries with no cache and no batching —
+     * three when the check abstains, six at the ceiling when a role is what
+     * granted it, counted from `Explainer::explain()`'s call sites and not from
+     * a query log — so a grid that explained every cell on render would spend
+     * more than a hundred on a screen nobody may ask a question about. It
+     * answers one cell at a time, and `#[Renderless]` keeps the click from
+     * re-rendering the whole page.
      *
      * The answer is about what is STORED — that is all `explain()` can read — so
      * the payload also carries the stance on screen when the two disagree. The

@@ -149,19 +149,26 @@ final class RoleGrants
         // One transaction for the whole grid, opened on warden's own
         // connection rather than the default one. `Context::resolve()` is
         // where every write in this class already asks, so a transaction on
-        // the wrong connection would wrap queries that never run on it,
-        // leaving the ones that matter to commit one at a time as they go —
-        // and it silently disabled a promise `BumpsCacheVersion` already
-        // makes: `BumpsCacheVersion::bumpCacheVersion()` only schedules its
-        // after-commit second bump when `Context::resolve()->grantClass()`'s OWN
-        // connection reports `transactionLevel() > 0`. On a split-connection
-        // install, opening this transaction on the default connection left
-        // that check reading zero always, so the second bump — the one that
-        // orphans a payload a concurrent reader rebuilt from pre-commit rows
-        // — never registered. "Each write bumps the cache version on its
-        // own, and the trait registers one more after the commit" only
-        // became true the moment this transaction moved to warden's own
-        // connection.
+        // the wrong connection wraps queries that never run on it, leaving the
+        // ones that matter to commit one at a time as they go — and it
+        // silently disables a promise warden already makes:
+        // `CacheInvalidations::bump()` only schedules its after-commit second
+        // bump when `Context::resolve()->grantClass()`'s OWN connection reports
+        // `transactionLevel() > 0`. On a split-connection install a transaction
+        // on the default connection leaves that check reading zero always, so
+        // the second bump — the one that orphans a payload a concurrent reader
+        // rebuilt from pre-commit rows — never registers.
+        //
+        // Warden opens one of its own INSIDE this, and only sometimes:
+        // `GrantsPermissions::reconstrain()` wraps its per-permission loop in a
+        // transaction on that same connection, so a narrowing chain nests here
+        // rather than running bare. It arrives too late to replace this one.
+        // `to()` and `toOwn()` are wrapped only in `asOneWrite()`, which
+        // coalesces cache bumps and is not a database transaction, so without
+        // this wrapper the UNCONSTRAINED grant would already be committed —
+        // visible, and authorizing every instance — before `reconstrain()`
+        // opened anything. And a plain grant or revoke never calls
+        // `reconstrain()` at all, so it is this wrapper or nothing for them.
         DB::connection(Context::resolve()->connection())->transaction(static function () use ($role, $changes): void {
             self::revoke($role, $changes);
             self::grant($role, $changes);
@@ -403,9 +410,12 @@ final class RoleGrants
      */
     private static function wanted(mixed $payload, ?string $entity): ?Narrowing
     {
-        // A permission with no model behind it and conditions on it is created,
-        // shown, and grants nothing ever: `passesConstraints()` wants an
-        // instance. The screen does not offer it and this does not accept it.
+        // A condition on a permission with no model behind it can never be
+        // tested: with no instance to compare, `passesConstraints()` answers the
+        // polarity of the pass, so as a grant it never grants and as a
+        // prohibition it always forbids. Warden's own chain refuses to write one
+        // — `GrantsPermissions::reconstrain()` throws — and the screen does not
+        // offer it, so this does not accept it either.
         if ($payload === null || $entity === null) {
             return Narrowing::all();
         }
@@ -422,11 +432,21 @@ final class RoleGrants
      * Every step takes away whatever was there before it writes, for every
      * change in the batch at once — and always before `grant()` runs, which
      * grouping makes structural rather than a habit `write()` happened to
-     * follow per cell. Editing with a fresh `allow()->to()->where()` instead
-     * of revoking first would leave the previous twin's grant standing: the
-     * old condition would go on authorizing and nothing would say so.
-     * Measured, and pinned in `RoleGrantsTest.php` ("changing a condition
-     * stops the old one authorizing, which a fresh grant would not").
+     * follow per cell.
+     *
+     * A grant chain does not make this redundant.
+     * `GrantsPermissions::reconstrain()` does sweep every sibling twin of the
+     * shape it narrows — its delete is a `whereIn()` over
+     * `GrantsPermissions::siblingKeys()`, which matches every catalogue row of
+     * that name, entity type, entity id, ownership and scope, conditions aside
+     * — but it pins the polarity and the ownership of the chain it belongs to
+     * while it does so, and nothing reaches it except `where()`, `orWhere()`,
+     * `whereColumn()` and `orWhereColumn()`. So it never crosses a polarity,
+     * never crosses `to()`/`toOwn()`, and does not run at all for a cell that is
+     * being cleared or widened back to a plain grant. Those are the shapes
+     * below, and they are why the order stands. Pinned in
+     * `RoleGrantsTest.php` ("widening a narrowed cell answers for every record,
+     * and keeps no twin grant").
      *
      * `forbidden` is part of the unique key on grants, so granted and forbidden
      * coexist as two rows: allowing without revoking the forbid leaves both, and
@@ -454,15 +474,29 @@ final class RoleGrants
      *
      * It is not free of everything else. `revoke()`'s own cache bump and
      * `PermissionRevoked`/`PermissionUnforbidden` event are gated on whether
-     * the `delete()` removed at least one row (`RevokesPermissions.php:
-     * 98-104`), and that gate now covers the WHOLE group. A name with
-     * nothing to revoke used to mean no bump and no event for it at all;
+     * the `delete()` removed at least one row (`RevokesPermissions::revoke()`),
+     * and that gate now covers the WHOLE group. A name with nothing to revoke
+     * used to mean no bump and no event for it at all;
      * grouped, that same name can ride inside a bump and an event that fire
      * only because a sibling in the same call had a row removed — the
      * event's collection still names every permission the group resolved,
-     * not only the one actually deleted. There is no pre-event on this path,
-     * so nothing here is vetoable: this is observable to a listener of the
-     * post-events, not an authorization change.
+     * not only the one actually deleted.
+     *
+     * This path carries a pre-event, and it can veto a whole group.
+     * `RevokesPermissions::revoke()` fires
+     * `RevokingPermission`/`UnforbiddingPermission` as its first act, before it
+     * resolves the authority and before it looks a permission up, carrying the
+     * whole group's name list — so a listener refusing one name aborts the
+     * removal for every cell of that entity, and only where the application
+     * turns cancellable events on, which ships off. The refusal is silent:
+     * warden returns, nothing here reads a return value, and `grant()` runs
+     * next inside the same transaction. Which way that lands depends on the
+     * cell. A flip between granted and forbidden still fails closed, because
+     * both rows then exist and forbidden wins. A cell cleared to abstain, or
+     * one whose narrowing changed, does NOT: the old grant survives beside
+     * whatever `grant()` writes, so the cell keeps power the screen says it
+     * gave up. `SaveReport` cannot see it either — `plan()` counts what it
+     * intended before any of this runs.
      *
      * @param  list<Change>  $changes
      */

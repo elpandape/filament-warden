@@ -22,11 +22,12 @@ use Throwable;
  * the candidates in SQL by name, entity type and a `whereExists` on the grant.
  *
  * And the number is a LOWER BOUND, not the truth. `whereCan()` and the panel's
- * own checks do not answer the same thing, measured in both directions: a role
- * assigned with a context grants rows the query cannot see, and a permission
- * whose conditions do not deserialize loses its row scope on the forbid side and
- * blackens the whole table. It also never consults the Gate, so a policy that
- * denies is invisible to it — and that one is true of every count, not only the
+ * own checks do not answer the same thing, measured in both directions, and a
+ * single assignment misses both ways: `WhereCan::activeKeys()` leaves a role
+ * assigned with a context out of the grant pass and counts it in the forbid
+ * pass, so such a role grants rows the query cannot see and blocks rows the
+ * panel lets through. It also never consults the Gate, so a policy that denies
+ * is invisible to it — and that one is true of every count, not only the
  * partial ones, which is why both sentences carry it. So this says when it
  * cannot be trusted, rather than printing a number and letting somebody decide
  * on it.

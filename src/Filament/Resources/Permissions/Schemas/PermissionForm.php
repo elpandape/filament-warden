@@ -85,9 +85,10 @@ final class PermissionForm
                             // The conditions named columns of another table, and the
                             // ownership was resolved against a column this entity may
                             // not have. Kept, either would be a rule that cannot be
-                            // true — and an `only_owned` over an attribute that is not
-                            // a column does not fail closed: it emits invalid SQL and
-                            // throws when the query runs.
+                            // true — and an `only_owned` warden cannot express in SQL
+                            // says nothing about it: the branch is skipped on the grant
+                            // pass and blocks on the forbid pass, without an error
+                            // anywhere.
                             ->afterStateUpdated(static function (callable $set): void {
                                 $set('options', ['mode' => 'all', 'rules' => []]);
                                 $set('only_owned', false);
@@ -319,6 +320,14 @@ final class PermissionForm
         // Nothing stored, nothing to lose: writing null over null keeps no rule
         // from anybody, and asking further would close the builder on every plain
         // row in the catalogue.
+        //
+        // The reach of that "nothing" is the CAST, not the column. Eloquent's
+        // `fromJson()` answers null for the empty string, and `json_decode()`
+        // answers null for the JSON literal `null` and for text that is not JSON
+        // at all — while warden asks the column and fails closed on exactly
+        // those three, in both polarities. A row like that arrives here looking
+        // empty, so the builder stays open over a rule this screen cannot see.
+        // Closing it would mean asking the column here too.
         if ($record->getAttribute('options') === null) {
             return null;
         }
