@@ -357,7 +357,7 @@ test('deletion follows the rule the installation chose', function (bool|string $
     'always' => ['all', true, true],
 ]);
 
-test('the modal says who loses it, because the cascade leaves no trace', function (): void {
+test('the modal says who loses it, because it is the only warning anybody gets', function (): void {
     $role = makeRole('editor');
     Warden::allow($role)->to('viewAny', Post::class);
 

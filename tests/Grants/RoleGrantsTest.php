@@ -506,7 +506,7 @@ test('a condition written from the grid leaves one grant and one twin', function
         ->and(grantCount())->toBe(1);
 });
 
-test('changing a condition stops the old one authorizing, which a fresh grant would not', function (): void {
+test('changing a condition stops the old one authorizing', function (): void {
     $role = makeRole();
     $user = makeUser();
     Warden::assign($role)->to($user);

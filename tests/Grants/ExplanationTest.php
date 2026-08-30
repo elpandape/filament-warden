@@ -112,7 +112,7 @@ test('a role that holds another role is explained through it, and it is named', 
         ->and($explanation->summary)->toContain($explanation->role);
 });
 
-test('a narrowed cell says more than the cause, which assumes a record', function (): void {
+test('a narrowed cell says more than the cause, which is true and not the reason', function (): void {
     $role = makeRole();
 
     Warden::allow($role)->to('update', Post::class)->where('id', 1);

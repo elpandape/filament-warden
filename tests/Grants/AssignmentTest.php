@@ -210,8 +210,13 @@ test('handing a role out writes it, and the store answers for it straight away',
 
     Warden::allow($role)->to('viewAny', Post::class);
 
-    // Warmed on purpose: from here the check is answered from the cache, and
-    // only warden's own actions bump the version behind it.
+    // Warmed on purpose: from here the check is answered from the cache, so
+    // the assertion below can only flip if the write moved the version behind
+    // it. Warden's own action classes move it, and so does an Eloquent event on
+    // a `grants` or `assigned_roles` row — `WardenServiceProvider` listens on
+    // `eloquent.created/updated/deleting/deleted: *` and hands the model to
+    // `CacheInvalidations::markFrom()`, which acts on those two classes and no
+    // other. What moves nothing is a raw pivot write, which fires neither.
     expect(Access::granted($account, 'viewAny', Post::class))->toBeFalse();
 
     Assignment::apply($account, [roleKey($role)]);
@@ -476,9 +481,13 @@ test('give() hands a role out and the store answers for it straight away', funct
  * `Query\Builder::where()` redirects a `null` search value to `whereNull()`,
  * so the existing unrestricted row is FOUND, never duplicated: this exact
  * count assertion stays green with `isHeld()` deleted from `give()`'s guard.
- * The real saving is the next test down: `to()` calls `bumpCacheVersion()`
- * unconditionally, found row or new one, and `isHeld()` is what keeps a
- * `give()` on an already-held role from paying for that with nothing to show.
+ *
+ * What `isHeld()` buys is `give()`'s own return value. `AssignsRoles` exposes
+ * no counterpart to `RetractsRoles::retractedCount()`, so this class cannot ask
+ * warden whether a row was written, and without the guard `give()` would answer
+ * true for a no-op. The test that goes red for that is in
+ * `RolesRelationManagerTest`: `assigning a role the account already holds
+ * notifies nothing`.
  */
 test('give() writes nothing for a role already held', function (): void {
     signInAsHandOut();
@@ -493,7 +502,16 @@ test('give() writes nothing for a role already held', function (): void {
     expect(assignmentCount())->toBe(1);
 });
 
-test('give() does not bump the cache version for a role already held', function (): void {
+/**
+ * A pin on the DEPENDENCY, not on this package, and it is written down here so
+ * the next reader does not mistake it for a plugin guarantee again.
+ * `AssignsRoles::to()` accumulates whether any row was recently created and
+ * returns before both `bumpCacheVersion($scope)` and the `RoleAssigned`
+ * dispatch, so a found row invalidates nothing at that scope. `give()`'s own
+ * guard returns earlier still and never reaches warden, so this case can only
+ * go red on two faults at once — the guard gone AND warden regressed.
+ */
+test('give() does not bump the cache version for a role already held, which warden now guarantees itself', function (): void {
     signInAsHandOut();
 
     $account = makeUser();

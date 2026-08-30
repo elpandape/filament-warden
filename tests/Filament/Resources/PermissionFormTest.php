@@ -15,19 +15,27 @@ use Illuminate\Database\Eloquent\Model;
 use function Pest\Livewire\livewire;
 
 /**
- * `PermissionForm::sameRule()`/`ordered()` is a second copy of warden's own
- * `ElPandaPe\Warden\Actions\GrantsPermissions::optionsMatch()`/`normalizedOptions()`
- * — private there, so copied here rather than reused. The twin-reuse pin below
- * asks the same question warden asks when it decides two rows are the same
- * twin, so a drift between the two comparisons shows up as a real
- * disagreement rather than a re-statement of the copy's own source.
+ * There is no copy of warden's twin comparison here to keep in step with.
+ * `PermissionForm::lockedReason()` asks warden directly, through the public
+ * `ConstraintSerializer::sameRule()` — the same call that
+ * `GrantsPermissions::twinWithOptions()` makes when it decides an existing row
+ * is the twin to reuse, and the same canonical form `PermissionIdentity`
+ * digests for the `(name, identity_key)` unique index. So the pin is not a drift
+ * check between two comparisons; only the PREDICATE is shared, and the
+ * operands are not. Warden feeds it the fluent chain's own serialization; this
+ * screen feeds it its own read-and-rebuild round trip through `Narrowing`,
+ * `Rule`, `Value` and `Columns`. It goes red if that round trip stops landing
+ * on the stored blob, because `lockedReason()` then answers `'rewrite'` and the
+ * options field closes — and a closed field is what keeps `ConditionBuilder`'s
+ * `dehydrateStateUsing` from writing `options => null` on a title-only save.
  *
  * `'two chains warden treats as the same twin are read as the same rule
  * here'` simulates what an engine may hand back on read: the same rule, its
  * maps reordered at every level, with the items list left exactly where it
- * was — warden compares maps order-insensitively and lists
- * order-sensitively, and the mutation has to respect both halves of that to
- * pin the right thing.
+ * was — warden compares maps order-insensitively and lists order-sensitively,
+ * the one exception being the leading item's logical operator, which
+ * `canonical()` rewrites to `and` before it sorts anything. The mutation has to
+ * respect both halves of that to pin the right thing.
  */
 pest()->extend(TestCase::class);
 
