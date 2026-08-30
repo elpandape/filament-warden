@@ -106,10 +106,10 @@ enum Provenance: string
             foreach ($catalog->entries as $entry) {
                 if ($everything || in_array($entry->origin, $origins, true)) {
                     $query->orWhere(static function (Builder $query) use ($entry): void {
-                        // `where('entity_type', null)` compiles to `= null`,
-                        // which is never true. A loose permission would then
-                        // never match its own row and the badge and the filter
-                        // would answer differently about it.
+                        // Spelled out rather than left to `where()`, which
+                        // already redirects a null value to `whereNull()` on
+                        // its own. Defensive, not corrective: the branch is
+                        // here so a reader does not have to know that (§6.24).
                         $entry->entityType === null
                             ? $query->where('name', $entry->name)->whereNull('entity_type')
                             : $query->where('name', $entry->name)->where('entity_type', $entry->entityType);

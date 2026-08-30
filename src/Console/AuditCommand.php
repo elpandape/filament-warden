@@ -70,7 +70,7 @@ final class AuditCommand extends Command
     /**
      * The panels to audit, or null when the name given matches none.
      *
-     * The same shape `filament-warden:catalog` has carried since `1.9.0`, and it
+     * The same shape `filament-warden:catalog` carries, and it
      * gets its own sentence rather than borrowing that command's: the two are
      * separate keys because a published translation may have one and not the
      * other, and a reader chasing "no panel with that id" should land on the

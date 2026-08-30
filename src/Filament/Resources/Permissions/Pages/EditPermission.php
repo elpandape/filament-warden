@@ -144,8 +144,8 @@ class EditPermission extends EditRecord
      * the same name. Choosing the entity clears the conditions — deliberately,
      * they named another table's columns — so the row being saved is no longer a
      * twin, while `PermissionForm::exists()` had already excused it for being
-     * one when the rule ran. Before this it came back as a raw
-     * `UniqueConstraintViolationException`.
+     * one when the rule ran — which without this comes back as a raw
+     * `UniqueConstraintViolationException` rather than as a field error.
      *
      * @param  array<string, mixed>  $data
      */

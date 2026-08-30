@@ -65,12 +65,11 @@ final class PermissionName
      * This list may only GROW: an entry added is a licence to rewrite rows in
      * somebody else's database, so a new shape is a MAJOR and `FrozenTest` says
      * so. Nothing here may delegate to a moving target — and "warden's answer
-     * for today" IS one. That exception used to be carved out here, and it cost
-     * the guarantee twice: warden `2.0` replaced a shape rather than adding one,
-     * and warden `2.0.1` then replaced it again, each time dropping the wording
-     * an installation already carried. Warden's half now comes from
-     * `PermissionTitle::generations()`, which is frozen per release on warden's
-     * side; the two shapes below are this package's own and are frozen here.
+     * for today" IS one: warden replaces a shape rather than adding one, which
+     * drops the wording an installation already carried (§6.40). Warden's half
+     * comes from `PermissionTitle::generations()`, which is frozen per release
+     * on warden's side; the two shapes below are this package's own and are
+     * frozen here.
      *
      * A row this package did NOT mint still comes through here rather than
      * being asked at the two call sites, so "did we write this?" has one answer

@@ -7,10 +7,9 @@ namespace ElPandaPe\FilamentWarden\Grants;
 /**
  * What a save did, once two people can be editing the same role at once.
  *
- * A save used to be one outcome — it happened — because the screen's payload
- * was compared straight against the store, so every difference was read as
- * something this person wanted. With a baseline there are three, and only the
- * first is what the old notification meant:
+ * A payload compared straight against the store reads every difference as
+ * something this person wanted. Compared against the baseline the screen was
+ * showing, a save has three outcomes instead of one (§6.36):
  *
  * - `written`: cells this person moved, with nobody else in the way.
  * - `preserved`: cells this person did NOT move and somebody else did. Nothing

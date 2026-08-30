@@ -467,8 +467,8 @@ final class PermissionForm
             ->where('only_owned', (bool) $get('only_owned'))
             ->whereNull('options')
             // `Query\Builder::where()` already short-circuits a `null` value to
-            // `whereNull()` on its own (`vendor/laravel/framework/…/Builder.php:
-            // 986-991`), for both the two-arg form used here and the three-arg
+            // `whereNull()` on its own, for both the two-arg form used here and
+            // the three-arg
             // `=` form, so a plain `where('entity_type', $entityType)` would read
             // the same rows. The explicit branch is defensive, not corrective:
             // it says what the query means without leaning on a Laravel internal

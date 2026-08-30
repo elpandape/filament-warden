@@ -37,12 +37,6 @@ final readonly class Row
     }
 
     /**
-     * The actions the browser is allowed to cycle on this row, which is also
-     * what a granted wildcard reaches.
-     *
-     * @return list<string>
-     */
-    /**
      * What this row's cells ANSWER, for the reading that folds them away.
      *
      * The same count `Tab::granted()` makes, over one entity instead of a tab
@@ -78,6 +72,9 @@ final readonly class Row
     }
 
     /**
+     * The actions the browser is allowed to cycle on this row, which is also
+     * what a granted wildcard reaches.
+     *
      * @return list<string>
      */
     public function editableActions(): array

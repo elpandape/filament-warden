@@ -81,10 +81,10 @@ trait DrawsThePermissionGrid
 
         $entry = $this->catalogEntryFor($row, $action);
 
-        // The two used to be one guard, and `[]` meant either. Split, because
-        // only one of them is a state a person can see: a cell that is not in
-        // this catalogue is nobody's click, while a role that has not been
-        // saved is the first screen a new admin opens.
+        // Two guards and not one, because only one of them is a state a person
+        // can see: a cell that is not in this catalogue is nobody's click,
+        // while a role that has not been saved is the first screen a new admin
+        // opens. One guard answering `[]` for both said nothing to either.
         if (! $entry instanceof Entry) {
             return [];
         }

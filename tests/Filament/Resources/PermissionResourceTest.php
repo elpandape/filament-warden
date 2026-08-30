@@ -48,6 +48,11 @@ use function Pest\Livewire\livewire;
  * (`disableSchemaStateUpdateHooksForTesting`), so the `afterStateUpdated` that
  * would otherwise blank `options` on a live entity change never fires, and the
  * stored row survives to be read back by `lockedReason()`.
+ *
+ * A check answered once is answered from the cache from there on, and only
+ * warden's own fluent actions bump the version behind it — which is why the
+ * tests here that mean to exercise an invalidation warm the check first, on
+ * purpose. Said here rather than beside each of them.
  */
 pest()->extend(TestCase::class);
 
@@ -519,8 +524,6 @@ test('an edit made here reaches the store, which warden alone does not invalidat
     $holder = makeUser('Holder');
     Warden::allow($holder)->to('viewAny', Post::class);
 
-    // Warmed on purpose: the check is answered from the cache from here on, and
-    // only warden's own fluent actions bump the version behind it.
     expect(Access::granted($holder, 'viewAny', Post::class))->toBeTrue();
 
     livewire(EditPermission::class, ['record' => heldRow()->getKey()])
@@ -543,8 +546,6 @@ test('deleting a permission from the listing reaches the store, and warden inval
     $holder = makeUser('Holder');
     Warden::allow($holder)->to('viewAny', Post::class);
 
-    // Warmed on purpose: the check is answered from the cache from here on, and
-    // only warden's own fluent actions bump the version behind it.
     expect(Access::granted($holder, 'viewAny', Post::class))->toBeTrue();
 
     $permission = heldRow();

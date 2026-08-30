@@ -152,9 +152,8 @@ final class RoleGrants
         // the wrong connection would wrap queries that never run on it,
         // leaving the ones that matter to commit one at a time as they go —
         // and it silently disabled a promise `BumpsCacheVersion` already
-        // makes: `bumpCacheVersion()` (`Actions/Concerns/
-        // BumpsCacheVersion.php:19-30`) only schedules its after-commit
-        // second bump when `Context::resolve()->grantClass()`'s OWN
+        // makes: `BumpsCacheVersion::bumpCacheVersion()` only schedules its
+        // after-commit second bump when `Context::resolve()->grantClass()`'s OWN
         // connection reports `transactionLevel() > 0`. On a split-connection
         // install, opening this transaction on the default connection left
         // that check reading zero always, so the second bump — the one that
@@ -186,11 +185,9 @@ final class RoleGrants
      * The difference between three things, not two.
      *
      * A payload is not an intent. It is what the store held when the screen
-     * opened PLUS whatever this person changed, and until this version nothing
-     * separated the two halves: every cell where the payload and the store
-     * disagreed was written, so a cell somebody else had moved in the meantime
-     * was quietly moved back. It ran in both directions and over every drawn
-     * cell, not only the ones this person touched.
+     * opened PLUS whatever this person changed, and separating the two halves
+     * is what keeps a cell somebody else moved from being quietly moved back —
+     * over every drawn cell, not only the ones this person touched (§6.36).
      *
      * With the baseline the screen was showing, each cell answers two questions
      * instead of one — did THIS person move it, and did the store move under
@@ -446,9 +443,9 @@ final class RoleGrants
      * believed was there.
      *
      * Grouped by entity rather than run once per changed cell:
-     * `RevokesPermissions::revoke()` (`Actions/RevokesPermissions.php:69-107`)
-     * accepts a list of names and resolves it with one `whereIn()` lookup
-     * (`Concerns/ResolvesPermissions.php:56-93`) and, when there is anything
+     * `RevokesPermissions::revoke()` accepts a list of names, resolves it with
+     * one `whereIn()` lookup through `ResolvesPermissions::findPermissions()`
+     * and, when there is anything
      * to remove, one `delete()` — so four warden calls clear an entire
      * entity's worth of changed cells instead of four calls PER cell. This is
      * free of the TWIN problem specifically: revoking never creates one, so
@@ -560,16 +557,14 @@ final class RoleGrants
      * and every such cell that shares (entity, stance) is asked for in one
      * call. A cell narrowed any other way — `Shape::Owned`,
      * `Shape::Conditions` — still runs alone, through `narrow()`, exactly as
-     * before: `where()`'s `reconstrain()`
-     * (`Actions/GrantsPermissions.php:201-249`) re-points EVERY permission
+     * before: `where()`'s `reconstrain()` re-points EVERY permission
      * in the chain's `lastGranted` at the same twin, and two different cells
      * asking for two different conditions must never share one.
      *
-     * Grouping a grant changes more than its query count: `to()`
-     * (`Actions/GrantsPermissions.php:48`) fires one
+     * Grouping a grant changes more than its query count:
+     * `GrantsPermissions::to()` fires one
      * `GrantingPermission`/`ForbiddingPermission` event per call, carrying
-     * every name it resolved (`grant()`, `:134-171`, its insert loop
-     * `:148-157`), not one event per name. An application listening for that
+     * every name it resolved, not one event per name. An application listening for that
      * event to veto a single cell vetoes the whole group its cell landed in.
      * Pinned by "a veto scoped to one name in the list kills every name
      * grouped with it".

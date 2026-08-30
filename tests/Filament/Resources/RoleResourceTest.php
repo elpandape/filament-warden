@@ -101,6 +101,11 @@ use function Pest\Livewire\livewire;
  * takes the wildcard through a real resource page: its two siblings elsewhere
  * drive `RoleGrants::apply()` and the bare field harness, neither of which has a
  * policy in front of it.
+ *
+ * A check answered once is answered from the cache from there on, and only
+ * warden's own fluent actions bump the version behind it — which is why the
+ * tests here that mean to exercise an invalidation warm the check first, on
+ * purpose. Said here rather than beside each of them.
  */
 pest()->extend(TestCase::class);
 
@@ -675,8 +680,6 @@ test('deleting a role from the listing reaches the store, and warden invalidates
     $holder = makeUser('Holder');
     Warden::assign($role)->to($holder);
 
-    // Warmed on purpose: the check is answered from the cache from here on, and
-    // only warden's own fluent actions bump the version behind it.
     expect(Access::granted($holder, 'viewAny', roleClass()))->toBeTrue();
 
     livewire(ListRoles::class)

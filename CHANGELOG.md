@@ -8,6 +8,62 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.7.0] - 2026-08-30
+
+Fewer words. The last tag of this plan, and the only one whose whole job was to delete. It deleted
+24 lines, and that is the finding: the density was never the problem. What the reading found instead
+was three defects hiding inside prose nobody had reread.
+
+### Fixed
+
+- **A comment that told a reader something this package had already measured and found false.**
+  `Provenance::of()` said `where('entity_type', null)` compiles to `= null` and never matches.
+  Laravel's own query builder detects a null value and redirects to `whereNull()`, in both the
+  two- and three-argument forms — which this repository measured, wrote down, and corrected in the
+  sibling method that shares the pattern, never here, in the file its own note names as the origin.
+  Unchanged since it was written. The branch it sits above was always right; only the reason was
+  wrong, which is the failure mode this project has logged more than twenty times.
+
+- **A docblock naming the wrong class.** `PermissionResource`'s tenancy guard carried a byte-identical
+  copy of `RoleResource`'s, including its measurement — *"with this line gone, `Role::query()->count()`
+  … throw"* — on the permission resource. It points at the one copy now instead of restating it.
+
+- **A docblock stranded above the wrong method.** `Row::answered()`, added last release, was inserted
+  between `editableActions()` and the docblock describing it, so a paragraph about a list of action
+  names sat above a method returning three counts.
+
+### Changed
+
+- **Seven vendor line citations removed**, six in one file. §5 has forbidden them since `1.5.0`, with
+  its reason measured: they drift between one and eight lines and send a reader to the wrong place,
+  which is worse than not citing. Every one already named its method beside the line range; the
+  method is what stayed.
+
+- **Nine chronicle passages replaced by what they were chronicling.** "A save used to be one
+  outcome", "that earlier sentence said six", "since `1.9.0`" — history belongs in AGENTS and in this
+  file, and the code keeps the fact. Where the history explains a live guard, it now points at its
+  section the way nine other comments in `src/` already do rather than retelling it.
+
+- **AGENTS §5's rule about test bodies, amended rather than enforced.** This tag existed partly to
+  sweep the comments inside test bodies that the rule forbids. Recounted with the rule's exact
+  wording: **310 lines in 23 files, which are 97 paragraphs, of which two are repeated.** The other
+  95 all answer the one question no test can pin — why the test is written the way it is — and the
+  rule's own carve-out already exempted them. A rule whose exception does its entire job is not being
+  applied, it is being ignored, which is the lesson §5 had already written about itself once before,
+  in 2026-08-21. So the two genuine repetitions moved to their files' docblocks and the rule was
+  rewritten to say what is actually wanted. The plan asked for one whole exit or the other and said
+  half would not do; this is the other one.
+
+### Not included
+
+- **A density sweep, because measuring found nothing to sweep.** `src/` was 36.6% comment before this
+  release and is 36.5% after. The long comment blocks were read one by one and they are what §5 asks
+  for: the environment fact that does not follow from the code and cost something to find — warden
+  comparing with `===`, `whereCan()` falling through to a dynamic where, what a twin's identity
+  includes. The chronicle §5 bans was already at zero and stayed there. The honest answer is that
+  this is the floor for a codebase whose hazards are mostly invisible in its own syntax, and a
+  reading that cut deeper would have cut measurements.
+
 ## [2.6.0] - 2026-08-30
 
 A screen reader. An accessibility fix without the session that checks it is how this line stayed

@@ -79,16 +79,14 @@ class ViewPermission extends ViewRecord
         // Escaping them takes an ESCAPE clause, and the character in it is the
         // part that had to be measured on three engines rather than one.
         //
-        // A backslash — the obvious choice, and what this was written with
-        // first — is not portable, and exactly ONE engine is why: `escape '\'`
-        // is a syntax error on MySQL, which reads the backslash inside the
-        // string literal unless `NO_BACKSLASH_ESCAPES` is set. SQLite and
-        // Postgres both take it as it stands (Postgres under its default
-        // `standard_conforming_strings = on`), so a first draft of this comment
-        // blamed two engines and was measured wrong. Doubling it to
+        // A backslash is not portable, and exactly ONE engine is why:
+        // `escape '\'` is a syntax error on MySQL, which reads the backslash
+        // inside the string literal unless `NO_BACKSLASH_ESCAPES` is set.
+        // SQLite and Postgres both take it as it stands (Postgres under its
+        // default `standard_conforming_strings = on`). Doubling it to
         // `escape '\\'` satisfies MySQL and then breaks the other two, which
         // see two characters where one is required — so there is no backslash
-        // literal that works everywhere, which is the part that stands.
+        // literal that works everywhere (§6.38).
         //
         // `!` needs no escaping in a string literal on any of them, so the
         // clause is the same text for every driver. Measured on SQLite,

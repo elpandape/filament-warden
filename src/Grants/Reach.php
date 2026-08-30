@@ -18,10 +18,8 @@ use Throwable;
  * row on the page. The count is deliberately not written down as one number —
  * it depends on the grant's shape, measured at seven for a plain one and nine
  * for a `toOwn()`, whose ownership check asks the schema and pays twice for it
- * on sqlite. It no longer hydrates the whole candidate catalogue: warden filters
+ * on sqlite. It does not hydrate the whole candidate catalogue: warden filters
  * the candidates in SQL by name, entity type and a `whereExists` on the grant.
- * That earlier sentence said six and said the catalogue was hydrated whole, and
- * both halves were true when written and are not now.
  *
  * And the number is a LOWER BOUND, not the truth. `whereCan()` and the panel's
  * own checks do not answer the same thing, measured in both directions: a role
