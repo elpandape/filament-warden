@@ -190,7 +190,7 @@
                                                 absorb it. Empty, and with no
                                                 `scope`: it heads nothing.
                                             --}}
-                                            <th class="fw-filler" rowspan="2"></th>
+                                            <th class="fw-filler" rowspan="2" role="presentation"></th>
                                         </tr>
                                         <tr>
                                             @foreach ($grid->groups as $group)
@@ -206,9 +206,25 @@
                                     <tbody>
                                         @foreach ($tab->rows as $row)
                                             <tr x-show="shown(@js($row->key))">
-                                                <th class="fw-entity" scope="row">
-                                                    <span class="fw-entity-name">{{ $row->label }}</span>
-                                                    <span class="fw-entity-model">{{ $row->model }}</span>
+                                                {{--
+                                                    Named by its two spans and
+                                                    not by its contents, because
+                                                    the preset buttons live in
+                                                    here too: without this, every
+                                                    row of the table is announced
+                                                    as "users … read all none",
+                                                    with the three button labels
+                                                    glued to the entity's name.
+                                                    Seen in an accessibility tree
+                                                    dump, not guessed.
+                                                --}}
+                                                <th
+                                                    class="fw-entity"
+                                                    scope="row"
+                                                    aria-labelledby="{{ $ids }}-row-{{ $loop->index }}-name {{ $ids }}-row-{{ $loop->index }}-model"
+                                                >
+                                                    <span class="fw-entity-name" id="{{ $ids }}-row-{{ $loop->index }}-name">{{ $row->label }}</span>
+                                                    <span class="fw-entity-model" id="{{ $ids }}-row-{{ $loop->index }}-model">{{ $row->model }}</span>
                                                     <span class="fw-shortcuts" @unless ($interactive) hidden @endunless>
                                                         @foreach (['read', 'all', 'clear'] as $preset)
                                                             <button
@@ -228,7 +244,7 @@
                                                         @endif
                                                     </td>
                                                 @endforeach
-                                                <td class="fw-filler"></td>
+                                                <td class="fw-filler" role="presentation"></td>
                                             </tr>
                                         @endforeach
                                     </tbody>

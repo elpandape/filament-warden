@@ -176,8 +176,8 @@ test('the table carries a filler column so the spare width lands nowhere real', 
     // cell short and every group heading shifts.
     $rows = mb_substr_count($html, '<tr>') - mb_substr_count($html, '<th class="fw-filler"');
 
-    expect($html)->toContain('<th class="fw-filler" rowspan="2"></th>')
-        ->and(mb_substr_count($html, '<td class="fw-filler"></td>'))->toBeGreaterThan(0)
+    expect($html)->toContain('<th class="fw-filler" rowspan="2" role="presentation"></th>')
+        ->and(mb_substr_count($html, '<td class="fw-filler" role="presentation"></td>'))->toBeGreaterThan(0)
         ->and($rows)->toBeGreaterThan(0);
 });
 
@@ -1207,4 +1207,18 @@ test('a click still announces with the inspector and the builder both switched o
     $write = mb_substr($script, (int) mb_strpos($script, 'write(row, action, stance) {'));
 
     expect(mb_substr($write, 0, (int) mb_strpos($write, "\n        },")))->toContain('this.said = this.spoken(');
+});
+
+test('a row is named by its entity, not by the buttons that sit beside it', function (): void {
+    $html = livewire(GridHost::class, ['roleKey' => makeRole()->getKey()])->html();
+
+    // The presets live inside the row header, so a header named by its contents
+    // is announced with the three button labels glued on: "Roles … read all
+    // none", on every row. Seen in an accessibility tree dump, not guessed.
+    expect($html)->toContain('aria-labelledby="')
+        ->and($html)->toMatch('/<th\s+class="fw-entity"\s+scope="row"\s+aria-labelledby="[^"]+-name [^"]+-model"/');
+
+    // The spare-width column heads nothing, and now says so rather than turning
+    // up as a column header with no name.
+    expect($html)->toContain('class="fw-filler" rowspan="2" role="presentation"');
 });
