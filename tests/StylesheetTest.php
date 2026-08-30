@@ -63,8 +63,9 @@ test('every custom property the sheet reads is one it declares, and none is decl
     // class short, and the two sides then disagree about the SAME token — the
     // declaration side fails to match at all while the usage side captures a
     // truncated name, so the token reads as used and never declared. Measured
-    // on `--fw-head-1`: 18 used against 17 declared, red on a sheet with
-    // nothing wrong with it.
+    // on a `--fw-head-1` that no longer ships: 18 used against 17 declared, red
+    // on a sheet with nothing wrong with it. Byte-identical on today's sheet,
+    // which has no token with a digit — kept for the next one that does.
 
     preg_match_all('/var\((--fw-[a-z0-9-]+)/', $sheet, $uses);
     preg_match_all('/(--fw-[a-z0-9-]+)\s*:/', $sheet, $declarations);

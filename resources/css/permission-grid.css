@@ -228,6 +228,15 @@
 
 .fw-scroll {
     overflow-x: auto;
+    /* The head above can only stick to something that scrolls, and this is the
+       something. `overflow-x: auto` already makes this a scroll container, so
+       the head sticks to IT rather than to the page — and without a cap it
+       never scrolls vertically, which is a head that travels off screen with
+       everything else. Measured: 589px to 205px on a 384px page scroll, a
+       sticky rule that did nothing at all. The sketch has no cap either.
+       Only bites on a long catalogue; a short one never reaches it. */
+    overflow-y: auto;
+    max-block-size: 60vh;
     /* Without this a browser may recompute the whole table's layout on every
        scroll once the head is fixed above it. */
     contain: layout;
@@ -250,10 +259,6 @@
  * must overflow the scroller rather than compress, which is what the pinned
  * first column and its opaque background were written for. */
 .fw-table {
-    /* The first head row's height, because the second one has to start where it
-       ends: the two rows stack and each needs its own offset. */
-    --fw-head-1: 2.25rem;
-
     border-collapse: separate;
     border-spacing: 0;
     inline-size: 100%;
@@ -263,27 +268,29 @@
    column already does across it: with twenty-seven rows you lose track of which
    column you are looking at.
 
-   The corner is fixed on BOTH axes, so it has to beat both — without the third
+   Stuck as ONE element rather than row by row. The sketch offsets the second row
+   by a declared first-row height, and that height is not this package's to
+   declare: it comes out of the host theme's own line-height, measured at 26px
+   against the sketch's 36px — a ten-pixel strip of body rows showing between two
+   rows that are supposed to be flush. A `<thead>` travels whole, so there is no
+   offset to get wrong and the gap is zero.
+
+   The corner is fixed on BOTH axes, so it has to beat this — without the third
    level the entity column draws over the head on a diagonal scroll. Only ever
    live in the wide reading: below the breakpoint the whole `.fw-scroll` is
    `display: none`. */
-.fw-table thead th {
+.fw-table thead {
     position: sticky;
-    z-index: 2;
-    background: var(--fw-raised);
-}
-
-.fw-table thead tr:first-child th {
     inset-block-start: 0;
+    z-index: 2;
 }
 
-.fw-table thead tr:last-child th {
-    inset-block-start: var(--fw-head-1);
+.fw-table thead th {
+    background: var(--fw-raised);
 }
 
 .fw-table thead .fw-corner {
     z-index: 3;
-    inset-inline-start: 0;
 }
 
 /* Where the spare width goes. Empty on purpose and last on purpose: it is the
