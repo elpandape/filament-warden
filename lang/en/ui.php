@@ -95,7 +95,7 @@ return [
             ],
             'delete' => [
                 'nobody' => 'Nobody holds this permission, so nothing goes with it.',
-                'holders' => 'Every grant that points at this permission goes with it, in the database and with no trace afterwards — roles: :roles, accounts: :accounts. They are: :names.',
+                'holders' => 'Every grant that points at this permission goes with it, in the database — roles: :roles, accounts: :accounts. They are: :names.',
             ],
             'probe' => [
                 'label' => 'Test it',

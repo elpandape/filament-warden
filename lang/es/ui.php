@@ -95,7 +95,7 @@ return [
             ],
             'delete' => [
                 'nobody' => 'Nadie tiene este permiso, así que no se lleva nada por delante.',
-                'holders' => 'Toda concesión que apunte a este permiso se va con él, en la base de datos y sin rastro después — roles: :roles, cuentas: :accounts. Son: :names.',
+                'holders' => 'Toda concesión que apunte a este permiso se va con él, en la base de datos — roles: :roles, cuentas: :accounts. Son: :names.',
             ],
             'probe' => [
                 'label' => 'Probarlo',
