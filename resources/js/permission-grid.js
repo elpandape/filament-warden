@@ -39,6 +39,11 @@
  * `booleanMisfit()` is the one with no counterpart: PHP ships the column list it
  * needs (`Columns::booleans()`) and decides nothing about it.
  *
+ * `said` is not a rule and not a word of its own: it is `stateOf()`'s answer,
+ * parked where a live region can read it. Written in `write()` so a preset and
+ * a keyboard cycle announce too, and deliberately NOT in `select()`, which
+ * returns early when the inspector and the condition builder are both off.
+ *
  * `shown()`, `matched()`, `filterCount()` and `filterEmpty()` are not on either
  * list, and that is the point of them: the filter decides what is DRAWN and the
  * server decides nothing about it, because a filter the server knew about would
@@ -205,6 +210,11 @@ function grid({ state, grid, interactive }) {
         loading: false,
 
         failed: false,
+
+        // What the last click did, for the live region above the grid. Empty
+        // until something is clicked, because a region that arrives with its
+        // text already in it is a region NVDA and JAWS do not announce.
+        said: '',
 
         // A plain counter, never an object. Alpine's reactivity (`@vue/reactivity`,
         // which it pins) wraps every object-valued property in a Proxy on each
@@ -507,6 +517,45 @@ function grid({ state, grid, interactive }) {
             }
 
             this.state = { ...this.state, stances: this.replace(this.state.stances, row, held) }
+
+            // Said here and not in `pick()`, so a preset and a keyboard cycle
+            // announce too; and not in `select()`, which returns without doing
+            // anything when the inspector and the builder are both off — a
+            // configuration where a click said nothing at all, ever.
+            //
+            // AFTER the write, and through the same three methods the cell's
+            // own spans are bound to, in the same order — so the region says
+            // byte for byte what the cell now says. Taking `grid.states[stance]`
+            // instead would be a second version of one fact: a cell cleared
+            // under a granting wildcard answers "granted", and carries "reached
+            // by a broader rule" beside it, where the stance alone says "no
+            // rule".
+            //
+            // The cell is not named. The person's focus is on it, so it is
+            // already known — and a preset writes a whole row at once, where
+            // naming one of them would be worse than naming none.
+            //
+            // A preset writes one stance to every cell it touches, so the last
+            // call through here is true of all of them.
+            this.said = this.spoken(row, action)
+        },
+
+        /**
+         * The cell's own words, in the cell's own order.
+         *
+         * `box.blade.php` binds three spans — `stateOf()`, `reachedMark()` and
+         * `markOf()` — and the accessibility tree joins them itself. This joins
+         * the same three the same way, which is what keeps one cell from having
+         * two descriptions on one screen.
+         */
+        spoken(row, action) {
+            const name = (this.grid.rows[row]?.cells ?? []).find((cell) => cell.action === action)?.name
+
+            return [
+                this.stateOf(row, action, name),
+                this.reachedMark(row, action, name),
+                this.markOf(row, action),
+            ].filter((word) => word !== '' && word !== undefined).join(' ')
         },
 
         /* ── The tabs, from the keyboard ────────────────────────────────── */

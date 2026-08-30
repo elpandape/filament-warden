@@ -1128,9 +1128,15 @@ test('one filter answers for both readings, and it never reaches the state', fun
 test('the filter says out loud what it took away', function (): void {
     $html = livewire(GridHost::class, ['roleKey' => makeRole()->getKey()])->html();
 
+    // The window used to be 900 characters wide and asked only whether
+    // `role="status"` appeared SOMEWHERE inside it. The grid has other live
+    // regions — the inspector has had one since `1.1.0` — so a second one
+    // landing anywhere near the filter would have kept this green with the
+    // filter's own gone. It asks for the filter's own node now.
     $filter = mb_substr($html, (int) mb_strpos($html, 'class="fw-filter"'), 900);
 
     expect($filter)->toContain('role="status"')
+        ->and($filter)->toContain('x-text="filter.trim() === \'\' ? \'\' : filterCount(')
         ->and($filter)->toContain('class="fw-sr"');
 });
 
@@ -1173,4 +1179,32 @@ test('the fold count and the row it counts agree, server and browser', function 
     expect($answered['granted'])->toBe(1)
         ->and($answered['forbidden'])->toBe(1)
         ->and($view->summaryOf($row))->toBe('1 of '.$answered['total'].' · 1 forbidden');
+});
+
+test('the grid carries one live region for what a click just did, from the first paint', function (): void {
+    $html = livewire(GridHost::class, ['roleKey' => makeRole()->getKey()])->html();
+
+    // One for the whole grid, not one per tab: only one cell can be clicked at
+    // a time. And empty, and never behind a condition — a live region that
+    // arrives with its text already in it is one NVDA and JAWS do not announce.
+    expect(mb_substr_count($html, 'x-text="said"'))->toBe(1)
+        ->and($html)->toContain('<p class="fw-sr" role="status" x-text="said"></p>');
+});
+
+test('a click still announces with the inspector and the builder both switched off', function (): void {
+    config()->set('filament-warden.grid.explain', false);
+    config()->set('filament-warden.grid.constraints', false);
+
+    $html = livewire(GridHost::class, ['roleKey' => makeRole()->getKey()])->html();
+
+    // The configuration that used to be silent: `select()` returns before doing
+    // anything when both are off, so an announcement hung off it would never
+    // fire. This one hangs off `write()`.
+    expect($html)->toContain('x-text="said"');
+
+    $script = (string) file_get_contents(dirname(__DIR__, 3).'/resources/js/permission-grid.js');
+
+    $write = mb_substr($script, (int) mb_strpos($script, 'write(row, action, stance) {'));
+
+    expect(mb_substr($write, 0, (int) mb_strpos($write, "\n        },")))->toContain('this.said = this.spoken(');
 });

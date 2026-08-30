@@ -68,6 +68,33 @@
                 @endif
 
                 {{--
+                    What a click just did, said once, for everyone who is not
+                    looking at the cell.
+
+                    A cell's accessible name already changes on its own — every
+                    `fw-sr` span inside it is bound with `x-text` — but a name
+                    that changes under a focus that never moved is not a name a
+                    screen reader re-reads. This is the element that says it.
+
+                    Empty from the first paint and never behind a condition, for
+                    the reason the inspector's own region below already names: a
+                    live region added to the page at the same moment its content
+                    appears is not announced by NVDA or JAWS. Only its TEXT may
+                    change.
+
+                    One for the whole grid, not one per tab like the filter's:
+                    only one cell can be clicked at a time, and a second region
+                    would only ever repeat this one.
+
+                    Driven by `write()`, which every stance change goes through,
+                    and NOT by `select()` — that one returns early when the
+                    inspector and the condition builder are both switched off,
+                    which is a configuration where a click used to say nothing
+                    at all, ever.
+                --}}
+                <p class="fw-sr" role="status" x-text="said"></p>
+
+                {{--
                     A tablist is ONE tab stop and the arrows walk it: that is the
                     pattern, and it is also the only way the panel below is
                     reachable without tabbing past every tab first. Without

@@ -56,8 +56,20 @@ function makeGrid() {
         grid: {
             order: ['abstain', 'granted', 'forbidden'],
             manage: '*',
+            // `alpine()` always sends this map; the fixture went without it until
+            // a cell learned to say what it became, which reads it.
+            rows: {
+                'App\\Models\\Post': {
+                    label: 'Posts',
+                    model: 'App\\Models\\Post',
+                    actions: ['viewAny'],
+                    read: ['viewAny'],
+                    cells: [{ action: 'viewAny', name: 'viewAny' }],
+                },
+            },
             tabs: [{ key: 'resources', rows: ['App\\Models\\Post'] }],
-            states: { narrowed: 'fw-narrowed' },
+            wider: {},
+            states: { narrowed: 'fw-narrowed', abstain: 'no rule', granted: 'granted', forbidden: 'forbidden', broader: '' },
             explain: false,
             constraints: false,
             words: {},
