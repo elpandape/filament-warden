@@ -305,6 +305,15 @@ return [
         'entity' => 'Entity',
         'manage' => 'Everything',
         'undeclared' => 'The policy does not declare this action',
+        'filter' => [
+            'label' => 'Filter entities',
+            'count' => ':matched of :total · the tab counters still count the whole tab',
+            'empty' => 'Nothing matches ":term".',
+        ],
+        'summary' => [
+            'ratio' => ':granted of :total',
+            'forbidden' => ':count forbidden',
+        ],
         'presets' => [
             'read' => 'read',
             'all' => 'all',

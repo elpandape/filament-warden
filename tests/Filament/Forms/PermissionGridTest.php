@@ -29,6 +29,8 @@ declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Conditions\Columns;
+use ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView;
+use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Row;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\CreateRole;
@@ -1084,4 +1086,91 @@ test('what the save did stays reachable in the container for a page that wants t
     expect($report->written)->toBe(0)
         ->and($report->preserved)->toBe(0)
         ->and($report->refused)->toBeEmpty();
+});
+
+test('one filter answers for both readings, and it never reaches the state', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    $html = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
+
+    // One input, above both readings, so the table and the fold cannot disagree
+    // about which rows exist.
+    expect(mb_substr_count($html, 'class="fw-filter-field"'))->toBe(1);
+
+    $table = mb_substr($html, (int) mb_strpos($html, 'class="fw-scroll"'), (int) mb_strpos($html, 'class="fw-stack"') - (int) mb_strpos($html, 'class="fw-scroll"'));
+    $stack = mb_substr($html, (int) mb_strpos($html, 'class="fw-stack"'));
+
+    expect($table)->toContain('x-show="shown(')
+        ->and($stack)->toContain('x-show="shown(');
+
+    $filter = mb_strpos($html, 'class="fw-filter"');
+    $scroll = mb_strpos($html, 'class="fw-scroll"');
+    $stack = mb_strpos($html, 'class="fw-stack"');
+
+    expect($filter)->toBeLessThan((int) $scroll)
+        ->and($filter)->toBeLessThan((int) $stack);
+
+    // What the browser filters ON. Without these two the predicate would have to
+    // read the DOM back, which is the shape that ends up rebuilding state.
+    $matches = [];
+    preg_match("/JSON\.parse\('(.+?)'\)/", $html, $matches);
+    $unescaped = json_decode('"'.($matches[1] ?? '').'"');
+
+    /** @var array{rows: array<string, array{label: string, model: string|null}>} $payload */
+    $payload = json_decode(is_string($unescaped) ? $unescaped : '{}', true, 512, JSON_THROW_ON_ERROR);
+
+    expect($payload['rows'][roleClass()]['label'])->not->toBeEmpty()
+        ->and($payload['rows'][roleClass()]['model'])->toBe(roleClass());
+});
+
+test('the filter says out loud what it took away', function (): void {
+    $html = livewire(GridHost::class, ['roleKey' => makeRole()->getKey()])->html();
+
+    $filter = mb_substr($html, (int) mb_strpos($html, 'class="fw-filter"'), 900);
+
+    expect($filter)->toContain('role="status"')
+        ->and($filter)->toContain('class="fw-sr"');
+});
+
+test('the folded reading carries the presets the table row has, and its own count', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    $html = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
+    $stack = mb_substr($html, (int) mb_strpos($html, 'class="fw-stack"'));
+
+    // In the body of the disclosure, never in its `<summary>`, where a click
+    // would toggle the fold instead of applying the preset.
+    $shortcuts = mb_strpos($stack, 'fw-stack-shortcuts');
+    $rows = mb_strpos($stack, 'class="fw-stack-rows"');
+
+    expect($stack)->toContain('fw-stack-shortcuts')
+        ->and($rows)->toBeLessThan((int) $shortcuts)
+        ->and($stack)->toContain('class="fw-stack-summary"');
+});
+
+test('the fold count and the row it counts agree, server and browser', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', roleClass());
+    Warden::forbid($role)->to('delete', roleClass());
+
+    $catalog = Catalog::for(Filament::getPanel('test'));
+    $stored = RoleGrants::of($role, $catalog);
+
+    // The third argument is what is ON SCREEN, and the cells answer from that:
+    // a view built without it draws a role that has nothing.
+    $view = GridView::for($catalog, $stored, $stored->stances);
+
+    /** @var Row $row */
+    $row = collect($view->tabs[0]->rows)->first(static fn (Row $candidate): bool => $candidate->model === roleClass());
+
+    $answered = $row->answered();
+
+    expect($answered['granted'])->toBe(1)
+        ->and($answered['forbidden'])->toBe(1)
+        ->and($view->summaryOf($row))->toBe('1 of '.$answered['total'].' · 1 forbidden');
 });

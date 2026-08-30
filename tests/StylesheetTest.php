@@ -59,8 +59,15 @@ test('a mark that carries meaning is drawn with the muted token too', function (
 test('every custom property the sheet reads is one it declares, and none is declared unread', function (): void {
     $sheet = stylesheet();
 
-    preg_match_all('/var\((--fw-[a-z-]+)/', $sheet, $uses);
-    preg_match_all('/(--fw-[a-z-]+)\s*:/', $sheet, $declarations);
+    // `[a-z0-9-]+` and not `[a-z-]+`: a digit in a token name stops the narrow
+    // class short, and the two sides then disagree about the SAME token — the
+    // declaration side fails to match at all while the usage side captures a
+    // truncated name, so the token reads as used and never declared. Measured
+    // on `--fw-head-1`: 18 used against 17 declared, red on a sheet with
+    // nothing wrong with it.
+
+    preg_match_all('/var\((--fw-[a-z0-9-]+)/', $sheet, $uses);
+    preg_match_all('/(--fw-[a-z0-9-]+)\s*:/', $sheet, $declarations);
 
     $used = array_values(array_unique($uses[1]));
     $declared = array_values(array_unique($declarations[1]));

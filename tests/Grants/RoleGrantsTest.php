@@ -1317,3 +1317,57 @@ test('a lone editor can still clear a cell whose reach this screen cannot rebuil
     expect($report->refused)->toBeEmpty()
         ->and($report->written)->toBe(1);
 });
+
+test('a payload with an entity missing revokes it, which is why a filter may never prune', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', Post::class);
+    Warden::allow($role)->to('viewAny', roleClass());
+
+    $holder = makeUser();
+    Warden::assign($role)->to($holder);
+
+    $catalog = gridCatalog();
+    $full = ['stances' => RoleGrants::of($role, $catalog)->stances];
+
+    $pruned = $full['stances'];
+    unset($pruned[Post::class]);
+
+    $report = RoleGrants::apply($role, $catalog, $pruned, null, $full);
+
+    expect(Access::granted($holder, 'viewAny', Post::class))->toBeFalse()
+        ->and(Access::granted($holder, 'viewAny', roleClass()))->toBeTrue()
+        ->and($report->written)->toBe(1)
+        ->and($report->revoked)->toBe(1)
+        ->and($report->refused)->toBeEmpty()
+        ->and($report->preserved)->toBe(0);
+});
+
+test('a narrowing map with a cell missing widens it, for the same reason', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', Post::class)->where('title', '=', 'alpha');
+
+    $catalog = gridCatalog();
+    $stored = RoleGrants::of($role, $catalog);
+    $baseline = $stored->toPayload();
+
+    expect($stored->narrowings[Post::class]['viewAny']->shape)->toBe(Shape::Conditions);
+
+    $narrowings = $baseline['narrowing'];
+    unset($narrowings[Post::class]['viewAny']);
+
+    $report = RoleGrants::apply($role, $catalog, $baseline['stances'], $narrowings, $baseline);
+
+    expect(RoleGrants::of($role, $catalog)->narrowings[Post::class]['viewAny']->shape)->toBe(Shape::All)
+        ->and($report->written)->toBe(1);
+
+    // A map that is absent altogether is the safe half of the same question,
+    // and it is the branch that makes the one above a hazard rather than a
+    // defect: nobody touched any reach, so the store keeps what it holds.
+    Warden::allow($role)->to('viewAny', Post::class)->where('title', '=', 'alpha');
+
+    RoleGrants::apply($role, $catalog, $baseline['stances'], null, $baseline);
+
+    expect(RoleGrants::of($role, $catalog)->narrowings[Post::class]['viewAny']->shape)->toBe(Shape::Conditions);
+});

@@ -39,7 +39,7 @@ helpers: ## Check for duplicate global test helpers
 # offline-idempotent against the committed lock, so the gate stays honest about
 # which `@vue/reactivity` it ran under — the whole point is that it is Alpine's.
 verify: ## Drive the JS through the reactivity Alpine really uses
-	$(PHP) sh -c 'cd verify && npm ci --silent && node verify-reach-of.mjs && node verify-reach-keyboard.mjs && node verify-select-sequencing.mjs && node verify-baseline-survives.mjs'
+	$(PHP) sh -c 'cd verify && npm ci --silent && node verify-reach-of.mjs && node verify-reach-keyboard.mjs && node verify-select-sequencing.mjs && node verify-baseline-survives.mjs && node verify-filter-keeps-state.mjs'
 
 stan: ## PHPStan (level max), at the ceiling and again at the declared floor
 	$(PHP) vendor/bin/phpstan analyse --memory-limit=1G

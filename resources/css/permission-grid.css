@@ -228,6 +228,9 @@
 
 .fw-scroll {
     overflow-x: auto;
+    /* Without this a browser may recompute the whole table's layout on every
+       scroll once the head is fixed above it. */
+    contain: layout;
 }
 
 /* What it NEEDS, not what there is. With the inspector gone from the side,
@@ -247,9 +250,40 @@
  * must overflow the scroller rather than compress, which is what the pinned
  * first column and its opaque background were written for. */
 .fw-table {
+    /* The first head row's height, because the second one has to start where it
+       ends: the two rows stack and each needs its own offset. */
+    --fw-head-1: 2.25rem;
+
     border-collapse: separate;
     border-spacing: 0;
     inline-size: 100%;
+}
+
+/* The head is fixed down the page, which is the other half of what the entity
+   column already does across it: with twenty-seven rows you lose track of which
+   column you are looking at.
+
+   The corner is fixed on BOTH axes, so it has to beat both — without the third
+   level the entity column draws over the head on a diagonal scroll. Only ever
+   live in the wide reading: below the breakpoint the whole `.fw-scroll` is
+   `display: none`. */
+.fw-table thead th {
+    position: sticky;
+    z-index: 2;
+    background: var(--fw-raised);
+}
+
+.fw-table thead tr:first-child th {
+    inset-block-start: 0;
+}
+
+.fw-table thead tr:last-child th {
+    inset-block-start: var(--fw-head-1);
+}
+
+.fw-table thead .fw-corner {
+    z-index: 3;
+    inset-inline-start: 0;
 }
 
 /* Where the spare width goes. Empty on purpose and last on purpose: it is the
@@ -502,7 +536,16 @@
 }
 
 tr:hover .fw-shortcuts,
+.fw-stack-entity:hover .fw-shortcuts,
 .fw-shortcuts:focus-within {
+    opacity: 1;
+}
+
+/* The fold has no `<tr>` for the rule above to hang off, and the copy there is
+   not a hover affordance beside a row title — it is the row's own control strip.
+   Shown, with its own room. */
+.fw-stack-shortcuts {
+    margin: 0.5rem 0.75rem 0;
     opacity: 1;
 }
 
@@ -640,7 +683,7 @@ tr:hover .fw-shortcuts,
 
 .fw-stack-entity > summary {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.25rem;
     padding: 0.625rem 0.75rem;
     cursor: pointer;

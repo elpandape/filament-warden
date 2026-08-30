@@ -42,6 +42,44 @@ final readonly class Row
      *
      * @return list<string>
      */
+    /**
+     * What this row's cells ANSWER, for the reading that folds them away.
+     *
+     * The same count `Tab::granted()` makes, over one entity instead of a tab
+     * and with one stance more: a tab counts granted, this counts granted and
+     * forbidden, because a collapsed entity hides a prohibition just as well
+     * as it hides a grant. The browser re-derives it in `answered()` — a click
+     * has to redraw the number without asking the server — and a test pins the
+     * two together.
+     *
+     * @return array{granted: int, forbidden: int, total: int}
+     */
+    public function answered(): array
+    {
+        $granted = 0;
+        $forbidden = 0;
+        $total = 0;
+
+        foreach ($this->allCells() as $cell) {
+            if (! $cell->declared) {
+                continue;
+            }
+
+            $total++;
+
+            match ($cell->answers()) {
+                Stance::Granted => $granted++,
+                Stance::Forbidden => $forbidden++,
+                default => null,
+            };
+        }
+
+        return ['granted' => $granted, 'forbidden' => $forbidden, 'total' => $total];
+    }
+
+    /**
+     * @return list<string>
+     */
     public function editableActions(): array
     {
         return $this->actionsOf(array_filter($this->cells, static fn (Cell $cell): bool => $cell->isEditable()));

@@ -305,6 +305,15 @@ return [
         'entity' => 'Entidad',
         'manage' => 'Todo',
         'undeclared' => 'La Policy no declara esta acción',
+        'filter' => [
+            'label' => 'Filtrar entidades',
+            'count' => ':matched de :total · los contadores siguen contando la pestaña entera',
+            'empty' => 'Nada casa con «:term».',
+        ],
+        'summary' => [
+            'ratio' => ':granted de :total',
+            'forbidden' => ':count prohibidas',
+        ],
         'presets' => [
             'read' => 'leer',
             'all' => 'todo',

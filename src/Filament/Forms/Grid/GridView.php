@@ -157,10 +157,12 @@ final readonly class GridView
      * @return array{
      *     order: list<string>,
      *     manage: string,
-     *     rows: array<string, array{actions: list<string>, read: list<string>, cells: list<array{action: string, name: string|null}>}>,
+     *     rows: array<string, array{label: string, model: string|null, actions: list<string>, read: list<string>, cells: list<array{action: string, name: string|null}>}>,
      *     tabs: list<array{key: string, rows: list<string>}>,
      *     wider: array<string, string>,
      *     states: array<string, string>,
+     *     filter: array{count: string, empty: string},
+     *     summary: array{ratio: string, forbidden: string},
      *     operators: list<string>,
      *     authority: string,
      *     boolean: string,
@@ -177,6 +179,12 @@ final readonly class GridView
         foreach ($this->tabs as $tab) {
             foreach ($tab->rows as $row) {
                 $rows[$row->key] = [
+                    // The two words the filter matches on. They are already
+                    // drawn in both readings; sending them is what lets one
+                    // predicate answer for both without the browser reading
+                    // the DOM back.
+                    'label' => $row->label,
+                    'model' => $row->model,
                     'actions' => $row->editableActions(),
                     'read' => $row->readActions(),
                     'cells' => $row->drawnCells(),
@@ -194,10 +202,51 @@ final readonly class GridView
             ], $this->tabs),
             'wider' => $this->wider,
             'states' => $this->states(),
+            // The one sentence the browser composes rather than looks up whole,
+            // because its numbers only exist once a cell has been clicked.
+            'filter' => [
+                'count' => self::translated('filament-warden::ui.grid.filter.count', ':matched / :total'),
+                'empty' => self::translated('filament-warden::ui.grid.filter.empty', ':term'),
+            ],
+            'summary' => [
+                'ratio' => self::translated('filament-warden::ui.grid.summary.ratio', ':granted / :total'),
+                'forbidden' => self::translated('filament-warden::ui.grid.summary.forbidden', ':count'),
+            ],
             'explain' => Config::enabled('grid.explain'),
             'constraints' => Config::enabled('grid.constraints'),
             ...Words::all(),
         ];
+    }
+
+    /**
+     * The fold's per-entity count, drawn by the server.
+     *
+     * The browser redraws it from the same count the moment a cell is clicked
+     * — `stackSummary()` in the script — so this is the half that is right
+     * before alpine boots, and the two are pinned together by a test. The
+     * placeholder substitution is the one this package does in two places on
+     * purpose (§6.15's rule: a rule written twice is named beside its
+     * counterpart, not collapsed).
+     */
+    public function summaryOf(Row $row): string
+    {
+        $answered = $row->answered();
+
+        $ratio = str_replace(
+            [':granted', ':total'],
+            [(string) $answered['granted'], (string) $answered['total']],
+            self::translated('filament-warden::ui.grid.summary.ratio', ':granted / :total'),
+        );
+
+        if ($answered['forbidden'] === 0) {
+            return $ratio;
+        }
+
+        return $ratio.' · '.str_replace(
+            ':count',
+            (string) $answered['forbidden'],
+            self::translated('filament-warden::ui.grid.summary.forbidden', ':count'),
+        );
     }
 
     /**

@@ -177,6 +177,11 @@ function grid({ state, grid, interactive }) {
 
         tab: grid.tabs.length > 0 ? grid.tabs[0].key : null,
 
+        // One term for the whole grid rather than one per tab, because there is
+        // exactly one matrix tab by construction: `GridView::matrix()` is
+        // private and called once. The doors tabs have no rows to filter.
+        filter: '',
+
         selected: null,
 
         why: null,
@@ -348,6 +353,89 @@ function grid({ state, grid, interactive }) {
         widen(row, action, stance) {
             this.write(row, action, stance)
             this.narrow(row, action, { mode: 'all', rules: [] })
+        },
+
+        /* ── Finding a row ───────────────────────────────────── */
+
+        /**
+         * Whether a row is one of the ones being looked for.
+         *
+         * It reads `grid`, which PHP filled and nothing ever writes, and NEVER
+         * `state`. That is the whole safety property of this feature, not a
+         * style: a filter that pruned `state.stances` would send a payload with
+         * an entity missing, and `RoleGrants::plan()` walks the CATALOGUE, so a
+         * missing cell arrives as an abstention against a baseline that still
+         * has it and is written as a deliberate revoke — with a success report
+         * on top. It cannot be defended against downstream either: clearing a
+         * cell deletes its key too, so the two are byte for byte the same
+         * payload. Two tests in `RoleGrantsTest` pin what that costs.
+         *
+         * Both readings ask this same method, so the table and the fold cannot
+         * disagree about which rows exist.
+         */
+        shown(row) {
+            const term = this.filter.trim().toLowerCase()
+
+            if (term === '') {
+                return true
+            }
+
+            const found = this.grid.rows[row] ?? {}
+
+            return (found.label + ' ' + (found.model ?? '')).toLowerCase().includes(term)
+        },
+
+        matched(tabKey) {
+            const tab = this.grid.tabs.find((candidate) => candidate.key === tabKey)
+
+            return tab === undefined ? 0 : tab.rows.filter((row) => this.shown(row)).length
+        },
+
+        filterCount(tabKey) {
+            const tab = this.grid.tabs.find((candidate) => candidate.key === tabKey)
+
+            return this.grid.filter.count
+                .replace(':matched', this.matched(tabKey))
+                .replace(':total', tab === undefined ? 0 : tab.rows.length)
+        },
+
+        filterEmpty() {
+            return this.grid.filter.empty.replace(':term', this.filter.trim())
+        },
+
+        /**
+         * The fold's per-entity count, which the wide reading does not need
+         * because its cells are all on one line.
+         *
+         * It counts what the cells ANSWER, like the tab counter, and one stance
+         * more than it: a tab counts granted, this counts granted and forbidden,
+         * because a collapsed entity hides a prohibition just as well as a
+         * grant. PHP: `Row::answered()`, and a test pins the two together.
+         *
+         * The one place this file puts a computed value inside a translated
+         * line. Every other string it produces is a whole word looked up in a
+         * map PHP filled. `verify/verify-stack-summary.mjs` drives it.
+         */
+        stackSummary(row) {
+            const answered = this.answered(row)
+            const ratio = this.grid.summary.ratio
+                .replace(':granted', answered.granted)
+                .replace(':total', answered.total)
+
+            return answered.forbidden === 0
+                ? ratio
+                : ratio + ' · ' + this.grid.summary.forbidden.replace(':count', answered.forbidden)
+        },
+
+        answered(row) {
+            const cells = this.grid.rows[row]?.cells ?? []
+            const states = cells.map((cell) => this.answers(row, cell.action, cell.name))
+
+            return {
+                granted: states.filter((state) => state === this.grid.order[1]).length,
+                forbidden: states.filter((state) => state === this.grid.order[2]).length,
+                total: states.length,
+            }
         },
 
         /**

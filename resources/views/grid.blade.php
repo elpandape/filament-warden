@@ -117,7 +117,37 @@
                         @unless ($loop->first) x-cloak @endunless
                     >
                         @if ($tab->matrix)
-                            <div class="fw-scroll">
+                            {{--
+                                Above both readings, so one input answers for
+                                the table and for the fold. It only ever decides
+                                what is DRAWN: the state below keeps every row,
+                                filtered out or not, because a payload with an
+                                entity missing is written as a deliberate revoke
+                                (`RoleGrants::plan()` walks the catalogue, not
+                                the payload).
+                            --}}
+                            <div class="fw-filter">
+                                <input
+                                    type="search"
+                                    class="fw-filter-field"
+                                    x-model="filter"
+                                    aria-label="{{ __('filament-warden::ui.grid.filter.label') }}"
+                                    placeholder="{{ __('filament-warden::ui.grid.filter.label') }}"
+                                >
+                                <span class="fw-filter-count" x-show="filter.trim() !== ''" x-cloak x-text="filterCount(@js($tab->key))"></span>
+                                {{--
+                                    Said out loud as well as drawn: a filter that
+                                    takes rows away without announcing it is a
+                                    change nobody who cannot see the screen is
+                                    told about. Same pattern as the inspector's
+                                    own line below.
+                                --}}
+                                <p class="fw-sr" role="status" x-text="filter.trim() === '' ? '' : filterCount(@js($tab->key))"></p>
+                            </div>
+
+                            <p class="fw-filter-empty" x-show="matched(@js($tab->key)) === 0" x-cloak x-text="filterEmpty()"></p>
+
+                            <div class="fw-scroll" x-show="matched(@js($tab->key)) > 0">
                                 <table class="fw-table">
                                     <thead>
                                         <tr>
@@ -148,7 +178,7 @@
                                     </thead>
                                     <tbody>
                                         @foreach ($tab->rows as $row)
-                                            <tr>
+                                            <tr x-show="shown(@js($row->key))">
                                                 <th class="fw-entity" scope="row">
                                                     <span class="fw-entity-name">{{ $row->label }}</span>
                                                     <span class="fw-entity-model">{{ $row->model }}</span>
@@ -193,15 +223,41 @@
                                 the tabs and the legend are not repeated: they
                                 sit above both readings, once.
                             --}}
-                            <div class="fw-stack">
+                            <div class="fw-stack" x-show="matched(@js($tab->key)) > 0">
                                 @foreach ($tab->rows as $row)
-                                    <details class="fw-stack-entity" @if ($loop->first) open @endif>
+                                    <details class="fw-stack-entity" x-show="shown(@js($row->key))" @if ($loop->first) open @endif>
                                         <summary>
                                             <span class="fw-stack-name">{{ $row->label }}</span>
                                             <span class="fw-stack-model">{{ $row->model }}</span>
+                                            {{--
+                                                What the row's cells answer, for
+                                                the reading that folds them away.
+                                                Drawn by the server and redrawn
+                                                by the browser from the same
+                                                count: `Row::answered()` and
+                                                `answered()` in the script.
+                                            --}}
+                                            <span class="fw-stack-summary" x-text="stackSummary(@js($row->key))">{{ $grid->summaryOf($row) }}</span>
                                         </summary>
 
                                         <div class="fw-stack-rows">
+                                            {{--
+                                                The presets again, because the
+                                                fold has no `<tr>` to carry the
+                                                copy above. In the body and never
+                                                in the `<summary>`, where a click
+                                                would toggle the disclosure.
+                                            --}}
+                                            <span class="fw-shortcuts fw-stack-shortcuts" @unless ($interactive) hidden @endunless>
+                                                @foreach (['read', 'all', 'clear'] as $preset)
+                                                    <button
+                                                        type="button"
+                                                        class="fw-shortcut"
+                                                        x-on:click="apply(@js($row->key), @js($preset))"
+                                                    >{{ __('filament-warden::ui.grid.presets.'.$preset) }}</button>
+                                                @endforeach
+                                            </span>
+
                                             @if ($row->manage instanceof \ElPandaPe\FilamentWarden\Filament\Forms\Grid\Cell)
                                                 <div class="fw-stack-row">
                                                     <span class="fw-stack-label">{{ $row->manage->label }}<span class="fw-stack-action">{{ $row->manage->action }}</span></span>
