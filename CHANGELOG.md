@@ -8,6 +8,56 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.7.1] - 2026-09-04
+
+Reasons, not conclusions. Warden moved through five releases while this package was reading its own
+notes, and several sentences here went on describing a version that no longer exists. Nothing a
+person sees changes except one modal, which had been promising something warden stopped doing a
+year of releases ago.
+
+### Fixed
+
+- **The permission delete modal no longer claims the cascade leaves no trace.** Warden has announced
+  it since its `1.1.0` — `CacheInvalidations::prepareCascade()` reads the doomed rows before the
+  delete and `announceCascade()` dispatches one event per removed grant — so the sentence was telling
+  people to treat the modal as their only record when it is not. What it still is: the only warning
+  that reaches the person about to click, because the cascade is a foreign key below Eloquent, fires
+  no `Grant` model event, and is blind to the tenant. The role sentence beside it is untouched and
+  still true.
+- **Two docblocks that gave a false reason for a guard that is right.** `CreatePermission` said
+  nothing in warden invalidates a model-layer write; warden's provider has listened on the wildcard
+  `eloquent.*` events since `1.1.0`. The `Warden::refresh()` call stays, because
+  `CacheInvalidations::isWardenRow()` admits only the grant and assigned-role classes and so never
+  marks a catalogue row — which is the reason it now gives. And the `catch` in `RoleGrants::narrow()`
+  named one cause where there are two: a vetoed grant, and a narrowing asked for on a row with no
+  entity to test against.
+
+### Added
+
+- **A door carrying a hand-written condition is pinned.** A door or loose permission has no
+  `entity_type`, and `Narrowing::of()` reads `options` without asking for one, so a blob written by a
+  seeder or a console comes back as `Shape::Conditions` with nothing to compare against. Moving that
+  cell still lands its stance, and the test says why: warden refuses ahead of its own transaction, so
+  the plain grant stands and only the condition is dropped. If that ordering ever moves upstream, the
+  cell would lose its grant while the report counted it written.
+- **The permission delete now has the tenant tests the role delete already had.** A permission held
+  only inside another tenant is not offered for deletion, and a `strict` installation with no tenant
+  active sees that grant too. `Holders` reads without global scopes on purpose — the cascade does —
+  and until now nothing went red if that was taken for redundant. Measured: removing it fails both.
+- **The `dontScopeRoleGrants()` test now pins what the mutator moves.** It asserts the `scope` warden
+  stamped on the row, which is null only while the call stays bare. Everything else it asserted holds
+  in both polarities, so the test was green whichever way the flag was read.
+
+### Not included
+
+- Adopting warden's raw-column read for `permissions.options`. `Narrowing::of()` still asks the
+  Eloquent cast, so the three column values that cast to `null` — undecodable text, the empty string,
+  the JSON literal `null` — are still drawn as "every row" and still overwritten on save. It changes
+  behaviour, so it gets its own release.
+- Removing either surviving `Warden::refresh()`. That waits on warden admitting catalogue rows into
+  `CacheInvalidations::isWardenRow()`, and on this package raising its floor to the version that
+  brings it.
+
 ## [2.7.0] - 2026-08-30
 
 Fewer words. The last tag of this plan, and the only one whose whole job was to delete. It deleted
