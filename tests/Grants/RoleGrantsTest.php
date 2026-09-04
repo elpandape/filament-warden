@@ -21,6 +21,7 @@ use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Events\GrantingPermission;
 use ElPandaPe\Warden\Events\PermissionGranted;
 use ElPandaPe\Warden\Facades\Warden;
+use ElPandaPe\Warden\Support\PermissionIdentity;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Migrations\Migration;
@@ -1370,4 +1371,51 @@ test('a narrowing map with a cell missing widens it, for the same reason', funct
     RoleGrants::apply($role, $catalog, $baseline['stances'], null, $baseline);
 
     expect(RoleGrants::of($role, $catalog)->narrowings[Post::class]['viewAny']->shape)->toBe(Shape::Conditions);
+});
+
+test('a door carrying a hand-written condition is still written, not swallowed', function (): void {
+    $role = makeRole();
+    $user = makeUser();
+    Warden::assign($role)->to($user);
+    $catalog = gridCatalog();
+    $door = 'page:'.Reports::class;
+
+    RoleGrants::apply($role, $catalog, [$door => [StateKey::DOOR => 'granted']]);
+
+    // A door has no entity, so warden's chain refuses a condition on it. The
+    // stored row can carry one anyway — a seeder, a console, a hand edit — and
+    // `Narrowing::of()` reads `options` without ever asking for `entity_type`,
+    // so the cell comes back `Shape::Conditions` with nothing to test against.
+    // Written out of band on purpose: through the model the `array` cast would
+    // re-encode it, and what is being reproduced is a row that already exists.
+    $class = Context::resolve()->permissionClass();
+    $class::query()->withoutGlobalScopes()->where('name', $door)->update([
+        'options' => '{"v":1,"g":{"t":"group","i":[["and",{"t":"value","c":"title","o":"=","v":"alpha"}]]}}',
+    ]);
+
+    // `identity_key` is computed on save and the raw update above skips that,
+    // so it still describes a row with no conditions. Left stale, warden's own
+    // lookup misses the row, tries to insert its plain twin and dies on the
+    // unique index — which is the fixture failing, not the defect. Recomputed
+    // here so the row is the one a seeder would really have left behind.
+    $row = $class::query()->withoutGlobalScopes()->where('name', $door)->firstOrFail();
+    $class::query()->withoutGlobalScopes()->whereKey($row->getKey())
+        ->update(['identity_key' => PermissionIdentity::for($row)]);
+
+    expect(RoleGrants::of($role, $catalog)->narrowings[$door][StateKey::DOOR]->shape)
+        ->toBe(Shape::Conditions);
+
+    // Moving that cell must still land its stance. It goes to `narrow()`,
+    // whose `where()` throws "Constraints need an entity to test". What makes
+    // that survivable is WHERE warden throws: `reconstrain()` walks
+    // `lastGranted` and refuses ahead of its own transaction, so the plain
+    // grant already asked for stands and only the condition is dropped. This
+    // pins that ordering against the vendor — if warden ever moved the refusal
+    // after the delete, the cell would lose its grant while the report still
+    // counted it written.
+    $report = RoleGrants::apply($role, $catalog, [$door => [StateKey::DOOR => 'forbidden']]);
+
+    expect($report->written)->toBe(1)
+        ->and(Access::granted($user, $door))->toBeFalse()
+        ->and(RoleGrants::of($role, $catalog)->stances[$door][StateKey::DOOR])->toBe('forbidden');
 });

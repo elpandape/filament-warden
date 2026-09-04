@@ -685,10 +685,21 @@ final class RoleGrants
                 $rule->applyTo($chain, $index === 0);
             }
         } catch (ConfigurationException) {
-            // Narrowing needs a grant in front of it, and an application
-            // listening to `GrantingPermission` can veto the one just asked for.
-            // Nothing was granted, so there is nothing to narrow — and the veto
-            // is the application's answer, not an error of this screen.
+            // TWO causes reach here, not one, and neither is an error of this
+            // screen. A narrowing needs a grant in front of it, and an
+            // application listening to `GrantingPermission` can veto the one
+            // just asked for: nothing was granted, so there is nothing to
+            // narrow, and the veto is the application's answer. And a narrowing
+            // needs an entity to test against — a door or loose row carries no
+            // `entity_type`, yet `Narrowing::of()` reads `options` without ever
+            // asking for one, so a hand-written blob on such a row arrives here
+            // as `Shape::Conditions` with nothing to compare against.
+            //
+            // Catching is the whole handling because warden refuses BEFORE it
+            // writes: `reconstrain()` walks `lastGranted` and throws ahead of
+            // its own transaction, so the plain grant this method already asked
+            // for stands and only the condition is dropped. Guarding the call
+            // site instead was tried and measured to change nothing.
         }
     }
 
