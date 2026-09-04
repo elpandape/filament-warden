@@ -16,9 +16,11 @@ class CreatePermission extends CreateRecord
     protected static string $resource = PermissionResource::class;
 
     /**
-     * Nothing in warden invalidates the check cache for a write made through the
-     * model layer: only its own fluent actions bump the version, and the
-     * `PermissionCreated`/`PermissionDeleted` events have no listener anywhere.
+     * Warden does invalidate a write made through the model layer: its service
+     * provider listens on the wildcard `eloquent.*` events and feeds
+     * `CacheInvalidations`. What that listener never marks is a catalogue row —
+     * `CacheInvalidations::isWardenRow()` admits only the configured grant and
+     * assigned-role classes — so nothing bumps the version for this create.
      * Without this, every check goes on answering the old way — silently, and
      * with no expiry.
      */
