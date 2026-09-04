@@ -1409,3 +1409,56 @@ test('a table narrowed to nothing is not told the catalogue is empty', function 
         ->assertSee(__('filament-warden::ui.resources.permissions.empty.heading'))
         ->assertDontSee('filament-warden:catalog');
 });
+
+/*
+ * The two below are the permission-side siblings of `RoleResourceTest`'s pair
+ * about a role assigned inside one tenant. Same reason, different table: the
+ * foreign key that takes a permission's grants down goes below Eloquent and
+ * below the `TenantScope`, so a read that DECIDES the delete has to be wide
+ * while a read that only INFORMS keeps its scope. `Holders` reads without
+ * global scopes on purpose, and these are what go red if that is ever taken
+ * for redundant.
+ */
+
+test('a permission held only inside another tenant is not offered for deletion', function (): void {
+    $role = makeRole();
+
+    // The control row is minted with no grant at all: it has to be genuinely
+    // orphaned, or it proves nothing.
+    $free = makePermission('archive');
+
+    Warden::tenant()->onceTo(7, static function () use ($role): void {
+        Warden::allow($role)->to('publish', Post::class);
+    });
+
+    $held = latestPermission('publish');
+
+    config()->set('filament-warden.permissions.delete', 'orphaned');
+
+    $one = Warden::tenant()->onceTo(8, static fn (): bool => PermissionResource::isDeletable($held));
+    $other = Warden::tenant()->onceTo(8, static fn (): bool => PermissionResource::isDeletable($free));
+
+    // The unheld row is the control: without it a bare `return false` would
+    // paint this green while proving nothing.
+    expect($one)->toBeFalse()
+        ->and($other)->toBeTrue();
+});
+
+test('and a strict installation with no tenant active sees that grant too', function (): void {
+    $role = makeRole();
+
+    Warden::tenant()->onceTo(7, static function () use ($role): void {
+        Warden::allow($role)->to('publish', Post::class);
+    });
+
+    $held = latestPermission('publish');
+
+    config()->set('filament-warden.permissions.delete', 'orphaned');
+
+    // Read live on every call by `Tenancy::readFilter()`, so this bites even
+    // though the `Tenancy` singleton is already resolved. Without it the
+    // factory `all` adds no predicate at all and the test passes either way.
+    config()->set('warden.scope.null_behavior', 'strict');
+
+    expect(PermissionResource::isDeletable($held))->toBeFalse();
+});
