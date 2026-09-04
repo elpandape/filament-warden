@@ -70,6 +70,21 @@ function gridCatalog(): Catalog
     );
 }
 
+/**
+ * The `scope` warden stamped on the role's one grant row, read past the tenant
+ * scope so the answer is the column and not the current tenant's view of it.
+ */
+function heldGrantScope(Model $role): int|string|null
+{
+    /** @var int|string|null $scope */
+    $scope = Context::resolve()->grantClass()::query()
+        ->withoutGlobalScopes()
+        ->where('entity_id', $role->getKey())
+        ->value('scope');
+
+    return $scope;
+}
+
 function grantCount(): int
 {
     return Context::resolve()->grantClass()::query()->count();
@@ -820,6 +835,11 @@ test('a grant of this tenant is writable, and one of no tenant is too when there
 });
 
 test('a role grant kept global by configuration is writable under a tenant', function (): void {
+    // Never with an argument. `Tenancy::dontScopeRoleGrants(bool $dont = true)`
+    // NEGATES what it is handed — `dontScopeRoleGrants(false)` restores the
+    // scoping — and neither its docblock nor warden's README says so, so
+    // forwarding the config value inverts the polarity in silence. Reported
+    // upstream as ficha 051.
     Warden::tenant()->dontScopeRoleGrants();
 
     $role = makeRole();
@@ -827,6 +847,14 @@ test('a role grant kept global by configuration is writable under a tenant', fun
 
     Warden::tenant()->onceTo(7, static function () use ($role, $catalog): void {
         Warden::allow($role)->to('viewAny', Post::class);
+
+        // The row itself, and this is the only assertion the inversion moves.
+        // The three below hold in BOTH polarities — under tenant 7 a scoped
+        // role grant lands at 7 and `writeScope(forRoleGrant: true)` answers 7
+        // as well, so the cell reads `Shape::All` and stays in the diff either
+        // way. Measured: with `dontScopeRoleGrants(false)` in place of the bare
+        // call, only this first expectation goes red.
+        expect(heldGrantScope($role))->toBeNull();
 
         $state = RoleGrants::of($role, $catalog);
 
