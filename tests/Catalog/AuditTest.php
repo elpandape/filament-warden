@@ -40,7 +40,7 @@ pest()->extend(TestCase::class);
  */
 function gateBuckets(): array
 {
-    return ['open', 'unpoliced', 'forgotten', 'strays', 'drifted', 'unkeyable', 'unmigrated', 'misconfigured'];
+    return ['open', 'unpoliced', 'forgotten', 'strays', 'drifted', 'unkeyable', 'unownable', 'unmigrated', 'misconfigured'];
 }
 
 /**
@@ -69,6 +69,7 @@ function auditWith(string $bucket): Audit
         drifted: $bucket === 'drifted' ? $finding : [],
         unwalkable: $bucket === 'unwalkable' ? $finding : [],
         unkeyable: $bucket === 'unkeyable' ? $finding : [],
+        unownable: $bucket === 'unownable' ? $finding : [],
         stranded: $bucket === 'stranded' ? $finding : [],
         unmigrated: $bucket === 'unmigrated' ? $finding : [],
         misconfigured: $bucket === 'misconfigured' ? $finding : [],
@@ -149,4 +150,62 @@ test('a name the grid can key is not reported', function (): void {
     Catalog::forget();
 
     expect(Audit::of([Panel::make()->id('undotted')])->unkeyable)->toBeEmpty();
+});
+
+test('an ownership row on a model that resolves no ownership is a finding', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->toOwn(Post::class, 'update');
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    // Turned off AFTER the write, which is the honest order: warden's `toOwn()`
+    // asks nothing on the way in, so the row that exists now is exactly the one
+    // a seeder leaves behind on an installation that never registered ownership.
+    // `Context` is a singleton built from config on first resolve, and booting
+    // the panel already resolved it — without this the config change is inert
+    // and the test passes green having changed nothing.
+    config()->set('warden.ownership.default_attribute');
+    app()->forgetInstance(Context::class);
+
+    $audit = Audit::of([Panel::make()->id('owning')->resources([PostResource::class])]);
+
+    expect($audit->unownable)->toBe(['update on '.new Post()->getMorphClass()])
+        // Red, not informational: it is fixable, and both fixes are the
+        // operator's — register the ownership, or take the row out.
+        ->and($audit->isClean())->toBeFalse();
+});
+
+test('an ownership row a model does resolve is not a finding', function (): void {
+    $role = makeRole();
+
+    // `title` is a real column on `posts`, which is what makes this resolve:
+    // `Ownership::of()` confirms a string resolver against the table before it
+    // says yes. Registered before the write only for readability — `toOwn()`
+    // asks nothing either way.
+    Warden::ownedVia(Post::class, 'title');
+
+    Warden::allow($role)->toOwn(Post::class, 'update');
+
+    $audit = Audit::of([Panel::make()->id('owning')->resources([PostResource::class])]);
+
+    // The control. Without it a bare `return [...]` would paint the test above
+    // green while naming every ownership row in the catalogue.
+    expect($audit->unownable)->toBeEmpty();
+});
+
+test('an ownership row whose entity type resolves nothing is left to the drifted bucket', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->toOwn(Post::class, 'update');
+
+    // The morph map moved out from under the row. Said once, by `drifted`, whose
+    // fix is the map; naming it here too would point the reader at ownership,
+    // which is not what is wrong with it.
+    permissionClass()::query()->withoutGlobalScopes()
+        ->where('name', 'update')
+        ->update(['entity_type' => 'gone.away']);
+
+    $audit = Audit::of([Panel::make()->id('owning')->resources([PostResource::class])]);
+
+    expect($audit->unownable)->toBeEmpty();
 });

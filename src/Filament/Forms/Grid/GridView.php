@@ -166,6 +166,7 @@ final readonly class GridView
      *     operators: list<string>,
      *     authority: string,
      *     boolean: string,
+     *     boolean_column: string,
      *     joiners: array{and: string, or: string},
      *     modes: array<string, array{name: string, hint: string}>,
      *     explain: bool,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Catalog;
 
+use ElPandaPe\FilamentWarden\Conditions\Ownership;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Guard;
 use ElPandaPe\FilamentWarden\FilamentWardenPlugin;
@@ -36,6 +37,7 @@ final readonly class Audit
      * @param  list<string>  $drifted  the same, but a whole entity type at once
      * @param  list<string>  $unwalkable  models only a relation manager reaches
      * @param  list<string>  $unkeyable  catalogue names the grid cannot key, which throw when a role screen renders
+     * @param  list<string>  $unownable  ownership rows whose model resolves no ownership, so they grant nothing
      * @param  list<string>  $stranded  grants whose authority no longer exists
      * @param  list<string>  $unmigrated  what warden's own schema is missing
      * @param  list<string>  $misconfigured  config entries this package reads and drops
@@ -49,6 +51,7 @@ final readonly class Audit
         public array $drifted = [],
         public array $unwalkable = [],
         public array $unkeyable = [],
+        public array $unownable = [],
         public array $stranded = [],
         public array $unmigrated = [],
         public array $misconfigured = [],
@@ -130,6 +133,7 @@ final readonly class Audit
             drifted: $drifted,
             unwalkable: array_values(array_unique($unwalkable)),
             unkeyable: array_values(array_unique($unkeyable)),
+            unownable: self::unownable(),
             stranded: self::stranded(),
             unmigrated: self::unmigrated(),
             misconfigured: self::misconfigured(),
@@ -169,6 +173,7 @@ final readonly class Audit
             && $this->strays === []
             && $this->drifted === []
             && $this->unkeyable === []
+            && $this->unownable === []
             && $this->misconfigured === [];
     }
 
@@ -547,6 +552,66 @@ final readonly class Audit
         }
 
         return $findings;
+    }
+
+    /**
+     * Catalogue rows carrying `only_owned` whose model resolves no ownership.
+     *
+     * Such a row grants nothing and forbids nothing: `Context::isOwnedBy()` has
+     * no attribute to compare, and on the query side warden fails closed —
+     * `WhereCan::ownershipAttribute()` asks `resolvesOwnershipFor()`, demands a
+     * string, and confirms the column, going through `inexpressible()` when any
+     * of the three says no. So the row sits in the catalogue looking exactly
+     * like a working one.
+     *
+     * Nothing on these screens can write one: `Conditions\Ownership::of()` is
+     * asked before the checkbox is offered. Warden's own `toOwn()` asks nothing
+     * at all, so a seeder, a console command or a migration mints them in
+     * silence — which is the whole reason this is worth naming here rather than
+     * waiting for somebody to notice a grant that never grants.
+     *
+     * A red finding and not an informational one: it is fixable, in two ways
+     * that are both the operator's — register the ownership with `ownedVia()`,
+     * or take the row out.
+     *
+     * @return list<string>
+     */
+    private static function unownable(): array
+    {
+        $context = Context::resolve();
+
+        $rows = $context->permissionClass()::query()
+            ->withoutGlobalScopes()
+            ->where('only_owned', true)
+            ->whereNotNull('entity_type')
+            ->get();
+
+        $unownable = [];
+
+        foreach ($rows as $row) {
+            $model = Morph::model($row->getAttribute('entity_type'));
+
+            // A type nothing resolves is already `drifted`'s finding, and saying
+            // it twice in two voices would have the reader fix the wrong thing.
+            if ($model === null) {
+                continue;
+            }
+
+            if (Ownership::of($model)->available) {
+                continue;
+            }
+
+            $name = $row->getAttribute('name');
+            $type = $row->getAttribute('entity_type');
+
+            // Narrowed before concatenating: both come back `mixed`, and a name
+            // that is not a string could not match anything anyway.
+            if (is_string($name) && is_string($type)) {
+                $unownable[] = $name.' on '.$type;
+            }
+        }
+
+        return array_values(array_unique($unownable));
     }
 
     /**
