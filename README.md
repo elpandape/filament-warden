@@ -81,7 +81,7 @@
 | PHP | `^8.4` |
 | Laravel | `^13.0` |
 | Filament | `^5.7` |
-| elpandape/warden | `^2.2.1` |
+| elpandape/warden | `^2.2.2` |
 
 ---
 
@@ -112,7 +112,7 @@ php artisan filament:assets
 
 ### Upgrading to 2.0 from 1.x
 
-`filament-warden 2.x` requires `elpandape/warden ^2.2.1`, and the jump to warden 2.x is the whole reason `2.0.0` was a major. **Run warden's migration before anybody uses the panel.**
+`filament-warden 2.x` requires `elpandape/warden ^2.2.2`, and the jump to warden 2.x is the whole reason `2.0.0` was a major. **Run warden's migration before anybody uses the panel.**
 
 Warden 2.0 adds an `identity_key` column to `permissions` and a unique index over `(name, identity_key)`, and it stamps that key on every save. A database still in the 1.x shape gets `no column named identity_key` the first time anything writes a permission — the grid, the permission screen, a seeder. Composer resolves without complaint and the application breaks on first use.
 
