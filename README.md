@@ -81,7 +81,7 @@
 | PHP | `^8.4` |
 | Laravel | `^13.0` |
 | Filament | `^5.7` |
-| elpandape/warden | `^2.1` |
+| elpandape/warden | `^2.2.1` |
 
 ---
 
@@ -112,7 +112,7 @@ php artisan filament:assets
 
 ### Upgrading to 2.0 from 1.x
 
-`filament-warden 2.x` requires `elpandape/warden ^2.1`, and the jump to warden 2.x is the whole reason `2.0.0` was a major. **Run warden's migration before anybody uses the panel.**
+`filament-warden 2.x` requires `elpandape/warden ^2.2.1`, and the jump to warden 2.x is the whole reason `2.0.0` was a major. **Run warden's migration before anybody uses the panel.**
 
 Warden 2.0 adds an `identity_key` column to `permissions` and a unique index over `(name, identity_key)`, and it stamps that key on every save. A database still in the 1.x shape gets `no column named identity_key` the first time anything writes a permission — the grid, the permission screen, a seeder. Composer resolves without complaint and the application breaks on first use.
 
@@ -135,6 +135,16 @@ The tag matters. `warden-migrations` publishes `create_warden_tables`, whose `Sc
 `php artisan filament-warden:audit --check` reports an unmigrated catalogue as its own finding and exits 1, so a deploy pipeline goes red before the deploy rather than after it. That bucket stays permanently empty afterwards, which is what it is supposed to do.
 
 **Existing titles are not rewritten by the upgrade itself.** Warden 2.0 changed how it generates a title — `viewAny` on `Post` is `View any posts` now, where 1.x wrote `ViewAny posts` — and neither warden nor this package retitles rows in place when you upgrade, so an upgraded catalogue shows mixed wording until somebody converges it. `php artisan warden:retitle` is what does that, since warden 2.1: it rewrites a title an older warden generated, leaves a title a person typed alone, and leaves a `null` null. `--dry-run` reports the count first. Nothing here is urgent — what this package guarantees meanwhile is that it still RECOGNISES the old wording, asking warden which titles warden has ever written, so renaming a permission still regenerates it whichever generation the row carries.
+
+### Upgrading to 2.10 from 2.9
+
+`composer update` and nothing else. The floor moves from `elpandape/warden ^2.1` to `^2.2.1`, which is where the invalidation this package used to do by hand now lives.
+
+Warden `2.2.0` taught its own invalidation hook to recognise the permission catalogue: editing a row through Eloquent — renaming a permission, rewriting its `options` — now bumps the cache version on its own. This package had two `Warden::refresh()` calls compensating for that, and they are gone. Nothing you can see changes; the cache is cleared by the same event it always should have been.
+
+If you pin warden below `2.2.1`, do not take this version: with the older hook, an edit made on the permission screen would leave every cached check answering the old rule until the payload expired a day later. Composer will not let you, which is the point of moving the floor rather than leaving it optimistic.
+
+Warden `2.2.1` also fixes a catalogue lookup this package reported: under a tenant, granting a permission attached the concession to the **global** row even when the tenant had minted its own, leaving that row orphaned and the rule governed by conditions somebody else chose. Nothing here had to change for it — but if you run tenancy, that fix is the reason to take warden `2.2.1` rather than `2.2.0`.
 
 ### Upgrading to 2.8 from 2.7
 

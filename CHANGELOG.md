@@ -8,6 +8,39 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.10.0] - 2026-09-04
+
+Warden took the work back. Its `2.2.0` taught its invalidation hook to recognise the permission
+catalogue, so the two compensating calls this package carried are gone — and the floor moves to the
+version that makes that true, rather than staying optimistic about it.
+
+### Changed
+
+- **`elpandape/warden ^2.1` → `^2.2.1`.** The invalidation below is only correct from `2.2.0`, and
+  `2.2.1` carries a tenancy fix this package reported: under a tenant, granting a permission
+  attached the concession to the **global** catalogue row even when the tenant had minted its own,
+  leaving that row orphaned and the rule governed by conditions somebody else chose. Measured here
+  before it was reported; nothing on this side had to change for the fix.
+
+### Removed
+
+- **Both surviving `Warden::refresh()` calls.** `CacheInvalidations::isWardenRow()` now admits
+  `permissionClass()`, so an edit made through the model bumps the version by the event it always
+  should have. Measured rather than taken from a changelog: with that one line switched off in the
+  vendor, the test that warms a check before editing goes red and nothing else does — which is both
+  the proof that warden does the work and the proof that the suite can tell.
+  The create-side call went with it and **nothing pins that half**, said plainly: a permission that
+  has just been created has no grants and nobody holds it, so no cached answer can have changed —
+  the same reason `CreateRole` never carried one.
+
+### Not included
+
+- Anything warden `2.2.0` added that this package could now lean on. `Warden::notOwned()`, the
+  write-time warnings for an unownable grant and an unsatisfiable boolean, and the refusal to
+  serialise a reserved negation all overlap with guards and screens here, and each is its own
+  decision about what a person should be told and where. The screens keep saying what they say: a
+  line in a log is not a sentence beside the field somebody is typing in.
+
 ## [2.9.0] - 2026-09-04
 
 Two rules a person can write, save, and never have fire. Warden takes both without complaint and
