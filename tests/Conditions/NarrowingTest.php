@@ -16,6 +16,7 @@ use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Enums\ComparisonOperator;
 use ElPandaPe\Warden\Enums\LogicalOperator;
 use ElPandaPe\Warden\Facades\Warden;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
 
 pest()->extend(TestCase::class);
@@ -274,3 +275,36 @@ test('an owned rule whose condition group is empty says the group is empty', fun
     expect($narrowing->reason)->toBe('empty')
         ->and($narrowing->rules)->toBeEmpty();
 });
+
+/*
+ * The three column values Eloquent's json cast flattens to null. Every corrupt
+ * case above stores an ARRAY through the cast, which `json_encode` leaves as
+ * valid JSON — so the class of blob that does not decode at all had never been
+ * exercised here. These are the ones warden singled out when it moved its three
+ * engines off the cast and onto the raw column in its `1.0.2`: text that is not
+ * JSON, the empty string, and the JSON literal `null`. The last two flatten
+ * even through a real `json` column.
+ *
+ * Written straight onto the column on purpose: setting them through the model
+ * re-encodes them, which is the very step that hides them.
+ */
+test('a blob that does not decode at all is unreadable, not "no conditions"', function (string $raw): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('update', Post::class)->where('id', 1);
+
+    $permission = narrowedPermission();
+
+    DB::table(Context::resolve()->table('permissions'))
+        ->where('id', $permission->getKey())
+        ->update(['options' => $raw]);
+
+    $narrowing = Narrowing::of($permission->fresh() ?? $permission);
+
+    expect($narrowing->shape)->toBe(Shape::Unreadable)
+        ->and($narrowing->reason)->toBe('corrupt');
+})->with([
+    'text that is not JSON' => ['{"v":1,"g":'],
+    'the empty string' => [''],
+    'the JSON literal null' => ['null'],
+]);

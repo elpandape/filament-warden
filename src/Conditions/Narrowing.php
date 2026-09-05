@@ -100,7 +100,14 @@ final readonly class Narrowing
      */
     public static function of(Model $permission): self
     {
-        $options = $permission->getAttribute('options');
+        // Ask the column, not the cast. `HasAttributes::fromJson()` flattens
+        // exactly three stored values to null — text that is not JSON, the empty
+        // string, and the JSON literal `null` — and reading them as "no
+        // conditions" turns a rule nobody can decode into an unconditional
+        // grant, editable, which the next save then writes for real. Warden's
+        // three engines moved off the cast for this, and `deserialize()` takes
+        // the string: it has an `is_string()` branch behind `json_validate()`.
+        $options = $permission->getAttributes()['options'] ?? null;
         $owned = (bool) $permission->getAttribute('only_owned');
 
         if ($options === null) {
