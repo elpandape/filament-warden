@@ -8,6 +8,45 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.9.0] - 2026-09-04
+
+Two rules a person can write, save, and never have fire. Warden takes both without complaint and
+neither screen said anything, so the only way to find out was that a check kept answering no. This
+release makes the screen say it first. Nothing already stored changes; two new sentences appear.
+
+### Added
+
+- **The other half of the boolean mismatch.** The builder already warned about `true`/`false` typed
+  against a column the model does not cast to boolean. It now warns about the mirror as well —
+  anything else against a column that IS cast. Warden's query side is symmetric about this
+  (`WhereCan::compileOne()` fails closed either way round) and its in-memory side is not:
+  `ComparisonOperator::compare()` is `$left === $right || ($numeric && $left == $right)`, and
+  `is_numeric(true)` is false, so a mismatch in either direction is stored and never matches an
+  instance. Written as a prohibition it never fires at all, which is the direction that matters.
+  A value still being typed says nothing, and a column-to-column rule compares no literal, so
+  neither of those is warned about.
+- **`filament-warden:audit` names an ownership rule that can never own anything.** A catalogue row
+  carrying `only_owned` whose model resolves no ownership grants nothing and forbids nothing:
+  `Context::isOwnedBy()` has no attribute to compare, and the query side fails closed through
+  `inexpressible()`. Nothing on these screens can write one — `Conditions\Ownership::of()` is asked
+  before the checkbox is offered — but warden's `toOwn()` asks nothing at all, so a seeder, a console
+  command or a migration mints them in silence. It is a **red** finding, because both fixes are the
+  operator's: register the ownership with `ownedVia()`, or take the row out. A row whose entity type
+  resolves nothing at all is left to `drifted`, whose fix is the morph map and not this.
+- **`verify/verify-boolean-misfit.mjs`**, wired into `make verify`. Both predicates are driven
+  through the real `@vue/reactivity` Alpine pins, across a live edit — because a test that matches
+  the source text proves a guard is written, not that it answers, which is exactly how a broken
+  guard shipped green in `1.1.0`. Inverting one `!` turns five of its checks red.
+
+### Not included
+
+- Widening `Columns::booleans()` past the `bool` and `boolean` casts. A boolean produced by an
+  `Attribute::make()` or a cast class of its own still reads as uncast, so the builder would warn
+  about a condition that in fact works. It is a known, narrow false positive; broadening cast
+  detection is a separate decision with its own measuring.
+- Anything that repairs an ownership row. The audit names it and writes nothing, which is what that
+  command is for.
+
 ## [2.8.0] - 2026-09-04
 
 Ask the column, not the cast. Warden moved its three engines off Eloquent's `array` cast in its
