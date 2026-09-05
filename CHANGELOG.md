@@ -8,6 +8,41 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.10.2] - 2026-09-05
+
+Warden `2.2.2` answered the question this package could not answer for itself: which of the
+behaviours it works around are permanent. Three are, and now say so where somebody is about to rely
+on them.
+
+### Changed
+
+- **`elpandape/warden ^2.2.1` → `^2.2.2`.** `PermissionIdentity` asked the cast for `options`, so a
+  row whose blob does not decode digested as a row with **no conditions at all** — byte for byte the
+  print of its plain sister, which `(name, identity_key)` then read as one permission. It also left
+  such a row unrepairable: the save that would recompute its key is the one that collides. Reported
+  from here after the same defect was closed on this side in `2.8.0`. Warden states no migration and
+  no key changes for a readable rule.
+
+### Fixed
+
+- **Three workaround comments that could not say whether they were permanent.** Warden `2.2.2`
+  declares all three, so each now carries the reason it stays rather than reading as a stopgap
+  somebody could tidy away:
+  - `Words::joiners` is written out by hand and never derived from `LogicalOperator::cases()`.
+    Warden refuses `Not` on the way in and out while a hand-built group still reads it as a
+    conjunction, and closing that needs a published signature to move — so it cannot land in 2.x.
+  - The two boolean warnings in the condition builder stay for as long as this package supports the
+    2.x line: aligning `ComparisonOperator::compare()` would change documented behaviour, and a row
+    stored before warden's write-time refusal still evaluates to false — written as a forbid, it
+    never fires.
+  - `Assignment`'s docblock settles that narrowing by scope and not by restriction is deliberate, so
+    the three reasons it lists for writing through the fluent API are the whole of it.
+- **A test comment that went false the moment warden shipped.** It said recomputing an
+  `identity_key` on an unreadable row was "not even available" because warden read the cast too.
+  It is available now. The test still does not recompute, for the reason that survives: a blob
+  corrupted after the fact keeps the digest of the rule it held, and that is what a real row in that
+  state looks like.
+
 ## [2.10.1] - 2026-09-04
 
 Two measured numbers that stopped being true. Warden `2.2.0` partitions a single `assigned_roles`
