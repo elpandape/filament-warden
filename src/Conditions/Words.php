@@ -23,6 +23,7 @@ final class Words
      *     operators: list<string>,
      *     authority: string,
      *     boolean: string,
+     *     boolean_column: string,
      *     joiners: array{and: string, or: string},
      *     modes: array<string, array{name: string, hint: string}>,
      * }
@@ -36,6 +37,7 @@ final class Words
             ),
             'authority' => self::line('authority'),
             'boolean' => self::line('boolean'),
+            'boolean_column' => self::line('boolean_column'),
             'joiners' => [
                 'and' => self::line('and'),
                 'or' => self::line('or'),

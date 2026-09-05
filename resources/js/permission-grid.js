@@ -36,8 +36,11 @@
  *   this file puts a computed value inside a translated sentence.
  *   PHP: `GridView::summaryOf()`, and a test pins the two together.
  *
- * `booleanMisfit()` is the one with no counterpart: PHP ships the column list it
- * needs (`Columns::booleans()`) and decides nothing about it.
+ * `booleanMisfit()` and `booleanColumnMisfit()` are the two with no counterpart:
+ * PHP ships the column list they need (`Columns::booleans()`) and decides nothing
+ * about it. Between them they mirror warden's own `WhereCan::compileOne()` guard,
+ * which is symmetric where its in-memory sibling `ComparisonOperator::compare()`
+ * is not.
  *
  * `said` is not a rule and not a word of its own: it is `stateOf()`'s answer,
  * parked where a live region can read it. Written in `write()` so a preset and
@@ -124,6 +127,28 @@ const conditions = {
         return rule.kind === 'value'
             && (rule.value === 'true' || rule.value === 'false')
             && ! this.source.booleans.includes(rule.column)
+    },
+
+    /**
+     * The mirror, and it is the half warden closed on its own side and not on
+     * the other: `WhereCan::compileOne()` compares `is_bool($value)` against
+     * `hasCast()` and fails closed either way round, while
+     * `ComparisonOperator::compare()` — the in-memory pass — still reads
+     * `$left === $right || ($numeric && $left == $right)`, and `is_numeric(true)`
+     * is false. So anything that is not `true`/`false` against a column the
+     * model DOES cast to boolean is stored and never matches an instance.
+     * Written as a prohibition it never fires at all, which is the direction
+     * that matters.
+     *
+     * An empty value is left alone: it is a rule still being typed, not a
+     * mistake, and `Value::cast()` refuses it on the way in anyway.
+     */
+    booleanColumnMisfit(rule) {
+        return rule.kind === 'value'
+            && rule.value !== ''
+            && rule.value !== 'true'
+            && rule.value !== 'false'
+            && this.source.booleans.includes(rule.column)
     },
 
     add(kind) {

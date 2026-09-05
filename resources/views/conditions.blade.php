@@ -75,6 +75,12 @@
                             x-text="words.boolean"
                         ></span>
 
+                        <span
+                            class="fw-misfit"
+                            x-show="booleanColumnMisfit(rule)"
+                            x-text="words.boolean_column.replace(':column', rule.column)"
+                        ></span>
+
                         <button
                             type="button"
                             class="fw-drop"

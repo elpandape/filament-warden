@@ -268,6 +268,7 @@ return [
         'no_ownership' => 'La tabla :table no tiene la columna :column, que es por donde se resolvería la propiedad.',
         'no_ownership_resolver' => 'Esta instalación no resuelve ninguna propiedad: no hay nada registrado con ownedVia() ni un atributo por defecto configurado, así que «solo lo que posee» no significa nada aquí.',
         'boolean' => 'Un valor true o false solo casa con una columna que el modelo castee a booleano. Esta no lo está, así que la condición se guardaría y no casaría nunca.',
+        'boolean_column' => 'El modelo castea :column a booleano, así que solo casa con un valor true o false. Éste se guardaría y no casaría nunca.',
         'modes' => [
             'all' => [
                 'name' => 'Todas las filas',

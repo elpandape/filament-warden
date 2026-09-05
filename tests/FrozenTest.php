@@ -406,6 +406,7 @@ test('the translation keys an application overrides are frozen', function (): vo
         'conditions.no_ownership',
         'conditions.no_ownership_resolver',
         'conditions.boolean',
+        'conditions.boolean_column',
         'conditions.modes.all.name',
         'conditions.modes.all.hint',
         'conditions.modes.owned.name',
