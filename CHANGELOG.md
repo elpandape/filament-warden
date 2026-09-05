@@ -8,6 +8,21 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.10.1] - 2026-09-04
+
+Two measured numbers that stopped being true. Warden `2.2.0` partitions a single `assigned_roles`
+read in PHP where it used to run several, and both figures this package had written down were
+counted before that.
+
+### Fixed
+
+- **`explain()` is three to five queries, not three to six**, and the note now says it was measured
+  against a query log rather than counted from call sites — which is what this project asks of a
+  figure in prose.
+- **A plain `whereCan()` is five queries, four of them preamble**, where the note said seven. The
+  product decision does not move: it is still lazy or nothing, and the number the screen shows is
+  still a lower bound.
+
 ## [2.10.0] - 2026-09-04
 
 Warden took the work back. Its `2.2.0` taught its invalidation hook to recognise the permission
