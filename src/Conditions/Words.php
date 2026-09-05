@@ -38,6 +38,14 @@ final class Words
             'authority' => self::line('authority'),
             'boolean' => self::line('boolean'),
             'boolean_column' => self::line('boolean_column'),
+            // Written out by hand and never derived from `LogicalOperator::cases()`.
+            // The enum carries a third case, `Not`, which warden refuses on the
+            // way in and on the way out while a hand-built group still reads it
+            // as a conjunction — and its 2.2.2 states that closing that needs a
+            // published signature to move, so it cannot land in 2.x. Deriving
+            // this list would offer an operator no save can accept. If the two
+            // are ever aligned, align them the other way: write the operators
+            // out too.
             'joiners' => [
                 'and' => self::line('and'),
                 'or' => self::line('or'),

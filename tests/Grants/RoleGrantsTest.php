@@ -1466,9 +1466,7 @@ test('an unreadable twin is still reachable when its cell is cleared', function 
     //
     // `identity_key` is left as warden wrote it, and that is the faithful shape:
     // a blob corrupted after the fact keeps the digest of the rule it used to
-    // hold. Recomputing it is not even available — `PermissionIdentity::for()`
-    // reads the cast too, so for this row it digests "no conditions" and
-    // collides with the plain sibling on warden's own unique index.
+    // hold, which is what a real row in this state looks like.
     $class::query()->withoutGlobalScopes()->whereKey($twin->getKey())
         ->update(['options' => '{"v":1,"g":']);
 

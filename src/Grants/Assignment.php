@@ -42,7 +42,9 @@ use WeakMap;
  * filters `restricted_to_type`/`restricted_to_id` only when `on()` named a
  * context, so a bare retraction takes every restricted row of the scope with it
  * exactly as a detach would — which is why `isRestricted()` shows such a row and
- * leaves it alone rather than trusting the writer.
+ * leaves it alone rather than trusting the writer. Warden's 2.2.2 states that
+ * narrowing by scope and not by restriction is deliberate, so this is settled
+ * rather than pending: the three reasons above are the whole of it.
  */
 final class Assignment
 {

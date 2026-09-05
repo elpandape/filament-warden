@@ -142,6 +142,12 @@ const conditions = {
      *
      * An empty value is left alone: it is a rule still being typed, not a
      * mistake, and `Value::cast()` refuses it on the way in anyway.
+     *
+     * Permanent, not a stopgap. Warden's 2.2.2 states that aligning
+     * `ComparisonOperator::compare()` would change documented behaviour and so
+     * cannot land in 2.x, and that a row stored before its write-time refusal
+     * still evaluates to false — written as a forbid, it never fires. Both
+     * warnings stay for as long as this package supports the 2.x line.
      */
     booleanColumnMisfit(rule) {
         return rule.kind === 'value'
