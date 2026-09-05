@@ -8,6 +8,51 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.8.0] - 2026-09-04
+
+Ask the column, not the cast. Warden moved its three engines off Eloquent's `array` cast in its
+`1.0.2`, for a reason this package had written down and not acted on: three stored values cast to
+`null`, and reading them as "no conditions" turns a rule nobody can decode into an unconditional
+grant. **Read the upgrade note — on a catalogue that has such a row, screens that used to accept an
+edit stop accepting one.**
+
+### Fixed
+
+- **An `options` blob that does not decode is no longer drawn as "every row".** `Narrowing::of()`
+  reads `permissions.options` from the column. `HasAttributes::fromJson()` flattens exactly three
+  stored values to null — text that is not JSON, the empty string, and the JSON literal `null`, the
+  last two even through a real `json` column — and every one of them arrived here looking like a
+  plain unconditional row: shown as every row, left editable, and overwritten on the next save.
+  It now reads unreadable, with its reason on screen, in the grid cell, the reach badge, the
+  inspector and the permission form alike.
+- **A save no longer blanks a condition it could not show.** `EditPermission` re-added the `options`
+  key with the CAST when the builder was closed, which wrote SQL `NULL` over the column. A disabled
+  field is already absent from the payload, so the key is simply left out and the column is not
+  touched. Re-assigning the raw string would have been no better: the `array` cast encodes it a
+  second time.
+- **An unreadable twin is reachable when its cell is cleared.** `RoleGrants::twinsHeld()` collects
+  the models a revoke has to name — since warden's `2.0` a name resolves only the plain row — and it
+  skipped exactly the rows whose blob does not decode. Clearing a cell backed by one reported
+  success and left half the grant standing.
+- **`PermissionForm::exists()` stops comparing an unreadable twin against the plain rows**, which
+  refused a name the database would have taken on a row nobody can fix from that screen anyway.
+
+### Added
+
+- Tests for the class of blob that had never been exercised: every previous "corrupt" case stored an
+  array THROUGH the cast, which `json_encode` leaves as valid JSON. The three column values are
+  covered on the read side and both writers are pinned — measured red before the fix, each for its
+  own reason.
+
+### Not included
+
+- Anything that repairs an existing row. This release stops the screens from making it worse and
+  says what it is; the column is repaired outside the panel. `warden:clean --duplicates` is not the
+  tool, and the upgrade note says why.
+- Removing either surviving `Warden::refresh()`. Still waiting on warden admitting catalogue rows
+  into `CacheInvalidations::isWardenRow()`, and on this package raising its floor to the version
+  that brings it.
+
 ## [2.7.1] - 2026-09-04
 
 Reasons, not conclusions. Warden moved through five releases while this package was reading its own

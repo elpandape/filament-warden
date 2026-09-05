@@ -136,6 +136,23 @@ The tag matters. `warden-migrations` publishes `create_warden_tables`, whose `Sc
 
 **Existing titles are not rewritten by the upgrade itself.** Warden 2.0 changed how it generates a title — `viewAny` on `Post` is `View any posts` now, where 1.x wrote `ViewAny posts` — and neither warden nor this package retitles rows in place when you upgrade, so an upgraded catalogue shows mixed wording until somebody converges it. `php artisan warden:retitle` is what does that, since warden 2.1: it rewrites a title an older warden generated, leaves a title a person typed alone, and leaves a `null` null. `--dry-run` reports the count first. Nothing here is urgent — what this package guarantees meanwhile is that it still RECOGNISES the old wording, asking warden which titles warden has ever written, so renaming a permission still regenerates it whichever generation the row carries.
 
+### Upgrading to 2.8 from 2.7
+
+Nothing to run. One behaviour changes, and it can be visible on an installation that has rows nobody could read anyway.
+
+`permissions.options` is now read from the **column** instead of Eloquent's `array` cast. Three stored values cast to `null` and so used to read as "no conditions": text that is not JSON, the empty string, and the JSON literal `null`. Warden's three engines moved off the cast in its `1.0.2` and fail closed on all three; this package did not, so such a row was drawn as **every row**, left editable, and overwritten with SQL `NULL` on the next save — turning a rule nobody could decode into an unconditional grant.
+
+After upgrading, a row like that is drawn as unreadable and locked, with the reason on screen, and no save touches its column. **If your catalogue has any, cells and permission screens that used to accept an edit will stop accepting one.** That is the point: they were offering to overwrite something they could not show you.
+
+Only a write from outside this package can produce such a row — a seeder, a console command, a restore, a hand edit. Nothing in warden's fluent API or in these screens can mint one. To find them:
+
+```sql
+select id, name, entity_type from permissions
+where options is not null and json_valid(options) = 0;
+```
+
+`php artisan warden:clean --duplicates` is **not** the tool for these, and is worth avoiding until they are fixed: it groups by the cast too, so it can collapse an undecodable twin onto its plain sibling and leave the grant unconditional. Repair the column, or delete the row and write the rule again.
+
 ### Optional publishes
 
 ```bash

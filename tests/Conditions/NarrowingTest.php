@@ -16,8 +16,8 @@ use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Enums\ComparisonOperator;
 use ElPandaPe\Warden\Enums\LogicalOperator;
 use ElPandaPe\Warden\Facades\Warden;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 pest()->extend(TestCase::class);
 
