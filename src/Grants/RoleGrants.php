@@ -546,7 +546,11 @@ final class RoleGrants
         $twins = [];
 
         foreach (self::held($role) as [$permission]) {
-            if ($permission->getAttribute('options') === null) {
+            // The column, not the cast: a twin whose blob does not decode casts
+            // to null and would be skipped here, so its model never reaches
+            // `revoke()` and clearing the cell leaves the grant standing. A
+            // narrowed row is a twin whatever its blob says.
+            if (($permission->getAttributes()['options'] ?? null) === null) {
                 continue;
             }
 

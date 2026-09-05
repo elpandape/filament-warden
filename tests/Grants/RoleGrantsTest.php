@@ -1447,3 +1447,40 @@ test('a door carrying a hand-written condition is still written, not swallowed',
         ->and(Access::granted($user, $door))->toBeFalse()
         ->and(RoleGrants::of($role, $catalog)->stances[$door][StateKey::DOOR])->toBe('forbidden');
 });
+
+test('an unreadable twin is still reachable when its cell is cleared', function (): void {
+    $role = makeRole();
+    $catalog = gridCatalog();
+    $class = Context::resolve()->permissionClass();
+
+    // A plain grant beside a narrowed one: two rows for one cell, which is the
+    // only shape this screen will clear without being able to edit it.
+    Warden::allow($role)->to('update', Post::class)->where('title', 'alpha');
+    Warden::allow($role)->to('update', Post::class);
+
+    $twin = $class::query()->withoutGlobalScopes()
+        ->where('name', 'update')->whereNotNull('options')->orderByDesc('id')->firstOrFail();
+
+    // Straight onto the column: through the model the `array` cast re-encodes it
+    // into valid JSON, which is the step that hides this class of row.
+    //
+    // `identity_key` is left as warden wrote it, and that is the faithful shape:
+    // a blob corrupted after the fact keeps the digest of the rule it used to
+    // hold. Recomputing it is not even available — `PermissionIdentity::for()`
+    // reads the cast too, so for this row it digests "no conditions" and
+    // collides with the plain sibling on warden's own unique index.
+    $class::query()->withoutGlobalScopes()->whereKey($twin->getKey())
+        ->update(['options' => '{"v":1,"g":']);
+
+    expect(RoleGrants::of($role, $catalog)->narrowings[Post::class]['update']->isClearable())
+        ->toBeTrue()
+        ->and(grantCount())->toBe(2);
+
+    // The twin has to be reached BY ITS MODEL: since warden's 2.0 a name
+    // resolves only the plain row. `twinsHeld()` collects the models to send,
+    // and reading the cast rather than the column made it skip exactly this row
+    // — so the clear reported success and left half the grant standing.
+    RoleGrants::apply($role, $catalog, [Post::class => ['update' => 'none']]);
+
+    expect(grantCount())->toBe(0);
+});
