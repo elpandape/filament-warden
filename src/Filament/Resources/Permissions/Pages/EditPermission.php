@@ -83,8 +83,17 @@ class EditPermission extends EditRecord
         // runs before this method against a schema rebuilt for this request, so
         // `disabled()` is re-evaluated ahead of `$data` and no payload can carry
         // `options` past it. A copy could only drift.
+        // Unset rather than re-assign. A disabled field is already gone from
+        // `$data` — `disabled()` calls `saved(false)` and Filament forgets the
+        // path — so putting the key back is the only thing that can write this
+        // column, and what it puts back is the CAST. For the three stored values
+        // Eloquent flattens to null — text that is not JSON, the empty string,
+        // the JSON literal `null` — that is SQL NULL written over a rule nobody
+        // could decode, turning it into an unconditional grant. Re-assigning the
+        // raw string instead is no good either: the `array` cast would encode it
+        // a second time. Leaving the key out touches nothing.
         if (! PermissionResource::mayEditConditions($record)) {
-            $data['options'] = $record->getAttribute('options');
+            unset($data['options']);
         }
 
         $entityType = $this->nullableText($this->submitted($data, 'entity_type'));

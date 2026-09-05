@@ -321,13 +321,12 @@ final class PermissionForm
         // from anybody, and asking further would close the builder on every plain
         // row in the catalogue.
         //
-        // The reach of that "nothing" is the CAST, not the column. Eloquent's
-        // `fromJson()` answers null for the empty string, and `json_decode()`
-        // answers null for the JSON literal `null` and for text that is not JSON
-        // at all — while warden asks the column and fails closed on exactly
-        // those three, in both polarities. A row like that arrives here looking
-        // empty, so the builder stays open over a rule this screen cannot see.
-        // Closing it would mean asking the column here too.
+        // The cast is the right question HERE, and only because the guard above
+        // already answered the wrong one. `Narrowing::of()` reads the column, so
+        // the three values Eloquent flattens to null — text that is not JSON,
+        // the empty string, the JSON literal `null` — come back `Unreadable` and
+        // leave with their own word. What reaches this line is a row whose blob
+        // decodes, where cast and column say the same thing.
         if ($record->getAttribute('options') === null) {
             return null;
         }
@@ -445,7 +444,11 @@ final class PermissionForm
      */
     private static function exists(mixed $name, ?Model $record, Get $get): bool
     {
-        if ($record instanceof Model && $record->getAttribute('options') !== null) {
+        // The column, not the cast. A twin whose blob does not decode casts to
+        // null, so this short-circuit would miss it and compare it against the
+        // plain rows as though it were one — refusing a name the database would
+        // have taken, on a row the person cannot fix from here anyway.
+        if ($record instanceof Model && ($record->getAttributes()['options'] ?? null) !== null) {
             return false;
         }
 

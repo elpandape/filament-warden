@@ -1462,3 +1462,39 @@ test('and a strict installation with no tenant active sees that grant too', func
 
     expect(PermissionResource::isDeletable($held))->toBeFalse();
 });
+
+/*
+ * The writer half of the same question the `Narrowing` tests ask on the read
+ * side. A blob that does not decode is a rule this screen cannot show, and the
+ * promise is that it is said out loud and left alone — not silently replaced.
+ * Both rows below are written straight onto the column: through the model the
+ * `array` cast re-encodes them into valid JSON, which is exactly the step that
+ * used to hide them.
+ */
+
+test('a save that never touched an unreadable condition does not blank it', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $permission = permissionWithOptions(Post::class, ['column' => 'title', 'operator' => '=', 'value' => 'alpha']);
+
+    $raw = '{"v":1,"g":';
+    DB::table(Context::resolve()->table('permissions'))
+        ->where('id', $permission->getKey())
+        ->update(['options' => $raw]);
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->fillForm(['title' => 'Renamed'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $after = DB::table(Context::resolve()->table('permissions'))
+        ->where('id', $permission->getKey())
+        ->value('options');
+
+    // Before this release `mutateFormDataBeforeSave()` put the key back with the
+    // CAST — null for this blob — and the update wrote SQL NULL over it, turning
+    // a rule nobody could decode into an unconditional grant.
+    expect($after)->toBe($raw);
+});
