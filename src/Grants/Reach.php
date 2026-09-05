@@ -16,10 +16,13 @@ use Throwable;
  * Asked and never volunteered: one `whereCan()` costs a handful of queries with
  * no memoisation and no cache, so a listing column would multiply it by every
  * row on the page. The count is deliberately not written down as one number —
- * it depends on the grant's shape, measured at seven for a plain one and nine
- * for a `toOwn()`, whose ownership check asks the schema and pays twice for it
- * on sqlite. It does not hydrate the whole candidate catalogue: warden filters
- * the candidates in SQL by name, entity type and a `whereExists` on the grant.
+ * it depends on the grant's shape, measured against a query log on warden 2.2.1
+ * at five for a plain one, four of them preamble and one the caller's own
+ * select, and more for a `toOwn()`, whose ownership check asks the schema and
+ * pays twice for it on sqlite. Warden 2.2.0 partitions a single `assigned_roles`
+ * read in PHP where it used to run three, so the preamble went from six to four.
+ * It does not hydrate the whole candidate catalogue either: warden filters the
+ * candidates in SQL by name, entity type and a `whereExists` on the grant.
  *
  * And the number is a LOWER BOUND, not the truth. `whereCan()` and the panel's
  * own checks do not answer the same thing, measured in both directions, and a
