@@ -134,20 +134,6 @@ class EditPermission extends EditRecord
     }
 
     /**
-     * Warden does invalidate a write made through the model layer: its service
-     * provider listens on the wildcard `eloquent.*` events and feeds
-     * `CacheInvalidations`. What that listener never marks is a catalogue row —
-     * `CacheInvalidations::isWardenRow()` admits only the configured grant and
-     * assigned-role classes — so nothing bumps the version for this save.
-     * Without this, every check goes on answering the old way — silently, and
-     * with no expiry.
-     */
-    protected function afterSave(): void
-    {
-        Warden::refresh();
-    }
-
-    /**
      * The catalogue's unique index, reported as a field error rather than a 500.
      *
      * The same guard `CreatePermission` carries, and the path that was measured
