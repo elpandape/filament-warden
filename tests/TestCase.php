@@ -154,10 +154,14 @@ abstract class TestCase extends ApplicationTestCase
      * that same stub which honours `warden.tables` and `warden.connection` — so the
      * four tables no longer need a vendor path resolved here by hand.
      *
-     * `Schema::upgradeToV2()` is deliberately not called: warden publishes its
-     * creation stub already in the 2.0 shape, so this suite has no way to build a
-     * 1.x database to upgrade, and calling it would run against a catalogue that
-     * already has `identity_key`.
+     * Neither `Schema::upgradeToV2()` nor `upgradeToV3()` is called, for the same
+     * measured reason: warden publishes its creation stub already in the newest
+     * shape, so this suite has no way to build an older database to upgrade.
+     * `create_warden_tables.php.stub` carries `identity_key` and, since 3.0,
+     * `expires_at` on BOTH pivots — checked against the stub, not inferred from
+     * the changelog. `tests/SchemaTest.php` pins the expiry columns, so the day
+     * that stops being true one test says so instead of every expiry test dying
+     * on a missing column.
      *
      * The hook is `defineDatabaseMigrationsAfterDatabaseRefreshed()` and not
      * `defineDatabaseMigrations()`: testbench calls the second *before* refreshing the
