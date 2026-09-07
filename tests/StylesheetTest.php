@@ -230,6 +230,10 @@ test('the fold gives the FQCN a row of its own before it breaks mid-word', funct
     // which is what gives the FQCN's own `overflow-wrap` room to work with.
     $narrow = blockOf('@media (max-width: 30rem)');
 
+    // The semicolon matters: the base rule's two-column
+    // `minmax(0, 1fr) auto` starts with this same substring, so a needle
+    // without it would still match the very layout this test exists to rule
+    // out.
     expect($narrow)->toContain('.fw-stack-entity > summary')
-        ->and($narrow)->toContain('grid-template-columns: minmax(0, 1fr)');
+        ->and($narrow)->toContain('grid-template-columns: minmax(0, 1fr);');
 });
