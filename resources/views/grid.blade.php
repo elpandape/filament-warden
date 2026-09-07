@@ -183,14 +183,6 @@
                                             @foreach ($grid->groups as $group)
                                                 <th class="fw-group" data-scope="{{ $group->scope->value }}" colspan="{{ count($group->columns) }}" scope="colgroup">{{ $group->label }}</th>
                                             @endforeach
-                                            {{--
-                                                Where the spare width goes, so the
-                                                table reaches the edge of the card
-                                                without any real column growing to
-                                                absorb it. Empty, and with no
-                                                `scope`: it heads nothing.
-                                            --}}
-                                            <th class="fw-filler" rowspan="2" role="presentation"></th>
                                         </tr>
                                         <tr>
                                             @foreach ($grid->groups as $group)
@@ -244,7 +236,6 @@
                                                         @endif
                                                     </td>
                                                 @endforeach
-                                                <td class="fw-filler" role="presentation"></td>
                                             </tr>
                                         @endforeach
                                     </tbody>

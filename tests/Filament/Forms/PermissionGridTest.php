@@ -166,19 +166,17 @@ test('the field renders every tab of the catalogue at once', function (): void {
         ->assertSee('data-fw-action="'.StateKey::DOOR.'"', escape: false);
 });
 
-test('the table carries a filler column so the spare width lands nowhere real', function (): void {
+test('the spare width lands on the entity column, not on a column of nothing', function (): void {
     $role = makeRole();
 
     $html = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
 
-    // One in the head and one per body row: with the head alone the column has
-    // no cells to hold it open, and with the rows alone the header row is one
-    // cell short and every group heading shifts.
-    $rows = mb_substr_count($html, '<tr>') - mb_substr_count($html, '<th class="fw-filler"');
-
-    expect($html)->toContain('<th class="fw-filler" rowspan="2" role="presentation"></th>')
-        ->and(mb_substr_count($html, '<td class="fw-filler" role="presentation"></td>'))->toBeGreaterThan(0)
-        ->and($rows)->toBeGreaterThan(0);
+    // The column that held the slack is gone from both rows of the head and
+    // from every body row: with it, the action cells ended 313px short of the
+    // card in a 1010px table. Measured in a browser, not asserted here — what
+    // this pins is that no cell of it is drawn any more.
+    expect($html)->not->toContain('fw-filler')
+        ->and(mb_substr_count($html, '<tr>'))->toBeGreaterThan(0);
 });
 
 test('the folded reading draws the same cell the table does, from the same partial', function (): void {
@@ -1218,9 +1216,9 @@ test('a row is named by its entity, not by the buttons that sit beside it', func
     expect($html)->toContain('aria-labelledby="')
         ->and($html)->toMatch('/<th\s+class="fw-entity"\s+scope="row"\s+aria-labelledby="[^"]+-name [^"]+-model"/');
 
-    // The spare-width column heads nothing, and now says so rather than turning
-    // up as a column header with no name.
-    expect($html)->toContain('class="fw-filler" rowspan="2" role="presentation"');
+    // The spare-width column is gone: nothing in the head is a column header
+    // without a name any more.
+    expect($html)->not->toContain('fw-filler');
 });
 
 test('why an option cannot be picked is pointed at by the option it is about', function (): void {

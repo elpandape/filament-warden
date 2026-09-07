@@ -293,13 +293,6 @@
     z-index: 3;
 }
 
-/* Where the spare width goes. Empty on purpose and last on purpose: it is the
-   only cell with no width of its own, so the auto algorithm gives it what is
-   left over instead of taking it out of the entity column. */
-.fw-filler {
-    inline-size: auto;
-}
-
 .fw-table th,
 .fw-table td {
     padding: 0.25rem 0.5rem;
@@ -329,16 +322,15 @@
     z-index: 1;
     background: var(--fw-surface);
     text-align: start;
-    /* Capped AND wrapping, and the two are one change. The cap alone does not
-       contain the column while `white-space: nowrap` is still in force: the box
-       obeys it and the text does not, and because this cell is sticky over an
-       opaque background only as wide as itself, a long label paints across the
-       action columns scrolling underneath — the exact failure that background
-       exists to prevent. Wrapped rather than truncated: an FQCN cut short with
-       an ellipsis is not a shorter FQCN, it is a different one. */
+    /* Wrapping, and floored. The wrap is what keeps a long label from painting
+       across the action columns scrolling under this sticky cell over a
+       background only as wide as itself — an FQCN cut short with an ellipsis is
+       not a shorter FQCN, it is a different one. The floor is what stops a
+       narrow card taking the column back. There is no ceiling: with the filler
+       column gone this is what absorbs the slack, which is what makes the table
+       reach the edge of the card. */
     inline-size: 14rem;
     min-inline-size: 14rem;
-    max-inline-size: 14rem;
     overflow-wrap: anywhere;
 }
 

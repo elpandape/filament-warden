@@ -112,30 +112,30 @@ test('the reach rail asks its container how wide it is, not the window', functio
 });
 
 test('the table fills the card and still never compresses below the matrix', function (): void {
-    // Measured in a 1041px card: `100%` alone gave the spare width to the entity
-    // column, 224px to 521px, with the cells still bunched at the left; a bare
-    // `max-content` left the table — and the row rules — ending mid-card. The
-    // pair plus a filler column keeps both.
+    // Measured in a 1010px table on 2026-09-06, with and without a filler
+    // column: with it the action cells end at 752 and leave 313px of nothing;
+    // without it the entity column takes the slack — 224px to 558px — and the
+    // cells end at 1065, flush with the card. It gives the slack back as the
+    // card narrows: 392px in an 844px table, and it never overflows.
     //
-    // `min-` and never `max-`: a maximum resolves against a scrollport already
-    // clamped to the card, so the table could not overflow it, `overflow-x`
-    // never engaged, and the entity column gave up the width instead.
+    // An older note here said the same arrangement left "the cells still
+    // bunched at the left". That does not reproduce against this markup, and
+    // the markup it was measured on is not recorded — so it is written down as
+    // not reproducing rather than argued with.
+    //
+    // `min-` and never `max-`: the floor is what stops a narrow card taking the
+    // column back, measured at 94px in a 520px card with only a cap declared.
+    // The cap is what stopped the column claiming the slack.
     expect(declarationsOf('.fw-table'))->toContain('inline-size: 100%')
-        // Neither bound belongs on the table: a maximum stops it overflowing a
-        // scrollport already clamped to the card, and a `max-content` minimum
-        // resolves against the unconstrained filler column and blows the table
-        // out — measured at 9856px in a 993px card. The floor goes on the cell.
         ->and(declarationsOf('.fw-table'))->not->toContain('max-inline-size')
         ->and(declarationsOf('.fw-table'))->not->toContain('min-inline-size')
-        ->and(declarationsOf('.fw-filler'))->toContain('inline-size: auto')
+        ->and(stylesheet())->not->toContain('.fw-filler')
         ->and(declarationsOf('.fw-scroll'))->toContain('overflow-x: auto');
 
-    // The entity column holds its width from both sides, or a narrow card takes
-    // it back: measured at 94px in a 520px card with only the cap declared.
     $pinned = declarationsOf(".fw-table .fw-corner,\n.fw-table .fw-entity");
 
     expect($pinned)->toContain('min-inline-size: 14rem')
-        ->and($pinned)->toContain('max-inline-size: 14rem');
+        ->and($pinned)->not->toContain('max-inline-size: 14rem');
 });
 
 test('the wide condition row resets the misfit note it would otherwise be crushed by', function (): void {
