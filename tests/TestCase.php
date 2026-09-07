@@ -181,8 +181,11 @@ abstract class TestCase extends ApplicationTestCase
         Schema::create('posts', static function (Blueprint $table): void {
             $table->id();
             $table->string('title');
-            // The one boolean column the suite has. A condition comparing `true`
-            // only matches where the model casts, and nothing here cast anything.
+            // The one boolean column the suite has, and `Post` does cast it.
+            // Warden 3.0 refuses a condition whose value and column disagree
+            // about being boolean, in BOTH directions, so this is the only
+            // column a `true` can be compared against and the only one a
+            // string cannot.
             $table->boolean('published')->default(false);
             $table->timestamps();
         });

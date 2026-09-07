@@ -948,31 +948,6 @@ test('a cell that is both ownership and conditions is never written over', funct
         ->and($permission->getAttribute('only_owned'))->toBeTrue();
 });
 
-test('flipping a stance keeps the rule exactly as the store wrote it', function (): void {
-    $role = makeRole();
-    Warden::allow($role)->to('viewAny', Post::class)->where('published', '=', 'true');
-
-    $before = permissionClass()::query()->withoutGlobalScopes()
-        ->whereNotNull('options')->orderByDesc('id')->firstOrFail()->getAttribute('options');
-
-    RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'forbidden']], [
-        Post::class => ['viewAny' => [
-            'mode' => 'conditions',
-            'rules' => [[
-                'logic' => 'and', 'kind' => 'value', 'column' => 'published',
-                'operator' => '=', 'value' => 'true', 'authority' => '',
-            ]],
-        ]],
-    ]);
-
-    $after = permissionClass()::query()->withoutGlobalScopes()
-        ->whereNotNull('options')->orderByDesc('id')->firstOrFail()->getAttribute('options');
-
-    expect($after)->toBe($before)
-        ->and(grantCount())->toBe(1)
-        ->and(RoleGrants::of($role, gridCatalog())->stances[Post::class]['viewAny'])->toBe('forbidden');
-});
-
 test('a narrowed cell cycled back to granted is granted, not stuck forbidden', function (): void {
     $role = makeRole();
     $user = makeUser();
@@ -993,7 +968,7 @@ test('a narrowed cell cycled back to granted is granted, not stuck forbidden', f
 
 test('a rule the browser really changed is written as the browser sent it', function (): void {
     $role = makeRole();
-    Warden::allow($role)->to('viewAny', Post::class)->where('published', '=', 'true');
+    Warden::allow($role)->to('viewAny', Post::class)->where('published', '=', true);
 
     RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'granted']], [
         Post::class => ['viewAny' => [

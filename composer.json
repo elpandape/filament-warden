@@ -27,7 +27,7 @@
     },
     "require": {
         "php": "^8.4",
-        "elpandape/warden": "^2.2.2",
+        "elpandape/warden": "^3.0",
         "filament/filament": "^5.7",
         "illuminate/auth": "^13.0",
         "illuminate/console": "^13.0",
