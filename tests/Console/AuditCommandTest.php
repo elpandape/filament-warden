@@ -627,3 +627,36 @@ test('a loose row carrying conditions is not this bucket, because there is no mo
 
     expect(Audit::run()->unsatisfiable)->toBeEmpty();
 });
+
+test('a role assigned to another role while nesting is off is reported, and reddens nothing', function (): void {
+    $outer = makeRole('outer');
+    $inner = makeRole('inner');
+
+    Warden::assign($inner)->to($outer);
+
+    $audit = Audit::run();
+
+    // Warden's own UPGRADE asks for this count before the flag is turned on,
+    // because turning it on is what makes these edges live: a grant somebody
+    // wrote years ago as a no-op becomes access on the next check.
+    expect($audit->dormant)->toHaveCount(1)
+        ->and($audit->dormant[0])->toContain('inherits')
+        // Nothing to fix and nothing this package can clean, which is exactly
+        // the test for a bucket that must never redden a build (§6.28). It is
+        // what a SWITCH would do, not a defect.
+        ->and($audit->isClean())->toBeTrue()
+        ->and($audit->isSilent())->toBeFalse();
+});
+
+test('with nesting on there is nothing dormant, by definition', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $outer = makeRole('outer');
+    $inner = makeRole('inner');
+
+    Warden::assign($inner)->to($outer);
+
+    // The edges are not dormant any more, they are the feature. Reporting them
+    // would be telling somebody that what they turned on is on.
+    expect(Audit::run()->dormant)->toBeEmpty();
+});

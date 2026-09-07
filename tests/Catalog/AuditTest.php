@@ -74,6 +74,7 @@ function auditWith(string $bucket): Audit
         unmigrated: $bucket === 'unmigrated' ? $finding : [],
         misconfigured: $bucket === 'misconfigured' ? $finding : [],
         unsatisfiable: $bucket === 'unsatisfiable' ? $finding : [],
+        dormant: $bucket === 'dormant' ? $finding : [],
     );
 }
 
@@ -89,6 +90,11 @@ test('each bucket the gate reads turns the build red on its own', function (stri
 test('the declared and unheld bucket is reported and never reddens the build', function (): void {
     expect(auditWith('orphans')->isClean())->toBeTrue()
         ->and(auditWith('orphans')->isSilent())->toBeFalse();
+});
+
+test('the dormant bucket is reported and never reddens the build', function (): void {
+    expect(auditWith('dormant')->isClean())->toBeTrue()
+        ->and(auditWith('dormant')->isSilent())->toBeFalse();
 });
 
 test('the stranded bucket is reported and never reddens the build', function (): void {
@@ -108,7 +114,7 @@ test('the gate reads exactly the buckets this file names, no more and no fewer',
     ));
 
     expect($reaching)->toBe(gateBuckets())
-        ->and(declaredBuckets())->toHaveCount(count(gateBuckets()) + 3);
+        ->and(declaredBuckets())->toHaveCount(count(gateBuckets()) + 4);
 });
 
 test('this file puts a finding in every bucket the audit carries', function (string $bucket): void {

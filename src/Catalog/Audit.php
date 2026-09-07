@@ -12,6 +12,7 @@ use ElPandaPe\FilamentWarden\FilamentWardenPlugin;
 use ElPandaPe\FilamentWarden\Support\Config;
 use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Context;
+use ElPandaPe\Warden\Support\Config as WardenConfig;
 use Filament\Facades\Filament;
 use Filament\Panel;
 use Filament\Resources\Resource;
@@ -43,6 +44,7 @@ final readonly class Audit
      * @param  list<string>  $unmigrated  what warden's own schema is missing
      * @param  list<string>  $misconfigured  config entries this package reads and drops
      * @param  list<string>  $unsatisfiable  catalogue rows whose condition can never be true
+     * @param  list<string>  $dormant  role-to-role edges that would come alive if nesting were turned on
      */
     public function __construct(
         public array $open = [],
@@ -58,6 +60,7 @@ final readonly class Audit
         public array $unmigrated = [],
         public array $misconfigured = [],
         public array $unsatisfiable = [],
+        public array $dormant = [],
     ) {}
 
     public static function run(): self
@@ -141,6 +144,7 @@ final readonly class Audit
             unmigrated: self::unmigrated(),
             misconfigured: self::misconfigured(),
             unsatisfiable: self::unsatisfiable(),
+            dormant: self::dormant(),
         );
     }
 
@@ -191,7 +195,7 @@ final readonly class Audit
      */
     public function isSilent(): bool
     {
-        return $this->isClean() && $this->orphans === [] && $this->stranded === [] && $this->unwalkable === [];
+        return $this->isClean() && $this->orphans === [] && $this->stranded === [] && $this->unwalkable === [] && $this->dormant === [];
     }
 
     /**
@@ -565,6 +569,51 @@ final readonly class Audit
         }
 
         return $findings;
+    }
+
+    /**
+     * Role-to-role edges sitting in the store with nesting switched off.
+     *
+     * They have always been writable and have always granted nothing, so an
+     * installation can have collected them without knowing — and warden's own
+     * UPGRADE asks for exactly this count before the flag is turned on, because
+     * turning it on is what makes them live. A grant somebody wrote years ago as
+     * a no-op becomes access on the next check.
+     *
+     * INFORMATIONAL, and it is the one bucket here that reports something which
+     * is not a defect: it is what a switch WOULD do. There is nothing to fix and
+     * nothing this package can clean, which is §6.28's own test for a bucket
+     * that must never redden a build. With the flag on it reports nothing at
+     * all — the edges are not dormant any more, they are the feature.
+     *
+     * @return list<string>
+     */
+    private static function dormant(): array
+    {
+        if (WardenConfig::nestedRoles()) {
+            return [];
+        }
+
+        $context = Context::resolve();
+        $roleMorph = new ($context->roleClass())()->getMorphClass();
+
+        $rows = $context->assignedRoleClass()::query()
+            ->withoutGlobalScopes()
+            ->where('entity_type', $roleMorph)
+            ->get(['entity_id', 'role_id']);
+
+        $findings = [];
+
+        foreach ($rows as $row) {
+            $outer = $row->getAttribute('entity_id');
+            $inner = $row->getAttribute('role_id');
+
+            if ((is_int($outer) || is_string($outer)) && (is_int($inner) || is_string($inner))) {
+                $findings[] = $outer.' inherits '.$inner;
+            }
+        }
+
+        return array_values(array_unique($findings));
     }
 
     /**
