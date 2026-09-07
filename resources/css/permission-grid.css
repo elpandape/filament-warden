@@ -242,22 +242,18 @@
     contain: layout;
 }
 
-/* What it NEEDS, not what there is. With the inspector gone from the side,
-   `inline-size: 100%` handed every spare pixel to the one auto-width cell — the
-   entity column — while the action cells stayed pinned at `1%`, and the matrix
-   read as a broken form rather than as a matrix. */
 /* The full width, and never less than the matrix needs.
  *
- * `100%` alone let the auto table algorithm hand every spare pixel to one
- * column — measured in a 1041px card, the entity column went from 224px to
- * 521px while the cells stayed bunched at the left. `max-content` alone left
- * the table ending mid-card with the row rules cut short. The pair, with the
- * spare width falling into a filler column at the end, keeps every column the
- * size it asked for AND reaches the edge.
- *
- * `min-inline-size` and not `max-inline-size`: below its own content the table
- * must overflow the scroller rather than compress, which is what the pinned
- * first column and its opaque background were written for. */
+ * `100%` is the only bound this rule carries. Under automatic table layout the
+ * action columns take only what their content needs — pinned at `inline-size:
+ * 1%` below — so any slack the 100% implies lands on the entity column
+ * instead: measured in a 1010px table, 224px to 558px, with the cells ending
+ * at 1065px, flush with the card, rather than 313px short of it as they did
+ * when a filler column absorbed that slack instead. A narrower card gives the
+ * slack back rather than compressing the matrix — 392px of it in an 844px
+ * table — because this rule sets no minimum of its own; what refuses to
+ * compress below a legible width is the entity column's own floor, declared
+ * on it below. */
 .fw-table {
     border-collapse: separate;
     border-spacing: 0;
@@ -301,9 +297,11 @@
     vertical-align: middle;
 }
 
-/* The action columns take what they need and no more. There is no "rest" for
-   the entity column to keep any more — the table is `max-content` — but a cell
-   that sized itself would still push the matrix apart. */
+/* The action columns take what they need and no more, pinned at 1% below so
+   the auto layout algorithm shrinks each one to its content. What is left of
+   the table's 100% is the entity column's to keep, not spare space with
+   nowhere to go — see `.fw-table` above. A cell that sized itself here would
+   still let a wrapped line push the matrix apart. */
 .fw-table .fw-cell,
 .fw-table .fw-action,
 .fw-table .fw-manage {
