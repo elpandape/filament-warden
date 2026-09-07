@@ -138,8 +138,9 @@ The tag matters. `warden-migrations` publishes `create_warden_tables`, whose `Sc
 
 ### Upgrading to 2.11 from 2.10
 
-`composer update`, then **run `php artisan filament:assets`** — this release rewrote 478 lines of
-the stylesheet and changed `grid.blade.php`, and skipping the republish is not a quiet downgrade:
+`composer update`, then **run `php artisan filament:assets`** — this release grew the stylesheet
+from 1107 lines to 1400 and changed `grid.blade.php`, and skipping the republish is not a quiet
+downgrade:
 it serves the OLD assets against the NEW markup, and three things actually break, not just look a
 version behind.
 
