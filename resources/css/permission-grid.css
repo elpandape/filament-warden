@@ -35,6 +35,14 @@
     --fw-no-line: color-mix(in oklab, var(--danger-600) 34%, transparent);
     --fw-accent: var(--primary-600);
     --fw-noted: var(--warning-600);
+    /* Expiry gets `info`, which is the one colour of the panel this package had
+       never spent. Not `warning`: an end date somebody set on purpose is not a
+       problem, and the amber corner two millimetres away already means one. */
+    --fw-time: var(--info-600);
+    /* Inheritance is not a state of the rule, so it does not take a state
+       colour: it says where the answer came from, which is the same job the
+       muted print does everywhere else on this grid. */
+    --fw-lent: var(--gray-500);
     --fw-text: var(--gray-950);
     --fw-muted: var(--gray-600);
     --fw-line: color-mix(in oklab, var(--gray-950) 10%, transparent);
@@ -46,7 +54,17 @@
     --fw-surface: white;
 
     --fw-tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+    --fw-clock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");
+    --fw-link: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1'/%3E%3Cpath d='M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1'/%3E%3C/svg%3E");
     --fw-cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round'%3E%3Cpath d='M18 6 6 18'/%3E%3Cpath d='m6 6 12 12'/%3E%3C/svg%3E");
+
+    /* What the panel's container query below resolves against. The window is
+       the wrong thing to ask: a host panel with its own navigation rail hands
+       this field less than the viewport says, and a sheet that opened as a
+       column at 1280px would be a matrix with nothing left of it.
+       `.fw-builder` declares its own further in, so this does not steal its
+       query — the nearest container wins and that one is nearer. */
+    container-type: inline-size;
 
     font-size: 0.875rem;
     color: var(--fw-text);
@@ -57,6 +75,8 @@
     --fw-no: var(--danger-400);
     --fw-accent: var(--primary-400);
     --fw-noted: var(--warning-400);
+    --fw-time: var(--info-400);
+    --fw-lent: var(--gray-400);
     --fw-text: var(--gray-100);
     --fw-muted: var(--gray-400);
     --fw-line: color-mix(in oklab, var(--gray-50) 13%, transparent);
@@ -82,6 +102,44 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
+}
+
+/* The panel that pushes, and why it is not the side column 2.11 threw away.
+   That one was FIXED: it took 19rem off the grid at every width, including the
+   ones where the matrix needed them, and it took them whether anybody was
+   reading it or not. This one exists only while a cell is selected, and the
+   matrix takes the width back the moment it closes.
+   30rem and not less: at 24rem the builder's own container query drops to its
+   stacked reading and the rule stops sitting beside what it means, which is the
+   pairing 2.11 measured and this file inherits. What absorbs the loss is the
+   matrix scrolling sideways with its entity column pinned — the mechanism the
+   fixed column never had.
+   `minmax(0, …)` on the first track, or a table wider than the space would
+   refuse to shrink and push the panel off the card instead of scrolling. */
+.fw-layout[data-open='true'] {
+    grid-template-columns: minmax(0, 1fr) 30rem;
+}
+
+/* Below the width where two tracks stop being honest, the panel is a sheet at
+   the bottom rather than a column: 30rem of a 48rem card is the matrix gone.
+   A container query and not a media query, because what decides is the space
+   this field was given, not the window — a panel with its own navigation rail
+   hands over less than the viewport says. */
+@container (width < 64rem) {
+    .fw-layout[data-open='true'] {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .fw-inspector {
+        position: sticky;
+        inset-block-end: 0;
+        z-index: 4;
+        max-block-size: 50vh;
+        overflow-y: auto;
+        background: var(--fw-surface);
+        /* Upwards, because the sheet is what sits on top of the matrix here. */
+        box-shadow: 0 -1px 3px 0 color-mix(in oklab, var(--gray-950) 10%, transparent);
+    }
 }
 
 .fw-main {
@@ -565,6 +623,43 @@
 .fw-box[data-locked='true']::after {
     border-radius: 1px;
     background: var(--fw-no);
+}
+
+/* The other two corners, and why they are spans rather than pseudo-elements.
+   A button has exactly two of those and both are spent: `::before` draws the
+   glyph and `::after` draws the corner above. Four marks need four boxes, so
+   the two that arrived with 3.0 are elements the template writes — which is
+   also what lets them carry their own `.fw-sr` word, since a pseudo-element
+   cannot be named to a screen reader.
+
+   Placed at the two corners the first two do not use, so no two marks ever
+   share one and a cell carrying all four is still readable. */
+.fw-mark {
+    position: absolute;
+    inline-size: 0.5rem;
+    block-size: 0.5rem;
+    background: currentcolor;
+    -webkit-mask: var(--fw-mark) center / contain no-repeat;
+    mask: var(--fw-mark) center / contain no-repeat;
+    pointer-events: none;
+}
+
+/* The grant behind this cell ends on a date. */
+.fw-mark-time {
+    --fw-mark: var(--fw-clock);
+
+    inset-block-end: -0.1875rem;
+    inset-inline-end: -0.1875rem;
+    color: var(--fw-time);
+}
+
+/* Nobody wrote this cell here: a role this one inherits answers it. */
+.fw-mark-lent {
+    --fw-mark: var(--fw-link);
+
+    inset-block-start: -0.1875rem;
+    inset-inline-start: -0.1875rem;
+    color: var(--fw-lent);
 }
 
 /* Said out loud and drawn nowhere.

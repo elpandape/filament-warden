@@ -357,3 +357,46 @@ test('the fold outranks everything it collapses, by being the last rule in the f
     // `substr()` this test is avoiding.
     expect(byteOffsetOf('/\S(?!.*\S)/s', $sheet))->toBe($close);
 });
+
+test('the panel takes width only while it is open, and gives it back', function (): void {
+    $sheet = stylesheet();
+
+    // 2.11 measured a FIXED side column and threw it away: it took 19rem off the
+    // grid at every width, read or not. This one is conditional, and the whole
+    // difference is the attribute — a rule without it would be that column
+    // again, wider.
+    expect($sheet)->toContain(".fw-layout[data-open='true'] {")
+        ->and($sheet)->toContain('grid-template-columns: minmax(0, 1fr) 30rem;')
+        // What absorbs the width the panel takes: the matrix scrolls sideways
+        // with its entity column pinned. `minmax(0, …)` is what allows that — a
+        // plain `1fr` refuses to shrink below the table and pushes the panel off
+        // the card instead.
+        ->and($sheet)->toContain('minmax(0, 1fr) 30rem');
+});
+
+test('the sheet asks its container how wide it is before it becomes a column', function (): void {
+    $sheet = stylesheet();
+
+    // The window is the wrong thing to ask: a host panel with its own navigation
+    // rail hands this field less than the viewport says, so a media query would
+    // open a 30rem column beside a matrix that has no room for one.
+    expect($sheet)->toMatch('/@container \(width < 64rem\) \{\s*\.fw-layout\[data-open=.true.\]/')
+        ->and($sheet)->toContain('max-block-size: 50vh;');
+});
+
+test('the two marks 3.0 adds are elements, because a button has only two pseudos', function (): void {
+    $sheet = stylesheet();
+
+    // `::before` draws the glyph and `::after` draws the amber or red corner.
+    // Four marks need four boxes, so these two are elements the template writes
+    // — which is also what lets them carry their own screen-reader word, since a
+    // pseudo-element cannot be named.
+    expect($sheet)->toContain('.fw-mark-time {')
+        ->and($sheet)->toContain('.fw-mark-lent {')
+        ->and($sheet)->toContain('--fw-mark: var(--fw-clock);')
+        ->and($sheet)->toContain('--fw-mark: var(--fw-link);')
+        // The two corners the first two do not use, so no cell ever stacks two
+        // marks in one place.
+        ->and($sheet)->toMatch('/\.fw-mark-time \{[^}]*inset-block-end/')
+        ->and($sheet)->toMatch('/\.fw-mark-lent \{[^}]*inset-block-start/');
+});

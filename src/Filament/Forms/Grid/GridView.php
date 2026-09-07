@@ -60,6 +60,7 @@ final readonly class GridView
     ): self {
         $narrowings = $stored->narrowings;
         $untils = $stored->untils;
+        $inherited = $stored->inherited;
         $wider = $stored->wider;
 
         $groups = self::groups($catalog);
@@ -73,10 +74,10 @@ final readonly class GridView
         }
 
         $tabs = [
-            self::matrix($catalog, $columns, $state, $narrowings, $untils, $wider),
-            self::doors('pages', $catalog, [Origin::Page], $state, $narrowings, $untils, $wider),
-            self::doors('widgets', $catalog, [Origin::Widget], $state, $narrowings, $untils, $wider),
-            self::doors('loose', $catalog, [Origin::Custom, Origin::Panel], $state, $narrowings, $untils, $wider),
+            self::matrix($catalog, $columns, $state, $narrowings, $untils, $wider, $inherited),
+            self::doors('pages', $catalog, [Origin::Page], $state, $narrowings, $untils, $wider, $inherited),
+            self::doors('widgets', $catalog, [Origin::Widget], $state, $narrowings, $untils, $wider, $inherited),
+            self::doors('loose', $catalog, [Origin::Custom, Origin::Panel], $state, $narrowings, $untils, $wider, $inherited),
         ];
 
         // `reach()` below is one of seven decisions this package makes twice —
@@ -385,8 +386,9 @@ final readonly class GridView
      * @param  array<string, array<string, Narrowing>>  $narrowings
      * @param  array<string, array<string, CarbonImmutable>>  $untils
      * @param  array<string, string>  $wider
+     * @param  array<string, array<string, array{role: string, stance: string}>>  $inherited
      */
-    private static function matrix(Catalog $catalog, array $columns, array $state, array $narrowings, array $untils, array $wider): Tab
+    private static function matrix(Catalog $catalog, array $columns, array $state, array $narrowings, array $untils, array $wider, array $inherited): Tab
     {
         /** @var array<string, list<Entry>> $byModel */
         $byModel = [];
@@ -414,7 +416,7 @@ final readonly class GridView
                 $entry = $declared[$column->action] ?? null;
 
                 $cells[] = $entry instanceof Entry
-                    ? self::cell($key, $column->action, $column->label, $state, $narrowings, $untils, $wider, $column->scope, $entry)
+                    ? self::cell($key, $column->action, $column->label, $state, $narrowings, $untils, $wider, $column->scope, $entry, $inherited)
                     : Cell::undeclared($key, $column->action, $column->label, $column->scope);
             }
 
@@ -424,7 +426,7 @@ final readonly class GridView
                 label: self::entityLabel($model, $entries),
                 model: $model,
                 cells: $cells,
-                manage: self::cell($key, StateKey::MANAGE, self::translated('filament-warden::ui.grid.manage', 'everything'), $state, $narrowings, $untils, $wider),
+                manage: self::cell($key, StateKey::MANAGE, self::translated('filament-warden::ui.grid.manage', 'everything'), $state, $narrowings, $untils, $wider, null, null, $inherited),
             );
         }
 
@@ -437,8 +439,9 @@ final readonly class GridView
      * @param  array<string, array<string, Narrowing>>  $narrowings
      * @param  array<string, array<string, CarbonImmutable>>  $untils
      * @param  array<string, string>  $wider
+     * @param  array<string, array<string, array{role: string, stance: string}>>  $inherited
      */
-    private static function doors(string $key, Catalog $catalog, array $origins, array $state, array $narrowings, array $untils, array $wider): Tab
+    private static function doors(string $key, Catalog $catalog, array $origins, array $state, array $narrowings, array $untils, array $wider, array $inherited): Tab
     {
         $rows = [];
 
@@ -454,7 +457,7 @@ final readonly class GridView
                 key: $row,
                 label: $label,
                 model: null,
-                cells: [self::cell($row, StateKey::DOOR, $label, $state, $narrowings, $untils, $wider, $entry->scope, $entry)],
+                cells: [self::cell($row, StateKey::DOOR, $label, $state, $narrowings, $untils, $wider, $entry->scope, $entry, $inherited)],
             );
         }
 
@@ -466,6 +469,7 @@ final readonly class GridView
      * @param  array<string, array<string, Narrowing>>  $narrowings
      * @param  array<string, array<string, CarbonImmutable>>  $untils
      * @param  array<string, string>  $wider
+     * @param  array<string, array<string, array{role: string, stance: string}>>  $inherited
      */
     private static function cell(
         string $row,
@@ -477,6 +481,7 @@ final readonly class GridView
         array $wider,
         ?Scope $scope = null,
         ?Entry $entry = null,
+        array $inherited = [],
     ): Cell {
         $written = $state[$row][$action] ?? null;
 
@@ -489,8 +494,9 @@ final readonly class GridView
             narrowing: $narrowings[$row][$action] ?? null,
             scope: $scope,
             entry: $entry,
-            reach: self::reach($row, $action, $entry->name ?? $action, $state, $wider),
+            reach: self::reach($row, $action, $entry->name ?? $action, $state, $wider, $inherited),
             until: $untils[$row][$action] ?? null,
+            inheritedFrom: isset($state[$row][$action]) ? null : ($inherited[$row][$action]['role'] ?? null),
         );
     }
 
@@ -501,13 +507,21 @@ final readonly class GridView
      *
      * @param  array<string, array<string, string>>  $state
      * @param  array<string, string>  $wider
+     * @param  array<string, array<string, array{role: string, stance: string}>>  $inherited
      */
-    private static function reach(string $row, string $action, string $name, array $state, array $wider): ?Stance
+    private static function reach(string $row, string $action, string $name, array $state, array $wider, array $inherited = []): ?Stance
     {
         $candidates = [
             $action === StateKey::MANAGE ? null : ($state[$row][StateKey::MANAGE] ?? null),
             $wider['*'] ?? null,
             $wider[$name] ?? null,
+            // An inherited answer is the same SHAPE as a wider rule: nobody
+            // wrote this cell and something else answers it. Reading it here
+            // rather than beside it is what keeps the tab counters honest for
+            // free — they count what a cell ANSWERS (§6.11), and the browser
+            // re-derives the same thing from the same payload. What differs is
+            // only WHICH thing answers, and that is `inheritedFrom` on the cell.
+            $inherited[$row][$action]['stance'] ?? null,
         ];
 
         $reach = null;
