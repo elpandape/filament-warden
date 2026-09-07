@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Conditions\Shape;
+use ElPandaPe\FilamentWarden\Conditions\Words;
 use ElPandaPe\FilamentWarden\Filament\Forms\ConditionBuilder;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Livewire\ConditionHost;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Comment;
@@ -67,8 +68,13 @@ test('ownership is offered only where it could resolve', function (): void {
 test('every word the browser says arrives already written', function (): void {
     $words = builderFor(Post::class)->getWords();
 
+    // `toBe` on the KEYS and not `toHaveKeys`, which passes just as happily
+    // with a third one beside them. That third one is the whole risk: warden's
+    // `LogicalOperator` carries `Not`, and since 3.0 evaluating a group that
+    // holds it THROWS — so a list derived from `cases()` would offer an
+    // operator that saves fine and blows up on the next check.
     expect($words['operators'])->toBe(['=', '!=', '<', '>', '<=', '>='])
-        ->and($words['joiners'])->toHaveKeys(['and', 'or'])
+        ->and(array_keys(Words::all()['joiners']))->toBe(['and', 'or'])
         ->and($words['authority'])->toBeString();
 });
 

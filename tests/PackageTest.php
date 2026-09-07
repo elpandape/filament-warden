@@ -274,3 +274,70 @@ test('the two things the README tells an application to read after a save are th
 
     expect($named)->toBe(['written', 'preserved', 'refused', 'unresolved', 'granted', 'forbidden', 'revoked', 'lapsed', 'impossible']);
 });
+
+test('every call to whereCan() carries its own guard, in the same file', function (): void {
+    // `Model::whereCan()` on a model that does not compose `QueriesByPermission`
+    // does not fail: `Query\Builder::__call` turns any unknown `where*` into a
+    // dynamic where, so it builds `where "can" = ?` with the authority as the
+    // binding and answers ZERO ROWS without a word (§6.20). A screen that
+    // trusted it would print a number meaning nothing, and no exception would
+    // ever say so.
+    //
+    // One call site today, in `Grants\Reach`. This is the rule for the next one,
+    // and it is a rule nothing else can enforce: a second unguarded call is
+    // invisible to every other gate, because it does not throw, does not fail a
+    // type check and does not lower coverage.
+    //
+    // `method_exists(..., 'scopeWhereCan')` and never `hasNamedScope()`: they
+    // stopped being equivalent, and the second reads as the tidier one.
+    $files = [];
+
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(dirname(__DIR__).'/src')) as $file) {
+        if (! $file instanceof SplFileInfo || $file->getExtension() !== 'php') {
+            continue;
+        }
+
+        $source = (string) file_get_contents($file->getPathname());
+
+        // The call, not the word: every docblock in `Reach` names it in prose.
+        if (preg_match('/->whereCan\(/', $source) !== 1) {
+            continue;
+        }
+
+        $files[] = str_contains($source, "method_exists(\$model, 'scopeWhereCan')")
+            ? null
+            : $file->getFilename();
+    }
+
+    expect(array_values(array_filter($files)))->toBeEmpty()
+        ->and($files)->not->toBeEmpty();
+});
+
+test('nothing writes an assignment or a grant through an eloquent relation', function (): void {
+    // `Warden::assign()` / `retract()` / `allow()` / `disallow()` dispatch events
+    // carrying `actor()`, report `retractedCount()`, and are the only place
+    // `until()` exists at all. A relation's `attach()`/`detach()`/`sync()` does
+    // none of the three, and it captures its write scope when the relation is
+    // BUILT, so one that outlives a tenant change writes to the old scope
+    // (§6.18). Warden closed the tenancy half of that in 2.0 and the restriction
+    // half is still open in 3.0 — but the durable reasons were never that one.
+    //
+    // Written as a test because the alternative is a sentence in a docblock
+    // nobody reads at the moment they reach for the shortcut, and every gate
+    // this package has would stay green on the shortcut.
+    $offenders = [];
+
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(dirname(__DIR__).'/src')) as $file) {
+        if (! $file instanceof SplFileInfo || $file->getExtension() !== 'php') {
+            continue;
+        }
+
+        $source = (string) file_get_contents($file->getPathname());
+
+        if (preg_match('/->(?:roles|permissions)\(\)\s*->\s*(?:attach|detach|sync|toggle|updateExistingPivot)\(/', $source) === 1) {
+            $offenders[] = $file->getFilename();
+        }
+    }
+
+    expect($offenders)->toBeEmpty();
+});

@@ -38,14 +38,23 @@ final class Words
             'authority' => self::line('authority'),
             'boolean' => self::line('boolean'),
             'boolean_column' => self::line('boolean_column'),
-            // Written out by hand and never derived from `LogicalOperator::cases()`.
-            // The enum carries a third case, `Not`, which warden refuses on the
-            // way in and on the way out while a hand-built group still reads it
-            // as a conjunction — and its 2.2.2 states that closing that needs a
-            // published signature to move, so it cannot land in 2.x. Deriving
-            // this list would offer an operator no save can accept. If the two
-            // are ever aligned, align them the other way: write the operators
-            // out too.
+            // Written out by hand and never derived from `LogicalOperator::cases()`,
+            // and warden 3.0 says so itself: the enum's own docblock now reads
+            // "Do not derive a connector list from cases(): the third one is not
+            // a connector anything will store."
+            //
+            // The reason changed with that release and got sharper, so the old
+            // one is not worth keeping: `Not` used to read as a conjunction in a
+            // hand-built group and be refused on the way to disk, which made a
+            // derived list an operator no SAVE could accept. It now THROWS when
+            // the group is evaluated. So a derived list would offer an operator
+            // that saves fine and blows up on the next check — later, and worse.
+            //
+            // The 2.x note said closing this needed a published signature to
+            // move and therefore could not land in a minor. It landed in 3.0
+            // without moving one: `Contracts\Constraint::passes()` kept its
+            // signature. Aligning the two lists is not the answer either way —
+            // warden has ruled the third case out of any list, permanently.
             'joiners' => [
                 'and' => self::line('and'),
                 'or' => self::line('or'),
