@@ -136,6 +136,30 @@ The tag matters. `warden-migrations` publishes `create_warden_tables`, whose `Sc
 
 **Existing titles are not rewritten by the upgrade itself.** Warden 2.0 changed how it generates a title — `viewAny` on `Post` is `View any posts` now, where 1.x wrote `ViewAny posts` — and neither warden nor this package retitles rows in place when you upgrade, so an upgraded catalogue shows mixed wording until somebody converges it. `php artisan warden:retitle` is what does that, since warden 2.1: it rewrites a title an older warden generated, leaves a title a person typed alone, and leaves a `null` null. `--dry-run` reports the count first. Nothing here is urgent — what this package guarantees meanwhile is that it still RECOGNISES the old wording, asking warden which titles warden has ever written, so renaming a permission still regenerates it whichever generation the row carries.
 
+### Upgrading to 2.11 from 2.10
+
+`composer update`, then **run `php artisan filament:assets`** — this release rewrote 478 lines of
+the stylesheet and changed `grid.blade.php`, and skipping the republish is not a quiet downgrade:
+it serves the OLD assets against the NEW markup, and three things actually break, not just look a
+version behind.
+
+- **The folded key renders unstyled.** `<details class="fw-legend-fold">` — "What the marks
+  mean," now sitting above the tabs instead of under the grid — is new markup with no counterpart
+  in `2.10`'s sheet: no chevron, no two-column layout for the marks, just a bare native disclosure
+  triangle.
+- **The inspector's two voices render unstyled, and worse, non-functional.** "In the store" and
+  "On screen, not saved" call `storedStance()`, `moved()`, `matchedName()` and `storedRule()` —
+  confirmed absent from `2.10.2`'s script — so Alpine throws evaluating them instead of drawing
+  anything, the same way a missing method broke the grid entirely when `1.1.0`'s assets went out
+  unrepublished.
+- **The condition editor and the tabs stay exactly at `2.10`'s look.** `2.10`'s sheet has no
+  two-column `.fw-conditions` split and no `.fw-write` rule at all, so neither this release's
+  pairing nor the narrow-screen collapse it needed apply — what renders is last release's single
+  column, not a broken copy of the new one.
+
+Nothing here touches the database, the config, or the `{stances, narrowing, baseline}` envelope:
+this release is assets only.
+
 ### Upgrading to 2.10 from 2.9
 
 `composer update` and nothing else. The floor moves from `elpandape/warden ^2.1` to `^2.2.1`, which is where the invalidation this package used to do by hand now lives.
