@@ -153,11 +153,12 @@ test('the state a grid field hands to a form is frozen', function (): void {
     // turns this red on purpose, so a new key is a line somebody typed rather
     // than a diff nobody read.
     //
-    // `until` sits before `baseline` because `baseline` is a copy of everything
-    // in front of it: a key added after it would be missing from the copy, and
-    // a save would then read every cell carrying that key as one nobody touched.
+    // Everything sits before `baseline`, and that order is load bearing:
+    // `baseline` is a copy of everything in front of it, so a key added after it
+    // would be missing from the copy and a save would read every cell carrying
+    // it as one nobody touched.
     expect(array_keys(partOf(is_array($state) ? $state : [], 'permissions')))
-        ->toBe(['stances', 'narrowing', 'until', 'baseline']);
+        ->toBe(['stances', 'narrowing', 'until', 'inherited', 'baseline']);
 });
 
 test('the key the roles field keeps beside its own is frozen', function (): void {

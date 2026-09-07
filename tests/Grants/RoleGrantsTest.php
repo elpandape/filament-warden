@@ -1832,3 +1832,139 @@ test('a stored rule that can never be true is drawn locked, not offered for edit
     expect(RoleGrants::of($role, gridCatalog())->narrowings[Post::class]['viewAny']->shape)
         ->toBe(Shape::Unreadable);
 });
+
+test('with nesting off a role inherits nothing, whatever the store holds', function (): void {
+    $outer = makeRole('outer');
+    $inner = makeRole('inner');
+
+    Warden::allow($inner)->to('viewAny', Post::class);
+    Warden::assign($inner)->to($outer);
+
+    // The edge has always been writable and has always granted nothing. Reading
+    // the flag here would be a second place for that answer to live; warden's
+    // closure decides it, and with nesting off it returns direct edges only.
+    expect(RoleGrants::of($outer, gridCatalog())->inherited)->toBeEmpty()
+        ->and(RoleGrants::of($outer, gridCatalog())->stances)->toBeEmpty();
+});
+
+test('an inherited cell is drawn with the role that lends it, not left empty', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $outer = makeRole('outer');
+    $inner = makeRole('inner');
+
+    Warden::allow($inner)->to('viewAny', Post::class);
+    Warden::assign($inner)->to($outer);
+
+    $state = RoleGrants::of($outer, gridCatalog());
+
+    // The wildcard mistake of §6.11 wearing another hat: a cell that ANSWERS
+    // must not read as one nobody wrote. And the link is half the point — a
+    // hollow tick with no name says the grid knows something it will not say.
+    expect($state->inherited[Post::class]['viewAny'])->toBe(['role' => 'Inner', 'stance' => 'granted'])
+        // Not in `stances`: the outer role wrote nothing, and a save must not be
+        // able to revoke somebody else's rule from a screen that never showed it
+        // as theirs.
+        ->and($state->stances)->toBeEmpty();
+});
+
+test('inheritance reaches two hops, because warden walks the closure', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $outer = makeRole('outer');
+    $middle = makeRole('middle');
+    $inner = makeRole('inner');
+
+    Warden::allow($inner)->to('viewAny', Post::class);
+    Warden::assign($inner)->to($middle);
+    Warden::assign($middle)->to($outer);
+
+    expect(RoleGrants::of($outer, gridCatalog())->inherited[Post::class]['viewAny']['role'])->toBe('Inner');
+});
+
+test('a rule of its own is what is in force, so nothing inherited is reported under it', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $outer = makeRole('outer');
+    $inner = makeRole('inner');
+
+    Warden::allow($inner)->to('viewAny', Post::class);
+    Warden::assign($inner)->to($outer);
+    Warden::forbid($outer)->to('viewAny', Post::class);
+
+    $state = RoleGrants::of($outer, gridCatalog());
+
+    // The role's own forbid wins, and warden agrees. Reporting the inherited
+    // grant underneath it would put two answers on one cell, and only one of
+    // them is true.
+    expect($state->stances[Post::class]['viewAny'])->toBe('forbidden')
+        ->and($state->inherited)->toBeEmpty();
+});
+
+test('an inherited forbid is what the cell says, over an inherited grant', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $outer = makeRole('outer');
+    $yes = makeRole('yes');
+    $no = makeRole('no');
+
+    Warden::allow($yes)->to('viewAny', Post::class);
+    Warden::forbid($no)->to('viewAny', Post::class);
+    Warden::assign($yes)->to($outer);
+    Warden::assign($no)->to($outer);
+
+    // Two inner roles disagreeing is warden's question and it answers forbidden.
+    // The screen names the role that DECIDES, not the first one it read.
+    expect(RoleGrants::of($outer, gridCatalog())->inherited[Post::class]['viewAny'])
+        ->toBe(['role' => 'No', 'stance' => 'forbidden']);
+});
+
+test('a cycle stops at the depth warden caps it with, instead of hanging', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $a = makeRole('a');
+    $b = makeRole('b');
+
+    Warden::allow($b)->to('viewAny', Post::class);
+    Warden::assign($b)->to($a);
+    Warden::assign($a)->to($b);
+
+    // Warden stops expanding at `warden.roles.max_depth` rather than throwing,
+    // so this is a screen that renders rather than one that dies. The cell still
+    // answers, from the role that lends it.
+    expect(RoleGrants::of($a, gridCatalog())->inherited[Post::class]['viewAny']['role'])->toBe('B');
+});
+
+test('an inherited cell is not written by a save that never touched it', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $outer = makeRole('outer');
+    $inner = makeRole('inner');
+
+    Warden::allow($inner)->to('viewAny', Post::class);
+    Warden::assign($inner)->to($outer);
+
+    // The grid sends back what it was drawn with. An inherited cell is not in
+    // `stances`, so the save sees an abstention against an abstention and has
+    // nothing to do — which is the whole reason it is kept out of that map.
+    $report = RoleGrants::apply($outer, gridCatalog(), []);
+
+    expect($report->written)->toBe(0)
+        ->and(grantCount())->toBe(1)
+        ->and(RoleGrants::of($outer, gridCatalog())->inherited[Post::class]['viewAny']['role'])->toBe('Inner');
+});
+
+test('a role with nesting on and nothing nested still costs no extra lookup', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    // The early return that skips naming roles nobody assigned: with the flag on
+    // and an empty closure there is nothing to look up, and asking anyway would
+    // put a query on every grid render of every installation that turned nesting
+    // on and never used it.
+    expect(RoleGrants::of($role, gridCatalog())->inherited)->toBeEmpty()
+        ->and(RoleGrants::of($role, gridCatalog())->stances[Post::class]['viewAny'])->toBe('granted');
+});

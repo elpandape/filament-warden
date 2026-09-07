@@ -160,8 +160,8 @@ test('only the form carries a baseline, and it is a copy of what it was handed',
     $state = livewire(EditRole::class, ['record' => $role->getKey()])->get('data.permissions');
     $state = is_array($state) ? $state : [];
 
-    expect(array_keys($onThePage))->toBe(['stances', 'narrowing', 'until'])
-        ->and(array_keys($state))->toBe(['stances', 'narrowing', 'until', 'baseline'])
+    expect(array_keys($onThePage))->toBe(['stances', 'narrowing', 'until', 'inherited'])
+        ->and(array_keys($state))->toBe(['stances', 'narrowing', 'until', 'inherited', 'baseline'])
         ->and(partOf($state, 'baseline'))->toBe($onThePage);
 });
 

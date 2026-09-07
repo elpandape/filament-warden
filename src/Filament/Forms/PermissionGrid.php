@@ -318,7 +318,7 @@ final class PermissionGrid extends Field
      * never what — the stance and reach come from the payload — so the worst a
      * doctored one does is suppress the forger's own save.
      *
-     * @return array{stances?: mixed, narrowing?: mixed, until?: mixed}|null
+     * @return array{stances?: mixed, narrowing?: mixed, until?: mixed, inherited?: mixed}|null
      */
     private function gridBaseline(): ?array
     {
@@ -329,7 +329,7 @@ final class PermissionGrid extends Field
             return null;
         }
 
-        /** @var array{stances?: mixed, narrowing?: mixed, until?: mixed} $baseline */
+        /** @var array{stances?: mixed, narrowing?: mixed, until?: mixed, inherited?: mixed} $baseline */
         return $baseline;
     }
 

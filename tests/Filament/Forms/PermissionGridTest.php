@@ -81,7 +81,8 @@ test('a role that holds nothing opens on an empty grid', function (): void {
             'stances' => [],
             'narrowing' => [],
             'until' => [],
-            'baseline' => ['stances' => [], 'narrowing' => [], 'until' => []],
+            'inherited' => [],
+            'baseline' => ['stances' => [], 'narrowing' => [], 'until' => [], 'inherited' => []],
         ]);
 });
 

@@ -19,8 +19,10 @@ use ElPandaPe\Warden\Actions\GrantsPermissions;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Exceptions\ConfigurationException;
 use ElPandaPe\Warden\Facades\Warden;
+use ElPandaPe\Warden\Support\Config as WardenConfig;
 use ElPandaPe\Warden\Tenancy\Tenancy;
 use ElPandaPe\Warden\Tenancy\TenantScope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
@@ -55,12 +57,37 @@ final class RoleGrants
         // on the live side of one comparison and the expired side of the next.
         $now = CarbonImmutable::now();
 
+        // What this role reaches through nesting. The flag IS read here, and the
+        // first version of this said it was not: `RoleClosure::for()` returns
+        // the DIRECT edges whether nesting is on or off, because for an account
+        // those direct edges are simply its roles. For a role authority they are
+        // the nesting edge itself, and with the flag off warden lends nothing
+        // through them — measured, with a role→role edge in the store reading as
+        // inherited when it grants nothing at all.
+        //
+        // The names come with it because a cell has to say WHICH role answers
+        // it; a tick with no link is the wildcard mistake of §6.11 wearing
+        // another hat.
+        $inheritedFrom = self::inheritedFrom($role);
+        $ownKey = self::identifier($role->getKey());
+
         /** @var array<string, array<string, list<array{0: Narrowing, 1: bool, 2: int|string|null, 3: CarbonImmutable|null}>>> $variants */
         $variants = [];
         $wider = [];
         $records = [];
 
-        foreach (self::held($role) as [$permission, $forbidden, $scope, $ends]) {
+        /** @var array<string, array<string, array{0: string, 1: Stance}>> $inherited */
+        $inherited = [];
+
+        foreach (self::held($role, array_keys($inheritedFrom)) as [$permission, $forbidden, $scope, $ends, $authority]) {
+            // A grant an inner role holds answers for this one, and it is not
+            // this one's to rewrite: the cell is drawn with the link and left
+            // out of `$variants`, so nothing here can revoke somebody else's
+            // rule from a screen that never showed it as theirs.
+            $lender = $authority === null || self::identifier($authority) === $ownKey
+                ? null
+                : ($inheritedFrom[$authority] ?? null);
+
             // Warden stops reading a row the instant its date names, so a cell
             // drawn from an expired row would show a tick for access the store
             // denies. Past its date the row decides nothing here either — not
@@ -129,6 +156,18 @@ final class RoleGrants
                 continue;
             }
 
+            if ($lender !== null) {
+                // Forbidden wins over granted here too, and nearer over further
+                // is NOT decided: two inner roles disagreeing is warden's
+                // question, and it answers forbidden. The screen says which role
+                // it heard, so it says the one that decides.
+                if ($forbidden || ! isset($inherited[$row][$action])) {
+                    $inherited[$row][$action] = [$lender, $forbidden ? Stance::Forbidden : Stance::Granted];
+                }
+
+                continue;
+            }
+
             $variants[$row][$action][] = [
                 self::readable(Narrowing::of($permission), $model),
                 $forbidden,
@@ -154,7 +193,7 @@ final class RoleGrants
             }
         }
 
-        return new RoleState($stances, $narrowings, $wider, $records, $untils);
+        return new RoleState($stances, $narrowings, $wider, $records, $untils, self::inheritedCells($inherited, $stances));
     }
 
     /**
@@ -165,7 +204,7 @@ final class RoleGrants
      *
      * @param  array<string, array<string, string>>  $desired
      * @param  array<string, array<string, mixed>>|null  $narrowings  null when the screen does not offer them
-     * @param  array{stances?: mixed, narrowing?: mixed, until?: mixed}|null  $baseline  what the screen was showing when it opened
+     * @param  array{stances?: mixed, narrowing?: mixed, until?: mixed, inherited?: mixed}|null  $baseline  what the screen was showing when it opened
      * @param  array<string, array<string, CarbonImmutable>>|null  $untils  null when the screen does not offer end dates
      */
     public static function apply(Model $role, Catalog $catalog, array $desired, ?array $narrowings = null, ?array $baseline = null, ?array $untils = null): SaveReport
@@ -210,7 +249,7 @@ final class RoleGrants
     /**
      * @param  array<string, array<string, string>>  $desired
      * @param  array<string, array<string, mixed>>|null  $narrowings  null when the screen does not offer them
-     * @param  array{stances?: mixed, narrowing?: mixed, until?: mixed}|null  $baseline  what the screen was showing when it opened
+     * @param  array{stances?: mixed, narrowing?: mixed, until?: mixed, inherited?: mixed}|null  $baseline  what the screen was showing when it opened
      * @param  array<string, array<string, CarbonImmutable>>|null  $untils  null when the screen does not offer end dates
      * @return list<Change>
      */
@@ -250,7 +289,7 @@ final class RoleGrants
      *
      * @param  array<string, array<string, string>>  $desired
      * @param  array<string, array<string, mixed>>|null  $narrowings
-     * @param  array{stances?: mixed, narrowing?: mixed, until?: mixed}|null  $baseline
+     * @param  array{stances?: mixed, narrowing?: mixed, until?: mixed, inherited?: mixed}|null  $baseline
      * @param  array<string, array<string, CarbonImmutable>>|null  $untils
      * @return array{0: list<Change>, 1: SaveReport}
      */
@@ -953,15 +992,26 @@ final class RoleGrants
      * `permissions()` welds a raw tenant predicate that no scope removal can
      * strip, and typing the authority as a plain model says nothing about it.
      *
-     * @return list<array{0: Model, 1: bool, 2: int|string|null, 3: CarbonImmutable|null}>
+     * @param  list<int|string>  $alsoAsRoleKeys  inner roles whose grants answer for this one
+     * @return list<array{0: Model, 1: bool, 2: int|string|null, 3: CarbonImmutable|null, 4: int|string|null}>
      */
-    private static function held(Model $role): array
+    private static function held(Model $role, array $alsoAsRoleKeys = []): array
     {
         $context = Context::resolve();
 
         $grants = $context->grantClass()::query()
             ->where('entity_type', $role->getMorphClass())
-            ->where('entity_id', $role->getKey())
+            ->where(static function (Builder $authority) use ($role, $alsoAsRoleKeys): void {
+                // One query for the role and everything it inherits from, never
+                // one per inner role: `of()` runs on every grid render, and a
+                // hierarchy costing a query per level is the shape §6.35 exists
+                // to keep out.
+                $authority->where('entity_id', $role->getKey());
+
+                if ($alsoAsRoleKeys !== []) {
+                    $authority->orWhereIn('entity_id', $alsoAsRoleKeys);
+                }
+            })
             ->get();
 
         if ($grants->isEmpty()) {
@@ -985,11 +1035,14 @@ final class RoleGrants
 
                 $ends = $grant->getAttribute('expires_at');
 
+                $authority = $grant->getAttribute('entity_id');
+
                 $held[] = [
                     $permission,
                     (bool) $grant->getAttribute('forbidden'),
                     is_int($scope) || is_string($scope) ? $scope : null,
                     $ends instanceof DateTimeInterface ? CarbonImmutable::instance($ends) : null,
+                    is_int($authority) || is_string($authority) ? $authority : null,
                 ];
             }
         }
@@ -1034,6 +1087,70 @@ final class RoleGrants
         }
 
         return Narrowing::unsatisfiable($narrowing->rules);
+    }
+
+    /**
+     * The inner roles this one reaches, by the key their grants carry, named.
+     *
+     * Empty when `warden.roles.nested` is off, and asked here because warden's
+     * closure cannot answer it: `RoleClosure::for()` returns direct edges under
+     * either setting, since for an ACCOUNT those are its roles. A role→role edge
+     * has always been writable and has always granted nothing, so with the flag
+     * off it must read as nothing here too — the alternative is a grid showing
+     * an inheritance the engine does not honour.
+     *
+     * @return array<int|string, string>
+     */
+    private static function inheritedFrom(Model $role): array
+    {
+        if (! WardenConfig::nestedRoles()) {
+            return [];
+        }
+
+        $keys = Hierarchy::of($role)->all();
+
+        if ($keys === []) {
+            return [];
+        }
+
+        $named = [];
+
+        foreach (Context::resolve()->roleClass()::query()->whereKey($keys)->get() as $inner) {
+            $key = $inner->getKey();
+
+            if (is_int($key) || is_string($key)) {
+                $named[$key] = Holders::label($inner);
+            }
+        }
+
+        return $named;
+    }
+
+    /**
+     * Only the cells the role has not answered itself.
+     *
+     * A rule of its own — granted or forbidden — is what the grid draws and
+     * what a save can change, so an inherited answer underneath it is not the
+     * one in force and saying so would be noise. What is left is the set the
+     * screen draws hollow, with the link.
+     *
+     * @param  array<string, array<string, array{0: string, 1: Stance}>>  $inherited
+     * @param  array<string, array<string, string>>  $stances
+     * @return array<string, array<string, array{role: string, stance: string}>>
+     */
+    private static function inheritedCells(array $inherited, array $stances): array
+    {
+        $cells = [];
+
+        foreach ($inherited as $row => $actions) {
+            foreach ($actions as $action => [$lender, $stance]) {
+                if (! isset($stances[$row][$action])) {
+                    $cells[$row][$action] = ['role' => $lender, 'stance' => $stance->value];
+                }
+            }
+        }
+
+        return $cells;
     }
 
     /**

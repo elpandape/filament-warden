@@ -22,6 +22,14 @@ use ElPandaPe\FilamentWarden\Conditions\Narrowing;
  * cell, pinned to one row. It answers no class check, so it is neither a cell
  * nor a wider rule: it is reported, and nothing here offers to change it.
  *
+ * `inherited` is a cell this role answers through another: nesting puts an
+ * inner role's grants behind the outer one's, so a cell nobody wrote here can
+ * still say yes. It carries the LENDER's name, because a hollow tick with no
+ * link is the wildcard mistake of §6.11 wearing another hat — the most
+ * dangerous role in an installation reading as a role that holds nothing. Only
+ * cells with no rule of their own are in it: a rule of its own is what is in
+ * force, and an inherited answer underneath it is noise.
+ *
  * `untils` is when a cell stops. It is per GRANT, never per catalogue row: two
  * roles pointing at the same permission can end on different days, which is the
  * whole reason the date lives on the pivot. A cell whose stance is a written one
@@ -37,6 +45,7 @@ final readonly class RoleState
      * @param  array<string, string>  $wider  rules over every entity, keyed by permission name
      * @param  list<RecordGrant>  $records  rules pinned to one row, which own no cell and cannot be written from here
      * @param  array<string, array<string, CarbonImmutable>>  $untils  when a cell's grant stops, by row and action
+     * @param  array<string, array<string, array{role: string, stance: string}>>  $inherited  cells an inner role answers, and which
      */
     public function __construct(
         public array $stances = [],
@@ -44,6 +53,7 @@ final readonly class RoleState
         public array $wider = [],
         public array $records = [],
         public array $untils = [],
+        public array $inherited = [],
     ) {}
 
     /**
@@ -76,7 +86,7 @@ final readonly class RoleState
      * stance beside it, decided against the server's clock. Letting the browser
      * compare would put the answer in the one place whose clock nobody controls.
      *
-     * @return array{stances: array<string, array<string, string>>, narrowing: array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>, until: array<string, array<string, string>>}
+     * @return array{stances: array<string, array<string, string>>, narrowing: array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>, until: array<string, array<string, string>>, inherited: array<string, array<string, array{role: string, stance: string}>>}
      */
     public function toPayload(): array
     {
@@ -98,7 +108,12 @@ final readonly class RoleState
             }
         }
 
-        return ['stances' => $this->stances, 'narrowing' => $narrowing, 'until' => $until];
+        return [
+            'stances' => $this->stances,
+            'narrowing' => $narrowing,
+            'until' => $until,
+            'inherited' => $this->inherited,
+        ];
     }
 
     /**

@@ -33,7 +33,7 @@ final readonly class GridView
      * @param  list<ColumnGroup>  $groups
      * @param  array<string, string>  $wider
      * @param  list<RecordGrant>  $records  rules pinned to one row: reported above the grid, never drawn as a cell
-     * @param  array{stances: array<string, array<string, string>>, narrowing: array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>, until: array<string, array<string, string>>}  $stored  the store, in the shape the browser holds it
+     * @param  array{stances: array<string, array<string, string>>, narrowing: array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>, until: array<string, array<string, string>>, inherited: array<string, array<string, array{role: string, stance: string}>>}  $stored  the store, in the shape the browser holds it
      * @param  bool  $isProtected  whether the installation protects this role, which is not the same question as whether this screen can edit it
      * @param  bool  $isInteractive  whether this render's cells are controls, which the component knows and the view model does not
      */
