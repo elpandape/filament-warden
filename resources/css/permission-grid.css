@@ -345,8 +345,16 @@
     background: var(--fw-raised);
 }
 
+/* The corner went on `--fw-surface` while the rest of the head goes on
+   `--fw-raised`: a step visible right across the table in dark. It cannot take
+   `--fw-raised` on its own — that is a `color-mix` with transparency and this
+   cell is sticky, so the body rows would show through — so the two are stacked:
+   the tint on top, the opaque surface behind. */
 .fw-table thead .fw-corner {
     z-index: 3;
+    background:
+        linear-gradient(var(--fw-raised), var(--fw-raised)),
+        var(--fw-surface);
 }
 
 .fw-table th,
@@ -398,8 +406,6 @@
     color: var(--fw-muted);
     font-size: 0.75rem;
     font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
 }
 
 .fw-action {
@@ -745,8 +751,11 @@ tr:hover .fw-shortcuts,
     font-style: italic;
 }
 
+/* The samples are smaller than the real thing: they are read, not clicked. */
 .fw-key .fw-box,
 .fw-key .fw-void {
+    inline-size: 1.125rem;
+    block-size: 1.125rem;
     justify-self: center;
     cursor: default;
 }
@@ -864,8 +873,6 @@ tr:hover .fw-shortcuts,
     color: var(--fw-muted);
     font-size: 0.75rem;
     font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
     cursor: pointer;
     list-style: none;
 }
@@ -938,6 +945,27 @@ tr:hover .fw-shortcuts,
         gap: 0.5rem;
     }
 
+    /* One strip that scrolls, never two rows. It stays a tablist: one tab stop,
+       the arrow keys, and each tab's `aria-controls` — all of which turning it
+       into a `<select>` would take away. The fade is the only sign there is
+       more; without it a tab out of view does not exist. */
+    .fw-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        scroll-snap-type: inline proximity;
+        mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent);
+    }
+
+    .fw-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .fw-tab {
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+    }
+
     /* The pairing only means anything with room for both. Below the width where the
        table already becomes an accordion they stack — and the explicit row
        placement has to be let go, or the two stay pinned above the clauses. */
@@ -963,6 +991,17 @@ tr:hover .fw-shortcuts,
     }
 }
 
+/* At 390px the model shared a row with the name inside two columns, and broke
+   mid-word: "Permis sions". `.fw-stack-entity > summary` is a grid, not a flex
+   container, so what gives the model a row of its own is one column, not
+   `flex-wrap`: every line stacks full width, which is what the FQCN's own
+   `overflow-wrap` needs room to work with. */
+@media (max-width: 30rem) {
+    .fw-stack-entity > summary {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 /* The condition builder --------------------------------------------------- */
 
 /* `container-type` because the rail below asks its CONTAINER how wide it is and
@@ -982,8 +1021,6 @@ tr:hover .fw-shortcuts,
     color: var(--fw-muted);
     font-size: 0.75rem;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
 }
 
 /* One of three, on one line. It was three stacked cards each carrying a name

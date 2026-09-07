@@ -196,3 +196,40 @@ test('the condition controls take the shape of a panel field, and its focus ring
     // "and".
     expect(declarationsOf('.fw-condition .fw-joiner'))->toContain('flex: 0 0 4.75rem');
 });
+
+test('the head corner is opaque and still wears the head tint', function (): void {
+    // It went on `--fw-surface` while the rest of the head goes on
+    // `--fw-raised`, and in dark that step is visible across the table. It
+    // cannot simply take `--fw-raised`: that is a `color-mix` with
+    // transparency and this cell is sticky, so the body rows would show
+    // through. The two are stacked instead.
+    expect(declarationsOf('.fw-table thead .fw-corner'))
+        ->toContain('linear-gradient(var(--fw-raised), var(--fw-raised)),')
+        ->and(declarationsOf('.fw-table thead .fw-corner'))->toContain('var(--fw-surface)');
+});
+
+test('nothing that carries a category shouts it in small caps', function (): void {
+    // Weight and colour separate a group heading just as well, and they read.
+    expect(declarationsOf('.fw-group'))->not->toContain('text-transform: uppercase')
+        ->and(declarationsOf('.fw-manage'))->not->toContain('text-transform: uppercase')
+        ->and(declarationsOf('.fw-field-label'))->not->toContain('text-transform: uppercase');
+});
+
+test('the tabs are one strip that scrolls, never two rows', function (): void {
+    // Two rows put the list rule through the middle of it. A strip keeps the
+    // tablist a tablist: one tab stop, arrow keys, and each tab's
+    // `aria-controls` — all of which a `<select>` would take away.
+    expect(stylesheet())->toContain('mask-image: linear-gradient(to right')
+        ->and(declarationsOf('.fw-tabs'))->toContain('flex-wrap: wrap');
+});
+
+test('the fold gives the FQCN a row of its own before it breaks mid-word', function (): void {
+    // At 390px the model shared a row with the name inside two columns and
+    // broke mid-word: "Permis sions". `.fw-stack-entity > summary` is a
+    // grid, not a flex container: one column stacks every line full width,
+    // which is what gives the FQCN's own `overflow-wrap` room to work with.
+    $narrow = blockOf('@media (max-width: 30rem)');
+
+    expect($narrow)->toContain('.fw-stack-entity > summary')
+        ->and($narrow)->toContain('grid-template-columns: minmax(0, 1fr)');
+});

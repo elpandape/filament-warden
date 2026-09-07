@@ -306,7 +306,7 @@ return [
         'locked' => 'This role is protected: what it can do is fixed here.',
         'read_only' => 'This grid cannot be changed from here: its cells select, they do not cycle.',
         'read_description' => 'What this role can do, as the store has it today. Click a cell to ask why.',
-        'description' => 'One row per entity, one column per action its policy declares. Click a cell to cycle it; hold shift to go backwards.',
+        'description' => 'One row per entity, one column per action its policy declares.',
         'label' => 'Permissions',
         'entity' => 'Entity',
         'manage' => 'Everything',

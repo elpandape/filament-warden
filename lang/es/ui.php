@@ -306,7 +306,7 @@ return [
         'locked' => 'Este rol está protegido: lo que puede hacer no se toca desde aquí.',
         'read_only' => 'Esta rejilla no se cambia desde aquí: sus celdas se seleccionan, no ciclan.',
         'read_description' => 'Lo que este rol puede hacer, tal como lo tiene el almacén hoy. Pulsa una celda para preguntar por qué.',
-        'description' => 'Una fila por entidad y una columna por acción que su Policy declara. Pulsa una celda para ciclarla; con Shift, hacia atrás.',
+        'description' => 'Una fila por entidad y una columna por acción que su Policy declara.',
         'label' => 'Permisos',
         'entity' => 'Entidad',
         'manage' => 'Todo',
