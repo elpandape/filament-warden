@@ -8,6 +8,102 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [2.11.0] - 2026-09-07
+
+The grid keeps the width its own empty column used to waste, the key folds away above the tabs
+instead of sitting between a cell and the panel that explains it, and the inspector stops running
+two disagreeing sentences together by naming them apart. Nothing about the cycle, the diff, the
+save or the `{stances, narrowing, baseline}` envelope moves — every change here is where a pixel
+lands or which sentence says what.
+
+### Added
+
+- **Seven translation keys**, in both locales and pinned by `FrozenTest`: `grid.legend.title`,
+  `grid.legend.set` and `grid.legend.added` for the folded key's two group headings, and
+  `explain.stored`, `explain.screen`, `explain.save_hint` and `explain.matched` for the inspector's
+  two voices. An application with translations published sees these seven sentences in English
+  until it copies the keys across — `FileLoader::loadNamespaceOverrides()` merges recursively, so
+  the new keys still arrive, just untranslated — and an application with the view published has to
+  reintegrate it, the same as any release that touches `grid.blade.php`.
+- **`verify/verify-two-voices.mjs`**, wired into `make verify`. It drives `storedStance()` and
+  `moved()` through the real `@vue/reactivity` Alpine pins, under both payload shapes a host can
+  send: the form's, which carries a `baseline`, and the read-only infolist's, which never has and
+  never will.
+
+### Changed
+
+- **The grid keeps the width it used to hand to an empty column.** `th.fw-filler`/`td.fw-filler` —
+  311px of a 1010px table, with an FQCN wrapping beside that much empty space — is gone from both
+  head rows and every body row; the entity column takes what it freed instead. Measured in a
+  browser: the action cells used to end 313px short of the card and now end flush with it; the
+  entity column runs 224px to 556px, and gives the slack back as the card narrows — 392px of it in
+  an 844px table — without the matrix ever compressing below what it needs.
+- **The key folds away above the tabs, in two named groups.** It used to sit under the grid as
+  eight lines of flat vocabulary, between a cell and the panel that explains it. It now opens from a
+  one-line `<details>` — "What the marks mean" — split into what a click puts on a cell ("A cell you
+  set": the three states, plus the shift hint that used to trail the whole list) and what the grid
+  draws on its own ("What the grid adds"). Closed by default.
+- **The inspector names its two voices instead of running them together.** It used to say "No grant
+  matches" and, three lines down, "granted" — both true at once, because the first spoke for the
+  store and the second for the screen, with an unsaved change between them and nothing saying so. It
+  now shows "In the store" beside either "On screen, not saved" — only when a save would change this
+  cell — or "Matched rule": the catalogue row or stored rule warden matched, shown when nothing has
+  moved. The store half reads off the baseline the form already sends, so it costs no query. A
+  read-only screen's payload never carries a baseline at all — the infolist sends `{stances,
+  narrowing}`, nothing else — so it reads its own live state as the store's answer, by construction,
+  and never claims an unsaved move.
+- **The panel gains an accessible name it never had.** `explain.title` ("Why") used to title the
+  inspector only while it sat empty; it now labels the `<aside>` itself as an `aria-label`, so the
+  region is named whether or not a cell is selected.
+- **The condition builder's controls take the shape of a panel field.** Selects and inputs pick up
+  the field radius and a focus-visible ring, and a select draws its own chevron instead of the
+  browser's; the joiner column widens from 3.25rem — which drew "ar" for "and" — to 4.75rem. The
+  rule and what it means, its warning and its live preview, sit beside it instead of stacked with
+  the right two-thirds of the panel empty.
+- **Tabs stop wrapping across two rows below `55.9375rem`**, the same cut where the table already
+  folds into an accordion. At 390px they used to break the tablist itself across two lines; they now
+  scroll as one 39px strip, with a fade at the trailing edge as the only sign there is more.
+- **Group headings and field labels drop small caps.** `.fw-group`, `.fw-manage`, `.fw-field-label`
+  and the scope stack's summary lose `text-transform: uppercase` and its letter-spacing; weight and
+  colour already separated them and read as well without it.
+
+### Fixed
+
+- **The head corner cell carried a visible step in dark mode.** It painted on `--fw-surface` while
+  the rest of the header row paints on `--fw-raised` — a seam across the table that only dark mode
+  showed. It cannot simply take `--fw-raised`: that token is a `color-mix` with transparency, and
+  this cell is sticky over body rows that would show through it. The two are stacked instead, the
+  tint on top of an opaque surface.
+- **The narrow-screen collapse of the condition editor never applied.** The `@media (max-width:
+  55.9375rem)` query that stacks the rule editor, its warning and its live preview into one column
+  was declared before the unconditional rules it had to override, so the later rule always won the
+  cascade — at every width, on a real screen, including the 390px one this was written for. The
+  visible symptom was the warning squeezed into a column one word wide. Eight gates and three code
+  reviews passed it: `declarationsOf()` and `blockOf()` can only show that a declaration exists in
+  the sheet, never that it wins against another one declared later. Found by opening the screen in a
+  browser and reading the computed `grid-template-columns`; fixed by moving the query to the end of
+  the file, after every rule it overrides. The test that pins it now asserts the query's position
+  relative to its base rule, not the declaration's presence.
+
+### Not included
+
+- **A real screen reader.** Nobody has run one against these screens. What was run is the
+  accessibility tree, in both themes, against a real panel: the inspector reports as a named region,
+  its two voices as headings, the folded key as two heading-led groups, and no column header without
+  a name. That establishes what role, name and properties each node exposes — nothing about
+  announcement order, pacing or verbosity, which stay unverified.
+- **The width split, seen at scale.** The consuming application this was measured against has five
+  entity rows. What twenty resources and eight actions would do to the same layout has not been
+  seen — the self-regulating behaviour is reasoned about and measured at three widths, not against a
+  large catalogue.
+- **The key inside the resting panel**, tried and measured before the fold. It costs no fixed
+  height and teaches the vocabulary exactly where the answers it describes go on to appear — but
+  after the first click it never comes back for the rest of the session, because this screen has no
+  way to deselect a cell. A key has to stay reachable, so it lives above the grid instead.
+- **The tabs as a `<select>` below `55.9375rem`.** It would trade the tablist for a listbox, and
+  with it the single tab stop, the arrow keys, and the `aria-controls` relationship between each tab
+  and its panel — work `2.6.0` paid for with an accessibility-tree dump of its own.
+
 ## [2.10.2] - 2026-09-05
 
 Warden `2.2.2` answered the question this package could not answer for itself: which of the
