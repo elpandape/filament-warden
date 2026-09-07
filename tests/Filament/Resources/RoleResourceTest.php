@@ -1426,26 +1426,76 @@ test('a role whose only assignment has lapsed is still not deletable', function 
     Carbon::setTestNow();
 });
 
-test('the badge counts who holds a role, and a lapsed assignment is nobody', function (): void {
+test('the holders sentence drops a lapsed assignment; the delete warning keeps it', function (): void {
     $user = signIn();
     $role = makeRole();
     $account = makeUser('Amaru Quispe');
 
     Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
 
     Carbon::setTestNow('2026-09-07 12:00:00');
 
     Warden::assign($role)->until(Carbon::parse('2026-09-08 12:00:00'))->to($account);
 
+    // The positive half first, and it is not decoration: without it an
+    // `assertDontSee` proves only that the page never named anybody, which is
+    // exactly how a screen with the section switched off passes this (§6.34).
+    livewire(ViewRole::class, ['record' => $role->getKey()])->assertSee('Amaru Quispe');
+
     Carbon::setTestNow('2026-09-09 12:00:00');
 
-    // The holders sentence on the record page reports; the delete warning beside
-    // it does not. Same table, two questions.
-    $page = livewire(ViewRole::class, ['record' => $role->getKey()]);
-
-    $page->assertDontSee('Amaru Quispe');
+    // Same page, same row, one day later. The holders sentence reports and drops
+    // it; the delete warning beside it counts it, because the cascade takes it
+    // whatever the clock says. Same table, two questions.
+    livewire(ViewRole::class, ['record' => $role->getKey()])->assertDontSee('Amaru Quispe');
 
     expect(RolesTable::warning($role->refresh()))->toContain('Amaru Quispe');
+
+    Carbon::setTestNow();
+});
+
+/**
+ * The badge one row shows, read off the built table rather than out of the HTML.
+ *
+ * `Testable::instance()` is typed `Livewire\Component`, so `getTable()` is
+ * `method.notFound` at `level: max` even though the page has it (§6.42): the
+ * `@var` is the narrowing PHPStan requires, not a convenience.
+ *
+ * `-1` for a state that is not an integer, because it is a number no count can
+ * be — a broken read fails the comparison instead of passing as a zero.
+ */
+function heldBadge(Illuminate\Database\Eloquent\Model $role): int
+{
+    /** @var ListRoles $page */
+    $page = livewire(ListRoles::class)->instance();
+
+    $state = $page->getTable()->getColumn('held')?->record($role)->getState();
+
+    return is_int($state) ? $state : -1;
+}
+
+test('the held badge counts live assignments, and drops to nobody when they lapse', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::assign($role)->until(Carbon::parse('2026-09-08 12:00:00'))->to(makeUser('Amaru Quispe'));
+    Warden::assign($role)->to(makeUser('Nayra Mamani'));
+
+    // Two holders while both count, one after the clock retires the first. The
+    // badge is the reading that INFORMS, so it answers what somebody holds —
+    // while the delete button beside it, on the very same row, still refuses
+    // because the cascade would take both rows.
+    expect(heldBadge($role))->toBe(2);
+
+    Carbon::setTestNow('2026-09-09 12:00:00');
+
+    expect(heldBadge($role))->toBe(1)
+        ->and(RoleResource::isDeletable($role->refresh()))->toBeFalse();
 
     Carbon::setTestNow();
 });

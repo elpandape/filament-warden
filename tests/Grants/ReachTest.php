@@ -9,6 +9,7 @@ use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 pest()->extend(TestCase::class);
 
@@ -185,4 +186,30 @@ test('a row with no readable name is not asked about', function (): void {
     $permission->setAttribute('entity_type', new Document()->getMorphClass());
 
     expect(Reach::of($permission, $account)->available)->toBeFalse();
+});
+
+test('a lapsed assignment in a context is not why the caveat appears', function (): void {
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    documents();
+
+    $document = Document::query()->firstOrFail();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::allow($role)->to('view', Document::class);
+    Warden::assign($role)->until(Carbon::parse('2026-09-08 12:00:00'))->on($document)->to($account);
+
+    expect(Reach::of(reachedPermission(), $account)->partial)->toBeTrue();
+
+    Carbon::setTestNow('2026-09-09 12:00:00');
+
+    // The caveat says the count and the panel can disagree BECAUSE a restricted
+    // assignment falls out of one pass and into the other. A lapsed one falls
+    // out of both, so it cannot be the reason — and printing the caveat anyway
+    // sends somebody looking for a row that stopped existing yesterday.
+    expect(Reach::of(reachedPermission(), $account)->partial)->toBeFalse();
+
+    Carbon::setTestNow();
 });
