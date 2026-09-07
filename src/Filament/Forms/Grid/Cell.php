@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Filament\Forms\Grid;
 
+use Carbon\CarbonImmutable;
 use ElPandaPe\FilamentWarden\Catalog\Entry;
 use ElPandaPe\FilamentWarden\Catalog\Scope;
 use ElPandaPe\FilamentWarden\Conditions\Narrowing;
@@ -18,6 +19,12 @@ use ElPandaPe\FilamentWarden\Conditions\Narrowing;
  * in front of it — conditions, or ownership — and it can be changed from here.
  * Red is a rule this screen can read and cannot draw, and it is shown, explained
  * and left exactly as it is.
+ *
+ * `until` is when the grant behind the cell stops. It arrives already judged
+ * against the server's clock: a written stance beside a date means the access
+ * ends then, and an abstention beside one means it already ended. The cell never
+ * compares the date itself, because the browser holds the same object and its
+ * clock is not ours to trust.
  */
 final readonly class Cell
 {
@@ -33,6 +40,7 @@ final readonly class Cell
         public ?Scope $scope = null,
         public ?Entry $entry = null,
         public ?Stance $reach = null,
+        public ?CarbonImmutable $until = null,
     ) {
         $this->narrowing = $narrowing ?? Narrowing::all();
     }
@@ -86,6 +94,20 @@ final readonly class Cell
     public function isNarrowed(): bool
     {
         return $this->narrowing->isNarrowed();
+    }
+
+    /**
+     * Whether this cell's access has already ended.
+     *
+     * Not a date comparison: `RoleGrants::of()` already made it, against the
+     * server's clock, and the answer is in the stance. A cell that carries a
+     * date and writes nothing is a grant the clock retired — nothing else in
+     * this package produces that pair, because a cell nobody wrote carries no
+     * date at all.
+     */
+    public function hasExpired(): bool
+    {
+        return $this->until instanceof CarbonImmutable && ! $this->stance->isWritten();
     }
 
     public function isLocked(): bool

@@ -25,6 +25,7 @@ use ElPandaPe\Warden\Support\PermissionIdentity;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 
@@ -1456,4 +1457,111 @@ test('an unreadable twin is still reachable when its cell is cleared', function 
     RoleGrants::apply($role, $catalog, [Post::class => ['update' => 'none']]);
 
     expect(grantCount())->toBe(0);
+});
+
+test('an expired grant reads as an abstention, never as the tick it used to be', function (): void {
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::allow($role)->until(Carbon::parse('2026-09-08 12:00:00'))->to('viewAny', Post::class);
+
+    expect(RoleGrants::of($role, gridCatalog())->stances[Post::class]['viewAny'])->toBe('granted');
+
+    Carbon::setTestNow('2026-09-09 12:00:00');
+
+    $state = RoleGrants::of($role, gridCatalog());
+
+    // The row is still there and warden already stopped reading it. Drawing the
+    // stance the row carries rather than the one the store answers would put a
+    // tick on a cell that authorises nothing — the grid telling a person they
+    // granted access the store denies.
+    expect($state->stances[Post::class]['viewAny'] ?? 'absent')->toBe('abstain')
+        ->and(grantCount())->toBe(1);
+
+    Carbon::setTestNow();
+});
+
+test('a cell keeps the date it ended on, which is what tells a lapse from a blank', function (): void {
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::allow($role)->until(Carbon::parse('2026-09-08 12:00:00'))->to('viewAny', Post::class);
+
+    Carbon::setTestNow('2026-09-09 12:00:00');
+
+    $payload = RoleGrants::of($role, gridCatalog())->toPayload();
+
+    // Without the date the browser cannot tell a cell whose access ran out from
+    // one nobody ever wrote: both say `none`, and only one of them is a story a
+    // person needs.
+    expect($payload['until'][Post::class]['viewAny'])->toStartWith('2026-09-08T12:00:00');
+
+    Carbon::setTestNow();
+});
+
+test('an expired rule over every entity reaches nothing', function (): void {
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::allow($role)->until(Carbon::parse('2026-09-08 12:00:00'))->to('viewAny', '*');
+
+    expect(RoleGrants::of($role, gridCatalog())->wider)->toBe(['viewAny' => 'granted']);
+
+    Carbon::setTestNow('2026-09-09 12:00:00');
+
+    // `wider` is what paints the hollow tick on every cell of that name. A row
+    // the clock retired reaching all of them would be the widest lie the grid
+    // can tell in one pass.
+    expect(RoleGrants::of($role, gridCatalog())->wider)->toBeEmpty();
+
+    Carbon::setTestNow();
+});
+
+test('an expired row beside a live one is one row, not a tangle', function (): void {
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    // Two rows of the same polarity for one cell is what the grid draws as
+    // unreadable — but only while both count. Letting the retired one join the
+    // tally would lock a cell whose store has exactly one live rule in it, and
+    // locking it is the one thing a person cannot undo from the screen.
+    Warden::allow($role)->until(Carbon::parse('2026-09-08 12:00:00'))->to('viewAny', Post::class)->where('title', '=', 'alpha');
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    Carbon::setTestNow('2026-09-09 12:00:00');
+
+    $state = RoleGrants::of($role, gridCatalog());
+
+    expect($state->stances[Post::class]['viewAny'])->toBe('granted')
+        ->and($state->narrowings[Post::class]['viewAny']->shape)->toBe(Shape::All);
+
+    Carbon::setTestNow();
+});
+
+test('a live grant carries its date without moving its stance', function (): void {
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::allow($role)->until(Carbon::parse('2026-09-14 12:00:00'))->to('viewAny', Post::class);
+
+    $state = RoleGrants::of($role, gridCatalog());
+
+    expect($state->stances[Post::class]['viewAny'])->toBe('granted')
+        ->and($state->untils[Post::class]['viewAny']->toIso8601String())->toStartWith('2026-09-14T12:00:00');
+
+    Carbon::setTestNow();
+});
+
+test('a grant with no date carries none, so the map only holds cells that end', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    expect(RoleGrants::of($role, gridCatalog())->untils)->toBeEmpty()
+        ->and(RoleGrants::of($role, gridCatalog())->toPayload()['until'])->toBeEmpty();
 });

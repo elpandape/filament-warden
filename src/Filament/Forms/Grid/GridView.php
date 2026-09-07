@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Filament\Forms\Grid;
 
+use Carbon\CarbonImmutable;
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Catalog\Entry;
 use ElPandaPe\FilamentWarden\Catalog\Origin;
@@ -32,7 +33,7 @@ final readonly class GridView
      * @param  list<ColumnGroup>  $groups
      * @param  array<string, string>  $wider
      * @param  list<RecordGrant>  $records  rules pinned to one row: reported above the grid, never drawn as a cell
-     * @param  array{stances: array<string, array<string, string>>, narrowing: array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>}  $stored  the store, in the shape the browser holds it
+     * @param  array{stances: array<string, array<string, string>>, narrowing: array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>, until: array<string, array<string, string>>}  $stored  the store, in the shape the browser holds it
      * @param  bool  $isProtected  whether the installation protects this role, which is not the same question as whether this screen can edit it
      * @param  bool  $isInteractive  whether this render's cells are controls, which the component knows and the view model does not
      */
@@ -58,6 +59,7 @@ final readonly class GridView
         bool $isInteractive = true,
     ): self {
         $narrowings = $stored->narrowings;
+        $untils = $stored->untils;
         $wider = $stored->wider;
 
         $groups = self::groups($catalog);
@@ -71,10 +73,10 @@ final readonly class GridView
         }
 
         $tabs = [
-            self::matrix($catalog, $columns, $state, $narrowings, $wider),
-            self::doors('pages', $catalog, [Origin::Page], $state, $narrowings, $wider),
-            self::doors('widgets', $catalog, [Origin::Widget], $state, $narrowings, $wider),
-            self::doors('loose', $catalog, [Origin::Custom, Origin::Panel], $state, $narrowings, $wider),
+            self::matrix($catalog, $columns, $state, $narrowings, $untils, $wider),
+            self::doors('pages', $catalog, [Origin::Page], $state, $narrowings, $untils, $wider),
+            self::doors('widgets', $catalog, [Origin::Widget], $state, $narrowings, $untils, $wider),
+            self::doors('loose', $catalog, [Origin::Custom, Origin::Panel], $state, $narrowings, $untils, $wider),
         ];
 
         // `reach()` below is one of seven decisions this package makes twice —
@@ -381,9 +383,10 @@ final readonly class GridView
      * @param  list<Column>  $columns
      * @param  array<string, array<string, string>>  $state
      * @param  array<string, array<string, Narrowing>>  $narrowings
+     * @param  array<string, array<string, CarbonImmutable>>  $untils
      * @param  array<string, string>  $wider
      */
-    private static function matrix(Catalog $catalog, array $columns, array $state, array $narrowings, array $wider): Tab
+    private static function matrix(Catalog $catalog, array $columns, array $state, array $narrowings, array $untils, array $wider): Tab
     {
         /** @var array<string, list<Entry>> $byModel */
         $byModel = [];
@@ -411,7 +414,7 @@ final readonly class GridView
                 $entry = $declared[$column->action] ?? null;
 
                 $cells[] = $entry instanceof Entry
-                    ? self::cell($key, $column->action, $column->label, $state, $narrowings, $wider, $column->scope, $entry)
+                    ? self::cell($key, $column->action, $column->label, $state, $narrowings, $untils, $wider, $column->scope, $entry)
                     : Cell::undeclared($key, $column->action, $column->label, $column->scope);
             }
 
@@ -421,7 +424,7 @@ final readonly class GridView
                 label: self::entityLabel($model, $entries),
                 model: $model,
                 cells: $cells,
-                manage: self::cell($key, StateKey::MANAGE, self::translated('filament-warden::ui.grid.manage', 'everything'), $state, $narrowings, $wider),
+                manage: self::cell($key, StateKey::MANAGE, self::translated('filament-warden::ui.grid.manage', 'everything'), $state, $narrowings, $untils, $wider),
             );
         }
 
@@ -432,9 +435,10 @@ final readonly class GridView
      * @param  list<Origin>  $origins
      * @param  array<string, array<string, string>>  $state
      * @param  array<string, array<string, Narrowing>>  $narrowings
+     * @param  array<string, array<string, CarbonImmutable>>  $untils
      * @param  array<string, string>  $wider
      */
-    private static function doors(string $key, Catalog $catalog, array $origins, array $state, array $narrowings, array $wider): Tab
+    private static function doors(string $key, Catalog $catalog, array $origins, array $state, array $narrowings, array $untils, array $wider): Tab
     {
         $rows = [];
 
@@ -450,7 +454,7 @@ final readonly class GridView
                 key: $row,
                 label: $label,
                 model: null,
-                cells: [self::cell($row, StateKey::DOOR, $label, $state, $narrowings, $wider, $entry->scope, $entry)],
+                cells: [self::cell($row, StateKey::DOOR, $label, $state, $narrowings, $untils, $wider, $entry->scope, $entry)],
             );
         }
 
@@ -460,6 +464,7 @@ final readonly class GridView
     /**
      * @param  array<string, array<string, string>>  $state
      * @param  array<string, array<string, Narrowing>>  $narrowings
+     * @param  array<string, array<string, CarbonImmutable>>  $untils
      * @param  array<string, string>  $wider
      */
     private static function cell(
@@ -468,6 +473,7 @@ final readonly class GridView
         string $label,
         array $state,
         array $narrowings,
+        array $untils,
         array $wider,
         ?Scope $scope = null,
         ?Entry $entry = null,
@@ -484,6 +490,7 @@ final readonly class GridView
             scope: $scope,
             entry: $entry,
             reach: self::reach($row, $action, $entry->name ?? $action, $state, $wider),
+            until: $untils[$row][$action] ?? null,
         );
     }
 

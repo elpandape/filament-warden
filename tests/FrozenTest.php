@@ -147,12 +147,17 @@ test('the state a grid field hands to a form is frozen', function (): void {
 
     $state = $component->get('data');
 
-    // `baseline` joined the envelope in 1.6.0, and adding to a frozen surface is
-    // a minor by this package's own rule — an application reading `stances` or
-    // `narrowing` goes on working. The addition still turns this red on purpose,
-    // so a new key is a line somebody typed rather than a diff nobody read.
+    // `baseline` joined the envelope in 1.6.0 and `until` in 3.0.0, and adding
+    // to a frozen surface is a minor by this package's own rule — an application
+    // reading `stances` or `narrowing` goes on working. Each addition still
+    // turns this red on purpose, so a new key is a line somebody typed rather
+    // than a diff nobody read.
+    //
+    // `until` sits before `baseline` because `baseline` is a copy of everything
+    // in front of it: a key added after it would be missing from the copy, and
+    // a save would then read every cell carrying that key as one nobody touched.
     expect(array_keys(partOf(is_array($state) ? $state : [], 'permissions')))
-        ->toBe(['stances', 'narrowing', 'baseline']);
+        ->toBe(['stances', 'narrowing', 'until', 'baseline']);
 });
 
 test('the key the roles field keeps beside its own is frozen', function (): void {

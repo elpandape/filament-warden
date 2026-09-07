@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Carbon\CarbonImmutable;
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Catalog\Scope;
 use ElPandaPe\FilamentWarden\Conditions\Narrowing;
@@ -437,6 +438,26 @@ test('a row hands out its cells by scope, and the wildcard belongs to none of th
     expect($row->inScope(Scope::Read))->toBe([$view])
         ->and($row->inScope(Scope::Irreversible))->toBe([$wipe])
         ->and($row->inScope(Scope::Write))->toBeEmpty();
+});
+
+test('a cell tells a lapsed grant from a live one by the stance beside the date', function (): void {
+    $ends = CarbonImmutable::parse('2026-09-08 12:00:00');
+
+    // The pair is what carries the meaning, and only the server can make it:
+    // `RoleGrants::of()` compares against the server's clock and writes the
+    // answer into the stance. A cell comparing the date itself would be asking
+    // the browser's clock, which nobody controls — and would answer differently
+    // on a laptop with the wrong time than on the machine that stores the rule.
+    $live = new Cell('posts', 'viewAny', 'List', Stance::Granted, until: $ends);
+    $lapsed = new Cell('posts', 'viewAny', 'List', Stance::Abstain, until: $ends);
+    $plain = new Cell('posts', 'viewAny', 'List', Stance::Abstain);
+
+    expect($live->hasExpired())->toBeFalse()
+        ->and($lapsed->hasExpired())->toBeTrue()
+        // A cell nobody wrote carries no date, so this pair never occurs — and
+        // if it ever did, saying "expired" of a rule that never existed is the
+        // wrong half to guess.
+        ->and($plain->hasExpired())->toBeFalse();
 });
 
 test('an undeclared cell keeps its scope, so the folded reading still draws its dot', function (): void {

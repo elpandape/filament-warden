@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Grants;
 
+use Carbon\CarbonImmutable;
 use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 
 /**
@@ -20,6 +21,13 @@ use ElPandaPe\FilamentWarden\Conditions\Narrowing;
  * `records` is the opposite mistake waiting to happen — a rule narrower than a
  * cell, pinned to one row. It answers no class check, so it is neither a cell
  * nor a wider rule: it is reported, and nothing here offers to change it.
+ *
+ * `untils` is when a cell stops. It is per GRANT, never per catalogue row: two
+ * roles pointing at the same permission can end on different days, which is the
+ * whole reason the date lives on the pivot. A cell whose stance is a written one
+ * ends then; a cell that abstains and still carries a date ended then, and the
+ * difference between those two is the only thing that tells an access that
+ * lapsed from one nobody ever wrote.
  */
 final readonly class RoleState
 {
@@ -28,12 +36,14 @@ final readonly class RoleState
      * @param  array<string, array<string, Narrowing>>  $narrowings
      * @param  array<string, string>  $wider  rules over every entity, keyed by permission name
      * @param  list<RecordGrant>  $records  rules pinned to one row, which own no cell and cannot be written from here
+     * @param  array<string, array<string, CarbonImmutable>>  $untils  when a cell's grant stops, by row and action
      */
     public function __construct(
         public array $stances = [],
         public array $narrowings = [],
         public array $wider = [],
         public array $records = [],
+        public array $untils = [],
     ) {}
 
     /**
@@ -61,7 +71,12 @@ final readonly class RoleState
      * the server once and never touched again, because putting it here would
      * offer the browser something to edit that nothing would accept back.
      *
-     * @return array{stances: array<string, array<string, string>>, narrowing: array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>}
+     * `until` travels as ISO 8601 rather than as an object, because the browser
+     * only ever prints it: whether a date has passed is already answered by the
+     * stance beside it, decided against the server's clock. Letting the browser
+     * compare would put the answer in the one place whose clock nobody controls.
+     *
+     * @return array{stances: array<string, array<string, string>>, narrowing: array<string, array<string, array{mode: string, rules: list<array<string, string>>}>>, until: array<string, array<string, string>>}
      */
     public function toPayload(): array
     {
@@ -75,7 +90,15 @@ final readonly class RoleState
             }
         }
 
-        return ['stances' => $this->stances, 'narrowing' => $narrowing];
+        $until = [];
+
+        foreach ($this->untils as $row => $actions) {
+            foreach ($actions as $action => $ends) {
+                $until[$row][$action] = $ends->toIso8601String();
+            }
+        }
+
+        return ['stances' => $this->stances, 'narrowing' => $narrowing, 'until' => $until];
     }
 
     /**

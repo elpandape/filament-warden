@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Grants;
 
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Catalog\PermissionName;
 use ElPandaPe\FilamentWarden\Conditions\Columns;
@@ -49,12 +51,26 @@ final class RoleGrants
         // tenant reads a writable row as somebody else's.
         $forRoleGrant = $role instanceof (Context::resolve()->roleClass());
 
-        /** @var array<string, array<string, list<array{0: Narrowing, 1: bool, 2: int|string|null}>>> $variants */
+        // One reading of the clock for the whole pass. Two would let a row sit
+        // on the live side of one comparison and the expired side of the next.
+        $now = CarbonImmutable::now();
+
+        /** @var array<string, array<string, list<array{0: Narrowing, 1: bool, 2: int|string|null, 3: CarbonImmutable|null}>>> $variants */
         $variants = [];
         $wider = [];
         $records = [];
 
-        foreach (self::held($role) as [$permission, $forbidden, $scope]) {
+        foreach (self::held($role) as [$permission, $forbidden, $scope, $ends]) {
+            // Warden stops reading a row the instant its date names, so a cell
+            // drawn from an expired row would show a tick for access the store
+            // denies. Past its date the row decides nothing here either — not
+            // the stance, not `wider`, not a record pin — and only the date
+            // survives, so the screen can say the access ended rather than that
+            // it never existed. Kept out of `held()` on purpose: this class also
+            // WRITES, and a revocation still has to reach a row the clock has
+            // already retired.
+            $expired = self::expired($ends, $now);
+
             $type = $permission->getAttribute('entity_type');
             $name = $permission->getAttribute('name');
             $id = $permission->getAttribute('entity_id');
@@ -65,7 +81,7 @@ final class RoleGrants
             // line because `name` is NOT NULL — only PHPStan needs it, and a
             // branch nothing reaches is one coverage cannot honestly ask for.
             if (! is_string($name) || $id !== null) {
-                if (is_string($name) && is_string($type) && isset($models[$type])) {
+                if (! $expired && is_string($name) && is_string($type) && isset($models[$type])) {
                     $records[] = new RecordGrant(
                         name: $name,
                         model: $models[$type],
@@ -83,7 +99,7 @@ final class RoleGrants
             if ($type === '*') {
                 // Forbidden wins wherever it is written, so it never loses to a
                 // grant that arrives later in the loop.
-                if ($forbidden || ! isset($wider[$name])) {
+                if (! $expired && ($forbidden || ! isset($wider[$name]))) {
                     $wider[$name] = $forbidden ? Stance::Forbidden->value : Stance::Granted->value;
                 }
 
@@ -110,22 +126,27 @@ final class RoleGrants
                 continue;
             }
 
-            $variants[$row][$action][] = [Narrowing::of($permission), $forbidden, $scope];
+            $variants[$row][$action][] = [Narrowing::of($permission), $forbidden, $scope, $ends];
         }
 
         $stances = [];
         $narrowings = [];
+        $untils = [];
 
         foreach ($variants as $row => $actions) {
             foreach ($actions as $action => $held) {
-                [$stance, $narrowing] = self::resolve($held, $forRoleGrant);
+                [$stance, $narrowing, $ends] = self::resolve($held, $forRoleGrant, $now);
 
                 $stances[$row][$action] = $stance->value;
                 $narrowings[$row][$action] = $narrowing;
+
+                if ($ends instanceof CarbonImmutable) {
+                    $untils[$row][$action] = $ends;
+                }
             }
         }
 
-        return new RoleState($stances, $narrowings, $wider, $records);
+        return new RoleState($stances, $narrowings, $wider, $records, $untils);
     }
 
     /**
@@ -136,7 +157,7 @@ final class RoleGrants
      *
      * @param  array<string, array<string, string>>  $desired
      * @param  array<string, array<string, mixed>>|null  $narrowings  null when the screen does not offer them
-     * @param  array{stances?: mixed, narrowing?: mixed}|null  $baseline  what the screen was showing when it opened
+     * @param  array{stances?: mixed, narrowing?: mixed, until?: mixed}|null  $baseline  what the screen was showing when it opened
      */
     public static function apply(Model $role, Catalog $catalog, array $desired, ?array $narrowings = null, ?array $baseline = null): SaveReport
     {
@@ -180,7 +201,7 @@ final class RoleGrants
     /**
      * @param  array<string, array<string, string>>  $desired
      * @param  array<string, array<string, mixed>>|null  $narrowings  null when the screen does not offer them
-     * @param  array{stances?: mixed, narrowing?: mixed}|null  $baseline  what the screen was showing when it opened
+     * @param  array{stances?: mixed, narrowing?: mixed, until?: mixed}|null  $baseline  what the screen was showing when it opened
      * @return list<Change>
      */
     public static function changes(Model $role, Catalog $catalog, array $desired, ?array $narrowings = null, ?array $baseline = null): array
@@ -219,7 +240,7 @@ final class RoleGrants
      *
      * @param  array<string, array<string, string>>  $desired
      * @param  array<string, array<string, mixed>>|null  $narrowings
-     * @param  array{stances?: mixed, narrowing?: mixed}|null  $baseline
+     * @param  array{stances?: mixed, narrowing?: mixed, until?: mixed}|null  $baseline
      * @return array{0: list<Change>, 1: SaveReport}
      */
     private static function plan(Model $role, Catalog $catalog, array $desired, ?array $narrowings, ?array $baseline): array
@@ -358,24 +379,49 @@ final class RoleGrants
      * the wrong sequence leaves behind, so the honest answer is to say so and
      * keep hands off.
      *
-     * @param  list<array{0: Narrowing, 1: bool, 2: int|string|null}>  $held
-     * @return array{0: Stance, 1: Narrowing}
+     * An expired row is not one of those rows. It is filtered before anything
+     * here counts, so it can neither pick the stance nor make a cell tangled —
+     * two rows where the clock already retired one are one row, and drawing them
+     * as unreadable would lock a cell that has nothing wrong with it. What comes
+     * back instead is its date, so the screen can say the access ended.
+     *
+     * @param  list<array{0: Narrowing, 1: bool, 2: int|string|null, 3: CarbonImmutable|null}>  $held
+     * @return array{0: Stance, 1: Narrowing, 2: CarbonImmutable|null}
      */
-    private static function resolve(array $held, bool $forRoleGrant): array
+    private static function resolve(array $held, bool $forRoleGrant, CarbonImmutable $now): array
     {
-        $forbidden = array_values(array_filter($held, static fn (array $one): bool => $one[1]));
-        $chosen = $forbidden === [] ? $held : $forbidden;
+        $live = array_values(array_filter(
+            $held,
+            static fn (array $one): bool => ! self::expired($one[3], $now),
+        ));
+
+        if ($live === []) {
+            // Every row this cell has is past its date. Warden abstains, so this
+            // says abstain too — with the LAST date any of them named, because a
+            // person reading the cell wants to know when the access ended, not
+            // when the first of several did.
+            $ends = array_map(static fn (array $one): ?CarbonImmutable => $one[3], $held);
+
+            return [Stance::Abstain, Narrowing::all(), $ends === [] ? null : max($ends)];
+        }
+
+        $forbidden = array_values(array_filter($live, static fn (array $one): bool => $one[1]));
+        $chosen = $forbidden === [] ? $live : $forbidden;
 
         $stance = $forbidden === [] ? Stance::Granted : Stance::Forbidden;
 
         if (count($chosen) !== 1) {
-            return [$stance, Narrowing::tangled()];
+            return [$stance, Narrowing::tangled(), null];
         }
 
         // A grant that lives at another scope is read — warden answers with it —
         // and cannot be written: a write targets one exact scope, so switching
         // this cell off would delete nothing and report success.
-        return [$stance, self::writable($chosen[0][2], $forRoleGrant) ? $chosen[0][0] : Narrowing::elsewhere()];
+        return [
+            $stance,
+            self::writable($chosen[0][2], $forRoleGrant) ? $chosen[0][0] : Narrowing::elsewhere(),
+            $chosen[0][3],
+        ];
     }
 
     /**
@@ -782,7 +828,7 @@ final class RoleGrants
      * `permissions()` welds a raw tenant predicate that no scope removal can
      * strip, and typing the authority as a plain model says nothing about it.
      *
-     * @return list<array{0: Model, 1: bool, 2: int|string|null}>
+     * @return list<array{0: Model, 1: bool, 2: int|string|null, 3: CarbonImmutable|null}>
      */
     private static function held(Model $role): array
     {
@@ -812,15 +858,32 @@ final class RoleGrants
             if ($permission instanceof Model) {
                 $scope = $grant->getAttribute('scope');
 
+                $ends = $grant->getAttribute('expires_at');
+
                 $held[] = [
                     $permission,
                     (bool) $grant->getAttribute('forbidden'),
                     is_int($scope) || is_string($scope) ? $scope : null,
+                    $ends instanceof DateTimeInterface ? CarbonImmutable::instance($ends) : null,
                 ];
             }
         }
 
         return $held;
+    }
+
+    /**
+     * Whether the clock has already retired a row.
+     *
+     * Warden's own boundary, and it is exclusive: a row stops counting AT the
+     * instant it names, not a tick later. Written once because `of()` asks it of
+     * `wider` and record pins while `resolve()` asks it of the cell, and the two
+     * answering differently is the shape where a cell reads granted while the
+     * store denies.
+     */
+    private static function expired(?CarbonImmutable $ends, CarbonImmutable $now): bool
+    {
+        return $ends instanceof CarbonImmutable && $ends->lessThanOrEqualTo($now);
     }
 
     /**
