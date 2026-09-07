@@ -44,6 +44,12 @@ function check(label, condition) {
 const BASELINE = {
     stances: { 'App\\Models\\Post': { viewAny: 'granted' } },
     narrowing: {},
+    // 3.0.0 put two more maps in the envelope, and they ride the same spread
+    // this file exists to protect. Carried here so a rewrite that drops one is
+    // caught by the same block rather than by a second script saying the same
+    // thing twice.
+    until: {},
+    inherited: {},
 }
 
 function makeGrid() {
@@ -51,6 +57,8 @@ function makeGrid() {
         state: {
             stances: { 'App\\Models\\Post': { viewAny: 'granted' } },
             narrowing: {},
+            until: {},
+            inherited: {},
             baseline: BASELINE,
         },
         grid: {
@@ -151,6 +159,16 @@ check(
     'rebuilding state from its two known keys DOES drop the baseline — so the check above discriminates',
     four.state.baseline === undefined,
 )
+
+
+console.log('\n=== The two maps 3.0.0 added ride the same spread ===')
+
+const withMaps = makeGrid()
+
+withMaps.write('App\\Models\\Post', 'viewAny', 'forbidden')
+
+check('`until` survived a stance write', withMaps.state.until !== undefined)
+check('and so did `inherited`', withMaps.state.inherited !== undefined)
 
 console.log(
     failures === 0

@@ -234,6 +234,12 @@ function grid({ state, grid, interactive }) {
 
         selected: null,
 
+        // Whether the panel has the layout's second track. Separate from
+        // `selected` on purpose: a cell stays selected when the panel closes, so
+        // the grid keeps showing WHICH cell was being read, and reopening does
+        // not have to ask the server again for something it still holds.
+        panel: false,
+
         why: null,
 
         narrowing: null,
@@ -293,6 +299,7 @@ function grid({ state, grid, interactive }) {
             // catalogue name every other cell already resolves its wildcard
             // lookup against.
             this.selected = { row, action, title: label, subtitle: name ?? row, name }
+            this.panel = true
             this.why = null
             this.narrowing = null
             this.failed = false
@@ -363,6 +370,12 @@ function grid({ state, grid, interactive }) {
                 action === this.grid.manage ? null : this.stanceOf(row, this.grid.manage),
                 this.grid.wider['*'] ?? null,
                 this.grid.wider[name ?? action] ?? null,
+                // An inherited answer has the same shape as a wider rule —
+                // nobody wrote this cell and something else answers it — so it
+                // is read here rather than beside it, and every counter that
+                // asks what a cell ANSWERS is right for free. Paired with
+                // `GridView::reach()`, which folds it in exactly here.
+                this.inheritedAt(row, action)?.stance ?? null,
             ].filter((stance) => stance !== null && stance !== this.grid.order[0])
 
             if (candidates.length === 0) {
@@ -542,6 +555,37 @@ function grid({ state, grid, interactive }) {
             return this.narrowedAt(row, action) ? this.grid.states.narrowed : ''
         },
 
+        /**
+         * When the grant behind this cell stops, as ISO 8601 or nothing.
+         *
+         * Never compared here. Whether a date has passed is already answered by
+         * the stance beside it, decided against the SERVER's clock, and this
+         * machine's is not ours to trust. Paired with `RoleState::toPayload()`,
+         * which is why the value is a string rather than anything with methods.
+         */
+        untilAt(row, action) {
+            return (this.state.until?.[row] ?? {})[action] ?? null
+        },
+
+        /**
+         * The role lending this cell its answer, or nothing.
+         *
+         * Paired with `RoleGrants::inheritedCells()`, which keeps a cell out of
+         * this map the moment it has a rule of its own — so this never has to
+         * ask whether the inheritance is the thing in force.
+         */
+        inheritedAt(row, action) {
+            return (this.state.inherited?.[row] ?? {})[action] ?? null
+        },
+
+        timeMark(row, action) {
+            return this.untilAt(row, action) === null ? '' : this.grid.states.expires
+        },
+
+        lentMark(row, action) {
+            return this.inheritedAt(row, action) === null ? '' : this.grid.states.inherited
+        },
+
         write(row, action, stance) {
             const held = { ...(this.state.stances?.[row] ?? {}) }
 
@@ -590,7 +634,74 @@ function grid({ state, grid, interactive }) {
                 this.stateOf(row, action, name),
                 this.reachedMark(row, action, name),
                 this.markOf(row, action),
+                this.timeMark(row, action),
+                this.lentMark(row, action),
             ].filter((word) => word !== '' && word !== undefined).join(' ')
+        },
+
+        /**
+         * Close the panel and give the width back, keeping the selection.
+         *
+         * The reply already in `why` is kept too: it is about a cell that has
+         * not moved, so throwing it away would buy nothing and cost a round trip
+         * the next time the same cell is opened.
+         */
+        closePanel() {
+            this.panel = false
+        },
+
+        /**
+         * Whether this cell can carry an end date at all.
+         *
+         * Three noes, and each is a different sentence rather than one greyed
+         * control: warden REFUSES a date on a prohibition — `until()` on a forbid
+         * throws, `null` included — an abstention is the absence of a row and has
+         * no life to end, and a cell answered by something wider or inherited has
+         * no rule here to put a date on.
+         *
+         * Advisory, not the guarantee. The payload of a disabled control still
+         * reaches the server (§6.11), so `RoleGrants::plan()` asks the same
+         * question again and drops the date whatever arrives.
+         */
+        untilEnabled(row, action) {
+            return this.stanceOf(row, action) === this.grid.order[1]
+        },
+
+        untilReason(row, action) {
+            const stance = this.stanceOf(row, action)
+
+            if (stance === this.grid.order[2]) {
+                return this.grid.until.forbidden
+            }
+
+            return stance === this.grid.order[1] ? '' : this.grid.until.unwritten
+        },
+
+        /**
+         * Write a date, or take it away.
+         *
+         * Through the same spread `write()` uses, and for the same reason: it
+         * carries every key this file does not know about, `baseline` among
+         * them. Rebuilding the object from the keys this file DOES know would
+         * drop the baseline on the first click and make every save read as a
+         * screen nobody had touched.
+         */
+        setUntil(row, action, value) {
+            if (! this.untilEnabled(row, action)) {
+                return
+            }
+
+            const held = { ...(this.state.until?.[row] ?? {}) }
+
+            if (value === '' || value === null) {
+                delete held[action]
+            } else {
+                held[action] = value
+            }
+
+            this.state = { ...this.state, until: this.replace(this.state.until, row, held) }
+
+            this.said = this.spoken(row, action)
         },
 
         /* ── The tabs, from the keyboard ────────────────────────────────── */
