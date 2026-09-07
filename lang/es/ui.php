@@ -25,6 +25,8 @@ return [
             'columns' => [
                 'name' => 'Nombre',
                 'title' => 'Título',
+                'inherits' => 'Hereda de',
+                'ending' => '{1} 1 termina pronto|[2,*] :count terminan pronto',
                 'held' => 'Lo tienen',
             ],
             'holders' => [

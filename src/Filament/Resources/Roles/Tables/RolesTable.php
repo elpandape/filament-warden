@@ -9,6 +9,7 @@ use ElPandaPe\FilamentWarden\Grants\Holders;
 use ElPandaPe\FilamentWarden\Support\Config;
 use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Context;
+use ElPandaPe\Warden\Support\Config as WardenConfig;
 use ElPandaPe\Warden\Support\Expiry;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -42,6 +43,7 @@ final class RolesTable
     {
         $heldCounts = null;
         $assignedRoleIds = null;
+        $inherits = null;
 
         return $table
             ->defaultSort('name')
@@ -60,6 +62,24 @@ final class RolesTable
                 // column's own name and would ask the database for a column
                 // that does not exist — an error at click time, not at build
                 // time (§6.17).
+                TextColumn::make('inherits')
+                    ->label(__('filament-warden::ui.resources.roles.columns.inherits'))
+                    ->badge()
+                    ->placeholder('—')
+                    // Three and a tally, never the whole list: a role can inherit
+                    // from a dozen and the column is one cell wide. `+n` is the
+                    // same shape the holders sentence has used since 1.0.
+                    ->limitList(3)
+                    ->expandableLimitedList()
+                    ->visible(static fn (): bool => WardenConfig::nestedRoles())
+                    ->state(static function (Model $record) use (&$inherits): array {
+                        $inherits ??= self::inheritsFrom();
+
+                        $key = $record->getKey();
+
+                        return (is_int($key) || is_string($key)) ? ($inherits[$key] ?? []) : [];
+                    }),
+
                 TextColumn::make('held')
                     ->label(__('filament-warden::ui.resources.roles.columns.held'))
                     ->badge()
@@ -68,7 +88,21 @@ final class RolesTable
 
                         $key = $record->getKey();
 
-                        return (is_int($key) || is_string($key)) ? ($heldCounts[$key] ?? 0) : 0;
+                        return (is_int($key) || is_string($key)) ? ($heldCounts[$key]['held'] ?? 0) : 0;
+                    })
+                    // Under the count and not beside it: it is a subset of the
+                    // number above, so a second badge would read as a second
+                    // population. Absent when there is none, rather than a zero
+                    // nobody needs.
+                    ->description(static function (Model $record) use (&$heldCounts): ?string {
+                        $heldCounts ??= self::heldCounts();
+
+                        $key = $record->getKey();
+                        $ending = (is_int($key) || is_string($key)) ? ($heldCounts[$key]['ending'] ?? 0) : 0;
+
+                        return $ending === 0
+                            ? null
+                            : trans_choice('filament-warden::ui.resources.roles.columns.ending', $ending);
                     }),
             ])
             ->recordActions([
@@ -184,7 +218,7 @@ final class RolesTable
      * other values this class reads are keys, not aggregates, and take
      * `is_int() || is_string()`.
      *
-     * @return array<int|string, int>
+     * @return array<int|string, array{held: int, ending: int}>
      */
     private static function heldCounts(): array
     {
@@ -193,6 +227,12 @@ final class RolesTable
         $rows = Context::resolve()->assignedRoleClass()::query()
             ->select('role_id')
             ->selectRaw('count(*) as held')
+            // The second figure rides the SAME query as the first. A column of
+            // its own would be a second grouped read per page for a number that
+            // is a subset of one already in hand — and this table's cost is
+            // bounded by a test that counts statements AND hydrated rows, so a
+            // second one shows up.
+            ->selectRaw('sum(case when expires_at is not null then 1 else 0 end) as ending')
             // A badge that informs counts what somebody actually holds. The two
             // reads below it decide a DELETE and count the lapsed rows too,
             // because the cascade removes them all the same.
@@ -203,13 +243,86 @@ final class RolesTable
         foreach ($rows as $row) {
             $key = $row->getAttribute('role_id');
             $held = $row->getAttribute('held');
+            $ending = $row->getAttribute('ending');
 
             if ((is_int($key) || is_string($key)) && is_numeric($held)) {
-                $counts[$key] = (int) $held;
+                $counts[$key] = [
+                    'held' => (int) $held,
+                    'ending' => is_numeric($ending) ? (int) $ending : 0,
+                ];
             }
         }
 
         return $counts;
+    }
+
+    /**
+     * Which roles each role was GIVEN, named.
+     *
+     * Two reads for the whole table and never one per row: this is the listing
+     * v1.5.0 measured at 22 MB when a fix counted statements and not rows.
+     *
+     * Not scoped to the page, and that is the cheaper half rather than the
+     * lazier one: the rows are role-to-role EDGES, which are bounded by the
+     * catalogue and are the rarest thing in this schema — a `whereIn` on the
+     * page's keys would add a binding list per render to save nothing, and
+     * `heldCounts()` beside it already groups over the whole table for the same
+     * reason.
+     *
+     * Direct edges only — what somebody chose — because the rest is what the
+     * choice brought along, and a chip saying so would be a chip nobody put
+     * there.
+     *
+     * `warden.roles.nested` is asked ONCE, on the column's `visible()`, and not
+     * again here. A hidden column never evaluates its state, so a second check
+     * would be a line nothing can reach — and this project runs its coverage
+     * gate at 100% with no baseline, which is how that showed up rather than
+     * sitting there looking careful.
+     *
+     * Empty when nesting is off, and asked here rather than of warden's closure
+     * for the same reason `RoleGrants` asks it: `RoleClosure::for()` returns
+     * direct edges under either setting, because for an ACCOUNT those are simply
+     * its roles.
+     *
+     * @return array<int|string, list<string>>
+     */
+    private static function inheritsFrom(): array
+    {
+        $context = Context::resolve();
+        $roleClass = $context->roleClass();
+
+        $edges = $context->assignedRoleClass()::query()
+            ->where('entity_type', new $roleClass()->getMorphClass())
+            ->tap(Expiry::live(...))
+            ->get(['entity_id', 'role_id']);
+
+        if ($edges->isEmpty()) {
+            return [];
+        }
+
+        $named = [];
+
+        foreach ($roleClass::query()->whereKey($edges->pluck('role_id')->all())->get() as $inner) {
+            $key = $inner->getKey();
+
+            if (is_int($key) || is_string($key)) {
+                $named[$key] = Holders::label($inner);
+            }
+        }
+
+        $chips = [];
+
+        foreach ($edges as $edge) {
+            $outer = $edge->getAttribute('entity_id');
+            $inner = $edge->getAttribute('role_id');
+            $label = (is_int($inner) || is_string($inner)) ? ($named[$inner] ?? null) : null;
+
+            if ((is_int($outer) || is_string($outer)) && $label !== null) {
+                $chips[$outer][] = $label;
+            }
+        }
+
+        return $chips;
     }
 
     /**

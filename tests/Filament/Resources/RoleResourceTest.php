@@ -1499,3 +1499,86 @@ test('the held badge counts live assignments, and drops to nobody when they laps
 
     Carbon::setTestNow();
 });
+
+test('the inheritance chips are two reads for the whole table, not one per row', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    $inner = makeRole('inner');
+
+    // Five roles all inheriting the same one. A read per row would be five;
+    // grouped it is two, whatever the page holds — and the number that catches
+    // the difference is hydrated ROWS, not statements, which is the half the
+    // v1.5.0 cap could not see.
+    for ($index = 0; $index < 5; $index++) {
+        Warden::assign($inner)->to(makeRole("outer-{$index}"));
+    }
+
+    $hydrated = 0;
+
+    Event::listen(
+        'eloquent.retrieved: '.Context::resolve()->assignedRoleClass(),
+        static function () use (&$hydrated): void {
+            $hydrated++;
+        },
+    );
+
+    livewire(ListRoles::class)->assertSee('Inner');
+
+    // Five edges read once, plus what `heldCounts()` and the delete read group
+    // to. A per-row shape would multiply the five by the page.
+    expect($hydrated)->toBeLessThanOrEqual(12);
+});
+
+test('the chips are absent with nesting off, because the edge lends nothing', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    $inner = makeRole('inner');
+    Warden::assign($inner)->to(makeRole('outer'));
+
+    // The column is hidden rather than empty: with the flag off the edge grants
+    // nothing, so a chip would name an inheritance the engine does not honour.
+    livewire(ListRoles::class)
+        ->assertDontSee(__('filament-warden::ui.resources.roles.columns.inherits'));
+});
+
+test('the held badge says how many of those assignments end soon', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::assign($role)->until(Carbon::parse('2026-09-14 12:00:00'))->to(makeUser('Amaru Quispe'));
+    Warden::assign($role)->to(makeUser('Nayra Mamani'));
+
+    // Under the count and not beside it: it is a SUBSET of the number above, so
+    // a second badge would read as a second population. And it rides the same
+    // grouped query — a column of its own would be a second read per page for a
+    // figure already in hand.
+    livewire(ListRoles::class)
+        ->assertSee(trans_choice('filament-warden::ui.resources.roles.columns.ending', 1));
+
+    Carbon::setTestNow();
+});
+
+test('with nesting on and nothing nested, the column is there and says nothing', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    makeRole();
+
+    // The two early returns of the chip read, and they are different answers:
+    // the flag being off hides the COLUMN, while an empty table of edges leaves
+    // it there with a dash. Turning nesting on and using none of it is the
+    // ordinary case for an installation that just upgraded.
+    livewire(ListRoles::class)
+        ->assertSee(__('filament-warden::ui.resources.roles.columns.inherits'))
+        ->assertSee('—');
+});

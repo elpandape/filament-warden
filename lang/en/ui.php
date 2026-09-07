@@ -25,6 +25,8 @@ return [
             'columns' => [
                 'name' => 'Name',
                 'title' => 'Title',
+                'inherits' => 'Inherits from',
+                'ending' => '{1} 1 ends soon|[2,*] :count end soon',
                 'held' => 'Held by',
             ],
             'holders' => [
