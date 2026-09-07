@@ -19,9 +19,18 @@ namespace ElPandaPe\FilamentWarden\Grants;
  *   something else. Their intent was not applied, and that is the half a
  *   notification has to say out loud rather than count.
  *
- * `refused` carries the cell's own keys rather than a sentence, because the
- * words belong to the screen: the row and action keys the grid is drawn from, so
- * a caller looks their titles up in the catalogue it already has.
+ * - `lapsed`: cells this person asked to grant until a moment that has already
+ *   passed. Nothing was written, and nothing could have been: warden stops
+ *   reading a row at the instant it names, so the grant would have authorised
+ *   nothing while the save reported success. It has a list of its own rather
+ *   than joining `unresolved`, whose sentence names a rule the screen cannot
+ *   read — a different thing said in the same words is how a person ends up
+ *   chasing the wrong problem.
+ *
+ * `refused`, `unresolved` and `lapsed` carry the cell's own keys rather than a
+ * sentence, because the words belong to the screen: the row and action keys the
+ * grid is drawn from, so a caller looks their titles up in the catalogue it
+ * already has.
  *
  * `granted`, `forbidden` and `revoked` split `written` by the stance each cell
  * was moved TO, so a save can say what it did rather than how much of it there
@@ -40,6 +49,7 @@ final readonly class SaveReport
     /**
      * @param  list<array{row: string, action: string}>  $refused
      * @param  list<array{row: string, action: string}>  $unresolved
+     * @param  list<array{row: string, action: string}>  $lapsed
      */
     public function __construct(
         public int $written = 0,
@@ -49,6 +59,7 @@ final readonly class SaveReport
         public int $granted = 0,
         public int $forbidden = 0,
         public int $revoked = 0,
+        public array $lapsed = [],
     ) {}
 
     /**

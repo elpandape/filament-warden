@@ -336,6 +336,10 @@ return [
             'title' => 'Guardado, pero hay celdas con dos reglas',
             'body' => 'La tienda guarda dos reglas para estas, así que esta pantalla no elige entre ellas: solo puede quitar las dos. Apágalas, guarda, y vuelve a ponerlas: :cells',
         ],
+        'lapsed' => [
+            'title' => 'Guardado, pero hay celdas con una fecha ya pasada',
+            'body' => 'Una concesión que termina antes de empezar no autoriza nada, así que se quedaron como estaban. Dales una fecha futura, o concédelas sin fin: :cells',
+        ],
         'saved' => [
             'granted' => '{1} 1 concedida|[2,*] :count concedidas',
             'forbidden' => '{1} 1 prohibida|[2,*] :count prohibidas',

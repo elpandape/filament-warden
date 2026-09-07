@@ -802,11 +802,11 @@ protected function getSavedNotification(): ?Notification
 {
     $report = app()->bound(SaveReport::class) ? app(SaveReport::class) : null;
     // $report->written, ->granted, ->forbidden, ->revoked, ->preserved,
-    // ->refused, ->unresolved
+    // ->refused, ->unresolved, ->lapsed
 }
 ```
 
-It is thinner from the account screen: a role is held or it is not, so `refused` and `unresolved` are always empty there and the three stance counts stay at zero.
+It is thinner from the account screen: a role is held or it is not, so `refused`, `unresolved` and `lapsed` are always empty there and the three stance counts stay at zero.
 
 > ⚠️ `SaveReport` is **not frozen** (see Stability) and the binding lives exactly as long as the request that made it. Neither mechanism survives a queue — if you need a save delivered asynchronously, listen to warden's events and write your own record.
 

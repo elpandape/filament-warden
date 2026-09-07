@@ -158,10 +158,11 @@ final class RoleGrants
      * @param  array<string, array<string, string>>  $desired
      * @param  array<string, array<string, mixed>>|null  $narrowings  null when the screen does not offer them
      * @param  array{stances?: mixed, narrowing?: mixed, until?: mixed}|null  $baseline  what the screen was showing when it opened
+     * @param  array<string, array<string, CarbonImmutable>>|null  $untils  null when the screen does not offer end dates
      */
-    public static function apply(Model $role, Catalog $catalog, array $desired, ?array $narrowings = null, ?array $baseline = null): SaveReport
+    public static function apply(Model $role, Catalog $catalog, array $desired, ?array $narrowings = null, ?array $baseline = null, ?array $untils = null): SaveReport
     {
-        [$changes, $report] = self::plan($role, $catalog, $desired, $narrowings, $baseline);
+        [$changes, $report] = self::plan($role, $catalog, $desired, $narrowings, $baseline, $untils);
 
         if ($changes === []) {
             return $report;
@@ -202,11 +203,12 @@ final class RoleGrants
      * @param  array<string, array<string, string>>  $desired
      * @param  array<string, array<string, mixed>>|null  $narrowings  null when the screen does not offer them
      * @param  array{stances?: mixed, narrowing?: mixed, until?: mixed}|null  $baseline  what the screen was showing when it opened
+     * @param  array<string, array<string, CarbonImmutable>>|null  $untils  null when the screen does not offer end dates
      * @return list<Change>
      */
-    public static function changes(Model $role, Catalog $catalog, array $desired, ?array $narrowings = null, ?array $baseline = null): array
+    public static function changes(Model $role, Catalog $catalog, array $desired, ?array $narrowings = null, ?array $baseline = null, ?array $untils = null): array
     {
-        return self::plan($role, $catalog, $desired, $narrowings, $baseline)[0];
+        return self::plan($role, $catalog, $desired, $narrowings, $baseline, $untils)[0];
     }
 
     /**
@@ -241,22 +243,31 @@ final class RoleGrants
      * @param  array<string, array<string, string>>  $desired
      * @param  array<string, array<string, mixed>>|null  $narrowings
      * @param  array{stances?: mixed, narrowing?: mixed, until?: mixed}|null  $baseline
+     * @param  array<string, array<string, CarbonImmutable>>|null  $untils
      * @return array{0: list<Change>, 1: SaveReport}
      */
-    private static function plan(Model $role, Catalog $catalog, array $desired, ?array $narrowings, ?array $baseline): array
+    private static function plan(Model $role, Catalog $catalog, array $desired, ?array $narrowings, ?array $baseline, ?array $untils = null): array
     {
         $current = self::of($role, $catalog);
 
         $wasStances = $baseline === null ? null : State::stances($baseline);
         $wasNarrowings = $baseline === null ? [] : State::narrowings($baseline);
+        $wasUntils = $baseline === null ? [] : State::untils($baseline);
+
+        // One reading, so two cells saved together cannot land on opposite sides
+        // of the same instant.
+        $now = CarbonImmutable::now();
 
         $changes = [];
         $preserved = 0;
         $refused = [];
         $unresolved = [];
+        $lapsed = [];
 
         foreach (self::cells($catalog) as [$row, $action, $name, $entity]) {
             $stored = $current->narrowings[$row][$action] ?? Narrowing::all();
+            $storedUntil = $current->untils[$row][$action] ?? null;
+            $storedUntil = $storedUntil instanceof CarbonImmutable ? $storedUntil : null;
 
             $from = self::stanceIn($current->stances, $row, $action);
             $to = self::stanceIn($desired, $row, $action);
@@ -300,7 +311,42 @@ final class RoleGrants
                 continue;
             }
 
-            $moved = ! $stored->is($wanted);
+            // Three lines the browser cannot cross, and all three live here
+            // because a screen is not where a guarantee about writing lives.
+            //
+            // A prohibition never carries one: warden throws rather than write
+            // an expiring forbid, because a forbid that lapsed by clock turns
+            // "a forbid beats every grant" into "until Tuesday". An abstention
+            // never carries one either — it is the absence of a row.
+            //
+            // And a date that is not in the FUTURE is not written at all. The
+            // screen hands back the date it was given, so a cell that lapsed and
+            // is being switched on again arrives carrying the date it died on;
+            // writing that grants nothing while reporting success, and dropping
+            // it silently grants forever. Neither is what the click meant, so
+            // the cell is left alone and named.
+            $wantedUntil = match (true) {
+                $to !== Stance::Granted => null,
+                $untils === null => $storedUntil,
+                default => self::moment($untils[$row][$action] ?? null),
+            };
+
+            if ($wantedUntil instanceof CarbonImmutable && $wantedUntil->lessThanOrEqualTo($now)) {
+                $lapsed[] = ['row' => $row, 'action' => $action];
+
+                continue;
+            }
+
+            // Two questions, not one. Whether the REACH moved decides which
+            // narrowing gets written — the store's, or the one the browser sent
+            // — and whether the DATE moved only decides that something has to be
+            // written at all. Folding them into one flag would make a date-only
+            // edit rebuild the rule from a payload, which is the shape §6.33
+            // exists to keep shut.
+            $reachMoved = ! $stored->is($wanted);
+            $untilMoved = $storedUntil?->getTimestamp() !== $wantedUntil?->getTimestamp();
+
+            $moved = $reachMoved || $untilMoved;
 
             if ($from === $to && ! $moved) {
                 continue;
@@ -327,8 +373,21 @@ final class RoleGrants
 
                 $reachAnswers = $wasReach instanceof Narrowing;
 
-                $touched = $was !== $to || ($reachAnswers && ! $wasReach->is($wanted));
-                $drifted = $was !== $from || ($reachAnswers && ! $wasReach->is($stored));
+                $wasUntil = self::moment($wasUntils[$row][$action] ?? null);
+
+                // The date joins both questions, and it needs no flag of its
+                // own: unlike a reach, the baseline either carries one or the
+                // cell has none, and "none" is a real answer rather than a
+                // stand-in. A screen that never offered dates hands back exactly
+                // what it was given, so `wanted` equals `was` and neither
+                // question moves.
+                $touched = $was !== $to
+                    || ($reachAnswers && ! $wasReach->is($wanted))
+                    || $wasUntil?->getTimestamp() !== $wantedUntil?->getTimestamp();
+
+                $drifted = $was !== $from
+                    || ($reachAnswers && ! $wasReach->is($stored))
+                    || $wasUntil?->getTimestamp() !== $storedUntil?->getTimestamp();
 
                 if (! $touched) {
                     $preserved++;
@@ -351,7 +410,7 @@ final class RoleGrants
             // both turns a condition stored as the string `'true'`, which matches
             // nothing, into the boolean `true`, which matches every row, on a
             // click that only meant to forbid instead of grant.
-            $changes[] = new Change($name, $entity, $to, $moved ? $wanted : $stored);
+            $changes[] = new Change($name, $entity, $to, $reachMoved ? $wanted : $stored, $wantedUntil);
         }
 
         $tally = array_count_values(array_map(
@@ -367,6 +426,7 @@ final class RoleGrants
             $tally[Stance::Granted->value] ?? 0,
             $tally[Stance::Forbidden->value] ?? 0,
             $tally[Stance::Abstain->value] ?? 0,
+            $lapsed,
         )];
     }
 
@@ -677,8 +737,12 @@ final class RoleGrants
                 continue;
             }
 
+            // The date joins the grouping key, not just the entity: one `to()`
+            // call carries one date for every name in it, so two cells ending on
+            // different days must not share a call. A forbid never carries one,
+            // so its key is the entity alone.
             if ($change->to === Stance::Granted) {
-                $granted[$change->entity ?? ''][] = $change;
+                $granted[$change->entity.'@'.($change->until?->getTimestamp() ?? '')][] = $change;
             } else {
                 $forbidden[$change->entity ?? ''][] = $change;
             }
@@ -699,11 +763,30 @@ final class RoleGrants
      */
     private static function grantGroup(callable $chain, array $byEntity): void
     {
-        foreach ($byEntity as $key => $group) {
-            $entity = $key === '' ? null : $key;
+        foreach ($byEntity as $group) {
+            // Read off the group rather than parsed back out of its key: the key
+            // now carries the date too, and a key that has to be taken apart
+            // again is a second place the two halves can disagree.
+            $first = $group[0] ?? null;
+
+            if (! $first instanceof Change) {
+                continue; // @codeCoverageIgnore
+            }
+
+            $entity = $first->entity;
             $names = array_map(static fn (Change $one): string => $one->name, $group);
 
-            $chain()->to($names, $entity);
+            $started = $chain();
+
+            // Same reason as `narrow()`: a forbid chain refuses the call itself,
+            // not just a date in it. The forbidden groups never carry one — the
+            // plan drops it before a `Change` is built — so this is the second
+            // line holding one guarantee, and both are on the server (§6.24).
+            if ($first->to === Stance::Granted) {
+                $started->until($first->until);
+            }
+
+            $started->to($names, $entity);
 
             foreach ($group as $one) {
                 self::settleTitle($one);
@@ -719,6 +802,16 @@ final class RoleGrants
     private static function narrow(GrantsPermissions $chain, Change $change): void
     {
         $entity = $change->entity;
+
+        // Before `to()`, and only on a grant. The write executes at `to()` and
+        // warden throws rather than let a date be added to something already
+        // written — and `ForbidsPermissions::until()` throws UNCONDITIONALLY,
+        // measured: passing `null` is not a way to say "no end" to a forbid, it
+        // is still an error. So the stance decides whether the call happens at
+        // all, not what goes in it.
+        if ($change->to === Stance::Granted) {
+            $chain->until($change->until);
+        }
 
         if ($entity !== null && $change->narrowing->shape === Shape::Owned) {
             $chain->toOwn($entity, $change->name);
@@ -870,6 +963,19 @@ final class RoleGrants
         }
 
         return $held;
+    }
+
+    /**
+     * A moment, or nothing, out of a map this class did not build.
+     *
+     * `State::untils()` already refuses anything that will not parse, but the
+     * map also arrives from a caller's own array in tests and from a baseline
+     * the browser round-tripped. Narrowing once here keeps the reads honest
+     * without a cast at every site.
+     */
+    private static function moment(mixed $value): ?CarbonImmutable
+    {
+        return $value instanceof CarbonImmutable ? $value : null;
     }
 
     /**

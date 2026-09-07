@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Grants;
 
+use Carbon\CarbonImmutable;
 use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
 use Illuminate\Database\Eloquent\Model;
@@ -18,6 +19,10 @@ use Illuminate\Database\Eloquent\Model;
  *
  * The wildcard needs no special case: `toManage($entity)` is literally
  * `to('*', $entity)`, so a manage cell is a change whose name is `*`.
+ *
+ * `until` is when the grant stops, and it is only ever set on a granted cell.
+ * A prohibition does not expire — warden throws rather than write one — and an
+ * abstention is the absence of a row, which has no life to end.
  */
 final readonly class Change
 {
@@ -27,5 +32,6 @@ final readonly class Change
         public ?string $entity,
         public Stance $to,
         public Narrowing $narrowing,
+        public ?CarbonImmutable $until = null,
     ) {}
 }

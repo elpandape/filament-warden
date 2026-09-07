@@ -67,11 +67,19 @@ return [
     | separate decisions. Conditions can be defined only on a permission's own
     | screen, where they are seen whole, leaving the grid to hand things out.
     |
+    | `expiry` decides whether the grid may SET an end date. It never decides
+    | whether one is honoured: warden stops reading a row past its date whatever
+    | this says, so a grid with this off still draws a lapsed cell as the
+    | abstention it is. Switching it off makes the screen answer "no opinion"
+    | rather than "no date" — an empty answer would end every timed grant on the
+    | grid the first time anybody saved it.
+    |
     */
 
     'grid' => [
         'explain' => true,
         'constraints' => true,
+        'expiry' => true,
     ],
 
     /*

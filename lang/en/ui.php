@@ -336,6 +336,10 @@ return [
             'title' => 'Saved, but two cells hold two rules each',
             'body' => 'The store holds two rules for these, so this screen will not choose between them — it will only take both away. Switch them off, save, and set them again: :cells',
         ],
+        'lapsed' => [
+            'title' => 'Saved, but some cells asked for a date already past',
+            'body' => 'A grant that ends before it starts authorises nothing, so these were left exactly as they were. Give them a date in the future, or grant them with no end at all: :cells',
+        ],
         'saved' => [
             'granted' => '{1} 1 granted|[2,*] :count granted',
             'forbidden' => '{1} 1 forbidden|[2,*] :count forbidden',

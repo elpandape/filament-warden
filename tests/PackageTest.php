@@ -272,5 +272,5 @@ test('the two things the README tells an application to read after a save are th
         new ReflectionClass(SaveReport::class)->getProperties(ReflectionProperty::IS_PUBLIC),
     );
 
-    expect($named)->toBe(['written', 'preserved', 'refused', 'unresolved', 'granted', 'forbidden', 'revoked']);
+    expect($named)->toBe(['written', 'preserved', 'refused', 'unresolved', 'granted', 'forbidden', 'revoked', 'lapsed']);
 });

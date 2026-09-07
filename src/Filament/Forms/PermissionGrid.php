@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Filament\Forms;
 
+use Carbon\CarbonImmutable;
 use ElPandaPe\FilamentWarden\Filament\Concerns\DrawsThePermissionGrid;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
@@ -87,6 +88,7 @@ final class PermissionGrid extends Field
                     $component->gridState(),
                     $component->gridNarrowings(),
                     $component->gridBaseline(),
+                    $component->gridUntils(),
                 );
 
                 // Kept reachable for a page that wants to say something more of
@@ -167,7 +169,7 @@ final class PermissionGrid extends Field
      */
     public function announce(SaveReport $report): void
     {
-        if (! $report->metAnother() && $report->unresolved === []) {
+        if (! $report->metAnother() && $report->unresolved === [] && $report->lapsed === []) {
             return;
         }
 
@@ -178,6 +180,22 @@ final class PermissionGrid extends Field
                     ->title(__('filament-warden::ui.grid.tangled.title'))
                     ->body(__('filament-warden::ui.grid.tangled.body', [
                         'cells' => $this->namedCells($report->unresolved),
+                    ])),
+            );
+        }
+
+        // Its own notice rather than a line inside the tangled one. The two
+        // report the same outcome — asked for, not written — for opposite
+        // reasons, and a person reading "the store holds two rules for these"
+        // about a date they mistyped goes looking for a problem that is not
+        // there.
+        if ($report->lapsed !== []) {
+            $this->sendAfterCommit(
+                Notification::make()
+                    ->warning()
+                    ->title(__('filament-warden::ui.grid.lapsed.title'))
+                    ->body(__('filament-warden::ui.grid.lapsed.body', [
+                        'cells' => $this->namedCells($report->lapsed),
                     ])),
             );
         }
@@ -312,5 +330,20 @@ final class PermissionGrid extends Field
     private function gridNarrowings(): ?array
     {
         return Config::enabled('grid.constraints') ? State::narrowings($this->getState()) : null;
+    }
+
+    /**
+     * When each cell stops, on screen.
+     *
+     * Null and an empty map are different answers here, exactly as they are for
+     * the reach: null keeps every date the store holds, and an empty map clears
+     * them all. So a screen with the feature switched off must answer null, or
+     * the first save from it would end every timed grant on the grid.
+     *
+     * @return array<string, array<string, CarbonImmutable>>|null
+     */
+    private function gridUntils(): ?array
+    {
+        return Config::enabled('grid.expiry') ? State::untils($this->getState()) : null;
     }
 }

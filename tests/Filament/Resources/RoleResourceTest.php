@@ -23,6 +23,7 @@ use Filament\Notifications\Livewire\Notifications;
 use Filament\Notifications\Notification;
 use Filament\Panel;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 
@@ -1218,6 +1219,35 @@ test('a tangled cell asked for anything but off says so rather than going quiet'
     expect($sent?->getTitle())->toBe(__('filament-warden::ui.grid.tangled.title'))
         ->and(is_string($body) ? $body : '')
         ->toContain(GridView::cellLabel(catalogForRoles(), roleClass(), 'update'));
+});
+
+test('a cell asked to end on a day already gone is named, not written', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    Carbon::setTestNow('2026-09-09 12:00:00');
+
+    // Its own notice, not a line inside the tangled one: the two report the same
+    // outcome for opposite reasons, and "the store holds two rules for these"
+    // sends a person chasing a problem that is not there.
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->set('data.permissions.stances.'.roleClass().'.update', 'granted')
+        ->set('data.permissions.until.'.roleClass().'.update', '2026-09-08T12:00:00+00:00')
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $sent = lastNotification();
+    $body = $sent?->getBody();
+
+    expect($sent?->getTitle())->toBe(__('filament-warden::ui.grid.lapsed.title'))
+        ->and(is_string($body) ? $body : '')
+        ->toContain(GridView::cellLabel(catalogForRoles(), roleClass(), 'update'));
+
+    Carbon::setTestNow();
 });
 
 test('a save that refuses more cells than it names counts the rest', function (): void {

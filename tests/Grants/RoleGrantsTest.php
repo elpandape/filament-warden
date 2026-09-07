@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Carbon\CarbonImmutable;
 use Composer\InstalledVersions;
 use ElPandaPe\FilamentWarden\Catalog\Audit;
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
@@ -1582,6 +1583,162 @@ test('an expired grant over one record is not reported as one the role still hol
     // cell can show. Printing one the clock retired says the role reaches a row
     // it does not, in the one place the screen offers no way to check.
     expect(RoleGrants::of($role, gridCatalog())->records)->toBeEmpty();
+
+    Carbon::setTestNow();
+});
+
+test('a granted cell is written with the date the screen sent', function (): void {
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'granted']], null, null, [
+        Post::class => ['viewAny' => CarbonImmutable::parse('2026-09-14 12:00:00')],
+    ]);
+
+    expect(RoleGrants::of($role, gridCatalog())->untils[Post::class]['viewAny']->toIso8601String())
+        ->toStartWith('2026-09-14T12:00:00');
+
+    Carbon::setTestNow();
+});
+
+test('a forbidden cell is written with no date, whatever the browser sends', function (): void {
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    // The payload carries a date for a cell being forbidden — which no screen of
+    // this package offers, and which is exactly why the guard is on the server
+    // (§6.24, second layer). Warden throws on `ForbidsPermissions::until()`
+    // UNCONDITIONALLY, `null` included, so getting this wrong is not a silently
+    // wrong row: it is a 500 on save.
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'forbidden']], null, null, [
+        Post::class => ['viewAny' => CarbonImmutable::parse('2026-09-14 12:00:00')],
+    ]);
+
+    $state = RoleGrants::of($role, gridCatalog());
+
+    expect($state->stances[Post::class]['viewAny'])->toBe('forbidden')
+        ->and($state->untils)->toBeEmpty();
+
+    Carbon::setTestNow();
+});
+
+test('a date already past is not written, and the cell is named instead', function (): void {
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-09 12:00:00');
+
+    // The screen hands back the date it was given, so a cell that lapsed and is
+    // being switched on again arrives carrying the date it died on. Writing it
+    // grants nothing and reports success; dropping it grants forever. Neither is
+    // the click, so the cell is left alone and said out loud.
+    $report = RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'granted']], null, null, [
+        Post::class => ['viewAny' => CarbonImmutable::parse('2026-09-08 12:00:00')],
+    ]);
+
+    expect($report->lapsed)->toBe([['row' => Post::class, 'action' => 'viewAny']])
+        ->and($report->written)->toBe(0)
+        ->and(grantCount())->toBe(0);
+
+    Carbon::setTestNow();
+});
+
+test('two cells ending on different days do not share one call', function (): void {
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'granted', 'view' => 'granted']], null, null, [
+        Post::class => [
+            'viewAny' => CarbonImmutable::parse('2026-09-14 12:00:00'),
+            'view' => CarbonImmutable::parse('2026-09-21 12:00:00'),
+        ],
+    ]);
+
+    // One `to()` call carries one date for every name in it, so grouping by
+    // entity alone would stamp both cells with whichever date got there first.
+    $untils = RoleGrants::of($role, gridCatalog())->untils[Post::class];
+
+    expect($untils['viewAny']->toIso8601String())->toStartWith('2026-09-14T12:00:00')
+        ->and($untils['view']->toIso8601String())->toStartWith('2026-09-21T12:00:00');
+
+    Carbon::setTestNow();
+});
+
+test('a screen that does not offer dates keeps every date the store holds', function (): void {
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::allow($role)->until(Carbon::parse('2026-09-14 12:00:00'))->to('viewAny', Post::class);
+
+    // Null, not an empty map. An empty map means "cleared", and reading the two
+    // as one would end every timed grant on the grid the first time somebody
+    // saved from a screen with the feature switched off.
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'granted', 'view' => 'granted']]);
+
+    expect(RoleGrants::of($role, gridCatalog())->untils[Post::class]['viewAny']->toIso8601String())
+        ->toStartWith('2026-09-14T12:00:00');
+
+    Carbon::setTestNow();
+});
+
+test('a map without a cell key clears that cell date, which is how a date is removed', function (): void {
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::allow($role)->until(Carbon::parse('2026-09-14 12:00:00'))->to('viewAny', Post::class);
+
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'granted']], null, null, []);
+
+    expect(RoleGrants::of($role, gridCatalog())->untils)->toBeEmpty()
+        ->and(RoleGrants::of($role, gridCatalog())->stances[Post::class]['viewAny'])->toBe('granted');
+
+    Carbon::setTestNow();
+});
+
+test('moving only the date is a write, not a cell that changed nothing', function (): void {
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::allow($role)->until(Carbon::parse('2026-09-14 12:00:00'))->to('viewAny', Post::class);
+
+    $report = RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'granted']], null, null, [
+        Post::class => ['viewAny' => CarbonImmutable::parse('2026-09-21 12:00:00')],
+    ]);
+
+    expect($report->written)->toBe(1)
+        ->and(RoleGrants::of($role, gridCatalog())->untils[Post::class]['viewAny']->toIso8601String())
+        ->toStartWith('2026-09-21T12:00:00')
+        // One row, moved. The date is outside the unique index, so warden's
+        // firstOrCreate finds the row it already has and changes it.
+        ->and(grantCount())->toBe(1);
+
+    Carbon::setTestNow();
+});
+
+test('narrowing a grant does not widen its life', function (): void {
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    // Warden's own guarantee, pinned here because this package depends on it and
+    // would otherwise have to re-apply the date after every `where()`:
+    // `reconstrain()` deletes the grant and re-creates it against the twin, and
+    // carries `expires_at` across on the way.
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'granted']], [
+        Post::class => ['viewAny' => conditionOn('title', 'alpha')],
+    ], null, [
+        Post::class => ['viewAny' => CarbonImmutable::parse('2026-09-14 12:00:00')],
+    ]);
+
+    $state = RoleGrants::of($role, gridCatalog());
+
+    expect($state->narrowings[Post::class]['viewAny']->shape)->toBe(Shape::Conditions)
+        ->and($state->untils[Post::class]['viewAny']->toIso8601String())->toStartWith('2026-09-14T12:00:00');
 
     Carbon::setTestNow();
 });
