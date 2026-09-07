@@ -471,7 +471,9 @@
                     </div>
                 </template>
 
-                @include('filament-warden::builder')
+                <div class="fw-write">
+                    @include('filament-warden::builder')
+                </div>
             </div>
         </aside>
         @endif

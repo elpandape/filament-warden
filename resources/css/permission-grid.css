@@ -937,6 +937,30 @@ tr:hover .fw-shortcuts,
         display: grid;
         gap: 0.5rem;
     }
+
+    /* The pairing only means anything with room for both. Below the width where the
+       table already becomes an accordion they stack — and the explicit row
+       placement has to be let go, or the two stay pinned above the clauses. */
+    .fw-conditions {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .fw-conditions > .fw-warn,
+    .fw-conditions > .fw-preview {
+        grid-column: 1;
+        grid-row: auto;
+    }
+
+    .fw-conditions > .fw-warn {
+        margin-block-start: 0.75rem;
+    }
+
+    .fw-write .fw-field-label,
+    .fw-write .fw-reach,
+    .fw-write .fw-reach-hint,
+    .fw-write .fw-reach-reason {
+        max-inline-size: none;
+    }
 }
 
 /* The condition builder --------------------------------------------------- */
@@ -1061,8 +1085,66 @@ tr:hover .fw-shortcuts,
     }
 }
 
+/* Reading above, writing below, with one line between them. A sentence and a
+   tool are not two columns of equal weight: the reading is three or four lines
+   and the builder can measure four hundred pixels, so splitting them into two
+   tracks leaves a hole by construction. */
+.fw-write {
+    margin-block-start: 1rem;
+    padding-block-start: 1rem;
+    border-block-start: 1px solid var(--fw-line);
+}
+
+/* `.fw-builder` carried its own rule, margin and padding from when it was the
+   one separating itself from the explanation. Both drew a divider thirty pixels
+   apart. */
+.fw-write .fw-builder {
+    margin-block-start: 0;
+    padding-block-start: 0;
+    border-block-start: 0;
+}
+
+.fw-write .fw-builder > :first-child {
+    margin-block-start: 0;
+}
+
+/* The rule on the left, what the rule MEANS on the right. The cap belongs to
+   the editor's column and never to the block: capping the block left the right
+   rail at sixty pixels.
+
+   ONE block for this selector, not two: `declarationsOf()` in the sheet's test
+   matches the FIRST block it finds, so a second `.fw-conditions {}` further
+   down would be read by nothing. Task 5 adds `--fw-chevron` in here. */
 .fw-conditions {
-    margin-block-start: 0.75rem;
+    display: grid;
+    grid-template-columns: minmax(0, 34rem) minmax(0, 1fr);
+    column-gap: 2rem;
+    align-items: start;
+    container-type: inline-size;
+}
+
+.fw-conditions > .fw-warn {
+    grid-column: 2;
+    grid-row: 1;
+    margin-block-start: 0;
+}
+
+.fw-conditions > .fw-preview {
+    grid-column: 2;
+    grid-row: 2;
+}
+
+.fw-conditions > .fw-clause,
+.fw-conditions > .fw-adds,
+.fw-conditions > .fw-note {
+    grid-column: 1;
+}
+
+.fw-write .fw-field-label,
+.fw-write .fw-reach,
+.fw-write .fw-reach-hint,
+.fw-write .fw-reach-reason {
+    max-inline-size: 34rem;
 }
 
 /* One clause is one group the precedence created: `and` binds tighter than `or`,
@@ -1223,4 +1305,18 @@ tr:hover .fw-shortcuts,
     font-family: ui-monospace, monospace;
     font-size: 0.75rem;
     overflow-x: auto;
+}
+
+/* The verdict and the condition warning lose their fill and keep their bar:
+   they are the panel's sentences, not alerts. */
+.fw-warn {
+    background: none;
+    padding-inline: 0.75rem 0;
+}
+
+/* Nothing here may push the page sideways: the preview is a line of code as
+   long as the rule it shows. */
+.fw-preview {
+    overflow-wrap: anywhere;
+    max-inline-size: 100%;
 }

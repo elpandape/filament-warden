@@ -155,3 +155,18 @@ test('the wide condition row resets the misfit note it would otherwise be crushe
         ->and($base)->not->toBeFalse()
         ->and((int) $prefixed)->toBeLessThan((int) $base);
 });
+
+test('the rule and what it means share a row, and stack when there is no room', function (): void {
+    // The editor was 34rem inside a 1010px panel and the rest was empty. The
+    // warning and the live preview are what the rule MEANS, so they sit beside
+    // it — placed by explicit row, because an `x-for` writes the clauses and
+    // there is no knowing how many there are.
+    expect(declarationsOf('.fw-conditions'))->toContain('grid-template-columns: minmax(0, 34rem) minmax(0, 1fr)')
+        ->and(declarationsOf('.fw-conditions > .fw-warn'))->toContain('grid-row: 1')
+        ->and(declarationsOf('.fw-conditions > .fw-preview'))->toContain('grid-row: 2');
+
+    // And they stack at the same width where the table already becomes an
+    // accordion, so the screen changes face once and not twice. Below it the
+    // right rail measured ~40px and the warning fell to one word per line.
+    expect(stylesheet())->toContain('grid-row: auto');
+});
