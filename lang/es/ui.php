@@ -206,7 +206,7 @@ return [
                 'kept_title' => 'Guardado, y alguien más estaba editando',
                 'kept' => '{1} Un rol que no cambiaste ya lo había cambiado otra persona. Se ha dejado como ella lo puso.|[2,*] :count roles que no cambiaste ya los había cambiado otra persona. Se han dejado como ellas los pusieron.',
             ],
-            'help' => 'Lo que esta cuenta es. Un rol reparte lo que digan sus permisos en cuanto se da.',
+            'help' => 'Lo que esta cuenta es. Un rol reparte lo que digan sus permisos en cuanto se da, y sin fecha de fin: una casilla no puede llevar una. Para dar un rol que caduque, usa la tabla de roles de esta página, o la acción Repartir del propio rol.',
             'protected' => 'No puedes editar este rol, así que tampoco puedes repartirlo.',
             'restricted' => 'Esta cuenta tiene este rol en un contexto. Quitarlo desde aquí se llevaría todos los contextos, así que se deja en paz.',
             'elsewhere' => 'Esta cuenta tiene este rol fuera del tenant en el que estás. Quitárselo desde aquí no borraría nada y aun así diría que sí, así que se deja en paz. Cambia de tenant para tocarlo.',

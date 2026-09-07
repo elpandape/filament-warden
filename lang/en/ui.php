@@ -206,7 +206,7 @@ return [
                 'kept_title' => 'Saved, and somebody else had been editing too',
                 'kept' => '{1} One role you did not change had already been changed by somebody else. It was left as they set it.|[2,*] :count roles you did not change had already been changed by somebody else. They were left as those people set them.',
             ],
-            'help' => 'What this account is. A role hands out whatever its permissions say, the moment it is given.',
+            'help' => 'What this account is. A role hands out whatever its permissions say, the moment it is given, and with no end date — a box cannot carry one. To give a role that ends, use the roles table on this page, or the role’s own Hand out action.',
             'protected' => 'You cannot edit this role, so you cannot hand it out either.',
             'restricted' => 'This account holds this role in a context. Taking it back from here would take every context with it, so it is left alone.',
             'elsewhere' => 'This account holds this role outside the tenant you are in. Taking it back from here would delete nothing and still report success, so it is left alone. Switch tenant to change it.',
