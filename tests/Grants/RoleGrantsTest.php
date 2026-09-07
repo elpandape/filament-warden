@@ -1565,3 +1565,23 @@ test('a grant with no date carries none, so the map only holds cells that end', 
     expect(RoleGrants::of($role, gridCatalog())->untils)->toBeEmpty()
         ->and(RoleGrants::of($role, gridCatalog())->toPayload()['until'])->toBeEmpty();
 });
+
+test('an expired grant over one record is not reported as one the role still holds', function (): void {
+    $role = makeRole();
+    $post = Post::query()->create(['title' => 'A post']);
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::allow($role)->until(Carbon::parse('2026-09-08 12:00:00'))->to('view', $post);
+
+    expect(RoleGrants::of($role, gridCatalog())->records)->toHaveCount(1);
+
+    Carbon::setTestNow('2026-09-09 12:00:00');
+
+    // A record pin is printed above the grid as a rule the role holds that no
+    // cell can show. Printing one the clock retired says the role reaches a row
+    // it does not, in the one place the screen offers no way to check.
+    expect(RoleGrants::of($role, gridCatalog())->records)->toBeEmpty();
+
+    Carbon::setTestNow();
+});
