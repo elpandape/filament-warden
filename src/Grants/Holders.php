@@ -164,6 +164,13 @@ final class Holders
         //
         // It is the one place in this package that reads wider than warden would
         // answer, and the screen says so.
+        //
+        // Wider in the other axis too, since 3.0: no `Expiry::live()` here
+        // either. A lapsed grant authorises nothing and the cascade still takes
+        // it, so counting it over-warns about a delete and over-locks a name —
+        // both in the safe direction. Splitting this into a live count and a
+        // doomed one is a screen's question, not this class's: it answers what
+        // a delete destroys.
         $grants = $context->grantClass()::query()
             ->withoutGlobalScope(TenantScope::class)
             ->where('permission_id', $permission->getKey())

@@ -160,6 +160,13 @@ class RoleResource extends Resource
      * table, `Grants\Reach::restricted()` and `Grants\Assignment::assignments()`,
      * are of the second kind and keep their scopes on purpose.
      *
+     * Expiry splits the same way, and this read is on the same side of it: no
+     * `Expiry::live()` here, so a LAPSED assignment still makes a role
+     * undeletable. The cascade is blind to the clock exactly as it is blind to
+     * the scope, so a role with nothing but dead assignments still takes rows
+     * with it — and `warden:clean --expired` is what makes it deletable, which
+     * is a decision somebody makes rather than one a date makes for them.
+     *
      * `$assignedRoleIds`, when given, is the listing's own set: one wide
      * `distinct()` query per render, one row per role anybody holds, so this
      * answers from an array lookup rather than an `EXISTS` per row. `null` —

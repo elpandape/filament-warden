@@ -6,6 +6,7 @@ use Composer\InstalledVersions;
 use ElPandaPe\FilamentWarden\Grants\Assignment;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Checks\Resolvers\CacheKeyVersioner;
 use ElPandaPe\Warden\Context;
@@ -13,6 +14,7 @@ use ElPandaPe\Warden\Events\RoleAssigned;
 use ElPandaPe\Warden\Facades\Warden;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 
@@ -895,4 +897,73 @@ test('without a baseline every role counts as ticked by this person', function (
     expect(Assignment::of($account))->toBeEmpty()
         ->and($report->written)->toBe(1)
         ->and($report->metAnother())->toBeFalse();
+});
+
+test('a lapsed assignment is not one the account holds', function (): void {
+    $account = makeUser();
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::assign($role)->until(Carbon::parse('2026-09-08 12:00:00'))->to($account);
+
+    expect(Assignment::of($account))->toHaveCount(1);
+
+    Carbon::setTestNow('2026-09-09 12:00:00');
+
+    // A fresh instance, because the rows are memoised per model object and per
+    // tenant — not per clock. That is right for a request, which is short and
+    // must not answer two different things about one account; it just means a
+    // second reading of the store needs what a second request would have.
+    /** @var User $later */
+    $later = User::query()->findOrFail($account->getKey());
+
+    // Warden stopped answering with it, so a screen still listing it would offer
+    // a revoke for access nobody has — and the revoke would report success.
+    expect(Assignment::of($later))->toBeEmpty();
+
+    Carbon::setTestNow();
+});
+
+test('ticking a lapsed box makes the role live again instead of finding a dead row', function (): void {
+    $account = makeUser();
+    signInAsHandOut();
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::assign($role)->until(Carbon::parse('2026-09-08 12:00:00'))->to($account);
+
+    Carbon::setTestNow('2026-09-09 12:00:00');
+
+    // `firstOrCreate` FINDS the expired row rather than making a new one, and
+    // warden only moves the date when a chain declared one. Without `until(null)`
+    // in `give()` this reported success, wrote nothing and left the account
+    // holding nothing — with the box now drawn ticked.
+    expect(Assignment::give($account, roleKey($role)))->toBeTrue()
+        ->and(Assignment::of($account))->toHaveCount(1)
+        ->and(assignmentCount())->toBe(1);
+
+    Carbon::setTestNow();
+});
+
+test('a lapsed assignment in a context is not a reason to say the account has one', function (): void {
+    $account = makeUser();
+    $role = makeRole();
+    $post = Post::query()->create(['title' => 'alpha']);
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::assign($role)->until(Carbon::parse('2026-09-08 12:00:00'))->on($post)->to($account);
+
+    expect(Assignment::isRestricted($account, roleKey($role)))->toBeTrue();
+
+    Carbon::setTestNow('2026-09-09 12:00:00');
+
+    /** @var User $later */
+    $later = User::query()->findOrFail($account->getKey());
+
+    expect(Assignment::isRestricted($later, roleKey($role)))->toBeFalse();
+
+    Carbon::setTestNow();
 });

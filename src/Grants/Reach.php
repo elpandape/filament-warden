@@ -7,6 +7,7 @@ namespace ElPandaPe\FilamentWarden\Grants;
 use ElPandaPe\FilamentWarden\Support\Line;
 use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Context;
+use ElPandaPe\Warden\Support\Expiry;
 use Illuminate\Database\Eloquent\Model;
 use Throwable;
 
@@ -139,6 +140,9 @@ final readonly class Reach
             ->where('entity_type', $authority->getMorphClass())
             ->where('entity_id', $authority->getKey())
             ->whereNotNull('restricted_to_type')
+            // A lapsed assignment reaches nothing, so it cannot be the reason
+            // this sentence appears.
+            ->tap(Expiry::live(...))
             ->exists();
     }
 

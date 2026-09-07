@@ -1402,3 +1402,50 @@ test('a role created with cells already ticked reports them too', function (): v
             ->title(__('filament-panels::resources/pages/create-record.notifications.created.title'))
             ->body('1 granted'));
 });
+
+test('a role whose only assignment has lapsed is still not deletable', function (): void {
+    $role = makeRole();
+    $account = makeUser();
+
+    config()->set('filament-warden.roles.delete', 'unassigned');
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::assign($role)->until(Carbon::parse('2026-09-08 12:00:00'))->to($account);
+
+    Carbon::setTestNow('2026-09-09 12:00:00');
+
+    // The cascade is blind to the clock exactly as it is blind to the scope: the
+    // row is still there and the delete still takes it. A read that DECIDES a
+    // delete therefore counts it, while the badge beside it does not — the two
+    // disagree on purpose, one saying who holds the role and the other what the
+    // delete would destroy. `warden:clean --expired` is what makes it deletable,
+    // which is a decision somebody makes rather than one a date makes for them.
+    expect(RoleResource::isDeletable($role->refresh()))->toBeFalse();
+
+    Carbon::setTestNow();
+});
+
+test('the badge counts who holds a role, and a lapsed assignment is nobody', function (): void {
+    $user = signIn();
+    $role = makeRole();
+    $account = makeUser('Amaru Quispe');
+
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::assign($role)->until(Carbon::parse('2026-09-08 12:00:00'))->to($account);
+
+    Carbon::setTestNow('2026-09-09 12:00:00');
+
+    // The holders sentence on the record page reports; the delete warning beside
+    // it does not. Same table, two questions.
+    $page = livewire(ViewRole::class, ['record' => $role->getKey()]);
+
+    $page->assertDontSee('Amaru Quispe');
+
+    expect(RolesTable::warning($role->refresh()))->toContain('Amaru Quispe');
+
+    Carbon::setTestNow();
+});

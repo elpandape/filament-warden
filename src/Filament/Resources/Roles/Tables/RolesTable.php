@@ -9,6 +9,7 @@ use ElPandaPe\FilamentWarden\Grants\Holders;
 use ElPandaPe\FilamentWarden\Support\Config;
 use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Context;
+use ElPandaPe\Warden\Support\Expiry;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
@@ -96,10 +97,10 @@ final class RolesTable
      * `ViewRole` carry their own `DeleteAction` and reuse this directly.
      *
      * Read wide on purpose: the assignment rows follow the role down through a
-     * foreign key and THE CASCADE IS BLIND TO THE SCOPE, exactly like
-     * `RoleResource::isDeletable()`'s own read and `Holders::of()`'s — counting
-     * only the active tenant's rows would promise a smaller loss than the
-     * delete actually causes.
+     * foreign key and THE CASCADE IS BLIND TO THE SCOPE — and to the clock —
+     * exactly like `RoleResource::isDeletable()`'s own read and `Holders::of()`'s.
+     * Counting only the active tenant's live rows would promise a smaller loss
+     * than the delete actually causes.
      */
     public static function warning(Model $record): string
     {
@@ -192,6 +193,10 @@ final class RolesTable
         $rows = Context::resolve()->assignedRoleClass()::query()
             ->select('role_id')
             ->selectRaw('count(*) as held')
+            // A badge that informs counts what somebody actually holds. The two
+            // reads below it decide a DELETE and count the lapsed rows too,
+            // because the cascade removes them all the same.
+            ->tap(Expiry::live(...))
             ->groupBy('role_id')
             ->get();
 
@@ -208,8 +213,11 @@ final class RolesTable
     }
 
     /**
-     * Every role id with at least one assignment row, ANY tenant: this decides
-     * a DELETE, and the cascade that removes those rows is blind to scope.
+     * Every role id with at least one assignment row, ANY tenant and ANY date:
+     * this decides a DELETE, and the cascade that removes those rows is blind to
+     * both. `heldCounts()` above is the other kind and applies warden's boundary,
+     * so the badge and the delete button can honestly disagree — one says who
+     * holds the role, the other says what the delete would destroy.
      *
      * `distinct()` is what bounds it to the catalogue rather than the
      * assignment table.

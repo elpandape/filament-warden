@@ -7,6 +7,7 @@ namespace ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Tables\RolesTable;
 use ElPandaPe\Warden\Context;
+use ElPandaPe\Warden\Support\Expiry;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -98,6 +99,10 @@ class ViewRole extends ViewRecord
         /** @var Collection<int, Model> $rows */
         $rows = Context::resolve()->assignedRoleClass()::query()
             ->where('role_id', $record->getKey())
+            // Who holds it, and a lapsed row is not one of them — unlike
+            // `RolesTable::warning()`, which counts them because the cascade
+            // takes them whatever the clock says.
+            ->tap(Expiry::live(...))
             ->orderBy('id')
             ->get();
 

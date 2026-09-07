@@ -7,6 +7,7 @@ namespace ElPandaPe\FilamentWarden\Grants;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
+use ElPandaPe\Warden\Support\Expiry;
 use ElPandaPe\Warden\Tenancy\Tenancy;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -362,7 +363,13 @@ final class Assignment
         $model = self::role($role);
 
         if ($model instanceof Model) {
-            Warden::assign($model)->to($account);
+            // `until(null)` and not a bare `to()`, because `firstOrCreate` FINDS
+            // an expired row rather than making a new one, and warden only moves
+            // the date when a chain declared one. Measured: without this, ticking
+            // a box whose assignment had lapsed found the dead row, changed
+            // nothing, and reported success. A checkbox carries no date, so what
+            // it can mean is "held, with no end".
+            Warden::assign($model)->until(null)->to($account);
 
             // The memo `offers()`/`isHeld()` just read from is exactly what
             // this line makes stale: a caller reading `Assignment::of()` (or
@@ -575,6 +582,11 @@ final class Assignment
         $assignments = Context::resolve()->assignedRoleClass()::query()
             ->where('entity_type', $account->getMorphClass())
             ->where('entity_id', $account->getKey())
+            // Warden's own boundary, called and not copied: a row past its date
+            // stops authorising, so a screen still listing it would offer a
+            // revoke for access nobody has. `Expiry::live()` is public for this,
+            // and it is where the exclusive frontier is decided.
+            ->tap(Expiry::live(...))
             ->get();
 
         $memo[$tenant] = $assignments;
