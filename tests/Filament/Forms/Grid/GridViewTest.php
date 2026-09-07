@@ -389,13 +389,13 @@ test('a grid is read-only when nothing else already explains why it does not wri
         ->toBeFalse();
 });
 
-test('the seven drawings have a word to say, in the cycle order', function (): void {
+test('the nine drawings have a word to say, in the cycle order', function (): void {
     $grid = gridFor(Panel::make()->id('scratch'));
 
     $states = $grid->states();
 
     expect(array_keys($states))
-        ->toBe(['abstain', 'granted', 'forbidden', 'broader', 'narrowed', 'locked', 'undeclared'])
+        ->toBe(['abstain', 'granted', 'forbidden', 'broader', 'narrowed', 'locked', 'undeclared', 'expires', 'inherited'])
         ->and(array_slice(array_keys($states), 0, 3))->toBe(Stance::order())
         ->and($grid->alpine()['states'])->toBe($states)
         ->and(array_filter($states, static fn (string $word): bool => mb_trim($word) === ''))->toBeEmpty();

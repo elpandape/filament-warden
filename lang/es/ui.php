@@ -379,6 +379,8 @@ return [
             'narrowed' => 'estrechada',
             'locked' => 'no se cambia desde aquí',
             'undeclared' => 'no declarada',
+            'expires' => 'termina en una fecha',
+            'inherited' => 'la contesta un rol que éste hereda',
         ],
         'shift' => 'Con Shift el ciclo va hacia atrás.',
     ],

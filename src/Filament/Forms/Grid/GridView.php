@@ -323,7 +323,10 @@ final readonly class GridView
             $states[$stance] = $this->state($stance);
         }
 
-        foreach (['broader', 'narrowed', 'locked', 'undeclared'] as $mark) {
+        // `expires` and `inherited` joined in 3.0.0. They are marks like the
+        // four beside them — a word said after the cell's own name, in a list —
+        // and not captions, which is why they are here and not in the legend.
+        foreach (['broader', 'narrowed', 'locked', 'undeclared', 'expires', 'inherited'] as $mark) {
             $states[$mark] = $this->state($mark);
         }
 

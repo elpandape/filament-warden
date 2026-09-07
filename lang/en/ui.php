@@ -379,6 +379,8 @@ return [
             'narrowed' => 'narrowed',
             'locked' => 'not changeable here',
             'undeclared' => 'not declared',
+            'expires' => 'ends on a date',
+            'inherited' => 'answered by a role this one inherits',
         ],
         'shift' => 'Hold shift to walk the cycle backwards.',
     ],

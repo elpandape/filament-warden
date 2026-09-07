@@ -1341,3 +1341,35 @@ test('the inspector carries the end date it was drawn with, not one it re-reads'
 
     Carbon::setTestNow();
 });
+
+test('a cell that ends and a cell somebody lends both say so, in the markup and in words', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $user = signIn();
+    $outer = makeRole('outer');
+    $inner = makeRole('inner');
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::allow($outer)->until(Carbon::parse('2026-09-14 12:00:00'))->to('update', roleClass());
+    Warden::allow($inner)->to('view', roleClass());
+    Warden::assign($inner)->to($outer);
+
+    $html = livewire(EditRole::class, ['record' => $outer->getKey()])->html();
+
+    // Both halves, and the pairing is the point: the mark is what an eye sees
+    // and the word is what a screen reader hears, and a cell that drew one
+    // without the other would be a state only some people can perceive.
+    expect($html)->toContain('data-until="2026-09-14T12:00:00')
+        ->and($html)->toContain('fw-mark fw-mark-time')
+        ->and($html)->toContain(__('filament-warden::ui.grid.states.expires'))
+        ->and($html)->toContain('data-lent="Inner"')
+        ->and($html)->toContain('fw-mark fw-mark-lent')
+        ->and($html)->toContain(__('filament-warden::ui.grid.states.inherited'));
+
+    Carbon::setTestNow();
+});
