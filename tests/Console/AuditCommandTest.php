@@ -551,7 +551,7 @@ test('a migrated catalogue reports nothing at all about its own schema', functio
     expect(Audit::run()->unmigrated)->toBeEmpty();
 });
 
-test('a rule that can never be true turns the build red, and the exit code says so', function (): void {
+test('a rule that can never be true is what makes this audit unclean, on its own', function (): void {
     $role = makeRole();
 
     Warden::allow($role)->to('viewAny', Post::class);
@@ -565,19 +565,31 @@ test('a rule that can never be true turns the build red, and the exit code says 
         'g' => ['t' => 'group', 'i' => [['and', ['t' => 'value', 'c' => 'published', 'o' => '=', 'v' => 'true']]]],
     ]])->save();
 
-    $audit = Audit::run();
+    // One panel that declares Post, and not `Audit::run()`, and neither half of
+    // that is incidental. Without the resource the whole entity type lands in
+    // `drifted`, which is red too; and `run()` walks every panel this suite
+    // registers — `bare` and `lax` among them — which are red on their own
+    // account, so the COMMAND's exit code cannot isolate any bucket at all here.
+    // Measured: with `unsatisfiable` taken back out of the gate, an exit-code
+    // assertion stayed green both times.
+    //
+    // What decides the exit code is `isClean()`, so that is what this asserts,
+    // over a panel set where this bucket is the only thing standing in the way
+    // (§6.30).
+    $audit = Audit::of([Panel::make()->id('posts')->resources([PostResource::class])]);
 
     expect($audit->unsatisfiable)->toHaveCount(1)
-        ->and($audit->unsatisfiable[0])->toContain('published');
-
-    // The exit code is what carries the guarantee, never the number of terms in
-    // `isClean()`: swapping one bucket for another leaves that count where it
-    // was (§6.30). RED and not informational, because whoever installs this can
-    // empty it — and since 3.0 nothing can write a new one, so it only shrinks.
-    /** @var Illuminate\Testing\PendingCommand $pending */
-    $pending = $this->artisan('filament-warden:audit', ['--check' => true]);
-
-    $pending->assertExitCode(1);
+        ->and($audit->unsatisfiable[0])->toContain('published')
+        ->and($audit->isClean())->toBeFalse()
+        ->and($audit->drifted)->toBeEmpty()
+        ->and($audit->strays)->toBeEmpty()
+        ->and($audit->forgotten)->toBeEmpty()
+        ->and($audit->open)->toBeEmpty()
+        ->and($audit->unpoliced)->toBeEmpty()
+        ->and($audit->unkeyable)->toBeEmpty()
+        ->and($audit->unownable)->toBeEmpty()
+        ->and($audit->unmigrated)->toBeEmpty()
+        ->and($audit->misconfigured)->toBeEmpty();
 });
 
 test('a role assignment whose authority is a deleted role is stranded too', function (): void {
