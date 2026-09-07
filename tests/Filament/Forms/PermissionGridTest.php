@@ -34,6 +34,7 @@ use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Row;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\CreateRole;
+use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\EditRole;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Grants\SaveReport;
 use ElPandaPe\FilamentWarden\Support\Access;
@@ -1311,6 +1312,31 @@ test('a grid with expiry switched off keeps dates a screen never sent', function
         ->call('save');
 
     expect(RoleGrants::of($role, Catalog::for(Filament::getPanel('test')))->untils)->toBeEmpty();
+
+    Carbon::setTestNow();
+});
+
+test('the inspector carries the end date it was drawn with, not one it re-reads', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::allow($role)->until(Carbon::parse('2026-09-14 12:00:00'))->to('update', roleClass());
+
+    // The whole point of handing the date down rather than querying for it: this
+    // runs on a CLICK, and the rule that keeps `explain()` affordable is that
+    // nothing asks it per row. The `RoleState` the grid was drawn from already
+    // holds the date, so the inspector costs no query for it — and a wiring that
+    // quietly dropped it would leave the sentence correct in `Explanation` and
+    // absent on the screen.
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->call('callSchemaComponentMethod', 'form.permissions', 'explainCell', [roleClass(), 'update'])
+        ->assertReturned(fn (array $why): bool => is_string($why['until']) && str_contains($why['until'], 'Sep 14'));
 
     Carbon::setTestNow();
 });
