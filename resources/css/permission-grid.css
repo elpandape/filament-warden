@@ -1116,6 +1116,8 @@ tr:hover .fw-shortcuts,
    matches the FIRST block it finds, so a second `.fw-conditions {}` further
    down would be read by nothing. Task 5 adds `--fw-chevron` in here. */
 .fw-conditions {
+    --fw-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236b7280' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+
     display: grid;
     grid-template-columns: minmax(0, 34rem) minmax(0, 1fr);
     column-gap: 2rem;
@@ -1173,12 +1175,30 @@ tr:hover .fw-shortcuts,
 .fw-condition select,
 .fw-condition input {
     min-inline-size: 0;
-    padding: 0.1875rem 0.3125rem;
+    padding: 0.375rem 0.625rem;
     border: 1px solid var(--fw-line);
-    border-radius: 0.25rem;
+    border-radius: 0.5rem;
     background: var(--fw-surface);
     color: inherit;
     font-size: 0.8125rem;
+    line-height: 1.25rem;
+    box-shadow: 0 1px 2px 0 color-mix(in oklab, var(--gray-950) 5%, transparent);
+}
+
+.fw-condition select {
+    appearance: none;
+    padding-inline-end: 1.75rem;
+    background-image: var(--fw-chevron);
+    background-repeat: no-repeat;
+    background-position: right 0.375rem center;
+    background-size: 1.125rem;
+}
+
+.fw-condition select:focus-visible,
+.fw-condition input:focus-visible {
+    outline: 2px solid var(--fw-accent);
+    outline-offset: -1px;
+    border-color: var(--fw-accent);
 }
 
 /* Each control is given its share by name, and the same way every time, or the
@@ -1198,11 +1218,17 @@ tr:hover .fw-shortcuts,
     opacity: 0.6;
 }
 
+/* Three letters and a chevron. At 3.25rem it drew "ar". */
 .fw-condition .fw-joiner {
-    flex: 0 0 3.25rem;
+    flex: 0 0 4.75rem;
     color: var(--fw-muted);
     font-size: 0.75rem;
-    text-transform: uppercase;
+}
+
+.fw-add {
+    padding: 0.3125rem 0.625rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
 }
 
 .fw-condition .fw-operator {

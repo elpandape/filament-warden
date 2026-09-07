@@ -179,3 +179,20 @@ test('the rule and what it means share a row, and stack when there is no room', 
     expect($fold)->toContain('grid-template-columns: minmax(0, 1fr)')
         ->and($fold)->toContain('grid-row: auto');
 });
+
+test('the condition controls take the shape of a panel field, and its focus ring', function (): void {
+    // Three native selects and an input in a row looked like no field in the
+    // rest of the panel. Nothing is imported for this: it is CSS against the
+    // panel's own tokens, and the chevron is a data URI like the tick already
+    // is.
+    $controls = declarationsOf(".fw-condition select,\n.fw-condition input");
+
+    expect($controls)->toContain('border-radius: 0.5rem')
+        ->and(declarationsOf('.fw-condition select'))->toContain('appearance: none')
+        ->and(declarationsOf(".fw-condition select:focus-visible,\n.fw-condition input:focus-visible"))
+        ->toContain('outline: 2px solid var(--fw-accent)');
+
+    // Three letters and a chevron do not fit in 3.25rem: it drew "ar" for
+    // "and".
+    expect(declarationsOf('.fw-condition .fw-joiner'))->toContain('flex: 0 0 4.75rem');
+});
