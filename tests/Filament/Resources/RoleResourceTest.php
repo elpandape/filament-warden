@@ -12,6 +12,7 @@ use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ListRoles;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ViewRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Tables\RolesTable;
+use ElPandaPe\FilamentWarden\Grants\Hierarchy;
 use ElPandaPe\FilamentWarden\Grants\Holders;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Support\Access;
@@ -20,6 +21,7 @@ use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\DeleteAction;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Livewire\Notifications;
 use Filament\Notifications\Notification;
 use Filament\Panel;
@@ -1465,6 +1467,11 @@ test('the holders sentence drops a lapsed assignment; the delete warning keeps i
  * `-1` for a state that is not an integer, because it is a number no count can
  * be — a broken read fails the comparison instead of passing as a zero.
  */
+function roleNamed(string $name): Illuminate\Database\Eloquent\Model
+{
+    return roleClass()::query()->where('name', $name)->firstOrFail();
+}
+
 function heldBadge(Illuminate\Database\Eloquent\Model $role): int
 {
     /** @var ListRoles $page */
@@ -1581,4 +1588,144 @@ test('with nesting on and nothing nested, the column is there and says nothing',
     livewire(ListRoles::class)
         ->assertSee(__('filament-warden::ui.resources.roles.columns.inherits'))
         ->assertSee('—');
+});
+
+test('the inheritance field writes through warden, never through the relation', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $outer = makeRole('outer');
+    $inner = makeRole('inner');
+
+    livewire(EditRole::class, ['record' => $outer->getKey()])
+        ->set('data.inherits', [$inner->getKey()])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    // The edge is a row in `assigned_roles` with the role as the authority, so
+    // the field cannot dehydrate onto the record — and the write goes through
+    // `Warden::assign()`, which is what dispatches the event with an actor.
+    expect(Hierarchy::of($outer->refresh())->direct)->toBe([$inner->getKey()]);
+
+    // And the way back is a diff, not a sync: `Warden::sync()` forces
+    // `entity: null`, which is the one thing these rows never are.
+    livewire(EditRole::class, ['record' => $outer->getKey()])
+        ->set('data.inherits', [])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(Hierarchy::of($outer->refresh())->direct)->toBeEmpty();
+});
+
+test('a role is not offered itself, nor anything that already inherits it', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $outer = makeRole('outer');
+    $middle = makeRole('middle');
+
+    Warden::assign($middle)->to($outer);
+
+    // Two exclusions and two different questions. Itself: a cycle with one link,
+    // which warden caps rather than refuses — so the store would take the row
+    // and answer nothing, which is worse than a refusal. And anything already
+    // reaching it: `outer` inherits `middle`, so offering `outer` to `middle`
+    // builds a cycle that stops expanding at `max_depth` and leaves both roles
+    // quietly holding less than they look like they hold.
+    expect(Hierarchy::barredFor($middle))->toBe([$middle->getKey(), $outer->getKey()])
+        // And the far end is not barred by the near one: `outer` may still be
+        // given anything that does not reach it.
+        ->and(Hierarchy::barredFor($outer))->toBe([$outer->getKey()]);
+});
+
+test('the inheritance search offers what is left, and names it', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $outer = makeRole('outer');
+    $middle = makeRole('middle');
+    makeRole('free');
+
+    Warden::assign($middle)->to($outer);
+
+    /** @var EditRole $page */
+    $page = livewire(EditRole::class, ['record' => $middle->getKey()])->instance();
+
+    $field = null;
+
+    // `withHidden` on purpose: the section is `visible()`-gated on the nesting
+    // flag, and a hidden component is not in the default listing — which is a
+    // property of Filament rather than of this form, and reading it as "the
+    // field is not there" would be reading the wrong thing.
+    foreach ($page->form->getFlatFields(withHidden: true) as $component) {
+        if ($component instanceof Select && $component->getName() === 'inherits') {
+            $field = $component;
+        }
+    }
+
+    expect($field)->not->toBeNull();
+
+    // Searched in the SERVER: an installation with two hundred roles would ship
+    // every one into every render to fill a control most saves never touch. The
+    // search runs the exclusion, so what comes back is the whole answer.
+    /** @var Select $field */
+    $found = $field->getSearchResults('');
+
+    /** @var int|string $freeKey */
+    $freeKey = roleNamed('free')->getKey();
+
+    expect(array_keys($found))->toBe([$freeKey])
+        ->and($found[$freeKey])->toBe('Free')
+        // `middle` inherits nothing — `outer` inherits IT — so its own field is
+        // empty, which is the honest reading of this fixture.
+        ->and($field->getOptionLabels())->toBeEmpty();
+
+    // The other end, where there IS something held: the labels come back the
+    // same way, since the field is `dehydrated(false)` and hydrates from the
+    // store rather than from a column.
+    /** @var EditRole $held */
+    $held = livewire(EditRole::class, ['record' => $outer->getKey()])->instance();
+
+    foreach ($held->form->getFlatFields(withHidden: true) as $component) {
+        if ($component instanceof Select && $component->getName() === 'inherits') {
+            /** @var int|string $middleKey */
+            $middleKey = $middle->getKey();
+
+            expect($component->getOptionLabels())->toBe([$middleKey => 'Middle']);
+        }
+    }
+});
+
+test('a percent typed into the inheritance search is a character, not a wildcard', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole('outer');
+    makeRole('plain');
+    makeRole('has%percent');
+
+    /** @var EditRole $page */
+    $page = livewire(EditRole::class, ['record' => $role->getKey()])->instance();
+
+    foreach ($page->form->getFlatFields(withHidden: true) as $component) {
+        if ($component instanceof Select && $component->getName() === 'inherits') {
+            // Unescaped, this matched every role and the box was a way to page
+            // through the table. And escaping WITHOUT the `escape` clause is
+            // worse than not escaping: SQLite has no default escape character,
+            // so it would match nothing at all — too wide becomes permanently
+            // empty (§6.38).
+            expect($component->getSearchResults('%'))->toHaveCount(1);
+        }
+    }
 });

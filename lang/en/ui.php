@@ -13,9 +13,13 @@ return [
             'models' => 'Roles',
             'sections' => [
                 'identity' => 'The role',
+                'inherits' => 'Inherits from',
+                'inherits_help' => 'Everything these roles grant, this one grants too — today, and as they grow. A prohibition still wins, wherever it comes from.',
                 'holders' => 'Who holds it',
             ],
             'fields' => [
+                'inherits' => 'Roles this one inherits',
+                'inherits_help' => 'Search by name or title. A role cannot inherit itself, nor anything that already inherits it: warden stops expanding a cycle at :depth levels instead of failing, so the two roles would quietly hold less than they look like they hold.',
                 'name' => 'Name',
                 'name_help' => 'How your code names it. Grants point at it.',
                 'name_protected' => 'roles.protected lists this name. A role holding it cannot be renamed, cannot be deleted, and its grid cannot be edited.',

@@ -76,3 +76,26 @@ test('a role that has not been saved is inherited by nobody, and asks nothing', 
     // and it saves the query that asking with a null key would make.
     expect(Hierarchy::reaching(new (roleClass())))->toBeEmpty();
 });
+
+test('a screen that never offered the field keeps every edge the store holds', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $outer = makeRole('outer');
+    $inner = makeRole('inner');
+
+    Warden::assign($inner)->to($outer);
+
+    // `null` and an empty ARRAY are different answers, and this is the same
+    // shape `narrowings` and `until` already have: null means the screen never
+    // offered the field — nesting off, or a form that does not carry it — and an
+    // empty array means somebody cleared it. Reading the two as one drops every
+    // inheritance in the installation on the first save from a screen that never
+    // showed one.
+    Hierarchy::apply($outer, null);
+
+    expect(Hierarchy::of($outer)->direct)->toBe([$inner->getKey()]);
+
+    Hierarchy::apply($outer, []);
+
+    expect(Hierarchy::of($outer)->direct)->toBeEmpty();
+});

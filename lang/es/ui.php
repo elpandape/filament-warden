@@ -13,9 +13,13 @@ return [
             'models' => 'Roles',
             'sections' => [
                 'identity' => 'El rol',
+                'inherits' => 'Hereda de',
+                'inherits_help' => 'Todo lo que concedan estos roles lo concede también éste, hoy y cuando crezcan. Una prohibición gana igual, venga de donde venga.',
                 'holders' => 'Quién lo tiene',
             ],
             'fields' => [
+                'inherits' => 'Roles que hereda',
+                'inherits_help' => 'Busca por nombre o título. Un rol no puede heredarse a sí mismo, ni nada que ya lo herede: warden deja de expandir un ciclo a los :depth niveles en vez de fallar, así que los dos roles tendrían en silencio menos de lo que parece.',
                 'name' => 'Nombre',
                 'name_help' => 'Como lo nombra tu código. Las concesiones apuntan aquí.',
                 'name_protected' => 'roles.protected incluye este nombre. Un rol que lo tenga no se puede renombrar, no se puede borrar y su rejilla no se puede editar.',

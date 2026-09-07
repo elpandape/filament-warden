@@ -7,6 +7,7 @@ namespace ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages;
 use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Tables\RolesTable;
+use ElPandaPe\FilamentWarden\Grants\Hierarchy;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
@@ -67,9 +68,20 @@ class EditRole extends EditRecord
      * the browser's copy of `data.name`, so without this the screen keeps
      * showing a forged rename that never reached the store. The grid does not
      * need it: its field re-reads itself after every save.
+     *
+     * The inheritance is written HERE and not through the form's own state,
+     * because the edges are rows in `assigned_roles` and not columns on this
+     * record — the field is `dehydrated(false)` for exactly that reason, the
+     * same way the grid is. Read from the RAW state: `getState()` drops a field
+     * that does not dehydrate, which is the whole point of the flag and would
+     * leave nothing here to write.
      */
     protected function afterSave(): void
     {
+        $raw = $this->form->getRawState();
+
+        Hierarchy::apply($this->getRecord(), is_array($raw) ? ($raw['inherits'] ?? null) : null);
+
         $this->fillForm();
     }
 
