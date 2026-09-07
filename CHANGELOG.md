@@ -33,11 +33,14 @@ lands or which sentence says what.
 ### Changed
 
 - **The grid keeps the width it used to hand to an empty column.** `th.fw-filler`/`td.fw-filler` —
-  311px of a 1010px table, with an FQCN wrapping beside that much empty space — is gone from both
-  head rows and every body row; the entity column takes what it freed instead. Measured in a
+  311px of a 1010px-wide table, with an FQCN wrapping beside that much empty space — is gone from
+  both head rows and every body row; the entity column takes what it freed instead. Measured in a
   browser: the action cells used to end 313px short of the card and now end flush with it; the
   entity column runs 224px to 556px, and gives the slack back as the card narrows — 392px of it in
-  an 844px table — without the matrix ever compressing below what it needs.
+  an 844px-wide table — without the matrix ever compressing below what it needs. (The design spec
+  and the sheet's own comment say 558px for that same column: a real, two-pixel-different
+  measurement taken earlier in a standalone harness, not this figure re-typed wrong. 556px is what
+  the shipped application measures.)
 - **The key folds away above the tabs, in two named groups.** It used to sit under the grid as
   eight lines of flat vocabulary, between a cell and the panel that explains it. It now opens from a
   one-line `<details>` — "What the marks mean" — split into what a click puts on a cell ("A cell you
@@ -60,12 +63,30 @@ lands or which sentence says what.
   browser's; the joiner column widens from 3.25rem — which drew "ar" for "and" — to 4.75rem. The
   rule and what it means, its warning and its live preview, sit beside it instead of stacked with
   the right two-thirds of the panel empty.
+- **The permission form's own condition builder inherits the same pairing, untouched.** It draws
+  `.fw-conditions` through the same partial the role grid's inspector does
+  (`resources/views/conditions.blade.php`), so the split above and its narrow-screen collapse apply
+  there too, without either screen's Blade or CSS naming the other. Measured in a browser on
+  2026-09-07, against the consuming application's `admin/security/permissions/5/edit` — the one
+  permission whose `options` column is set: `grid-template-columns` computes to `544px 432px`
+  inside a 1008px block, the warning and the live preview sit beside the rule exactly as they do on
+  the role grid, and nothing overflows with a clean console.
 - **Tabs stop wrapping across two rows below `55.9375rem`**, the same cut where the table already
   folds into an accordion. At 390px they used to break the tablist itself across two lines; they now
   scroll as one 39px strip, with a fade at the trailing edge as the only sign there is more.
 - **Group headings and field labels drop small caps.** `.fw-group`, `.fw-manage`, `.fw-field-label`
   and the scope stack's summary lose `text-transform: uppercase` and its letter-spacing; weight and
   colour already separated them and read as well without it.
+- **Two existing translation values changed, not just the seven new keys above.** `explain.empty`
+  now reads "Pick a cell to see why it answers the way it does." instead of "Click a cell of the
+  grid.", and `grid.description` — the sentence above the grid on the role form — drops its second
+  sentence, the click-and-shift hint that used to trail it; the folded key says that now, next to
+  the states it describes. Unlike a new key, a published translation keeps whatever text it already
+  declares for a path it names — `FileLoader::loadNamespaceOverrides()` only overrides what the
+  override does not mention. So an application that published translations before this release
+  still shows the OLD `grid.description` above the grid, shift hint included, and the SAME hint now
+  says itself a second time, in the folded key below: diff just these two keys against
+  `lang/{en,es}/ui.php` rather than assuming a stale copy is merely dated.
 
 ### Fixed
 
@@ -78,8 +99,10 @@ lands or which sentence says what.
   55.9375rem)` query that stacks the rule editor, its warning and its live preview into one column
   was declared before the unconditional rules it had to override, so the later rule always won the
   cascade — at every width, on a real screen, including the 390px one this was written for. The
-  visible symptom was the warning squeezed into a column one word wide. Eight gates and three code
-  reviews passed it: `declarationsOf()` and `blockOf()` can only show that a declaration exists in
+  visible symptom was the warning squeezed into a column one word wide. Eight gates passed it, and
+  so did four of the five code reviews run while this query existed — the fifth, the final
+  whole-branch pass, only saw the fix already in place because a browser had caught the bug first:
+  `declarationsOf()` and `blockOf()` can only show that a declaration exists in
   the sheet, never that it wins against another one declared later. Found by opening the screen in a
   browser and reading the computed `grid-template-columns`; fixed by moving the query to the end of
   the file, after every rule it overrides. The test that pins it now asserts the query's position
@@ -88,10 +111,18 @@ lands or which sentence says what.
 ### Not included
 
 - **A real screen reader.** Nobody has run one against these screens. What was run is the
-  accessibility tree, in both themes, against a real panel: the inspector reports as a named region,
-  its two voices as headings, the folded key as two heading-led groups, and no column header without
-  a name. That establishes what role, name and properties each node exposes — nothing about
-  announcement order, pacing or verbosity, which stay unverified.
+  accessibility tree, dumped once — at 1440px, in light — against a real panel: the inspector
+  reports as a named region, its two voices as headings, the folded key as two heading-led groups,
+  and no column header without a name. That establishes what role, name and properties each node
+  exposes at that one width and theme — nothing about dark mode, any other width, announcement
+  order, pacing or verbosity, all of which stay unverified.
+- **`ui.explain.pending` and the CSS rule it used to colour.** `Explanation::of()` still composes
+  the sentence — no file under `src/` changes on this branch — and the payload still carries it
+  under `why.pending` for whoever reads it directly, but nothing renders it any more: the two
+  voices above say the same thing in their own words, "On screen, not saved" plus the stance, so
+  the field is redundant rather than wrong. `.fw-note-pending`, the rule that used to colour it, is
+  removed — it styled an element this branch deleted. The translation key stays — dropping it would
+  be a major — even though a sentence a few lines above it already says the same thing better.
 - **The width split, seen at scale.** The consuming application this was measured against has five
   entity rows. What twenty resources and eight actions would do to the same layout has not been
   seen — the self-regulating behaviour is reasoned about and measured at three widths, not against a
