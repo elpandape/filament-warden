@@ -207,6 +207,54 @@
     min-inline-size: 0;
 }
 
+/* Who lends this cell its answer. Above the two voices rather than inside the
+   stored one: it is not a second reading of the same rule, it is a different
+   rule belonging to a different role — and the part somebody has to know
+   BEFORE they click. */
+.fw-inspector-lent {
+    margin: 0;
+    padding: 0.5rem 0.625rem;
+    border-radius: var(--radius-md, 0.375rem);
+    background: var(--fw-raised);
+    color: var(--fw-muted);
+    font-size: 0.75rem;
+}
+
+/* The date control, in the shape of a panel field like every other control on
+   this grid. */
+.fw-until {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.fw-until-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.fw-until-date {
+    justify-self: start;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-md, 0.375rem);
+    box-shadow: 0 0 0 1px var(--fw-line);
+    background: transparent;
+    color: var(--fw-text);
+    font-size: 0.75rem;
+}
+
+.fw-until-date:disabled {
+    color: var(--fw-muted);
+    opacity: 0.6;
+}
+
+/* The reason the control is off, and it is information rather than decoration:
+   three different noes reach it and only the sentence tells them apart. */
+.fw-until-why {
+    margin: 0;
+    color: var(--fw-muted);
+    font-size: 0.6875rem;
+}
+
 .fw-inspector-empty {
     margin: 0;
     color: var(--fw-muted);

@@ -166,6 +166,7 @@ final readonly class GridView
      *     states: array<string, string>,
      *     filter: array{count: string, empty: string},
      *     summary: array{ratio: string, forbidden: string},
+     *     until: array{forbidden: string, unwritten: string},
      *     operators: list<string>,
      *     authority: string,
      *     boolean: string,
@@ -215,6 +216,14 @@ final readonly class GridView
             'summary' => [
                 'ratio' => self::translated('filament-warden::ui.grid.summary.ratio', ':granted / :total'),
                 'forbidden' => self::translated('filament-warden::ui.grid.summary.forbidden', ':count'),
+            ],
+            // The two sentences the date control says when it cannot be used.
+            // Handed over whole rather than composed: the browser picks one out
+            // of a map, exactly as it does with `states`, so no stance name and
+            // no reason ever lives in the script.
+            'until' => [
+                'forbidden' => self::translated('filament-warden::ui.grid.until.forbidden', 'forbidden'),
+                'unwritten' => self::translated('filament-warden::ui.grid.until.unwritten', 'unwritten'),
             ],
             'explain' => Config::enabled('grid.explain'),
             'constraints' => Config::enabled('grid.constraints'),

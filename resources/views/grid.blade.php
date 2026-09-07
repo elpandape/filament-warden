@@ -445,6 +445,60 @@
                 <p class="fw-inspector-empty fw-inspector-failed" x-show="selected && failed && ! loading" x-cloak>{{ __('filament-warden::ui.explain.failed') }}</p>
 
                 {{--
+                    Who answers this cell, when it is not this role.
+
+                    Above the two voices rather than inside the stored one: it is
+                    not a second reading of the same rule, it is a different rule
+                    belonging to a different role — and changing the cell here
+                    writes one of this role's own on top rather than editing
+                    theirs, which is the part somebody has to know BEFORE they
+                    click.
+                --}}
+                <template x-if="selected && inheritedAt(selected.row, selected.action) && ! loading">
+                    <p class="fw-inspector-lent">
+                        <span
+                            x-text="@js(__('filament-warden::ui.explain.inherited')).replace(
+                                ':role',
+                                inheritedAt(selected.row, selected.action).role,
+                            )"
+                        ></span>
+                    </p>
+                </template>
+
+                {{--
+                    When this cell's grant ends, and whether it may be given one.
+
+                    Three noes with three sentences rather than one greyed
+                    control: warden REFUSES a date on a prohibition — `until()`
+                    on a forbid throws, `null` included — an abstention is the
+                    absence of a row and has no life to end, and a cell answered
+                    by something wider or inherited has no rule here to date.
+
+                    Advisory only. The payload of a disabled control still
+                    reaches the server, so `RoleGrants::plan()` asks the same
+                    question again and drops the date whatever arrives.
+                --}}
+                <template x-if="selected && grid.constraints && interactive && ! loading">
+                    <div class="fw-until">
+                        <span class="fw-until-label">{{ __('filament-warden::ui.grid.until.label') }}</span>
+                        <input
+                            type="date"
+                            class="fw-until-date"
+                            aria-label="{{ __('filament-warden::ui.grid.until.label') }}"
+                            x-bind:disabled="! untilEnabled(selected.row, selected.action)"
+                            x-bind:value="(untilAt(selected.row, selected.action) ?? '').slice(0, 10)"
+                            x-on:change="setUntil(selected.row, selected.action, $event.target.value)"
+                        >
+                        <p
+                            class="fw-until-why"
+                            x-show="untilReason(selected.row, selected.action)"
+                            x-text="untilReason(selected.row, selected.action)"
+                            x-cloak
+                        ></p>
+                    </div>
+                </template>
+
+                {{--
                     The two voices that were one paragraph.
 
                     The panel said "No grant matches" and, three lines down,
@@ -465,6 +519,15 @@
                             </p>
                             <p class="fw-voice-why" x-text="why.summary"></p>
                             <p class="fw-voice-note" x-show="why.narrowed" x-text="why.narrowed" x-cloak></p>
+                            {{--
+                                Beside warden's cause and never instead of it.
+                                There is no `Cause::Expired`: a lapsed grant comes
+                                back `NoMatchingGrant`, byte for byte what a cell
+                                nobody ever wrote answers, so the sentence above
+                                is true and is not the story. Same shape as the
+                                narrowed note for the same reason.
+                            --}}
+                            <p class="fw-voice-note" x-show="why.until" x-text="why.until" x-cloak></p>
                         </section>
 
                         <section class="fw-voice fw-voice-screen" x-show="moved()" x-cloak>

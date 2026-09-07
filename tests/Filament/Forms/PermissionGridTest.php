@@ -1395,3 +1395,51 @@ test('the panel takes its track only once a cell is opened, and gives it back', 
         ->toContain('x-on:keydown.escape="closePanel()"')
         ->toContain(__('filament-warden::ui.explain.close'));
 });
+
+test('the panel offers a date, and says which of the three noes stops it', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $html = livewire(EditRole::class, ['record' => $role->getKey()])->html();
+
+    // Three sentences and not one greyed control: warden refuses a date on a
+    // prohibition — `until()` on a forbid throws, `null` included — an
+    // abstention has no life to end, and a cell answered by something wider has
+    // no rule here to date. A single disabled input would say none of that.
+    expect($html)->toContain('fw-until-date')
+        ->toContain('untilEnabled(selected.row, selected.action)')
+        ->toContain('setUntil(selected.row, selected.action, $event.target.value)')
+        ->toContain(__('filament-warden::ui.grid.until.label'))
+        // Handed over whole rather than composed in the script, exactly as the
+        // state words are: no reason and no stance name ever lives in the js.
+        ->toContain(__('filament-warden::ui.grid.until.forbidden'))
+        ->toContain(__('filament-warden::ui.grid.until.unwritten'));
+});
+
+test('the panel names the role that lends a cell before anybody clicks it', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $user = signIn();
+    $outer = makeRole('outer');
+    $inner = makeRole('inner');
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    Warden::allow($inner)->to('view', roleClass());
+    Warden::assign($inner)->to($outer);
+
+    $html = livewire(EditRole::class, ['record' => $outer->getKey()])->html();
+
+    // Above the two voices and not inside the stored one: it is not a second
+    // reading of the same rule, it is a different rule belonging to a different
+    // role — and changing the cell writes one of this role's own ON TOP rather
+    // than editing theirs, which is the part somebody has to know first.
+    expect($html)->toContain('fw-inspector-lent')
+        ->toContain('inheritedAt(selected.row, selected.action).role');
+});
