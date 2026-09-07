@@ -49,6 +49,7 @@ use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Facades\Filament;
 use Filament\Panel;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
@@ -1275,4 +1276,41 @@ test('the key is folded away above the grid, in two named groups', function (): 
         ->and($html)->toContain(__('filament-warden::ui.grid.legend.set'))
         ->and($html)->toContain(__('filament-warden::ui.grid.legend.added'))
         ->and(mb_substr_count($html, 'class="fw-key-group"'))->toBe(2);
+});
+
+test('a grid with expiry switched off keeps dates a screen never sent', function (): void {
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::allow($role)->until(Carbon::parse('2026-09-14 12:00:00'))->to('viewAny', roleClass());
+
+    // A state with no `until` key at all — which is what a page building its own
+    // state produces, and what this field's own envelope did before 3.0.0.
+    // `State::untils()` reads that as the empty map, and the empty map means
+    // CLEARED. Only the config tells "this screen has no opinion" from "this
+    // screen removed them", and getting it wrong ends every timed grant on the
+    // grid on the first save from such a page.
+    $without = ['stances' => [roleClass() => ['viewAny' => 'granted']], 'narrowing' => []];
+
+    config()->set('filament-warden.grid.expiry', false);
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->set('data.permissions', $without)
+        ->call('save');
+
+    $kept = RoleGrants::of($role, Catalog::for(Filament::getPanel('test')))->untils;
+
+    expect($kept[roleClass()]['viewAny']->toIso8601String())->toStartWith('2026-09-14T12:00:00');
+
+    // And with it on, the same state is an instruction: the date goes.
+    config()->set('filament-warden.grid.expiry', true);
+
+    livewire(GridHost::class, ['roleKey' => $role->getKey()])
+        ->set('data.permissions', $without)
+        ->call('save');
+
+    expect(RoleGrants::of($role, Catalog::for(Filament::getPanel('test')))->untils)->toBeEmpty();
+
+    Carbon::setTestNow();
 });

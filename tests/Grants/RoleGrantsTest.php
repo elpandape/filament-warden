@@ -1742,3 +1742,39 @@ test('narrowing a grant does not widen its life', function (): void {
 
     Carbon::setTestNow();
 });
+
+test('moving only the date leaves the rule byte for byte as the store wrote it', function (): void {
+    $role = makeRole();
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    // The value is stored as the STRING '2'. A payload carries every value as
+    // text, so rebuilding the rule from one turns it into the integer 2 — a
+    // different twin, matching different rows (§6.15). Whether the reach moved
+    // and whether the date moved are therefore two questions: fold them into one
+    // flag and a date-only edit rebuilds the rule, which is the defect 1.4.0
+    // exists to keep shut, reached through a door it did not have then.
+    Warden::allow($role)->until(Carbon::parse('2026-09-14 12:00:00'))->to('viewAny', Post::class)->where('id', '=', '2');
+
+    $before = latestPermission('viewAny')->getAttribute('options');
+
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'granted']], [
+        Post::class => ['viewAny' => [
+            'mode' => 'conditions',
+            'rules' => [[
+                'logic' => 'and', 'kind' => 'value', 'column' => 'id',
+                'operator' => '=', 'value' => '2', 'authority' => '',
+            ]],
+        ]],
+    ], null, [
+        Post::class => ['viewAny' => CarbonImmutable::parse('2026-09-21 12:00:00')],
+    ]);
+
+    $state = RoleGrants::of($role, gridCatalog());
+
+    expect(latestPermission('viewAny')->getAttribute('options'))->toBe($before)
+        ->and($state->untils[Post::class]['viewAny']->toIso8601String())->toStartWith('2026-09-21T12:00:00')
+        ->and(grantCount())->toBe(1);
+
+    Carbon::setTestNow();
+});
