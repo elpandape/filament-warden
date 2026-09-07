@@ -242,7 +242,8 @@ return [
             'unkeyable' => 'Catalogue names carrying a dot. Livewire splits a state path on dots, so these cannot be a cell: a role screen throws the moment it draws one. Rename the permission.',
             'unownable' => 'Permissions restricted to what the holder owns, on a model that resolves no ownership. They grant nothing and forbid nothing: there is no attribute to compare, and the query side fails closed. Register the ownership with ownedVia(), or take the row out.',
             'unwalkable' => 'Models only a relation manager reaches. Reaching one means running the relationship, which is not safe to do here, so they are named instead. A relation manager declaring `$relatedResource` is walked for free; one that cannot declare it stays on this list for good — this package\'s own `RolesRelationManager` is one, deliberately. `catalog.models` is what puts the model in the catalogue; it does not clear the line.',
-            'stranded' => 'Grants whose authority no longer exists. No database cascade reaches them. Warden sweeps a deleted ROLE through a model event; an account, a role subclass, and anything deleted by raw SQL are left behind. Run `warden:clean --stranded` to remove them.',
+            'unsatisfiable' => 'Catalogue rows whose condition can never be true: a boolean value against a column the model does not cast to bool, or the reverse. As a grant they authorise nothing; as a prohibition they are inert, and the grant they were written to narrow keeps applying. Warden refuses to write new ones — these predate that. Correct the condition, or add the cast. `warden:doctor` lists the same rows with more detail.',
+            'stranded' => 'Grants and role assignments whose authority no longer exists. No database cascade reaches them. Warden sweeps a deleted ROLE through a model event; an account, a role subclass, and anything deleted by raw SQL are left behind. Run `warden:clean --stranded` to remove them.',
             'misconfigured' => 'Config entries this package reads and cannot use. Each one was dropped in silence, so what is missing from a screen never said why. Fix the line or take it out.',
             'clean' => 'Nothing to report.',
         ],
@@ -288,6 +289,8 @@ return [
                 'hint' => 'Attributes of the row are compared. Stored as a twin permission of its own.',
             ],
         ],
+        'impossible' => 'A boolean only ever matches a column the model casts to bool, and :columns compares across that line — so this rule can never be true. Compare against true or false, add the cast to the model, or point the condition at another column.',
+
         'locked' => [
             'corrupt' => 'The stored conditions cannot be read. They are shown as they are and left alone: rewriting them would replace a rule nobody can see.',
             'empty' => 'The stored rule carries an empty condition group: it answers only with a record in front of it, and then always.',

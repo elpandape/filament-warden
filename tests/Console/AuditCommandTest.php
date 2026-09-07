@@ -550,3 +550,68 @@ test('a catalogue still in its pre-2.0 shape turns the build red before anybody 
 test('a migrated catalogue reports nothing at all about its own schema', function (): void {
     expect(Audit::run()->unmigrated)->toBeEmpty();
 });
+
+test('a rule that can never be true turns the build red, and the exit code says so', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    // The row a 2.x database carries and warden 3.0 will not write: the string
+    // 'true' against a column `Post` DOES cast to bool. Warden migrates none of
+    // them, so a build that only runs this command has to hear about it here.
+    $row = permissionClass()::query()->withoutGlobalScopes()->where('name', 'viewAny')->orderByDesc('id')->firstOrFail();
+    $row->forceFill(['options' => [
+        'v' => 1,
+        'g' => ['t' => 'group', 'i' => [['and', ['t' => 'value', 'c' => 'published', 'o' => '=', 'v' => 'true']]]],
+    ]])->save();
+
+    $audit = Audit::run();
+
+    expect($audit->unsatisfiable)->toHaveCount(1)
+        ->and($audit->unsatisfiable[0])->toContain('published');
+
+    // The exit code is what carries the guarantee, never the number of terms in
+    // `isClean()`: swapping one bucket for another leaves that count where it
+    // was (§6.30). RED and not informational, because whoever installs this can
+    // empty it — and since 3.0 nothing can write a new one, so it only shrinks.
+    /** @var Illuminate\Testing\PendingCommand $pending */
+    $pending = $this->artisan('filament-warden:audit', ['--check' => true]);
+
+    $pending->assertExitCode(1);
+});
+
+test('a role assignment whose authority is a deleted role is stranded too', function (): void {
+    $outer = makeRole('outer');
+    $inner = makeRole('inner');
+
+    // Nesting made this edge possible and no foreign key reaches it: the
+    // authority side of `assigned_roles` is polymorphic. Warden 3.0 sweeps both
+    // pivots with `--stranded`, so a bucket that covered only `grants` would
+    // call an installation clean while the command it names still had work.
+    Warden::assign($inner)->to($outer);
+
+    Context::resolve()->roleClass()::query()->whereKey($outer->getKey())->delete();
+
+    expect(Audit::run()->stranded)->toHaveCount(1);
+});
+
+test('a loose row carrying conditions is not this bucket, because there is no model to ask', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('export');
+
+    // A permission with no entity and conditions on it — §6.5's row, and a
+    // dangerous one: with no instance, `passesConstraints()` answers the
+    // polarity of the pass, so as a grant it never grants and as a prohibition
+    // it always forbids. But whether a rule can EVER be true is a question about
+    // a model's casts, and there is no model here to ask. Naming it in this
+    // bucket would send somebody to add a cast to a class that does not exist;
+    // `drifted` is where a row whose entity resolves to nothing is reported.
+    $row = permissionClass()::query()->withoutGlobalScopes()->where('name', 'export')->orderByDesc('id')->firstOrFail();
+    $row->forceFill(['options' => [
+        'v' => 1,
+        'g' => ['t' => 'group', 'i' => [['and', ['t' => 'value', 'c' => 'published', 'o' => '=', 'v' => 'true']]]],
+    ]])->save();
+
+    expect(Audit::run()->unsatisfiable)->toBeEmpty();
+});

@@ -242,7 +242,8 @@ return [
             'unkeyable' => 'Nombres del catálogo con un punto. Livewire parte las rutas de estado por puntos, así que no pueden ser una celda: una pantalla de rol lanza en cuanto dibuja una. Renombra el permiso.',
             'unownable' => 'Permisos limitados a lo que el titular posee, sobre un modelo que no resuelve ninguna propiedad. No conceden nada ni prohíben nada: no hay atributo que comparar, y la consulta falla cerrada. Regístrala con ownedVia(), o quita la fila.',
             'unwalkable' => 'Modelos a los que solo llega un relation manager. Llegar a uno exige ejecutar la relación, que aquí no es seguro hacer, así que se nombran en vez de resolverse. Un relation manager que declara `$relatedResource` se recorre gratis; uno que no puede declararlo se queda en esta lista para siempre —el `RolesRelationManager` de este paquete es uno, a propósito—. `catalog.models` es lo que mete el modelo en el catálogo; no quita la línea.',
-            'stranded' => 'Concesiones cuya autoridad ya no existe. Ninguna cascada de la base las alcanza. Warden barre un ROL borrado por evento de modelo; una cuenta, una subclase de rol y todo lo borrado por SQL crudo quedan atrás. Ejecuta `warden:clean --stranded` para quitarlas.',
+            'unsatisfiable' => 'Filas del catálogo cuya condición nunca puede ser cierta: un valor booleano contra una columna que el modelo no castea a bool, o al revés. Como concesión no autorizan nada; como prohibición son inertes, y la concesión que venían a estrechar sigue aplicando. Warden se niega a escribir nuevas: éstas son anteriores. Corrige la condición, o añade el cast. `warden:doctor` lista las mismas filas con más detalle.',
+            'stranded' => 'Concesiones y asignaciones de rol cuya autoridad ya no existe. Ninguna cascada de la base las alcanza. Warden barre un ROL borrado por evento de modelo; una cuenta, una subclase de rol y todo lo borrado por SQL crudo quedan atrás. Ejecuta `warden:clean --stranded` para quitarlas.',
             'misconfigured' => 'Entradas de configuración que este paquete lee y no puede usar. Cada una se descartó en silencio, así que lo que falta en una pantalla nunca dijo por qué. Corrige la línea o quítala.',
             'clean' => 'Nada que informar.',
         ],
@@ -288,6 +289,8 @@ return [
                 'hint' => 'Se comparan atributos de la fila. Se guarda como un permiso gemelo propio.',
             ],
         ],
+        'impossible' => 'Un booleano solo casa con una columna que el modelo castee a bool, y :columns compara cruzando esa línea, así que esta regla nunca puede ser cierta. Compara contra true o false, añade el cast al modelo, o apunta la condición a otra columna.',
+
         'locked' => [
             'corrupt' => 'Las condiciones guardadas no se pueden leer. Se enseñan como están y se dejan en paz: reescribirlas sustituiría una regla que nadie puede ver.',
             'empty' => 'La regla guardada lleva un grupo de condiciones vacío: solo responde con una fila delante, y entonces siempre.',

@@ -1498,3 +1498,49 @@ test('a save that never touched an unreadable condition does not blank it', func
     // a rule nobody could decode into an unconditional grant.
     expect($after)->toBe($raw);
 });
+
+test('a stored rule that can never be true closes the builder with its own word', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    // `Post` casts `published` to bool and the stored value is the string
+    // 'true'. It reads back and writes back perfectly well — the round trip has
+    // no opinion on whether anything could ever match it — so this has to be
+    // asked BEFORE that check, or the builder opens on a rule the save refuses
+    // and the person is told nothing until they press save.
+    $permission = permissionWithOptions(Post::class, [
+        'v' => 1,
+        'g' => ['t' => 'group', 'i' => [['and', ['t' => 'value', 'c' => 'published', 'o' => '=', 'v' => 'true']]]],
+    ]);
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->assertSee(__('filament-warden::ui.conditions.locked.unsatisfiable'))
+        ->assertDontSee(__('filament-warden::ui.conditions.locked.rewrite'));
+});
+
+test('a rule that can never be true is refused on the field, not saved and audited later', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $permission = permissionWithOptions(Post::class, [
+        'v' => 1,
+        'g' => ['t' => 'group', 'i' => [['and', ['t' => 'value', 'c' => 'title', 'o' => '=', 'v' => 'alpha']]]],
+    ]);
+
+    $before = $permission->getAttribute('options');
+
+    // This screen writes `options` through Eloquent, never through warden's
+    // fluent chain, so warden's own refusal never runs here: without a rule on
+    // the field the row would simply be saved unsatisfiable and `warden:doctor`
+    // would find it later — which is exactly the state 3.0 exists to stop
+    // anybody entering.
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->set('data.options.rules.0.column', 'published')
+        ->set('data.options.rules.0.value', 'alpha')
+        ->call('save')
+        ->assertHasFormErrors(['options']);
+
+    expect($permission->refresh()->getAttribute('options'))->toBe($before);
+});

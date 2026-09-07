@@ -337,6 +337,16 @@ final class PermissionForm
             return 'model';
         }
 
+        // Ahead of the round trip on purpose. A rule that can never be true
+        // reads and writes back perfectly well — the round trip has no opinion
+        // on whether anything could ever match it — so asking afterwards would
+        // let the builder open on a rule warden refuses, and the save would come
+        // back with a field error the person could not act on from a form that
+        // said everything was fine.
+        if ($stored->unsatisfiableColumns($model) !== []) {
+            return 'unsatisfiable';
+        }
+
         $rebuilt = Narrowing::fromPayload(
             $stored->toPayload(),
             Columns::of($model),

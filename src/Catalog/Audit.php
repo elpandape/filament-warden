@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Catalog;
 
+use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Conditions\Ownership;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Guard;
@@ -38,9 +39,10 @@ final readonly class Audit
      * @param  list<string>  $unwalkable  models only a relation manager reaches
      * @param  list<string>  $unkeyable  catalogue names the grid cannot key, which throw when a role screen renders
      * @param  list<string>  $unownable  ownership rows whose model resolves no ownership, so they grant nothing
-     * @param  list<string>  $stranded  grants whose authority no longer exists
+     * @param  list<string>  $stranded  grants and role assignments whose authority no longer exists
      * @param  list<string>  $unmigrated  what warden's own schema is missing
      * @param  list<string>  $misconfigured  config entries this package reads and drops
+     * @param  list<string>  $unsatisfiable  catalogue rows whose condition can never be true
      */
     public function __construct(
         public array $open = [],
@@ -55,6 +57,7 @@ final readonly class Audit
         public array $stranded = [],
         public array $unmigrated = [],
         public array $misconfigured = [],
+        public array $unsatisfiable = [],
     ) {}
 
     public static function run(): self
@@ -137,6 +140,7 @@ final readonly class Audit
             stranded: self::stranded(),
             unmigrated: self::unmigrated(),
             misconfigured: self::misconfigured(),
+            unsatisfiable: self::unsatisfiable(),
         );
     }
 
@@ -174,7 +178,8 @@ final readonly class Audit
             && $this->drifted === []
             && $this->unkeyable === []
             && $this->unownable === []
-            && $this->misconfigured === [];
+            && $this->misconfigured === []
+            && $this->unsatisfiable === [];
     }
 
     /**
@@ -495,16 +500,24 @@ final readonly class Audit
     {
         $context = Context::resolve();
 
-        $grants = $context->grantClass()::query()
-            ->withoutGlobalScopes()
-            ->get(['entity_type', 'entity_id']);
-
         /** @var array<string, list<int|string>> $byType */
         $byType = [];
 
-        foreach ($grants as $grant) {
-            $type = $grant->getAttribute('entity_type');
-            $key = $grant->getAttribute('entity_id');
+        // BOTH pivots since warden 3.0. Nesting made `assigned_roles` able to
+        // hold an edge whose authority is a role, and no foreign key reaches
+        // that side — so a deleted inner role leaves the same kind of orphan a
+        // grant does, and `warden:clean --stranded` sweeps both. A bucket that
+        // covered one of the two would call an installation clean while the
+        // command it names still had work.
+        /** @var list<Model> $rows */
+        $rows = [
+            ...$context->grantClass()::query()->withoutGlobalScopes()->get(['entity_type', 'entity_id'])->all(),
+            ...$context->assignedRoleClass()::query()->withoutGlobalScopes()->get(['entity_type', 'entity_id'])->all(),
+        ];
+
+        foreach ($rows as $row) {
+            $type = $row->getAttribute('entity_type');
+            $key = $row->getAttribute('entity_id');
 
             // Both null is a grant to everyone, and a type with no key is
             // warden's wildcard authority: neither names a row that could be
@@ -552,6 +565,54 @@ final readonly class Audit
         }
 
         return $findings;
+    }
+
+    /**
+     * Catalogue rows whose condition can never be true.
+     *
+     * Warden 3.0 refuses to write one, and `warden:doctor` lists the ones a 2.x
+     * database already carries — none of them are migrated. This bucket exists
+     * so the same fact reaches a build that already runs `filament-warden:audit`
+     * and does not know to run a second command.
+     *
+     * RED, unlike `stranded` beside it, and the difference is §6.28's rule:
+     * whoever installs this CAN empty it — correct the condition, or add the
+     * cast the value expects. It only shrinks, too: nothing can write a new one
+     * since 3.0, so a gate that goes green stays green. A tray the correct use
+     * of the package cannot empty is the one that must not be a gate; this is
+     * the opposite of that.
+     *
+     * The rule is warden's, asked through `Narrowing`, and it wants an instance
+     * — the answer is the model's casts. A row whose entity resolves to nothing
+     * is `drifted`'s finding, not this one's.
+     *
+     * @return list<string>
+     */
+    private static function unsatisfiable(): array
+    {
+        $rows = Context::resolve()->permissionClass()::query()
+            ->withoutGlobalScopes()
+            ->whereNotNull('options')
+            ->get();
+
+        $findings = [];
+
+        foreach ($rows as $row) {
+            $type = $row->getAttribute('entity_type');
+            $model = is_string($type) ? Morph::model($type) : null;
+
+            if ($model === null) {
+                continue;
+            }
+
+            foreach (Narrowing::of($row)->unsatisfiableColumns($model) as $column) {
+                $name = $row->getAttribute('name');
+
+                $findings[] = (is_string($name) ? $name : '?').' on '.$type.'.'.$column;
+            }
+        }
+
+        return array_values(array_unique($findings));
     }
 
     /**

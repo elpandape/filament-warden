@@ -45,6 +45,33 @@ final class ConditionBuilder extends Field
                 : Narrowing::all()->toPayload());
         });
 
+        // A rule that can never be true is refused HERE, on the field, and not
+        // in a hook after it. `EditRecord::save()` validates before it mutates,
+        // so a rule caught here stops the write and lands its sentence on the
+        // one field a person can fix — while the same check in
+        // `mutateFormDataBeforeSave()` would arrive after validation passed and
+        // have to throw a `ValidationException` at a field it does not own.
+        //
+        // This screen writes `options` through Eloquent, never through warden's
+        // fluent chain, so warden's own refusal never runs: the row would simply
+        // be saved unsatisfiable, and `warden:doctor` would find it later. The
+        // question is warden's either way — `Group::unsatisfiableColumns()` —
+        // asked of the entity the sibling field currently names.
+        $this->rule(static fn (self $component): Closure => static function (string $attribute, mixed $value, Closure $fail) use ($component): void {
+            $model = $component->getEntity();
+            $narrowing = $model === null ? null : $component->narrowing($value);
+
+            if ($model === null || ! $narrowing instanceof Narrowing) {
+                return;
+            }
+
+            $columns = $narrowing->unsatisfiableColumns($model);
+
+            if ($columns !== []) {
+                $fail(__('filament-warden::ui.conditions.impossible', ['columns' => implode(', ', $columns)]));
+            }
+        });
+
         // Written through the serializer, always: a shape it did not produce
         // deserializes to null without throwing, and the engines then answer
         // with whichever direction is safe for the pass they are running.
