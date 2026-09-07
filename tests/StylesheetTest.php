@@ -21,7 +21,7 @@ function stylesheet(): string
  * The declarations of the rule whose selector list is exactly $selector.
  *
  * Anchored on a line start so that `.fw-box` does not also catch
- * `.fw-legend .fw-box`, and terminated on the first `}` because no declaration
+ * `.fw-key .fw-box`, and terminated on the first `}` because no declaration
  * in this sheet contains one.
  */
 function declarationsOf(string $selector): string
@@ -43,6 +43,25 @@ function blockOf(string $atRule): string
     preg_match('/'.preg_quote($atRule, '/').'\s*\{(.*?)\n\}/s', stylesheet(), $matches);
 
     return implode('', array_slice($matches, 1));
+}
+
+/**
+ * The BYTE offset of the first match of $pattern in $haystack, from $from, or
+ * null.
+ *
+ * `PREG_OFFSET_CAPTURE` reports byte offsets and, unlike `strpos()`, survives
+ * Pint's `mb_str_functions` rule unrewritten — that rule's `mb_` substitute
+ * returns CHARACTER offsets, which stop lining up with a byte-oriented walk
+ * the moment anything multibyte, like this sheet's em dashes, sits earlier in
+ * the string. `??` on a possibly-absent match, rather than reading `$matches[0][1]`
+ * at the call site, is what lets PHPStan narrow the result to a plain `int`
+ * everywhere this is used instead of the array shape `preg_match()` returns.
+ */
+function byteOffsetOf(string $pattern, string $haystack, int $from = 0): ?int
+{
+    preg_match($pattern, $haystack, $matches, PREG_OFFSET_CAPTURE, $from);
+
+    return $matches[0][1] ?? null;
 }
 
 test('the smallest print is drawn with the muted token', function (): void {
@@ -111,11 +130,15 @@ test('the reach rail asks its container how wide it is, not the window', functio
 });
 
 test('the table fills the card and still never compresses below the matrix', function (): void {
-    // Measured in a 1010px table on 2026-09-06, with and without a filler
-    // column: with it the action cells end at 752 and leave 313px of nothing;
-    // without it the entity column takes the slack — 224px to 558px — and the
-    // cells end at 1065, flush with the card. It gives the slack back as the
-    // card narrows: 392px in an 844px table, and it never overflows.
+    // Measured on a table 1010px WIDE on 2026-09-06, in a 1120px viewport
+    // where the card's own right edge sits at the x-coordinate 1065px: WITH
+    // a filler column the action cells stopped at x=752, 313px short of that
+    // edge; WITHOUT it the entity column takes the slack instead — growing
+    // from 224px to 558px wide — and the cells now end at x=1065, flush with
+    // the card. It gives the slack back as the card narrows: 392px in an
+    // 844px table, and it never overflows. (558px is this standalone design
+    // pass; the shipped application measures 556px for the same column — see
+    // the CHANGELOG, which is the number that matters to somebody reading it.)
     //
     // An older note here said the same arrangement left "the cells still
     // bunched at the left". That does not reproduce against this markup, and
@@ -215,8 +238,19 @@ test('nothing that carries a category shouts it in small caps', function (): voi
     // `.fw-group` alone matches no line in the file (the line reads
     // `.fw-group,`, not `.fw-group {`) and passes on the empty string it
     // gets back.
-    expect(declarationsOf(".fw-group,\n.fw-manage"))->not->toContain('text-transform: uppercase')
-        ->and(declarationsOf('.fw-field-label'))->not->toContain('text-transform: uppercase');
+    //
+    // Each `not->toContain()` is paired with a `toContain()` from the SAME
+    // block: a selector that stops matching — split into two blocks, or
+    // renamed — returns `''` from `declarationsOf()`, and `''` does not
+    // contain `text-transform: uppercase` either. The pair proves the block
+    // was actually read and not just silently empty.
+    $group = declarationsOf(".fw-group,\n.fw-manage");
+    $field = declarationsOf('.fw-field-label');
+
+    expect($group)->toContain('font-weight: 600')
+        ->and($group)->not->toContain('text-transform: uppercase')
+        ->and($field)->toContain('font-weight: 600')
+        ->and($field)->not->toContain('text-transform: uppercase');
 });
 
 test('the tabs are one strip that scrolls, never two rows', function (): void {
@@ -258,22 +292,68 @@ test('the add-condition button is enlarged by the block that actually wins', fun
         ->and(declarationsOf('.fw-add'))->toContain('border-radius: 0.5rem');
 });
 
-test('the fold outranks the wide layout it collapses, by position', function (): void {
+test('the fold outranks everything it collapses, by being the last rule in the file', function (): void {
     // A media query and its base rule share specificity, so source order
     // decides which one wins — and this query used to lose. It sat two
     // hundred lines above `.fw-conditions {}`, so the unconditional root rule
     // always came later and always won, at every width, on a real screen: a
     // 390px viewport measured `grid-template-columns` as still two columns.
+    //
+    // Pinning the query's position against only ONE base — `.fw-conditions`,
+    // what this test checked before — proves nothing about the other seven
+    // this same query overrides: `.fw-scroll`, `.fw-stack`, `.fw-tabs`,
+    // `.fw-tab`, `.fw-conditions`'s own two children, and the four
+    // `.fw-write .fw-*` selectors. Moving any ONE of those back below the
+    // query reproduces the exact defect this release fixed, on a real
+    // screen, with that narrower check still green.
+    //
     // `declarationsOf()` and `blockOf()` can only prove a declaration exists
-    // in the sheet, never that it wins the cascade — this is the assertion
-    // that closes that gap.
+    // in the sheet, never that it wins the cascade. The one check that closes
+    // that gap for every base at once is the invariant the comment above the
+    // query already states in prose: nothing may restate any of them at the
+    // root after this point — which is the same thing as saying the query is
+    // the LAST rule in the file.
+    //
+    // Walked brace by brace and not matched with a greedy `.*`: a pattern
+    // that only checks for "some `\n}` before the end of the string" is
+    // fooled by anything appended afterwards, because an appended rule ends
+    // in `\n}` too — confirmed by appending one to a copy of this exact sheet
+    // and watching such a pattern keep matching regardless. Only tracking
+    // brace depth finds the query's OWN closing brace and nothing past it.
+    //
+    // `byteOffsetOf()`, not `strpos()`/`substr()`: those return and take
+    // CHARACTER positions once Pint's `mb_str_functions` rule rewrites them
+    // to their `mb_` form, and this sheet has multibyte em dashes throughout
+    // its comments — a character offset does not line up with where `{`
+    // actually sits in the byte string `preg_match_all()` reports it at.
     $sheet = stylesheet();
-    $query = mb_strpos($sheet, '@media (max-width: 55.9375rem)');
-    $base = mb_strpos($sheet, "\n.fw-conditions {");
+    $start = byteOffsetOf('/@media \(max-width: 55\.9375rem\)/', $sheet);
 
-    // Both present before either is ordered: a missing needle is `false`,
-    // and casting that to an int reads as position zero.
-    expect($query)->not->toBeFalse()
-        ->and($base)->not->toBeFalse()
-        ->and((int) $query)->toBeGreaterThan((int) $base);
+    expect($start)->not->toBeNull();
+
+    preg_match_all('/[{}]/', $sheet, $braces, PREG_OFFSET_CAPTURE, (int) $start);
+
+    $depth = 0;
+    $close = null;
+
+    foreach ($braces[0] as $brace) {
+        $depth += $brace[0] === '{' ? 1 : -1;
+
+        if ($depth === 0) {
+            $close = $brace[1];
+
+            break;
+        }
+    }
+
+    // Unbalanced braces would leave this null rather than let the next check
+    // compare against a wrong-but-plausible position.
+    expect($close)->not->toBeNull();
+
+    // The query's closing brace is the last non-whitespace byte in the file:
+    // found independently, by looking for a non-whitespace character with no
+    // OTHER non-whitespace character anywhere after it — never by slicing
+    // the tail and asking whether the slice is blank, which needs the same
+    // `substr()` this test is avoiding.
+    expect(byteOffsetOf('/\S(?!.*\S)/s', $sheet))->toBe($close);
 });
