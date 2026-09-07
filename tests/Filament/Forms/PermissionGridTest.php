@@ -1234,3 +1234,28 @@ test('why an option cannot be picked is pointed at by the option it is about', f
         ->and($html)->toMatch('/x-bind:aria-describedby="[^"]*reach-reason/s')
         ->and($html)->toMatch("/mode === 'owned' &&\s*narrowing\.ownership\.reason/");
 });
+
+test('the key is folded away above the grid, in two named groups', function (): void {
+    $html = livewire(GridHost::class, ['roleKey' => makeRole()->getKey()])->html();
+
+    // Above the tabs and not between a cell and its answer: the legend used to
+    // sit under the grid, so the panel that says why a cell is the way it is
+    // was eight lines of vocabulary further down.
+    $key = mb_strpos($html, 'fw-legend-fold');
+    $tabs = mb_strpos($html, 'class="fw-tabs"');
+
+    // Cast for PHPStan, not for the assertion: `toBeInt()` proves the value at
+    // runtime but does not narrow `int<0, max>|false` for `toBeLessThan()`,
+    // which wants an `int` argument — the same shape StylesheetTest already
+    // works around for `mb_strpos()`.
+    expect($key)->toBeInt()
+        ->and($tabs)->toBeInt()
+        ->and((int) $key)->toBeLessThan((int) $tabs);
+
+    // Two groups, because the vocabulary has two halves: the three a person
+    // sets with a click, and the four the grid adds on its own.
+    expect($html)->toContain(__('filament-warden::ui.grid.legend.title'))
+        ->and($html)->toContain(__('filament-warden::ui.grid.legend.set'))
+        ->and($html)->toContain(__('filament-warden::ui.grid.legend.added'))
+        ->and(mb_substr_count($html, 'class="fw-key-group"'))->toBe(2);
+});

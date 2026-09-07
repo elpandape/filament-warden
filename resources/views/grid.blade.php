@@ -94,6 +94,57 @@
                 --}}
                 <p class="fw-sr" role="status" x-text="said"></p>
 
+                <details class="fw-legend-fold">
+                    <summary>{{ __('filament-warden::ui.grid.legend.title') }}</summary>
+
+                    <div class="fw-key">
+                        {{--
+                            Two groups and not one list of eight: three of these
+                            are what a click puts on a cell — the shift hint
+                            belongs with them, not at the end of everything —
+                            and the rest are marks the grid adds on its own.
+                        --}}
+                        <section class="fw-key-group">
+                            <h4>{{ __('filament-warden::ui.grid.legend.set') }}</h4>
+                            @foreach (array_slice($grid->legend(), 0, 3) as $item)
+                                <span class="fw-legend-item">
+                                    <span
+                                        class="fw-box"
+                                        data-state="{{ $item['state'] }}"
+                                        data-broader="{{ $item['broader'] }}"
+                                        data-noted="{{ $item['noted'] ? 'true' : 'false' }}"
+                                        data-locked="{{ $item['locked'] ? 'true' : 'false' }}"
+                                        aria-hidden="true"
+                                    ></span>
+                                    {{ $item['label'] }}
+                                </span>
+                            @endforeach
+                            <span class="fw-legend-item fw-legend-shift">{{ __('filament-warden::ui.grid.shift') }}</span>
+                        </section>
+
+                        <section class="fw-key-group">
+                            <h4>{{ __('filament-warden::ui.grid.legend.added') }}</h4>
+                            @foreach (array_slice($grid->legend(), 3) as $item)
+                                <span class="fw-legend-item">
+                                    @if ($item['void'])
+                                        <span class="fw-void" aria-hidden="true">·</span>
+                                    @else
+                                        <span
+                                            class="fw-box"
+                                            data-state="{{ $item['state'] }}"
+                                            data-broader="{{ $item['broader'] }}"
+                                            data-noted="{{ $item['noted'] ? 'true' : 'false' }}"
+                                            data-locked="{{ $item['locked'] ? 'true' : 'false' }}"
+                                            aria-hidden="true"
+                                        ></span>
+                                    @endif
+                                    {{ $item['label'] }}
+                                </span>
+                            @endforeach
+                        </section>
+                    </div>
+                </details>
+
                 {{--
                     A tablist is ONE tab stop and the arrows walk it: that is the
                     pattern, and it is also the only way the panel below is
@@ -336,27 +387,6 @@
                         @endif
                     </div>
                 @endforeach
-
-                <div class="fw-legend">
-                    @foreach ($grid->legend() as $item)
-                        <span class="fw-legend-item">
-                            @if ($item['void'])
-                                <span class="fw-void" aria-hidden="true">·</span>
-                            @else
-                                <span
-                                    class="fw-box"
-                                    data-state="{{ $item['state'] }}"
-                                    data-broader="{{ $item['broader'] }}"
-                                    data-noted="{{ $item['noted'] ? 'true' : 'false' }}"
-                                    data-locked="{{ $item['locked'] ? 'true' : 'false' }}"
-                                    aria-hidden="true"
-                                ></span>
-                            @endif
-                            {{ $item['label'] }}
-                        </span>
-                    @endforeach
-                    <span class="fw-legend-item fw-legend-shift">{{ __('filament-warden::ui.grid.shift') }}</span>
-                </div>
         </div>
 
         @if ($grid->alpine()['explain'] || $grid->alpine()['constraints'])

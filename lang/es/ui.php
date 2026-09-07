@@ -348,6 +348,9 @@ return [
             'undeclared' => 'la Policy no la declara',
             'narrowed' => 'la regla está estrechada',
             'locked' => 'la regla no se cambia desde aquí',
+            'title' => 'Qué significan los dibujos',
+            'set' => 'Una celda que tú pones',
+            'added' => 'Lo que la rejilla añade',
         ],
         'states' => [
             'abstain' => 'sin regla',

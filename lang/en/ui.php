@@ -348,6 +348,9 @@ return [
             'undeclared' => 'the policy does not declare it',
             'narrowed' => 'the rule is narrowed',
             'locked' => 'the rule cannot be changed here',
+            'title' => 'What the marks mean',
+            'set' => 'A cell you set',
+            'added' => 'What the grid adds',
         ],
         'states' => [
             'abstain' => 'no rule',

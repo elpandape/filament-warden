@@ -591,35 +591,104 @@ tr:hover .fw-shortcuts,
 
 /* The legend -------------------------------------------------------------- */
 
-.fw-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 1rem;
-    margin-block-start: 0.75rem;
-    color: var(--fw-muted);
-    font-size: 0.75rem;
-}
-
 .fw-legend-item {
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
 }
 
-/* The samples are smaller than the real thing: they are read, not clicked. */
-.fw-legend .fw-box {
-    inline-size: 1.125rem;
-    block-size: 1.125rem;
-    cursor: default;
-}
-
-.fw-legend .fw-box::before {
-    inline-size: 0.625rem;
-    block-size: 0.625rem;
-}
-
 .fw-legend-shift {
     flex-basis: 100%;
+}
+
+/* The key, folded. Closed it is one line above the grid; it used to be eight
+   lines of vocabulary sitting between a cell and the panel that explains it. */
+.fw-legend-fold {
+    margin-block-end: 0.5rem;
+}
+
+.fw-legend-fold[open] {
+    margin-block-end: 1rem;
+    padding-block-end: 0.875rem;
+    border-block-end: 1px solid var(--fw-line);
+}
+
+.fw-legend-fold > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0;
+    color: var(--fw-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.fw-legend-fold > summary::-webkit-details-marker {
+    display: none;
+}
+
+.fw-legend-fold > summary::before {
+    content: '';
+    inline-size: 0.5rem;
+    block-size: 0.5rem;
+    border-inline-end: 1.5px solid currentColor;
+    border-block-end: 1.5px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 0.15s;
+}
+
+.fw-legend-fold[open] > summary::before {
+    transform: rotate(45deg);
+}
+
+.fw-key {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 0.75rem 2.5rem;
+    margin-block-start: 0.5rem;
+}
+
+.fw-key-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-inline-size: 0;
+}
+
+.fw-key-group h4 {
+    margin: 0 0 0.375rem;
+    color: var(--fw-muted);
+    font-size: 0.6875rem;
+    font-weight: 600;
+}
+
+/* The marks in a column of their own: it is what makes a key scan rather than
+   read. Inline, every symbol has to be hunted for. */
+.fw-key .fw-legend-item:not(.fw-legend-shift) {
+    display: grid;
+    grid-template-columns: 1.25rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--fw-muted);
+    font-size: 0.75rem;
+}
+
+/* The shift hint carries the same class and no mark of its own: inside that
+   two-column grid its text landed in the 1.25rem column, one word per line. */
+.fw-key .fw-legend-shift {
+    display: block;
+    margin-block-start: 0.25rem;
+    padding-inline-start: 1.75rem;
+    color: var(--fw-muted);
+    font-size: 0.75rem;
+    font-style: italic;
+}
+
+.fw-key .fw-box,
+.fw-key .fw-void {
+    justify-self: center;
+    cursor: default;
 }
 
 /* Two rules the grid cannot hold as cells: one wider than every cell, one
