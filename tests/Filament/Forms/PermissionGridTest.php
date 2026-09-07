@@ -445,7 +445,7 @@ test('a role being created explains its cells instead of answering nothing', fun
             && $why['cause'] === null
             && is_string($why['summary'])
             && $why['summary'] !== ''
-            && array_keys($why) === ['verdict', 'cause', 'summary', 'permission', 'role', 'narrowed', 'pending']);
+            && array_keys($why) === ['verdict', 'cause', 'summary', 'permission', 'role', 'narrowed', 'pending', 'until']);
 });
 
 test('the inspector is on the screen, waiting to be asked', function (): void {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Grants;
 
+use Carbon\CarbonImmutable;
 use ElPandaPe\FilamentWarden\Catalog\Entry;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
 use ElPandaPe\FilamentWarden\Support\Line;
@@ -40,6 +41,7 @@ final readonly class Explanation
         public ?string $role = null,
         public ?string $narrowed = null,
         public ?string $pending = null,
+        public ?string $until = null,
     ) {}
 
     /**
@@ -53,6 +55,7 @@ final readonly class Explanation
         array $narrowed = [],
         ?Stance $onScreen = null,
         ?Stance $stored = null,
+        ?CarbonImmutable $until = null,
     ): self {
         $why = Warden::explain($role, $entry->name, $entry->model);
 
@@ -93,6 +96,7 @@ final readonly class Explanation
                     'stance' => self::line('filament-warden::ui.stances.'.$onScreen->value),
                 ])
                 : null,
+            until: self::until($until),
         );
     }
 
@@ -131,7 +135,37 @@ final readonly class Explanation
             'role' => $this->role,
             'narrowed' => $this->narrowed,
             'pending' => $this->pending,
+            'until' => $this->until,
         ];
+    }
+
+    /**
+     * The date beside warden's cause, never instead of it.
+     *
+     * `Cause::Expired` does not exist: warden 3.0 filters expiry in SQL, so a
+     * lapsed grant comes back as `NoMatchingGrant` — byte for byte what a cell
+     * nobody ever wrote answers. The cause is true and it is not the story, so
+     * this sentence goes alongside it rather than replacing it, the same way the
+     * narrowed line does.
+     *
+     * The date arrives already read: `DrawsThePermissionGrid` has it in the
+     * `RoleState` it built for the grid, so the inspector costs no query for it.
+     * Comparing it to now is one reading, made here, because whether a cell says
+     * "expires" or "expired" is a display decision and nothing else on the
+     * screen answers it.
+     */
+    private static function until(?CarbonImmutable $until): ?string
+    {
+        if (! $until instanceof CarbonImmutable) {
+            return null;
+        }
+
+        $key = $until->lessThanOrEqualTo(CarbonImmutable::now()) ? 'expired' : 'expires';
+
+        return self::line('filament-warden::ui.explain.'.$key, [
+            'date' => $until->toDayDateTimeString(),
+            'human' => $until->diffForHumans(),
+        ]);
     }
 
     /**

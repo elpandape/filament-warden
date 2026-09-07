@@ -171,6 +171,8 @@ return [
         'failed' => 'The answer never arrived: the store could not be reached. Click the cell again.',
         'no_permission' => 'no permission',
         'narrowed' => 'There is a narrowed rule for this cell. With conditions, a grant only answers with a record in front of it — and a class check, like the one a listing makes, fails closed.',
+        'expires' => 'This grant ends on :date (:human). Past that moment warden stops reading it, with no command run.',
+        'expired' => 'This grant ended on :date (:human), so warden abstains here and your policies decide. The row is still there — `warden:clean --expired` is what removes it.',
         'pending' => 'On screen you have set this to «:stance». Save for the store to say so.',
         'stored' => 'In the store',
         'screen' => 'On screen, not saved',

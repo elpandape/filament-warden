@@ -109,6 +109,9 @@ trait DrawsThePermissionGrid
             narrowed: $stored->narrowed(),
             onScreen: $this->onScreenStance($row, $action),
             stored: self::stanceIn($stored->stances, $row, $action),
+            // Already read, and read once: this is the same `RoleState` the grid
+            // was drawn from, so the inspector costs no query for the date.
+            until: $stored->untils[$row][$action] ?? null,
         )->toPayload();
     }
 

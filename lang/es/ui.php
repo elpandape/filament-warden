@@ -171,6 +171,8 @@ return [
         'failed' => 'La respuesta no llegó nunca: no se pudo alcanzar el almacén. Vuelve a pulsar la celda.',
         'no_permission' => 'ningún permiso',
         'narrowed' => 'Hay una regla estrechada para esta celda. Con condiciones, la concesión solo responde con un registro delante — y una comprobación de clase, como la que hace un listado, falla cerrada.',
+        'expires' => 'Esta concesión termina el :date (:human). Pasado ese instante warden deja de leerla, sin que corra ningún comando.',
+        'expired' => 'Esta concesión terminó el :date (:human), así que warden se abstiene aquí y deciden tus Policies. La fila sigue ahí: `warden:clean --expired` es lo que la quita.',
         'pending' => 'En pantalla lo has puesto en «:stance». Guarda para que el almacén lo diga.',
         'stored' => 'En el almacén',
         'screen' => 'En pantalla, sin guardar',

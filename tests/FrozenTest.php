@@ -347,6 +347,8 @@ test('the translation keys an application overrides are frozen', function (): vo
         'explain.failed',
         'explain.no_permission',
         'explain.narrowed',
+        'explain.expires',
+        'explain.expired',
         'explain.pending',
         'explain.stored',
         'explain.screen',
