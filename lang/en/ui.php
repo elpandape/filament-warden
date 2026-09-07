@@ -169,6 +169,7 @@ return [
         'loading' => 'Asking the store…',
         'unsaved' => 'This role has not been saved yet, so there is nothing in the store to explain. What you set here is written when you create it.',
         'failed' => 'The answer never arrived: the store could not be reached. Click the cell again.',
+        'close' => 'Close this panel',
         'no_permission' => 'no permission',
         'narrowed' => 'There is a narrowed rule for this cell. With conditions, a grant only answers with a record in front of it — and a class check, like the one a listing makes, fails closed.',
         'expires' => 'This grant ends on :date (:human). Past that moment warden stops reading it, with no command run.',

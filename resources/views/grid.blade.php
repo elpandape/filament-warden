@@ -24,7 +24,15 @@
     })"
     class="fw-grid"
 >
-    <div class="fw-layout">
+    {{--
+        The layout takes its second track only while the panel is open, which is
+        the difference between this and the fixed side column 2.11 measured and
+        threw away: that one took its width whether anybody was reading it or
+        not. `data-open` is what the stylesheet keys the second track on, and it
+        is bound rather than rendered, because the panel opens and closes without
+        a round trip.
+    --}}
+    <div class="fw-layout" data-open="false" x-bind:data-open="panel ? 'true' : 'false'">
         <div class="fw-main">
                 @if ($grid->isProtected)
                     <p class="fw-locked-notice">{{ __('filament-warden::ui.grid.locked') }}</p>
@@ -394,11 +402,27 @@
             class="fw-inspector"
             aria-label="{{ __('filament-warden::ui.explain.title') }}"
             data-fw-open="false"
-            x-bind:data-fw-open="selected ? 'true' : 'false'"
+            x-bind:data-fw-open="panel ? 'true' : 'false'"
+            x-show="panel || ! selected"
+            {{--
+                Escape closes it, and the listener is on the panel rather than on
+                the window: a keystroke anywhere else on a Filament page is not
+                this component's to swallow, and the condition builder inside has
+                its own inputs where Escape means something to the browser first.
+            --}}
+            x-on:keydown.escape="closePanel()"
         >
             <div class="fw-inspector-head" x-show="selected" x-cloak>
                 <div class="fw-inspector-title" x-text="selected ? selected.title : ''"></div>
                 <div class="fw-inspector-sub" x-text="selected ? selected.subtitle : ''"></div>
+                <button
+                    type="button"
+                    class="fw-inspector-close"
+                    x-on:click="closePanel()"
+                >
+                    <span class="fw-sr">{{ __('filament-warden::ui.explain.close') }}</span>
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
 
             <div class="fw-inspector-body">

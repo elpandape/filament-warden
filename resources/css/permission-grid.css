@@ -159,6 +159,38 @@
     font-weight: 600;
 }
 
+/* The head becomes a row once it has a control at the end of it.
+
+   The title and the subtitle are NOT placed explicitly, and that is deliberate
+   rather than an omission: a second block for `.fw-inspector-sub` is invisible
+   to `declarationsOf()` in this suite's own stylesheet gate, which reads one
+   block per selector — the lesson 2.11 wrote down after a declaration existed
+   and did not win. With the button placed, auto-placement puts these two in the
+   first column by source order and no second block is needed. */
+.fw-inspector-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: 0.5rem;
+}
+
+.fw-inspector-close {
+    grid-row: 1 / span 2;
+    grid-column: 2;
+    /* A touch target, not a glyph: 24px is what the rest of this grid's
+       controls settled on and what a finger can find. */
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
+    border-radius: var(--radius-md, 0.375rem);
+    color: var(--fw-muted);
+    line-height: 1;
+}
+
+.fw-inspector-close:hover {
+    background: var(--fw-raised);
+    color: var(--fw-text);
+}
+
 .fw-inspector-sub {
     color: var(--fw-muted);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

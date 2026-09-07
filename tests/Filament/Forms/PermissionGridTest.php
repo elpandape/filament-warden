@@ -1373,3 +1373,25 @@ test('a cell that ends and a cell somebody lends both say so, in the markup and 
 
     Carbon::setTestNow();
 });
+
+test('the panel takes its track only once a cell is opened, and gives it back', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $html = livewire(EditRole::class, ['record' => $role->getKey()])->html();
+
+    // Rendered closed and BOUND, both halves. The server draws the first
+    // reading, so a layout that only existed in alpine would flash a full-width
+    // grid on every load; and one that only existed in php would never open,
+    // because opening is a click and not a round trip.
+    expect($html)->toContain('data-open="false"')
+        ->toContain('x-bind:data-open="panel ? \'true\' : \'false\'"')
+        // Escape on the panel and not on the window: a keystroke anywhere else
+        // on a Filament page is not this component's to swallow.
+        ->toContain('x-on:keydown.escape="closePanel()"')
+        ->toContain(__('filament-warden::ui.explain.close'));
+});
