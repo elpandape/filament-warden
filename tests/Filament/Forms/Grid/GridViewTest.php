@@ -13,6 +13,7 @@ use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Tab;
 use ElPandaPe\FilamentWarden\Grants\RecordGrant;
+use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Grants\RoleState;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\PostResource;
@@ -20,6 +21,7 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Widgets\Summary;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Tag;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
+use ElPandaPe\Warden\Facades\Warden;
 use Filament\Panel;
 
 pest()->extend(TestCase::class);
@@ -469,4 +471,43 @@ test('an undeclared cell keeps its scope, so the folded reading still draws its 
 
     expect($row->inScope(Scope::Withdraw))->toBe([$absent])
         ->and($absent->declared)->toBeFalse();
+});
+
+test('an inherited cell answers, so it counts — and names the role it heard', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $outer = makeRole('outer');
+    $inner = makeRole('inner');
+
+    Warden::allow($inner)->to('viewAny', Post::class);
+    Warden::assign($inner)->to($outer);
+
+    $panel = Panel::make()->id('scratch')->resources([PostResource::class]);
+    $catalog = Catalog::for($panel);
+    $stored = RoleGrants::of($outer, $catalog);
+
+    $grid = GridView::for($catalog, $stored, $stored->stances);
+
+    $cell = null;
+
+    foreach ($grid->tabs as $tab) {
+        foreach ($tab->rows as $row) {
+            foreach ($row->cells as $one) {
+                if ($row->model === Post::class && $one->action === 'viewAny') {
+                    $cell = $one;
+                }
+            }
+        }
+    }
+
+    // The counters ask what a cell ANSWERS, never what the role wrote on it
+    // (§6.11): counting what was written made the role holding the wildcard
+    // tally zero with the whole grid in ticks, and an inherited cell is the same
+    // trap with a different lender. Folding the answer into `reach` is what
+    // keeps every counter — and the browser's own re-derivation — right for
+    // free; `inheritedFrom` carries only the part no counter needs.
+    expect($cell?->answers())->toBe(Stance::Granted)
+        ->and($cell?->drawn())->toBe('broader')
+        ->and($cell?->inheritedFrom)->toBe('Inner')
+        ->and($cell?->stance)->toBe(Stance::Abstain);
 });

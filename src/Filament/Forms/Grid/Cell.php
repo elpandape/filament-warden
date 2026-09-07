@@ -20,6 +20,12 @@ use ElPandaPe\FilamentWarden\Conditions\Narrowing;
  * Red is a rule this screen can read and cannot draw, and it is shown, explained
  * and left exactly as it is.
  *
+ * `inheritedFrom` names the role lending this cell its answer. It arrives with
+ * the answer already folded into `reach`, because an inherited answer has the
+ * same shape as a wider rule — nobody wrote this cell and something else answers
+ * it — so every counter that asks what a cell ANSWERS gets it for free. What
+ * this carries is only WHICH role, which no counter needs and every reader does.
+ *
  * `until` is when the grant behind the cell stops. It arrives already judged
  * against the server's clock: a written stance beside a date means the access
  * ends then, and an abstention beside one means it already ended. The cell never
@@ -41,6 +47,7 @@ final readonly class Cell
         public ?Entry $entry = null,
         public ?Stance $reach = null,
         public ?CarbonImmutable $until = null,
+        public ?string $inheritedFrom = null,
     ) {
         $this->narrowing = $narrowing ?? Narrowing::all();
     }
