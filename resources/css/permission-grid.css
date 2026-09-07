@@ -928,69 +928,6 @@ tr:hover .fw-shortcuts,
     justify-self: end;
 }
 
-/* One reading at every width. The stack is off by default and this one query
-   turns the pair over together, so there is no width — integer, zoomed or
-   fractional — at which both are painted or neither is. Two disjoint queries
-   look equivalent and are not: between their thresholds neither fires.
-   `display: none` and nothing else: it is the only way of hiding that takes the
-   losing reading out of the accessibility tree AND out of the tab order, which
-   is what makes two copies of one button safe. */
-@media (max-width: 55.9375rem) {
-    .fw-scroll {
-        display: none;
-    }
-
-    .fw-stack {
-        display: grid;
-        gap: 0.5rem;
-    }
-
-    /* One strip that scrolls, never two rows. It stays a tablist: one tab stop,
-       the arrow keys, and each tab's `aria-controls` — all of which turning it
-       into a `<select>` would take away. The fade is the only sign there is
-       more; without it a tab out of view does not exist. */
-    .fw-tabs {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        scrollbar-width: none;
-        scroll-snap-type: inline proximity;
-        mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent);
-    }
-
-    .fw-tabs::-webkit-scrollbar {
-        display: none;
-    }
-
-    .fw-tab {
-        flex: 0 0 auto;
-        scroll-snap-align: start;
-    }
-
-    /* The pairing only means anything with room for both. Below the width where the
-       table already becomes an accordion they stack — and the explicit row
-       placement has to be let go, or the two stay pinned above the clauses. */
-    .fw-conditions {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .fw-conditions > .fw-warn,
-    .fw-conditions > .fw-preview {
-        grid-column: 1;
-        grid-row: auto;
-    }
-
-    .fw-conditions > .fw-warn {
-        margin-block-start: 0.75rem;
-    }
-
-    .fw-write .fw-field-label,
-    .fw-write .fw-reach,
-    .fw-write .fw-reach-hint,
-    .fw-write .fw-reach-reason {
-        max-inline-size: none;
-    }
-}
-
 /* At 390px the model shared a row with the name inside two columns, and broke
    mid-word: "Permis sions". `.fw-stack-entity > summary` is a grid, not a flex
    container, so what gives the model a row of its own is one column, not
@@ -1376,4 +1313,75 @@ tr:hover .fw-shortcuts,
 .fw-preview {
     overflow-wrap: anywhere;
     max-inline-size: 100%;
+}
+
+/* One reading at every width. The stack is off by default and this one query
+   turns the pair over together, so there is no width — integer, zoomed or
+   fractional — at which both are painted or neither is. Two disjoint queries
+   look equivalent and are not: between their thresholds neither fires.
+   `display: none` and nothing else: it is the only way of hiding that takes the
+   losing reading out of the accessibility tree AND out of the tab order, which
+   is what makes two copies of one button safe.
+
+   At the end of the file on purpose, and not where it was written: a media
+   query and its base rule share specificity, so source order decides, and
+   this one used to sit above `.fw-conditions {}` — losing at every width,
+   silently, because `declarationsOf()` and `blockOf()` can only prove a
+   declaration exists, never that it wins. Every selector below overrides one
+   whose unconditional rule is declared earlier in this file; nothing may
+   restate any of them at the root after this point. */
+@media (max-width: 55.9375rem) {
+    .fw-scroll {
+        display: none;
+    }
+
+    .fw-stack {
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    /* One strip that scrolls, never two rows. It stays a tablist: one tab stop,
+       the arrow keys, and each tab's `aria-controls` — all of which turning it
+       into a `<select>` would take away. The fade is the only sign there is
+       more; without it a tab out of view does not exist. */
+    .fw-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        scroll-snap-type: inline proximity;
+        mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent);
+    }
+
+    .fw-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .fw-tab {
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+    }
+
+    /* The pairing only means anything with room for both. Below the width where the
+       table already becomes an accordion they stack — and the explicit row
+       placement has to be let go, or the two stay pinned above the clauses. */
+    .fw-conditions {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .fw-conditions > .fw-warn,
+    .fw-conditions > .fw-preview {
+        grid-column: 1;
+        grid-row: auto;
+    }
+
+    .fw-conditions > .fw-warn {
+        margin-block-start: 0.75rem;
+    }
+
+    .fw-write .fw-field-label,
+    .fw-write .fw-reach,
+    .fw-write .fw-reach-hint,
+    .fw-write .fw-reach-reason {
+        max-inline-size: none;
+    }
 }

@@ -257,3 +257,23 @@ test('the add-condition button is enlarged by the block that actually wins', fun
         ->and(declarationsOf('.fw-add'))->toContain('padding: 0.3125rem 0.625rem')
         ->and(declarationsOf('.fw-add'))->toContain('border-radius: 0.5rem');
 });
+
+test('the fold outranks the wide layout it collapses, by position', function (): void {
+    // A media query and its base rule share specificity, so source order
+    // decides which one wins — and this query used to lose. It sat two
+    // hundred lines above `.fw-conditions {}`, so the unconditional root rule
+    // always came later and always won, at every width, on a real screen: a
+    // 390px viewport measured `grid-template-columns` as still two columns.
+    // `declarationsOf()` and `blockOf()` can only prove a declaration exists
+    // in the sheet, never that it wins the cascade — this is the assertion
+    // that closes that gap.
+    $sheet = stylesheet();
+    $query = mb_strpos($sheet, '@media (max-width: 55.9375rem)');
+    $base = mb_strpos($sheet, "\n.fw-conditions {");
+
+    // Both present before either is ordered: a missing needle is `false`,
+    // and casting that to an int reads as position zero.
+    expect($query)->not->toBeFalse()
+        ->and($base)->not->toBeFalse()
+        ->and((int) $query)->toBeGreaterThan((int) $base);
+});
