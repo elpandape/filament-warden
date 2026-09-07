@@ -451,7 +451,7 @@ test('the inspector is on the screen, waiting to be asked', function (): void {
 
     livewire(GridHost::class, ['roleKey' => $role->getKey()])
         ->assertSee('fw-inspector', escape: false)
-        ->assertSee('Click a cell of the grid')
+        ->assertSee(__('filament-warden::ui.explain.empty'))
         ->assertSee('x-on:click="pick(', escape: false);
 });
 
@@ -463,11 +463,27 @@ test('the inspector carries a sentence for an answer that never came', function 
         ->assertSee('The answer never arrived');
 });
 
-test('a verdict with no cause behind it shows no empty slot where one would go', function (): void {
-    $role = makeRole();
+test('the panel names its two voices, and the raw cause is not one of them', function (): void {
+    $html = livewire(GridHost::class, ['roleKey' => makeRole()->getKey()])->html();
 
-    livewire(GridHost::class, ['roleKey' => $role->getKey()])
-        ->assertSee('x-show="why.cause"', escape: false);
+    // The panel used to say "No grant matches" and, three lines down,
+    // "granted". They do not disagree: one speaks for the store and the other
+    // for the screen, with an unsaved change between them. Nothing said so.
+    expect($html)->toContain(__('filament-warden::ui.explain.stored'))
+        ->and($html)->toContain(__('filament-warden::ui.explain.screen'))
+        ->and($html)->toContain(__('filament-warden::ui.explain.matched'))
+        ->and($html)->toContain('class="fw-voices"');
+
+    // The cause code was jargon in a monospaced chip, and the sentence beside
+    // it already said what it said.
+    expect($html)->not->toContain('fw-why-cause');
+
+    // The panel is a region and used to have no name. The key that titled it
+    // when nothing was selected names it now. Built from the translation and
+    // not the literal word: the suite sets no locale.
+    $title = preg_quote(__('filament-warden::ui.explain.title'), '/');
+
+    expect($html)->toMatch('/<aside[^>]+class="fw-inspector"[^>]+aria-label="'.$title.'"/');
 });
 
 test('the script asks the server for the answer and composes none of it', function (): void {

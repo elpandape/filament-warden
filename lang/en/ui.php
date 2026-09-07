@@ -164,7 +164,7 @@ return [
             'no-matching-grant' => 'No grant matches. Warden abstains and your application policies decide.',
             'not-applicable' => 'Not a question for warden: the entity is not a model.',
         ],
-        'empty' => 'Click a cell of the grid.',
+        'empty' => 'Pick a cell to see why it answers the way it does.',
         'title' => 'Why',
         'loading' => 'Asking the store…',
         'unsaved' => 'This role has not been saved yet, so there is nothing in the store to explain. What you set here is written when you create it.',
@@ -172,6 +172,10 @@ return [
         'no_permission' => 'no permission',
         'narrowed' => 'There is a narrowed rule for this cell. With conditions, a grant only answers with a record in front of it — and a class check, like the one a listing makes, fails closed.',
         'pending' => 'On screen you have set this to «:stance». Save for the store to say so.',
+        'stored' => 'In the store',
+        'screen' => 'On screen, not saved',
+        'save_hint' => 'Save for the store to say so.',
+        'matched' => 'Matched rule',
     ],
 
     'stances' => [

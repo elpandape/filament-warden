@@ -638,6 +638,66 @@ function grid({ state, grid, interactive }) {
         },
 
         /**
+         * What the STORE holds for the selected cell.
+         *
+         * Read off the baseline — the third envelope the field has sent since
+         * 1.6.0 — which is by definition what the store had when this screen
+         * opened. Nothing is asked of the server for it.
+         */
+        storedStance() {
+            if (this.selected === null) {
+                return this.grid.order[0]
+            }
+
+            const { row, action } = this.selected
+
+            return (this.state.baseline?.stances?.[row] ?? {})[action] ?? this.grid.order[0]
+        },
+
+        /**
+         * What a save would change, in the cell's own words, or null when a save
+         * would change nothing here.
+         */
+        moved() {
+            if (this.selected === null) {
+                return null
+            }
+
+            const { row, action } = this.selected
+            const was = (this.state.baseline?.stances?.[row] ?? {})[action] ?? this.grid.order[0]
+            const now = this.stanceOf(row, action)
+
+            return was === now ? null : { from: this.grid.states[was], to: this.grid.states[now] }
+        },
+
+        /** The catalogue row warden matched, when it named one. */
+        matchedName() {
+            return this.why?.permission ?? ''
+        },
+
+        storedRule() {
+            return this.storedRuleWorthSaying() ? this.narrowing.stored.preview : ''
+        },
+
+        /**
+         * The stored rule, said only when it says something.
+         *
+         * With the builder open and untouched, the rule on the left and the
+         * preview under the editor are one fact twice — the trap this package
+         * has already paid for once. It is said when there is no builder, or
+         * when what is on screen is no longer what the store holds.
+         */
+        storedRuleWorthSaying() {
+            const stored = this.narrowing?.stored?.preview
+
+            if (! stored) {
+                return false
+            }
+
+            return ! this.offered() || stored !== (this.rules().length > 0 ? this.preview() : '')
+        },
+
+        /**
          * Which of the three the buttons light.
          *
          * A cell this screen may not change shows the store's own word, and

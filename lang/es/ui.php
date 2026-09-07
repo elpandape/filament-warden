@@ -164,7 +164,7 @@ return [
             'no-matching-grant' => 'Ninguna concesión casa. Warden se abstiene y deciden las Policies de tu aplicación.',
             'not-applicable' => 'No es una pregunta para warden: la entidad no es un modelo.',
         ],
-        'empty' => 'Pulsa una celda de la rejilla.',
+        'empty' => 'Pulsa una celda para saber por qué contesta lo que contesta.',
         'title' => 'Por qué',
         'loading' => 'Preguntando al almacén…',
         'unsaved' => 'Este rol todavía no se ha guardado, así que no hay nada en el almacén que explicar. Lo que pongas aquí se escribe al crearlo.',
@@ -172,6 +172,10 @@ return [
         'no_permission' => 'ningún permiso',
         'narrowed' => 'Hay una regla estrechada para esta celda. Con condiciones, la concesión solo responde con un registro delante — y una comprobación de clase, como la que hace un listado, falla cerrada.',
         'pending' => 'En pantalla lo has puesto en «:stance». Guarda para que el almacén lo diga.',
+        'stored' => 'En la tienda',
+        'screen' => 'En pantalla, sin guardar',
+        'save_hint' => 'Guarda para que la tienda lo diga.',
+        'matched' => 'Regla que casó',
     ],
 
     'stances' => [

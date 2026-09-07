@@ -52,8 +52,7 @@ test('the smallest print is drawn with the muted token', function (): void {
 });
 
 test('a mark that carries meaning is drawn with the muted token too', function (): void {
-    expect(declarationsOf('.fw-why'))->toContain('3px solid var(--fw-muted)')
-        ->and(declarationsOf('.fw-clause'))->toContain('3px solid var(--fw-muted)');
+    expect(declarationsOf('.fw-clause'))->toContain('3px solid var(--fw-muted)');
 });
 
 test('every custom property the sheet reads is one it declares, and none is declared unread', function (): void {

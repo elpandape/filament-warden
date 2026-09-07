@@ -97,10 +97,6 @@
     padding-block-start: 1rem;
 }
 
-.fw-inspector-head {
-    padding-block-end: 0.625rem;
-}
-
 .fw-inspector-title {
     font-weight: 600;
 }
@@ -132,32 +128,96 @@
     color: var(--fw-no);
 }
 
-/* The verdict is the first thing read, so it carries the colour. */
-.fw-why {
+/* The two voices. One speaks for the store and one for the screen, and the
+   panel used to run them together as one paragraph. Side by side with a name
+   each, warden's sentence reads on its own — and the width that was empty to
+   the right is what they use. */
+.fw-voices {
     display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 0.25rem 2rem;
+    margin-block-start: 0.25rem;
+}
+
+.fw-voice {
+    min-inline-size: 0;
+    padding-inline-start: 0.75rem;
+    border-inline-start: 2px solid var(--fw-line);
+}
+
+.fw-voice h4 {
+    margin: 0 0 0.375rem;
+    color: var(--fw-muted);
+    font-size: 0.6875rem;
+    font-weight: 600;
+}
+
+.fw-voice-state {
+    display: flex;
+    align-items: center;
     gap: 0.375rem;
-    padding: 0.625rem;
-    border-inline-start: 3px solid var(--fw-muted);
-    border-radius: 0.375rem;
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 500;
+}
+
+.fw-voice-state .fw-box {
+    inline-size: 1.125rem;
+    block-size: 1.125rem;
+    flex: 0 0 auto;
+    cursor: default;
+}
+
+.fw-voice-why,
+.fw-voice-note {
+    margin: 0.375rem 0 0;
+    color: var(--fw-muted);
+    font-size: 0.8125rem;
+    max-inline-size: 46ch;
+}
+
+.fw-voice-why code {
+    padding: 0.0625rem 0.375rem;
+    border-radius: 0.25rem;
+    background: var(--fw-raised);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.75rem;
+}
+
+/* Marked, because it is the only thing on this panel that does not describe
+   what is stored. */
+.fw-voice-screen {
+    border-inline-start-color: var(--fw-noted);
+}
+
+.fw-voice-screen h4 {
+    color: var(--fw-noted);
+}
+
+/* A panel once there is something in it, and a plain band while there is not:
+   an empty card announces a section that has nothing to say. Keyed off an
+   attribute the markup binds and never off `:has()`, because what used to be
+   inside it — `.fw-why` — is gone. */
+.fw-inspector[data-fw-open='true'] {
+    margin-block-start: 1rem;
+    padding: 0.875rem 1rem 1rem;
+    border: 1px solid var(--fw-line);
+    border-block-start: 1px solid var(--fw-line);
+    border-radius: 0.75rem;
     background: var(--fw-raised);
 }
 
-.fw-why[data-verdict='granted'] {
-    border-inline-start-color: var(--fw-yes);
-    background: var(--fw-yes-soft);
+/* The identity on one line: the FQCN used to take a row of its own. */
+.fw-inspector-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding-block-end: 0.75rem;
 }
 
-.fw-why[data-verdict='forbidden'] {
-    border-inline-start-color: var(--fw-no);
-    background: var(--fw-no-soft);
-}
-
-/* The raw case, because "granted to everyone" is an inference warden never
-   proves — somebody has to be able to trace it when it does not add up. */
-.fw-why-cause {
-    color: var(--fw-muted);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.6875rem;
+.fw-inspector-sub::before {
+    content: '·';
+    margin-inline-end: 0.5rem;
 }
 
 .fw-note {

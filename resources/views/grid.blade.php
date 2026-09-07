@@ -390,9 +390,14 @@
         </div>
 
         @if ($grid->alpine()['explain'] || $grid->alpine()['constraints'])
-        <aside class="fw-inspector">
-            <div class="fw-inspector-head">
-                <div class="fw-inspector-title" x-text="selected ? selected.title : @js(__('filament-warden::ui.explain.title'))"></div>
+        <aside
+            class="fw-inspector"
+            aria-label="{{ __('filament-warden::ui.explain.title') }}"
+            data-fw-open="false"
+            x-bind:data-fw-open="selected ? 'true' : 'false'"
+        >
+            <div class="fw-inspector-head" x-show="selected" x-cloak>
+                <div class="fw-inspector-title" x-text="selected ? selected.title : ''"></div>
                 <div class="fw-inspector-sub" x-text="selected ? selected.subtitle : ''"></div>
             </div>
 
@@ -415,14 +420,54 @@
                 <p class="fw-inspector-empty" x-show="selected && loading" x-cloak>{{ __('filament-warden::ui.explain.loading') }}</p>
                 <p class="fw-inspector-empty fw-inspector-failed" x-show="selected && failed && ! loading" x-cloak>{{ __('filament-warden::ui.explain.failed') }}</p>
 
+                {{--
+                    The two voices that were one paragraph.
+
+                    The panel said "No grant matches" and, three lines down,
+                    "granted". They do not disagree: the first speaks for the
+                    store and the second for the screen. Naming them is what
+                    makes warden's sentence readable.
+
+                    The stored half is read from the baseline, so none of this
+                    costs a query.
+                --}}
                 <template x-if="why && ! loading && grid.explain">
-                    <div>
-                        <div class="fw-why" x-bind:data-verdict="why.verdict">
-                            <span x-text="why.summary"></span>
-                            <code class="fw-why-cause" x-show="why.cause" x-text="why.cause"></code>
-                        </div>
-                        <p class="fw-note" x-show="why.narrowed" x-text="why.narrowed" x-cloak></p>
-                        <p class="fw-note fw-note-pending" x-show="why.pending" x-text="why.pending" x-cloak></p>
+                    <div class="fw-voices">
+                        <section class="fw-voice">
+                            <h4>{{ __('filament-warden::ui.explain.stored') }}</h4>
+                            <p class="fw-voice-state">
+                                <span class="fw-box" aria-hidden="true" x-bind:data-state="storedStance()"></span>
+                                <span x-text="grid.states[storedStance()]"></span>
+                            </p>
+                            <p class="fw-voice-why" x-text="why.summary"></p>
+                            <p class="fw-voice-note" x-show="why.narrowed" x-text="why.narrowed" x-cloak></p>
+                        </section>
+
+                        <section class="fw-voice fw-voice-screen" x-show="moved()" x-cloak>
+                            <h4>{{ __('filament-warden::ui.explain.screen') }}</h4>
+                            <p class="fw-voice-state">
+                                <span
+                                    class="fw-box"
+                                    aria-hidden="true"
+                                    x-bind:data-state="drawn(selected.row, selected.action, selected.name)"
+                                    x-bind:data-broader="reached(selected.row, selected.action, selected.name)"
+                                ></span>
+                                <span x-text="stateOf(selected.row, selected.action, selected.name)"></span>
+                            </p>
+                            <p class="fw-voice-why">{{ __('filament-warden::ui.explain.save_hint') }}</p>
+                        </section>
+
+                        {{--
+                            With nothing unsaved the second column would sit
+                            empty, so it says what the store matched instead.
+                        --}}
+                        <section class="fw-voice" x-show="! moved() && (matchedName() || storedRule())" x-cloak>
+                            <h4>{{ __('filament-warden::ui.explain.matched') }}</h4>
+                            <p class="fw-voice-state" x-show="matchedName()" x-text="matchedName()"></p>
+                            <p class="fw-voice-why" x-show="storedRule()">
+                                <code x-text="storedRule()"></code>
+                            </p>
+                        </section>
                     </div>
                 </template>
 
