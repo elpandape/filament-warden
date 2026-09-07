@@ -210,8 +210,12 @@ test('the head corner is opaque and still wears the head tint', function (): voi
 
 test('nothing that carries a category shouts it in small caps', function (): void {
     // Weight and colour separate a group heading just as well, and they read.
-    expect(declarationsOf('.fw-group'))->not->toContain('text-transform: uppercase')
-        ->and(declarationsOf('.fw-manage'))->not->toContain('text-transform: uppercase')
+    // `.fw-group` shares its block with `.fw-manage`, so it is read as the
+    // pair the sheet actually writes: asking `declarationsOf()` for
+    // `.fw-group` alone matches no line in the file (the line reads
+    // `.fw-group,`, not `.fw-group {`) and passes on the empty string it
+    // gets back.
+    expect(declarationsOf(".fw-group,\n.fw-manage"))->not->toContain('text-transform: uppercase')
         ->and(declarationsOf('.fw-field-label'))->not->toContain('text-transform: uppercase');
 });
 
@@ -219,8 +223,14 @@ test('the tabs are one strip that scrolls, never two rows', function (): void {
     // Two rows put the list rule through the middle of it. A strip keeps the
     // tablist a tablist: one tab stop, arrow keys, and each tab's
     // `aria-controls` — all of which a `<select>` would take away.
-    expect(stylesheet())->toContain('mask-image: linear-gradient(to right')
-        ->and(declarationsOf('.fw-tabs'))->toContain('flex-wrap: wrap');
+    // Scoped to the query's own block, not the unscoped `.fw-tabs`: the base
+    // rule already carries `flex-wrap: wrap` before this task touches
+    // anything, so reading it unscoped would still pass with the fold's own
+    // `nowrap` reverted.
+    $fold = blockOf('@media (max-width: 55.9375rem)');
+
+    expect($fold)->toContain('flex-wrap: nowrap')
+        ->and($fold)->toContain('mask-image: linear-gradient(to right');
 });
 
 test('the fold gives the FQCN a row of its own before it breaks mid-word', function (): void {
@@ -236,4 +246,14 @@ test('the fold gives the FQCN a row of its own before it breaks mid-word', funct
     // out.
     expect($narrow)->toContain('.fw-stack-entity > summary')
         ->and($narrow)->toContain('grid-template-columns: minmax(0, 1fr);');
+});
+
+test('the add-condition button is enlarged by the block that actually wins', function (): void {
+    // Two `.fw-add {}` blocks at equal specificity let the LATER one win the
+    // cascade: an earlier block's padding and radius would sit dead in the
+    // file, silently overridden by the pre-existing dashed-border rule below
+    // it. Counting the blocks is what catches a second one coming back.
+    expect(mb_substr_count(stylesheet(), "\n.fw-add {"))->toBe(1)
+        ->and(declarationsOf('.fw-add'))->toContain('padding: 0.3125rem 0.625rem')
+        ->and(declarationsOf('.fw-add'))->toContain('border-radius: 0.5rem');
 });

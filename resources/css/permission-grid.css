@@ -1262,12 +1262,6 @@ tr:hover .fw-shortcuts,
     font-size: 0.75rem;
 }
 
-.fw-add {
-    padding: 0.3125rem 0.625rem;
-    border-radius: 0.5rem;
-    font-size: 0.75rem;
-}
-
 .fw-condition .fw-operator {
     flex: 0 0 3rem;
     font-family: ui-monospace, monospace;
@@ -1316,9 +1310,9 @@ tr:hover .fw-shortcuts,
 }
 
 .fw-add {
-    padding: 0.25rem 0.5rem;
+    padding: 0.3125rem 0.625rem;
     border: 1px dashed var(--fw-line);
-    border-radius: 0.375rem;
+    border-radius: 0.5rem;
     background: transparent;
     color: var(--fw-muted);
     font-size: 0.75rem;
