@@ -1778,3 +1778,57 @@ test('moving only the date leaves the rule byte for byte as the store wrote it',
 
     Carbon::setTestNow();
 });
+
+test('a rule that can never be true is not written, and does not leave a plain grant behind', function (): void {
+    $role = makeRole();
+    $user = makeUser();
+    Warden::assign($role)->to($user);
+
+    $post = Post::query()->create(['title' => 'alpha']);
+
+    // `title` is a text column with no bool cast, and `Value::cast('true')` makes
+    // this a PHP boolean, so warden 3.0 refuses the condition. The refusal
+    // arrives from `reconstrain()`, AFTER `narrow()` has already asked for the
+    // plain grant — and `narrow()` catches `ConfigurationException` for two other
+    // causes, so without a check ahead of warden the catch swallows it and what
+    // survives is an unconditional grant. Measured on this branch: one row with
+    // `options = null`, the cell redrawn as every row, and `Access::granted()`
+    // answering true for a record the rule never named.
+    $report = RoleGrants::apply($role, gridCatalog(), [Post::class => ['view' => 'granted']], [
+        Post::class => ['view' => conditionOn('title', 'true')],
+    ]);
+
+    expect($report->impossible)->toBe([['row' => Post::class, 'action' => 'view']])
+        ->and($report->written)->toBe(0)
+        ->and(grantCount())->toBe(0)
+        ->and(Access::granted($user, 'view', $post))->toBeFalse();
+});
+
+test('a stored rule that can never be true is drawn locked, not offered for editing', function (): void {
+    $role = makeRole();
+
+    Warden::allow($role)->to('viewAny', Post::class);
+
+    // The row a 2.x database carries: the string 'true' against a column the
+    // model DOES cast to bool. Warden migrated none of them, and warden's own
+    // fluent API can no longer produce one, so it goes in by hand — which is
+    // exactly how it got there in the installations this protects.
+    $row = latestPermission('viewAny');
+    $row->forceFill(['options' => [
+        'v' => 1,
+        'g' => ['t' => 'group', 'i' => [['and', ['t' => 'value', 'c' => 'published', 'o' => '=', 'v' => 'true']]]],
+    ]])->save();
+
+    $narrowing = RoleGrants::of($role, gridCatalog())->narrowings[Post::class]['viewAny'];
+
+    expect($narrowing->shape)->toBe(Shape::Unreadable)
+        ->and($narrowing->reason)->toBe('unsatisfiable')
+        ->and($narrowing->isEditable())->toBeFalse();
+
+    // And the lock holds where it matters: a stance flip leaves the row alone
+    // instead of re-pointing the grant at a fresh plain one.
+    RoleGrants::apply($role, gridCatalog(), [Post::class => ['viewAny' => 'forbidden']]);
+
+    expect(RoleGrants::of($role, gridCatalog())->narrowings[Post::class]['viewAny']->shape)
+        ->toBe(Shape::Unreadable);
+});

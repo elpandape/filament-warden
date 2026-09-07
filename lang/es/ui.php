@@ -296,6 +296,7 @@ return [
             'column' => 'Las condiciones guardadas nombran una columna que no se puede casar con lo que hay disponible ahora. Reescribirlas guardaría una regla que no puede casar nunca, así que se enseñan como están y se dejan en paz.',
             'rewrite' => 'Las condiciones guardadas se pueden leer pero no volver a escribir exactamente como están: un valor volvería con otro tipo, o la primera línea perdería su or. Guardar cambiaría lo que esta regla significa para todos los que la tienen, así que el constructor se cierra.',
             'owned_with_conditions' => 'La regla guardada se limita a lo que la cuenta posee y además lleva condiciones. Una celda dibuja un solo alcance, así que se enseña tal y como está guardada y se deja en paz: leerla solo como propiedad tiraría la condición la próxima vez que alguien guardara.',
+            'unsatisfiable' => 'La regla guardada compara un booleano contra una columna que el modelo no castea a bool, o al revés. Nunca puede ser cierta, así que warden se niega a escribirla — y reescribirla desde aquí tiraría la condición y dejaría incondicional la concesión de debajo. Se enseña tal como está y se deja en paz; `warden:doctor` lista todas las filas así.',
             'tangled' => 'Esta celda tiene más de una regla para la misma acción. La rejilla no sabe enseñar eso, así que no la toca.',
             'elsewhere' => 'Esta concesión es de otro tenant, y una escritura apunta a uno solo. Apagarla aquí no borraría nada y aun así diría que sí, así que se deja en paz. Cambia de tenant para tocarla.',
         ],
@@ -339,6 +340,10 @@ return [
         'lapsed' => [
             'title' => 'Guardado, pero hay celdas con una fecha ya pasada',
             'body' => 'Una concesión que termina antes de empezar no autoriza nada, así que se quedaron como estaban. Dales una fecha futura, o concédelas sin fin: :cells',
+        ],
+        'impossible' => [
+            'title' => 'Guardado, pero hay reglas que nunca podrían ser ciertas',
+            'body' => 'Un booleano solo casa con una columna que el modelo castee a bool, y éstas comparan cruzando esa línea, así que la tienda las rechaza. Se quedaron como estaban, porque escribirlas sin la condición concedería todas las filas en vez de ninguna: :cells',
         ],
         'saved' => [
             'granted' => '{1} 1 concedida|[2,*] :count concedidas',

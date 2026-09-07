@@ -77,6 +77,24 @@ final readonly class Narrowing
         return new self(Shape::Unreadable, $rules, $reason);
     }
 
+    /**
+     * A rule warden would refuse to write, kept exactly as the store has it.
+     *
+     * Its own reason rather than `corrupt`: this rule parses fine and says
+     * something perfectly clear, it just can never be true. And unlike a corrupt
+     * blob it is inert in BOTH polarities — warden's own changelog says the
+     * forbid it makes is inert — so nothing is being protected by leaving it
+     * there. What locking buys is the opposite: a screen that offered to rewrite
+     * it would have its save refused by warden, and the refusal arrives after
+     * the plain grant beneath the condition is already written.
+     *
+     * @param  list<Rule>  $rules
+     */
+    public static function unsatisfiable(array $rules): self
+    {
+        return self::unreadable('unsatisfiable', $rules);
+    }
+
     public static function tangled(): self
     {
         return new self(Shape::Tangled, reason: 'tangled');
@@ -278,6 +296,34 @@ final readonly class Narrowing
      * permission screen needs it: everywhere else a condition is written by the
      * fluent API, which serializes for itself.
      */
+    /**
+     * The columns whose condition can never hold for this entity.
+     *
+     * Warden's rule, called and not copied: `Group::unsatisfiableColumns()` is
+     * public for exactly this, and it wants an INSTANCE because the answer is
+     * the model's casts, never the column's type. It is a biconditional — a
+     * boolean value and a bool-cast column have to agree, in both directions —
+     * so a string against a cast column fails it just as a boolean against an
+     * uncast one does.
+     *
+     * Empty means the rule is one warden would store. Empty is also what a shape
+     * with no conditions answers, which is right: there is nothing that can
+     * never hold.
+     *
+     * @param  class-string<Model>  $entity
+     * @return list<string>
+     */
+    public function unsatisfiableColumns(string $entity): array
+    {
+        $group = $this->toGroup();
+
+        if (! $group instanceof Group) {
+            return [];
+        }
+
+        return $group->unsatisfiableColumns(new $entity);
+    }
+
     public function toGroup(): ?Group
     {
         if ($this->shape !== Shape::Conditions) {

@@ -27,7 +27,13 @@ namespace ElPandaPe\FilamentWarden\Grants;
  *   read — a different thing said in the same words is how a person ends up
  *   chasing the wrong problem.
  *
- * `refused`, `unresolved` and `lapsed` carry the cell's own keys rather than a
+ * - `impossible`: cells whose rule can never be true — a boolean value against
+ *   a column the model does not cast to bool, or the mirror of it. Warden
+ *   refuses the write, and this package refuses it FIRST, because warden's
+ *   refusal arrives after the plain grant beneath the condition is already
+ *   written and a catch meant for two other causes swallows it.
+ *
+ * `refused`, `unresolved`, `lapsed` and `impossible` carry the cell's own keys rather than a
  * sentence, because the words belong to the screen: the row and action keys the
  * grid is drawn from, so a caller looks their titles up in the catalogue it
  * already has.
@@ -50,6 +56,7 @@ final readonly class SaveReport
      * @param  list<array{row: string, action: string}>  $refused
      * @param  list<array{row: string, action: string}>  $unresolved
      * @param  list<array{row: string, action: string}>  $lapsed
+     * @param  list<array{row: string, action: string}>  $impossible
      */
     public function __construct(
         public int $written = 0,
@@ -60,6 +67,7 @@ final readonly class SaveReport
         public int $forbidden = 0,
         public int $revoked = 0,
         public array $lapsed = [],
+        public array $impossible = [],
     ) {}
 
     /**

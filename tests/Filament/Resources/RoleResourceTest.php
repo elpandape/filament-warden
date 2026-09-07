@@ -13,6 +13,7 @@ use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ViewRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Tables\RolesTable;
 use ElPandaPe\FilamentWarden\Grants\Holders;
+use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
@@ -1248,6 +1249,43 @@ test('a cell asked to end on a day already gone is named, not written', function
         ->toContain(GridView::cellLabel(catalogForRoles(), roleClass(), 'update'));
 
     Carbon::setTestNow();
+});
+
+test('a rule that can never be true is named in red, not written as a plain grant', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    // `name` is a text column with no bool cast, so `true` against it is a rule
+    // warden refuses. The refusal reaches this package AFTER the plain grant
+    // beneath the condition is written, and a catch meant for two other causes
+    // swallows it — so its own notice, in danger rather than warning, is the
+    // difference between granting nothing and granting every row.
+    livewire(EditRole::class, ['record' => $role->getKey()])
+        ->set('data.permissions.stances.'.roleClass().'.update', 'granted')
+        ->set('data.permissions.narrowing.'.roleClass().'.update', [
+            'mode' => 'conditions',
+            'rules' => [[
+                'logic' => 'and', 'kind' => 'value', 'column' => 'name',
+                'operator' => '=', 'value' => 'true', 'authority' => '',
+            ]],
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $sent = lastNotification();
+    $body = $sent?->getBody();
+
+    expect($sent?->getTitle())->toBe(__('filament-warden::ui.grid.impossible.title'))
+        ->and(is_string($body) ? $body : '')
+        ->toContain(GridView::cellLabel(catalogForRoles(), roleClass(), 'update'))
+        ->and(Access::granted($user, 'update', roleClass()))->toBeTrue();
+
+    // The signed-in user's own grant is the one above; the ROLE got nothing.
+    expect(RoleGrants::of($role, catalogForRoles())->stances)->toBeEmpty();
 });
 
 test('a save that refuses more cells than it names counts the rest', function (): void {

@@ -296,6 +296,7 @@ return [
             'column' => 'The stored conditions name a column that cannot be matched against what is available now. Writing them back would store a rule that can never match, so they are shown as they are and left alone.',
             'rewrite' => 'The stored conditions can be read but not written back exactly as they are — a value would come back as another type, or the first line would lose its or. Saving would change what this rule means for everybody holding it, so the builder is closed.',
             'owned_with_conditions' => 'The stored rule is both limited to what the account owns and carries conditions. A cell draws one reach, so it is shown as it is stored and left alone: reading it as ownership alone would drop the condition the next time anybody saved.',
+            'unsatisfiable' => 'The stored rule compares a boolean against a column the model does not cast to bool, or the reverse. It can never be true, so warden refuses to write it — and rewriting it from here would drop the condition and leave the grant behind it unconditional. It is shown as it is stored and left alone; `warden:doctor` lists every row like it.',
             'tangled' => 'This cell holds more than one rule for the same action. The grid cannot show that, so it does not touch it.',
             'elsewhere' => 'This grant belongs to another tenant, and a write targets one tenant at a time. Switching it off here would delete nothing and still report success, so it is left alone. Change tenant to touch it.',
         ],
@@ -339,6 +340,10 @@ return [
         'lapsed' => [
             'title' => 'Saved, but some cells asked for a date already past',
             'body' => 'A grant that ends before it starts authorises nothing, so these were left exactly as they were. Give them a date in the future, or grant them with no end at all: :cells',
+        ],
+        'impossible' => [
+            'title' => 'Saved, but some rules could never be true',
+            'body' => 'A boolean only ever matches a column the model casts to bool, and these compare across that line — so the store refuses them. They were left exactly as they were, because writing them without the condition would grant every row instead of none: :cells',
         ],
         'saved' => [
             'granted' => '{1} 1 granted|[2,*] :count granted',

@@ -116,17 +116,25 @@ final class RoleGrants
             // `MANAGE` off `'*'` kept every test green, and a policy declaring its
             // own `manage` action would then have driven two writes from one cell.
             // Without it, the pin in `RoleGrantsTest` goes red.
-            [$row, $action] = match (true) {
-                $type === null && in_array($name, $doors, true) => [$name, StateKey::DOOR],
-                is_string($type) && isset($models[$type]) => [$models[$type], $name],
-                default => [null, null],
+            // The entity travels with the pair because the reach cannot be judged
+            // without it: whether a rule can ever be true is a question about the
+            // model's casts. A door has none, and a door carries no conditions.
+            [$row, $action, $model] = match (true) {
+                $type === null && in_array($name, $doors, true) => [$name, StateKey::DOOR, null],
+                is_string($type) && isset($models[$type]) => [$models[$type], $name, $models[$type]],
+                default => [null, null, null],
             };
 
             if ($row === null || $action === null) {
                 continue;
             }
 
-            $variants[$row][$action][] = [Narrowing::of($permission), $forbidden, $scope, $ends];
+            $variants[$row][$action][] = [
+                self::readable(Narrowing::of($permission), $model),
+                $forbidden,
+                $scope,
+                $ends,
+            ];
         }
 
         $stances = [];
@@ -263,6 +271,7 @@ final class RoleGrants
         $refused = [];
         $unresolved = [];
         $lapsed = [];
+        $impossible = [];
 
         foreach (self::cells($catalog) as [$row, $action, $name, $entity]) {
             $stored = $current->narrowings[$row][$action] ?? Narrowing::all();
@@ -402,6 +411,28 @@ final class RoleGrants
                 }
             }
 
+            // A rule that can never be true is not written, in either half.
+            //
+            // Warden refuses it since 3.0.0, and `narrow()` catches
+            // `ConfigurationException` for two other causes — so without this the
+            // refusal is swallowed and the PLAIN grant that `narrow()` already
+            // asked for stands. Measured on this branch: typing `title = true`
+            // against a text column and asking for a narrowed grant left one row
+            // with `options = null`, the cell redrawn as every row, and the check
+            // answering true for a record the rule never named. Under 2.2.2 the
+            // same write stored an inert condition and granted nothing, so the
+            // polarity of the failure inverted with the floor.
+            //
+            // Asked BEFORE warden rather than caught after it, because by the
+            // time it throws the plain grant is already written.
+            $writing = $reachMoved ? $wanted : $stored;
+
+            if ($entity !== null && $writing->unsatisfiableColumns($entity) !== []) {
+                $impossible[] = ['row' => $row, 'action' => $action];
+
+                continue;
+            }
+
             // What the browser sent decides WHETHER the rule moved; what the
             // store holds decides WHAT gets written when it did not. The two
             // are not the same object: `is()` compares payloads, and a payload
@@ -410,7 +441,7 @@ final class RoleGrants
             // both turns a condition stored as the string `'true'`, which matches
             // nothing, into the boolean `true`, which matches every row, on a
             // click that only meant to forbid instead of grant.
-            $changes[] = new Change($name, $entity, $to, $reachMoved ? $wanted : $stored, $wantedUntil);
+            $changes[] = new Change($name, $entity, $to, $writing, $wantedUntil);
         }
 
         $tally = array_count_values(array_map(
@@ -427,6 +458,7 @@ final class RoleGrants
             $tally[Stance::Forbidden->value] ?? 0,
             $tally[Stance::Abstain->value] ?? 0,
             $lapsed,
+            $impossible,
         )];
     }
 
@@ -976,6 +1008,32 @@ final class RoleGrants
     private static function moment(mixed $value): ?CarbonImmutable
     {
         return $value instanceof CarbonImmutable ? $value : null;
+    }
+
+    /**
+     * A stored reach this screen may offer to change, or a locked one.
+     *
+     * A rule warden would refuse to write is a rule this screen must not offer
+     * to rewrite: the save would be refused and the catch above `narrow()` would
+     * turn the refusal into a PLAIN grant. A 2.x database carries such rows —
+     * warden migrates none of them — so this is not a hypothetical.
+     *
+     * Locked rather than cleared. An unsatisfiable rule is inert in both
+     * polarities, so taking it away would lose nothing, but `isClearable()` is a
+     * property of the SHAPE and `Unreadable` covers four other reasons where
+     * clearing does lose something. Making one of them clearable is a bigger
+     * decision than this fix; `warden:doctor` names the row and the permission's
+     * own screen owns the rule.
+     *
+     * @param  class-string<Model>|null  $entity
+     */
+    private static function readable(Narrowing $narrowing, ?string $entity): Narrowing
+    {
+        if ($entity === null || $narrowing->unsatisfiableColumns($entity) === []) {
+            return $narrowing;
+        }
+
+        return Narrowing::unsatisfiable($narrowing->rules);
     }
 
     /**

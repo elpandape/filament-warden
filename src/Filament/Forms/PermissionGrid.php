@@ -169,7 +169,7 @@ final class PermissionGrid extends Field
      */
     public function announce(SaveReport $report): void
     {
-        if (! $report->metAnother() && $report->unresolved === [] && $report->lapsed === []) {
+        if (! $report->metAnother() && $report->unresolved === [] && $report->lapsed === [] && $report->impossible === []) {
             return;
         }
 
@@ -196,6 +196,22 @@ final class PermissionGrid extends Field
                     ->title(__('filament-warden::ui.grid.lapsed.title'))
                     ->body(__('filament-warden::ui.grid.lapsed.body', [
                         'cells' => $this->namedCells($report->lapsed),
+                    ])),
+            );
+        }
+
+        // Its own notice again, and for the sharpest reason of the three: this
+        // one is the difference between granting nothing and granting everything.
+        // Warden refuses the rule; the plain grant underneath it does not refuse
+        // itself, so saying "left alone" is only true because this package
+        // refused first.
+        if ($report->impossible !== []) {
+            $this->sendAfterCommit(
+                Notification::make()
+                    ->danger()
+                    ->title(__('filament-warden::ui.grid.impossible.title'))
+                    ->body(__('filament-warden::ui.grid.impossible.body', [
+                        'cells' => $this->namedCells($report->impossible),
                     ])),
             );
         }
