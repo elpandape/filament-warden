@@ -168,5 +168,14 @@ test('the rule and what it means share a row, and stack when there is no room', 
     // And they stack at the same width where the table already becomes an
     // accordion, so the screen changes face once and not twice. Below it the
     // right rail measured ~40px and the warning fell to one word per line.
-    expect(stylesheet())->toContain('grid-row: auto');
+    //
+    // Scoped to the query's own block, not the whole file: `grid-row: auto`
+    // also names the sibling reposition rule, so an unscoped substring check
+    // cannot tell the collapse's own rule apart from its neighbour — deleting
+    // `.fw-conditions { grid-template-columns: minmax(0, 1fr); }` still left
+    // that string in the file, and nothing went red.
+    $fold = blockOf('@media (max-width: 55.9375rem)');
+
+    expect($fold)->toContain('grid-template-columns: minmax(0, 1fr)')
+        ->and($fold)->toContain('grid-row: auto');
 });
