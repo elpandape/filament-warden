@@ -172,9 +172,9 @@ return [
         'no_permission' => 'ningún permiso',
         'narrowed' => 'Hay una regla estrechada para esta celda. Con condiciones, la concesión solo responde con un registro delante — y una comprobación de clase, como la que hace un listado, falla cerrada.',
         'pending' => 'En pantalla lo has puesto en «:stance». Guarda para que el almacén lo diga.',
-        'stored' => 'En la tienda',
+        'stored' => 'En el almacén',
         'screen' => 'En pantalla, sin guardar',
-        'save_hint' => 'Guarda para que la tienda lo diga.',
+        'save_hint' => 'Guarda para que el almacén lo diga.',
         'matched' => 'Regla que casó',
     ],
 

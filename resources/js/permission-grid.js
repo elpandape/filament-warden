@@ -288,7 +288,11 @@ function grid({ state, grid, interactive }) {
                 return
             }
 
-            this.selected = { row, action, title: label, subtitle: name ?? row }
+            // Kept raw and not only folded into `subtitle`: the screen voice
+            // below passes it straight to `drawn()`/`reached()`, the same
+            // catalogue name every other cell already resolves its wildcard
+            // lookup against.
+            this.selected = { row, action, title: label, subtitle: name ?? row, name }
             this.why = null
             this.narrowing = null
             this.failed = false
@@ -643,6 +647,13 @@ function grid({ state, grid, interactive }) {
          * Read off the baseline — the third envelope the field has sent since
          * 1.6.0 — which is by definition what the store had when this screen
          * opened. Nothing is asked of the server for it.
+         *
+         * A host that never sent one — the infolist's payload is `{stances,
+         * narrowing}`, with no save to compare against — has nothing to read
+         * there: the live state IS the store's answer on that screen, by
+         * construction. Keyed off the envelope's own absence and not off
+         * `interactive`, so anywhere else it goes missing fails the same safe
+         * way.
          */
         storedStance() {
             if (this.selected === null) {
@@ -651,20 +662,28 @@ function grid({ state, grid, interactive }) {
 
             const { row, action } = this.selected
 
-            return (this.state.baseline?.stances?.[row] ?? {})[action] ?? this.grid.order[0]
+            if (this.state.baseline === undefined) {
+                return this.stanceOf(row, action)
+            }
+
+            return (this.state.baseline.stances?.[row] ?? {})[action] ?? this.grid.order[0]
         },
 
         /**
          * What a save would change, in the cell's own words, or null when a save
          * would change nothing here.
+         *
+         * Also null with no baseline to compare against: a screen that never
+         * sent one cannot be asked what changed, because there store and screen
+         * are the same thing.
          */
         moved() {
-            if (this.selected === null) {
+            if (this.selected === null || this.state.baseline === undefined) {
                 return null
             }
 
             const { row, action } = this.selected
-            const was = (this.state.baseline?.stances?.[row] ?? {})[action] ?? this.grid.order[0]
+            const was = (this.state.baseline.stances?.[row] ?? {})[action] ?? this.grid.order[0]
             const now = this.stanceOf(row, action)
 
             return was === now ? null : { from: this.grid.states[was], to: this.grid.states[now] }
