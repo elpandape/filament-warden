@@ -1499,7 +1499,12 @@ test('the panel is not on the page until a cell has been picked', function (): v
     // floating strip that appears the moment the form opens, before anybody has
     // clicked anything, telling them to click something. The grid is right
     // there; the invitation is noise.
-    expect($html)->toContain('x-show="selected"')
+    // Las DOS mitades. `selected` sola dejaba el panel en pantalla después de
+    // Escape — `closePanel()` baja `panel` y no toca `selected`, a propósito,
+    // porque la celda conserva su aro. `panel` sola era el estado vacío
+    // flotante de antes. Medido en un navegador: con `selected` sola, Escape no
+    // cerraba nada y ninguna de las nueve puertas lo vio.
+    expect($html)->toContain('x-show="panel && selected"')
         ->and($html)->not->toContain('x-show="panel || ! selected"');
 });
 

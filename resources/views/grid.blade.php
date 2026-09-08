@@ -455,7 +455,22 @@
                 formulario, sin que nadie haya pulsado nada, y que dice que
                 pulses algo. La invitación sobra: la rejilla está delante.
             --}}
-            x-show="selected"
+            {{--
+                `panel && selected`, y las dos mitades hacen falta.
+
+                `selected` sola es lo que se puso al mover el panel abajo, y
+                rompió Escape sin que ninguna de las nueve puertas lo viera:
+                `closePanel()` baja `panel` y NO toca `selected` —a propósito,
+                porque la celda sigue marcada con su aro para decir cuál se
+                estaba leyendo— así que con `x-show="selected"` el panel se
+                quedaba en pantalla después de cerrarlo.
+
+                `panel` sola tampoco vale: era `panel || ! selected`, que sin
+                nada elegido enseñaba el estado vacío. Con las dos, entrar no
+                enseña nada, pulsar abre, y Escape cierra dejando el aro donde
+                estaba.
+            --}}
+            x-show="panel && selected"
             x-cloak
         >
             {{--
