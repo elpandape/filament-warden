@@ -127,6 +127,7 @@ return [
                 'accounts' => 'Accounts',
                 'everyone' => 'Everyone',
                 'forbidden' => 'Explicitly forbidden',
+                'ending' => 'Ending',
                 'yes' => 'yes',
                 'no' => 'no',
             ],

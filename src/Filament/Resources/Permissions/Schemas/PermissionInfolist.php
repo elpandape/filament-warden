@@ -8,6 +8,8 @@ use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Catalog\Provenance;
 use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Grants\Holders;
+use ElPandaPe\Warden\Context;
+use ElPandaPe\Warden\Support\Expiry;
 use Filament\Facades\Filament;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
@@ -60,16 +62,24 @@ final class PermissionInfolist
                             ->badge()
                             ->state(static fn (Model $record): string => self::reach($record)),
 
+                        TextEntry::make('only_owned')
+                            ->label(__('filament-warden::ui.resources.permissions.fields.only_owned'))
+                            ->state(static fn (Model $record): string => (string) __(
+                                'filament-warden::ui.resources.permissions.holders.'
+                                .((bool) $record->getAttribute('only_owned') ? 'yes' : 'no'),
+                            )),
+
                         TextEntry::make('rule')
                             ->label(__('filament-warden::ui.resources.permissions.fields.conditions'))
                             ->placeholder('—')
-                            ->state(static fn (Model $record): ?string => self::rule($record)),
+                            ->state(static fn (Model $record): ?string => self::rule($record))
+                            ->columnSpanFull(),
                     ]),
 
                 Section::make(__('filament-warden::ui.resources.permissions.sections.holders'))
                     ->icon(Heroicon::OutlinedUsers)
                     ->description(__('filament-warden::ui.resources.permissions.holders.description').' '.__('filament-warden::ui.resources.permissions.holders.every_tenant'))
-                    ->columns(4)
+                    ->columns(5)
                     ->schema([
                         TextEntry::make('roles')
                             ->label(__('filament-warden::ui.resources.permissions.holders.roles'))
@@ -93,8 +103,42 @@ final class PermissionInfolist
                             ->badge()
                             ->color(static fn (Model $record): string => Holders::of($record)->forbidden > 0 ? 'danger' : 'gray')
                             ->state(static fn (Model $record): int => Holders::of($record)->forbidden),
+
+                        // A separate axis from the four above and not a fifth
+                        // kind of holder: a grant that ends is held today by
+                        // whoever holds it, and counted in whichever of the
+                        // figures beside this one names them. What it says is
+                        // when that stops being true without anybody doing
+                        // anything.
+                        TextEntry::make('ending')
+                            ->label(__('filament-warden::ui.resources.permissions.holders.ending'))
+                            ->badge()
+                            ->color(static fn (Model $record): string => self::ending($record) > 0 ? 'info' : 'gray')
+                            ->state(static fn (Model $record): int => self::ending($record)),
                     ]),
             ]);
+    }
+
+    /**
+     * How many live grants on this row carry an end date.
+     *
+     * Live and not every one, unlike `Holders`, and the two answer different
+     * questions on purpose: that class counts what a DELETE destroys, so a
+     * lapsed grant belongs in its tally — the cascade takes it either way. This
+     * counts what is about to stop answering, and a row that already stopped is
+     * not about to do anything.
+     *
+     * Read across every tenant for the same reason `Holders` is: a grant ends or
+     * it does not, and that question has no scope.
+     */
+    private static function ending(Model $record): int
+    {
+        return Context::resolve()->grantClass()::query()
+            ->withoutGlobalScopes()
+            ->where('permission_id', $record->getKey())
+            ->whereNotNull('expires_at')
+            ->tap(Expiry::live(...))
+            ->count();
     }
 
     /**

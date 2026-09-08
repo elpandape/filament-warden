@@ -127,6 +127,7 @@ return [
                 'accounts' => 'Cuentas',
                 'everyone' => 'Todo el mundo',
                 'forbidden' => 'Prohibido explícitamente',
+                'ending' => 'Caducan',
                 'yes' => 'sí',
                 'no' => 'no',
             ],

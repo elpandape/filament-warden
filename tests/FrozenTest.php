@@ -320,6 +320,7 @@ test('the translation keys an application overrides are frozen', function (): vo
         'resources.permissions.holders.accounts',
         'resources.permissions.holders.everyone',
         'resources.permissions.holders.forbidden',
+        'resources.permissions.holders.ending',
         'resources.permissions.holders.yes',
         'resources.permissions.holders.no',
         'resources.permissions.delete.nobody',

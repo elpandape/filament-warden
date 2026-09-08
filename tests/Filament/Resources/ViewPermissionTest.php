@@ -549,3 +549,55 @@ test('the counts beside the button are re-read after a hand-out', function (): v
 
     expect(ElPandaPe\FilamentWarden\Grants\Holders::of($row->fresh() ?? $row)->accountCount)->toBe(1);
 });
+
+test('a grant that has already lapsed is not counted as ending', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+
+    $row = makePermission('export-reports');
+
+    $live = makeUser('Live');
+    $dead = makeUser('Dead');
+
+    Warden::allow($live)->until(now()->addWeek())->to($row);
+    Warden::allow($dead)->until(now()->addWeek())->to($row);
+
+    // Backdated by hand rather than by a fluent call, because warden refuses a
+    // date in the past on the way in — which is right, and leaves this the only
+    // way to build the row an installation gets by waiting.
+    Context::resolve()->grantClass()::query()
+        ->withoutGlobalScopes()
+        ->where('entity_id', $dead->getKey())
+        ->update(['expires_at' => now()->subDay()]);
+
+    // `Holders` counts both, and that is not a disagreement: it answers what a
+    // DELETE destroys, and the cascade takes a lapsed grant like any other. This
+    // figure answers what is about to stop, and a row that already stopped is
+    // not about to do anything.
+    livewire(ViewPermission::class, ['record' => $row->getKey()])
+        ->assertSee('Ending')
+        ->assertOk();
+
+    expect(ElPandaPe\FilamentWarden\Grants\Holders::of($row)->accountCount)->toBe(2);
+});
+
+test('ownership is stated on the screen, not left to be inferred from the rule', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+
+    Warden::allow(makeRole('editor'))->toOwn(Post::class, 'update');
+
+    $owned = permissionClass()::query()
+        ->withoutGlobalScopes()
+        ->where('only_owned', true)
+        ->firstOrFail();
+
+    // «Only what it owns» is a shape the reach badge already says, and saying it
+    // twice is not the point: the badge collapses to one word for a row that is
+    // BOTH owned and conditioned, and this field is the half that survives that.
+    livewire(ViewPermission::class, ['record' => $owned->getKey()])
+        ->assertSee('Only what it owns')
+        ->assertSee('yes');
+});
