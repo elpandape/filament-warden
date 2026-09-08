@@ -15,6 +15,7 @@ return [
                 'identity' => 'The role',
                 'inherits' => 'Inherits from',
                 'inherits_help' => 'Everything these roles grant, this one grants too — today, and as they grow. A prohibition still wins, wherever it comes from.',
+                'hierarchy' => 'Hierarchy',
                 'holders' => 'Who holds it',
             ],
             'fields' => [
@@ -32,6 +33,18 @@ return [
                 'inherits' => 'Inherits from',
                 'ending' => '{1} 1 ends soon|[2,*] :count end soon',
                 'held' => 'Held by',
+            ],
+            'hierarchy' => [
+                'description' => 'What this role reaches through other roles, and what reaches it.',
+                'none' => 'This role inherits nothing, and nothing inherits it.',
+                'inherits' => '{1} Inherits from 1 role, which brings :brought more — :total in total|[2,*] Inherits from :count roles, which bring :brought more — :total in total',
+                'reaching' => '{0} Nothing inherits it|{1} 1 role inherits it|[2,*] :count roles inherit it',
+            ],
+            'hand_out' => [
+                'label' => 'Hand out',
+                'account' => 'Account',
+                'until' => 'Ends on',
+                'until_help' => 'Leave it empty for an assignment with no end. Past the date the account stops holding the role on its own, with no command run — `warden:clean --expired` only removes the row.',
             ],
             'holders' => [
                 'description' => 'Counted under the tenant you are in. An assignment made elsewhere does not show here; one restricted to a context does, counted the same as any other.',

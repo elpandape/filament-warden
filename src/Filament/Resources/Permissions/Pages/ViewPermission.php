@@ -123,6 +123,19 @@ class ViewPermission extends ViewRecord
     }
 
     /**
+     * The account a key names, or nothing.
+     *
+     * Public because the role screen's own hand-out reaches for it: the search
+     * above hands back keys and something has to turn one back into a model,
+     * and having two answers to that would be two places for a key that does
+     * not read as a key to be handled differently.
+     */
+    public static function accountFor(mixed $key): ?Model
+    {
+        return self::account($key);
+    }
+
+    /**
      * Three actions, and only the probe is optional.
      *
      * Both visibilities are written by hand: an edit or delete button asks

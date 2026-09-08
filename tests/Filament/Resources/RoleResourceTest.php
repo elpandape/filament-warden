@@ -6,17 +6,20 @@ use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
+use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages\ViewPermission;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\CreateRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\EditRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ListRoles;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ViewRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Tables\RolesTable;
+use ElPandaPe\FilamentWarden\Grants\Assignment;
 use ElPandaPe\FilamentWarden\Grants\Hierarchy;
 use ElPandaPe\FilamentWarden\Grants\Holders;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
@@ -1728,4 +1731,121 @@ test('a percent typed into the inheritance search is a character, not a wildcard
             expect($component->getSearchResults('%'))->toHaveCount(1);
         }
     }
+});
+
+test('the hand-out writes an assignment with the date it was given', function (): void {
+    $user = signIn();
+    $role = makeRole();
+    $holder = makeUser('Amaru Quispe');
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    livewire(ViewRole::class, ['record' => $role->getKey()])
+        ->callAction('handOut', ['account' => recordKey($holder), 'until' => '2026-09-14']);
+
+    // Through `Warden::assign()->until()->to()`, in warden's own order: an
+    // assignment executes ON `to()`, so a date added afterwards throws.
+    expect(Assignment::of($holder->refresh()))->toBe([$role->getKey()]);
+
+    Carbon::setTestNow('2026-09-15 12:00:00');
+
+    /** @var User $later */
+    $later = User::query()->findOrFail($holder->getKey());
+
+    expect(Assignment::of($later))->toBeEmpty();
+
+    Carbon::setTestNow();
+});
+
+test('the hand-out is hidden without update on the role, and refuses it anyway', function (): void {
+    $user = signIn();
+    $role = makeRole();
+    $holder = makeUser('Amaru Quispe');
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+
+    // Two halves, and they are separate cases because a chain of assertions
+    // stops at its first failure and proves nothing about what it never reached
+    // (§6.34). The button first.
+    livewire(ViewRole::class, ['record' => $role->getKey()])
+        ->assertActionHidden('handOut');
+});
+
+test('the hand-out refuses the write even when the button is bypassed', function (): void {
+    $user = signIn();
+    $role = makeRole();
+    $holder = makeUser('Amaru Quispe');
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+
+    // `callAction()` checks visibility before it calls, so it cannot reach the
+    // server half. A bare mount and call can, which is the shape §6.23 measured:
+    // the `visible()` decides whether the button EXISTS and the check inside the
+    // action decides whether the write happens.
+    livewire(ViewRole::class, ['record' => $role->getKey()])
+        ->call('mountAction', 'handOut', ['account' => recordKey($holder)])
+        ->call('callMountedAction', []);
+
+    expect(Assignment::of($holder->refresh()))->toBeEmpty();
+});
+
+test('the hierarchy section counts what a role reaches and what reaches it', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+
+    $outer = makeRole('outer');
+    $middle = makeRole('middle');
+    $inner = makeRole('inner');
+    $alone = makeRole('alone');
+
+    Warden::assign($middle)->to($outer);
+    Warden::assign($inner)->to($middle);
+
+    // Counts and a folded chain, never the chain itself — and never a number of
+    // HOPS: `RoleClosure::for()` carries `[restriction type, restriction id, end
+    // date]` and no depth, so a hop count would mean walking the closure a
+    // second time, which is the one thing this package does not do with a rule
+    // warden already owns.
+    livewire(ViewRole::class, ['record' => $outer->getKey()])
+        ->assertSee(trans_choice('filament-warden::ui.resources.roles.hierarchy.inherits', 1, [
+            'brought' => 1,
+            'total' => 2,
+        ]))
+        ->assertSee(trans_choice('filament-warden::ui.resources.roles.hierarchy.reaching', 0));
+
+    // And the branch where there is nothing either way, which is what an
+    // installation that just turned nesting on sees on every role.
+    livewire(ViewRole::class, ['record' => $alone->getKey()])
+        ->assertSee(__('filament-warden::ui.resources.roles.hierarchy.none'));
+});
+
+test('a hand-out naming an account that is not one writes nothing', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    // The search hands back keys and this turns one back into a model. A key
+    // that names no row is the crafted request rather than the screen, and the
+    // safe answer is to write nothing rather than to guess which account was
+    // meant.
+    // Straight at the resolver rather than through the screen: a `Select` adds
+    // an `in:` rule over its own options, so a key that names no row never
+    // reaches the action — the guard is for the crafted request, and the
+    // crafted request does not come through `callAction()`.
+    expect(ViewPermission::accountFor('999999'))->toBeNull()
+        ->and(ViewPermission::accountFor(null))->toBeNull();
+
+    livewire(ViewRole::class, ['record' => $role->getKey()])->assertActionVisible('handOut');
 });

@@ -15,6 +15,7 @@ return [
                 'identity' => 'El rol',
                 'inherits' => 'Hereda de',
                 'inherits_help' => 'Todo lo que concedan estos roles lo concede también éste, hoy y cuando crezcan. Una prohibición gana igual, venga de donde venga.',
+                'hierarchy' => 'Jerarquía',
                 'holders' => 'Quién lo tiene',
             ],
             'fields' => [
@@ -32,6 +33,18 @@ return [
                 'inherits' => 'Hereda de',
                 'ending' => '{1} 1 termina pronto|[2,*] :count terminan pronto',
                 'held' => 'Lo tienen',
+            ],
+            'hierarchy' => [
+                'description' => 'Lo que este rol alcanza a través de otros roles, y lo que lo alcanza a él.',
+                'none' => 'Este rol no hereda nada, y nada lo hereda.',
+                'inherits' => '{1} Hereda de 1 rol, que trae :brought más: :total en total|[2,*] Hereda de :count roles, que traen :brought más: :total en total',
+                'reaching' => '{0} No lo hereda nadie|{1} Lo hereda 1 rol|[2,*] Lo heredan :count roles',
+            ],
+            'hand_out' => [
+                'label' => 'Repartir',
+                'account' => 'Cuenta',
+                'until' => 'Termina el',
+                'until_help' => 'Déjalo vacío para una asignación sin fin. Pasada la fecha la cuenta deja de tener el rol sola, sin que corra ningún comando: `warden:clean --expired` solo quita la fila.',
             ],
             'holders' => [
                 'description' => 'Contado bajo el tenant en el que estás. Una asignación hecha en otro tenant no aparece aquí; una restringida a un contexto sí, contada igual que cualquier otra.',
