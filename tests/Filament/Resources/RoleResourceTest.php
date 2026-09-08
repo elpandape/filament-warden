@@ -1872,3 +1872,30 @@ test('a lapsed assignment still blocks a delete, because the cascade takes it to
     // one.
     expect(RoleResource::isDeletable($role))->toBeFalse();
 });
+
+test('a role created with an inheritance keeps it, and does not drop it on the floor', function (): void {
+    config()->set('warden.roles.nested', true);
+    app()->forgetInstance(Context::class);
+
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('create', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $inner = makeRole('inner');
+
+    livewire(CreateRole::class)
+        ->fillForm(['name' => 'outer', 'inherits' => [$inner->getKey()]])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $outer = roleClass()::query()->where('name', 'outer')->firstOrFail();
+
+    // The field is `dehydrated(false)` because the edges are rows in
+    // `assigned_roles` and not columns on this record — which is right, and is
+    // exactly why the create screen needs a hook of its own. Without one the
+    // select was drawn, filled in, and its picks went nowhere: the state never
+    // reached the record and nothing else read it. Measured that way before the
+    // hook existed.
+    expect(Hierarchy::of($outer)->direct)->toContain($inner->getKey());
+});
