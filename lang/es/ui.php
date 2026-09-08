@@ -62,6 +62,8 @@ return [
             'sections' => [
                 'identity' => 'El permiso',
                 'reach' => 'Hasta dónde llega',
+                'held' => 'Quién lo tiene',
+                'expiry' => 'Caducidad',
                 'holders' => 'Quién lo tiene',
             ],
             'entity' => [
@@ -78,6 +80,10 @@ return [
                 'held' => 'Lo tienen',
                 'held_count' => '{1} 1 titular|[2,*] :count titulares',
                 'forbidden_count' => '{1} 1 prohibido|[2,*] :count prohibidos',
+            ],
+            'expiry' => [
+                'none' => 'Un permiso no caduca, y un rol tampoco: lo que caduca es la CONCESIÓN que lo apunta, y la asignación que la alcanza. Ninguna concesión de esta fila lleva fecha.',
+                'some' => '{1} 1 concesión de esta fila termina, la primera el :first. La fecha es de la concesión y se pone desde la rejilla del rol que la tiene, nunca aquí.|[2,*] :count concesiones de esta fila terminan, la primera el :first. La fecha es de la concesión y se pone desde la rejilla del rol que la tiene, nunca aquí.',
             ],
             'health' => [
                 'unsatisfiable' => 'Nunca cierta',

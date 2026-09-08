@@ -62,6 +62,8 @@ return [
             'sections' => [
                 'identity' => 'The permission',
                 'reach' => 'How far it reaches',
+                'held' => 'Who holds it',
+                'expiry' => 'Expiry',
                 'holders' => 'Who holds it',
             ],
             'entity' => [
@@ -78,6 +80,10 @@ return [
                 'held' => 'Held by',
                 'held_count' => '{1} 1 holder|[2,*] :count holders',
                 'forbidden_count' => '{1} 1 forbidden|[2,*] :count forbidden',
+            ],
+            'expiry' => [
+                'none' => 'A permission does not expire, and neither does a role: what expires is a GRANT that points at one, and the assignment that reaches it. None of this row’s grants carries a date.',
+                'some' => '{1} 1 grant on this row ends, the first on :first. The date belongs to the grant and is set from the grid of the role that holds it, never here.|[2,*] :count grants on this row end, the first on :first. The date belongs to the grant and is set from the grid of the role that holds it, never here.',
             ],
             'health' => [
                 'unsatisfiable' => 'Never true',

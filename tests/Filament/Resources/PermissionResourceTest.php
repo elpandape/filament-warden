@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Carbon\CarbonImmutable;
 use ElPandaPe\FilamentWarden\Conditions\Columns;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages\CreatePermission;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages\EditPermission;
@@ -20,6 +21,7 @@ use ElPandaPe\Warden\Support\Titles\PermissionTitle;
 use Filament\Actions\DeleteAction;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
@@ -1619,4 +1621,41 @@ test('the doctor banner appears only when there is something, and only unfiltere
     livewire(ListPermissions::class)
         ->filterTable('unsatisfiable')
         ->assertDontSee(trans_choice('filament-warden::ui.resources.permissions.health.warning', 1));
+});
+
+test('the edit screen says what the row costs beside the form, not under it', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $permission = makePermission('export');
+
+    Warden::allow(makeRole('one'))->to('export');
+
+    Carbon::setTestNow('2026-09-07 12:00:00');
+
+    Warden::allow(makeRole('two'))->until(Carbon::parse('2026-09-14 12:00:00'))->to('export');
+
+    // A permission does not expire and neither does a role: what expires is the
+    // GRANT that points at one. So the card COUNTS rather than offers — there is
+    // no date on this record to edit, and a field here would write nothing.
+    // Saying it beside the count is cheaper than a paragraph nobody reads.
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->assertSee(__('filament-warden::ui.resources.permissions.sections.expiry'))
+        ->assertSee(trans_choice('filament-warden::ui.resources.permissions.expiry.some', 1, [
+            'first' => CarbonImmutable::parse('2026-09-14 12:00:00')->toDayDateTimeString(),
+        ]));
+
+    Carbon::setTestNow();
+});
+
+test('a row nothing points at says a permission does not expire at all', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $permission = makePermission('export');
+
+    livewire(EditPermission::class, ['record' => $permission->getKey()])
+        ->assertSee(__('filament-warden::ui.resources.permissions.expiry.none'));
 });

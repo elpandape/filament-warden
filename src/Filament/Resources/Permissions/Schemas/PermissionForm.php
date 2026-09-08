@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Schemas;
 
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Catalog\PermissionName;
 use ElPandaPe\FilamentWarden\Conditions\Columns;
@@ -11,6 +13,7 @@ use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Conditions\Ownership;
 use ElPandaPe\FilamentWarden\Filament\Forms\ConditionBuilder;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
+use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Tables\PermissionsTable;
 use ElPandaPe\FilamentWarden\Grants\Holders;
 use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Constraints\ConstraintSerializer;
@@ -23,6 +26,8 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Group as Column;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
@@ -41,82 +46,121 @@ final class PermissionForm
     public static function configure(Schema $schema): Schema
     {
         return $schema
-            ->columns(1)
+            // Three tracks, so the form keeps two of them and the aside keeps
+            // one: a form is read left to right and what a row costs is read
+            // beside it, not underneath. Below the split's own breakpoint
+            // Filament stacks the two, which is the reading a phone gets.
+            ->columns(3)
             ->components([
-                Section::make(__('filament-warden::ui.resources.permissions.sections.identity'))
-                    ->icon(Heroicon::OutlinedKey)
-                    ->columns(2)
+                // Aliased, because `ElPandaPe\Warden\Constraints\Group` is
+                // already in this file and is the one the satisfiability check
+                // reads — the name belongs to warden's rule, not to a layout.
+                Column::make()
+                    ->columnSpan(2)
                     ->schema([
-                        TextInput::make('name')
-                            ->label(__('filament-warden::ui.resources.permissions.fields.name'))
-                            ->helperText(static fn (?Model $record): string => self::nameHelp($record))
-                            ->required()
-                            ->maxLength(255)
-                            ->live(onBlur: true)
-                            ->disabled(static fn (?Model $record): bool => $record instanceof Model && ! PermissionResource::mayEditName($record))
-                            // There is no unique index on this table, so `unique()`
-                            // on one column would not describe the row: a permission
-                            // is the tuple, and two identical ones are creatable.
-                            //
-                            // `$get` and `$record` are injected by PARAMETER NAME,
-                            // not by type: `Component::resolveDefault…ByName()` is
-                            // consulted first and answers both, while the by-type
-                            // path hands back the record for anything typed as a
-                            // model and would leave `Get` to the container. Rename
-                            // either and this closure stops resolving.
-                            ->rule(static fn (?Model $record, Get $get): callable => static function (string $attribute, mixed $value, callable $fail) use ($record, $get): void {
-                                if (self::exists($value, $record, $get)) {
-                                    $fail(__('filament-warden::ui.resources.permissions.fields.taken'));
-                                }
-                            }),
+                        Section::make(__('filament-warden::ui.resources.permissions.sections.identity'))
+                            ->icon(Heroicon::OutlinedKey)
+                            ->columns(2)
+                            ->schema([
+                                TextInput::make('name')
+                                    ->label(__('filament-warden::ui.resources.permissions.fields.name'))
+                                    ->helperText(static fn (?Model $record): string => self::nameHelp($record))
+                                    ->required()
+                                    ->maxLength(255)
+                                    ->live(onBlur: true)
+                                    ->disabled(static fn (?Model $record): bool => $record instanceof Model && ! PermissionResource::mayEditName($record))
+                                    // There is no unique index on this table, so `unique()`
+                                    // on one column would not describe the row: a permission
+                                    // is the tuple, and two identical ones are creatable.
+                                    //
+                                    // `$get` and `$record` are injected by PARAMETER NAME,
+                                    // not by type: `Component::resolveDefault…ByName()` is
+                                    // consulted first and answers both, while the by-type
+                                    // path hands back the record for anything typed as a
+                                    // model and would leave `Get` to the container. Rename
+                                    // either and this closure stops resolving.
+                                    ->rule(static fn (?Model $record, Get $get): callable => static function (string $attribute, mixed $value, callable $fail) use ($record, $get): void {
+                                        if (self::exists($value, $record, $get)) {
+                                            $fail(__('filament-warden::ui.resources.permissions.fields.taken'));
+                                        }
+                                    }),
 
-                        TextInput::make('title')
-                            ->label(__('filament-warden::ui.resources.permissions.fields.title'))
-                            ->helperText(__('filament-warden::ui.resources.permissions.fields.title_help'))
-                            ->placeholder(static fn (Get $get): string => self::generated($get))
-                            ->maxLength(255),
+                                TextInput::make('title')
+                                    ->label(__('filament-warden::ui.resources.permissions.fields.title'))
+                                    ->helperText(__('filament-warden::ui.resources.permissions.fields.title_help'))
+                                    ->placeholder(static fn (Get $get): string => self::generated($get))
+                                    ->maxLength(255),
 
-                        Select::make('entity_type')
-                            ->label(__('filament-warden::ui.resources.permissions.fields.entity'))
-                            ->helperText(__('filament-warden::ui.resources.permissions.fields.entity_help'))
-                            ->options(static fn (?Model $record): array => self::entities($record))
-                            ->live()
-                            ->disabled(static fn (?Model $record): bool => $record instanceof Model && ! PermissionResource::mayEditName($record))
-                            // The conditions named columns of another table, and the
-                            // ownership was resolved against a column this entity may
-                            // not have. Kept, either would be a rule that cannot be
-                            // true — and an `only_owned` warden cannot express in SQL
-                            // says nothing about it: the branch is skipped on the grant
-                            // pass and blocks on the forbid pass, without an error
-                            // anywhere.
-                            ->afterStateUpdated(static function (callable $set): void {
-                                $set('options', ['mode' => 'all', 'rules' => []]);
-                                $set('only_owned', false);
-                            })
-                            ->columnSpanFull(),
+                                Select::make('entity_type')
+                                    ->label(__('filament-warden::ui.resources.permissions.fields.entity'))
+                                    ->helperText(__('filament-warden::ui.resources.permissions.fields.entity_help'))
+                                    ->options(static fn (?Model $record): array => self::entities($record))
+                                    ->live()
+                                    ->disabled(static fn (?Model $record): bool => $record instanceof Model && ! PermissionResource::mayEditName($record))
+                                    // The conditions named columns of another table, and the
+                                    // ownership was resolved against a column this entity may
+                                    // not have. Kept, either would be a rule that cannot be
+                                    // true — and an `only_owned` warden cannot express in SQL
+                                    // says nothing about it: the branch is skipped on the grant
+                                    // pass and blocks on the forbid pass, without an error
+                                    // anywhere.
+                                    ->afterStateUpdated(static function (callable $set): void {
+                                        $set('options', ['mode' => 'all', 'rules' => []]);
+                                        $set('only_owned', false);
+                                    })
+                                    ->columnSpanFull(),
+                            ]),
+
+                        Section::make(__('filament-warden::ui.resources.permissions.sections.reach'))
+                            ->icon(Heroicon::OutlinedFunnel)
+                            ->description(static fn (?Model $record): ?string => self::sharedWarning($record))
+                            ->schema([
+                                Toggle::make('only_owned')
+                                    ->label(__('filament-warden::ui.resources.permissions.fields.only_owned'))
+                                    ->helperText(static fn (Get $get): string => self::ownershipHelp($get))
+                                    ->disabled(static fn (Get $get, ?Model $record): bool => ! self::ownable($get)
+                                        || ($record instanceof Model && ! PermissionResource::mayEditOwnership($record))),
+
+                                ConditionBuilder::make('options')
+                                    ->label(__('filament-warden::ui.resources.permissions.fields.conditions'))
+                                    ->helperText(static fn (Get $get, ?Model $record): string => self::conditionsHelp($get, $record))
+                                    ->entity(static fn (Get $get): ?string => self::model($get))
+                                    // Disabled is what keeps `options` out of the saved
+                                    // data at all: Filament's `disabled()` also calls
+                                    // `saved(false)`, and a component that is not
+                                    // dehydrated is forgotten rather than written.
+                                    ->disabled(static fn (?Model $record): bool => ($record instanceof Model && ! PermissionResource::mayEditConditions($record))
+                                        || ! self::conditionsWritable($record))
+                                    ->columnSpanFull(),
+                            ]),
                     ]),
 
-                Section::make(__('filament-warden::ui.resources.permissions.sections.reach'))
-                    ->icon(Heroicon::OutlinedFunnel)
-                    ->description(static fn (?Model $record): ?string => self::sharedWarning($record))
+                // Read-only, and on purpose: the date belongs to a GRANT and not
+                // to this row, so a permission has no date of its own to edit —
+                // which is exactly the thing people get wrong about expiry, and
+                // saying it beside the count is cheaper than saying it in a
+                // paragraph nobody reads.
+                Column::make()
+                    ->columnSpan(1)
                     ->schema([
-                        Toggle::make('only_owned')
-                            ->label(__('filament-warden::ui.resources.permissions.fields.only_owned'))
-                            ->helperText(static fn (Get $get): string => self::ownershipHelp($get))
-                            ->disabled(static fn (Get $get, ?Model $record): bool => ! self::ownable($get)
-                                || ($record instanceof Model && ! PermissionResource::mayEditOwnership($record))),
+                        Section::make(__('filament-warden::ui.resources.permissions.sections.held'))
+                            ->icon(Heroicon::OutlinedUsers)
+                            ->visible(static fn (?Model $record): bool => $record instanceof Model)
+                            ->schema([
+                                TextEntry::make('held')
+                                    ->hiddenLabel()
+                                    ->state(static fn (?Model $record): string => $record instanceof Model
+                                        ? PermissionsTable::warning($record)
+                                        : ''),
+                            ]),
 
-                        ConditionBuilder::make('options')
-                            ->label(__('filament-warden::ui.resources.permissions.fields.conditions'))
-                            ->helperText(static fn (Get $get, ?Model $record): string => self::conditionsHelp($get, $record))
-                            ->entity(static fn (Get $get): ?string => self::model($get))
-                            // Disabled is what keeps `options` out of the saved
-                            // data at all: Filament's `disabled()` also calls
-                            // `saved(false)`, and a component that is not
-                            // dehydrated is forgotten rather than written.
-                            ->disabled(static fn (?Model $record): bool => ($record instanceof Model && ! PermissionResource::mayEditConditions($record))
-                                || ! self::conditionsWritable($record))
-                            ->columnSpanFull(),
+                        Section::make(__('filament-warden::ui.resources.permissions.sections.expiry'))
+                            ->icon(Heroicon::OutlinedClock)
+                            ->schema([
+                                TextEntry::make('expiry')
+                                    ->hiddenLabel()
+                                    ->state(static fn (?Model $record): string => self::expiry($record)),
+                            ]),
                     ]),
             ]);
     }
@@ -150,6 +194,45 @@ final class PermissionForm
         }
 
         return $options;
+    }
+
+    /**
+     * How many of this row's grants end, and when the first of them does.
+     *
+     * A permission does not expire and neither does a role: what expires is the
+     * GRANT that points at one, and the assignment that reaches it. So this
+     * counts rather than offers — there is no date on this record to edit, and
+     * a field here would be a field that writes nothing.
+     *
+     * Read across every tenant, like `Holders`: a grant ends or it does not, and
+     * that question has no scope.
+     */
+    private static function expiry(?Model $record): string
+    {
+        if (! $record instanceof Model) {
+            return (string) __('filament-warden::ui.resources.permissions.expiry.none');
+        }
+
+        $ends = Context::resolve()->grantClass()::query()
+            ->withoutGlobalScopes()
+            ->where('permission_id', $record->getKey())
+            ->whereNotNull('expires_at')
+            ->orderBy('expires_at')
+            ->value('expires_at');
+
+        if (! $ends instanceof DateTimeInterface) {
+            return (string) __('filament-warden::ui.resources.permissions.expiry.none');
+        }
+
+        $count = Context::resolve()->grantClass()::query()
+            ->withoutGlobalScopes()
+            ->where('permission_id', $record->getKey())
+            ->whereNotNull('expires_at')
+            ->count();
+
+        return trans_choice('filament-warden::ui.resources.permissions.expiry.some', $count, [
+            'first' => CarbonImmutable::instance($ends)->toDayDateTimeString(),
+        ]);
     }
 
     /**
