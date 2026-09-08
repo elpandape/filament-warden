@@ -1849,3 +1849,26 @@ test('a hand-out naming an account that is not one writes nothing', function ():
 
     livewire(ViewRole::class, ['record' => $role->getKey()])->assertActionVisible('handOut');
 });
+
+test('a lapsed assignment still blocks a delete, because the cascade takes it too', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('delete', roleClass());
+
+    $role = makeRole('editor');
+    $account = makeUser();
+
+    Warden::assign($role)->until(now()->addWeek())->to($account);
+
+    // Backdated by hand: warden refuses a past date on the way in.
+    Context::resolve()->assignedRoleClass()::query()
+        ->where('role_id', $role->getKey())
+        ->update(['expires_at' => now()->subDay()]);
+
+    // A read that DECIDES a delete reads every row, because the foreign key
+    // does: a lapsed assignment is destroyed exactly like a live one, so
+    // calling the role unassigned would promise a smaller loss than the delete
+    // causes. The screen separates the two figures instead of narrowing this
+    // one.
+    expect(RoleResource::isDeletable($role))->toBeFalse();
+});

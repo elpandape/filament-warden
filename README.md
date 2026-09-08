@@ -882,6 +882,26 @@ A protected role keeps its name and its grid: both are shown, neither can be edi
 
 **A role cannot arrive at a protected name either.** Creating a role called `super-admin`, or renaming an ordinary one onto it, is refused by the form: otherwise the role is born protected, which is a way of minting an unremovable role by typing. The role that already carries the name keeps it: only the *arrival* is closed. The refusal names which list the name is on, rather than falling back to the framework's generic validation wording.
 
+> ⏳ **A grant or an assignment that has already lapsed still blocks a delete, and still counts as a
+> holder for the name lock.** Both rules read every row rather than the live ones, because the
+> foreign key that removes them does — a delete takes a lapsed row exactly like any other, so
+> calling the record unheld would promise a smaller loss than the delete causes. On screen the two
+> figures are separated instead: *Already lapsed* says how many of the holders are answering
+> nothing, so the wide count can stay wide without reading as access nobody has.
+
+### Nested Roles
+
+There is no `roles.nested` key here. It is **warden's** — `warden.roles.nested`, off out of the box,
+with `warden.roles.max_depth` beside it — because it is part of warden's own cache key and decides
+what every check answers, not merely what a screen draws. This package reads it and shows the
+*Inherits from* field only when it is on.
+
+> ⚠️ **Turning it on is not a write, and that is exactly why it is worth a moment.** A role assigned
+> to another role has always been storable and has always granted nothing, so an installation can
+> have collected such edges without knowing. Flipping the flag makes them live: a row somebody wrote
+> years ago as a no-op becomes access on the next check. `filament-warden:audit` counts them for you
+> before you flip it, under *roles assigned to other roles while nesting is off*.
+
 > ⚠️ **The merge is shallow, on purpose.** Declaring `roles.protected => []` in your published config genuinely unprotects every role. A recursive merge would blend lists by index and silently keep `'super-admin'` in there — so it is not used, and a test holds that line.
 
 ### Guard
