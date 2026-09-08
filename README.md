@@ -449,6 +449,39 @@ RoleAssignment::make('roles')->columnSpanFull(),
 > or, worse, deleting a real tenant-scoped row while the global one keeps it looking held. Switch
 > tenant to change it.
 
+### Grant a Permission Straight to an Account
+
+A permission handed to somebody without a role in between is the hardest access in an installation
+to find again: it belongs to no role, so no role's grid draws it. Warden has allowed the write since
+it existed — `Warden::allow($account)->to('export-reports')` — and 3.0 is the first version with
+anywhere to look at the result.
+
+Two screens, and they are the two directions of one write. From a permission's own page, **Grant to
+an account** hands that row to somebody, with an end date if it should have one. From an account's
+page, a relation manager lists everything that account holds directly:
+
+```php
+use ElPandaPe\FilamentWarden\Filament\RelationManagers\PermissionsRelationManager;
+
+public static function getRelations(): array
+{
+    return [RolesRelationManager::class, PermissionsRelationManager::class];
+}
+```
+
+> ⚠️ **It is off out of the box.** `permissions.direct` is `false`, and that is not caution about a
+> listing: turning it on does not only show direct grants, it hands them out. An installation that
+> keeps every permission behind a role should leave it off, and the tab will not appear.
+
+Each row says its polarity (a direct prohibition beats every grant the account's roles carry), its
+reach, and when it ends. A grant written outside the tenant you are viewing from is shown, marked
+and left alone — a revoke from there would delete nothing and still report success. Flipping a row
+from granted to forbidden is a write **and** a delete, because `forbidden` is part of warden's
+unique index and the two coexist as separate rows.
+
+The wildcard is never offered. `entity_type = '*'` is the one row that covers literally everything,
+and this package never writes it (property 6 below) — it can only be seeded from a console.
+
 ### Query Permissions Manually
 
 ```php
@@ -697,7 +730,7 @@ It writes nothing, and reports eleven things:
 - **permissions nothing declares that no grant points at** — a rename left them behind: they can never match again, and nothing will ever create them;
 - **grants for actions nothing declares any more** — a renamed policy method, a typo in a seeder, a screen that was deleted: the silent mistake warden has no way to detect;
 - **whole entity types nothing declares** — a morph alias that moved, reported apart because the fix is the opposite one;
-- **models only a relation manager reaches** — *informational: this one never turns `--check` red*. Reaching one means running the relationship, which is not safe to do from a command, so they are named instead. A relation manager that declares `$relatedResource` is walked for free; one that cannot stays listed for good, and `RolesRelationManager` below is deliberately one of them. `catalog.models` is what puts the model in the catalogue — it does not clear the line;
+- **models only a relation manager reaches** — *informational: this one never turns `--check` red*. Reaching one means running the relationship, which is not safe to do from a command, so they are named instead. A relation manager that declares `$relatedResource` is walked for free; one that cannot stays listed for good, and `RolesRelationManager` and `PermissionsRelationManager` below are deliberately two of them. `catalog.models` is what puts the model in the catalogue — it does not clear the line;
 - **catalogue names carrying a dot** — Livewire splits a state path on dots, so such a name cannot be a cell and a role screen throws the moment it draws one. Rename the permission — otherwise the only way to find out is somebody opening the screen;
 - **roles assigned to other roles while `warden.roles.nested` is off** — *informational, and the only bucket here that reports something which is not a defect: it is what a SWITCH would do.* Such an edge has always been writable and has always granted nothing, so an installation can have collected them without knowing — and turning the flag on is what makes them live, so a grant somebody wrote years ago as a no-op becomes access on the next check. Warden's own upgrade note asks for this count before you flip it. With nesting on the list is empty by definition;
 - **catalogue rows whose condition can never be true** — a boolean value against a column the model does not cast to `bool`, or the reverse. As a grant they authorise nothing; as a prohibition they are inert, and the grant they were written to narrow keeps applying. Warden 3.0 refuses to write new ones, so this bucket only ever shrinks — which is why it is red rather than informational: correcting the condition or adding the cast empties it, and nothing can refill it;
@@ -829,6 +862,7 @@ It is thinner from the account screen: a role is held or it is not, so `refused`
     'constraints' => true,         // the condition builder
     'only_owned'  => true,         // the ownership checkbox
     'probe'       => true,         // the test bench, built on explain() — see below
+    'direct'      => false,        // the direct-grants relation manager — see below
 ],
 ```
 
@@ -866,8 +900,14 @@ A protected role keeps its name and its grid: both are shown, neither can be edi
 'grid' => [
     'explain'     => true,  // Inspector
     'constraints' => true,  // Show scope
+    'expiry'      => true,  // May the grid set an end date
 ],
 ```
+
+> ⏳ **`expiry` decides whether the grid may SET a date, never whether one is honoured.** Warden
+> stops reading a row past its date whatever this says, so a grid with this off still draws a lapsed
+> cell as the abstention it is. Switching it off makes the screen answer "no opinion" rather than
+> "no date" — an empty answer would end every timed grant on the grid the first time anybody saved.
 
 > 🔎 **`probe` lets anyone who can view a permission search your accounts.** The bench needs an
 > account to test the permission against, so its picker searches whatever of `name`, `email` and
@@ -946,7 +986,7 @@ Two different kinds of thing are in that list, and both matter for the same reas
 | Permission prefixes | `page:`, `widget:`, `panel:` and `PermissionName`, which mints them and reads them back |
 | Plugin | `FilamentWardenPlugin`, its ID `filament-warden`, and its six methods: `make()`, `getId()`, `register()`, `boot()`, `roles()`, `permissions()` |
 | Fields | `PermissionGrid`, `PermissionGridEntry`, `ConditionBuilder`, `RoleAssignment`, the `{stances, narrowing, baseline}` state envelope a form receives — adding a key to it is a minor — and the key `RoleAssignment` keeps beside its own list, `__filament_warden_roles_baseline`, which sits in your page's state array |
-| Relation managers | `RolesRelationManager`'s class name — a consuming application's own `UserResource::getRelations()` stores it by name, so renaming the class breaks every installation that attached it |
+| Relation managers | `RolesRelationManager` and `PermissionsRelationManager`'s class names — a consuming application's own `UserResource::getRelations()` stores them by name, so renaming either breaks every installation that attached it |
 | Traits | `AuthorizesPageAccess`, `AuthorizesWidgetView`, `AccessesPanels` |
 | Authorization | `WardenPolicy`, `Access` |
 | Catalog | `Catalog` and its seven public methods — `for()`, `relationManagers()`, `resourceClasses()`, `pageClasses()`, `widgetClasses()`, `union()`, `forget()` — plus `Entry` and its `key()`, `Origin`, `Scope` |
