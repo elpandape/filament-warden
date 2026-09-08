@@ -4,12 +4,19 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Grants;
 
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
 use ElPandaPe\FilamentWarden\Support\Line;
 use ElPandaPe\FilamentWarden\Support\Morph;
+use ElPandaPe\Warden\Checks\Explain\Cause as WardenCause;
+use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
+use ElPandaPe\Warden\Support\Expiry;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 /**
  * What the store answers for one account, asked out loud.
@@ -34,6 +41,9 @@ final readonly class Probe
         public ?string $permission = null,
         public ?string $role = null,
         public ?string $note = null,
+        public ?string $rule = null,
+        public ?string $via = null,
+        public ?string $until = null,
     ) {}
 
     /**
@@ -103,6 +113,17 @@ final readonly class Probe
             note: Narrowing::of($permission)->isNarrowed() && ! $entity instanceof Model
                 ? Line::of('filament-warden::ui.probe.narrowed')
                 : null,
+            // The three rows of the card, and each one is read from a place
+            // warden's answer does not carry.
+            //
+            // The rule comes off `$why->permission` and not off the row on
+            // screen: a condition is a row of the catalogue, so the twin that
+            // actually matched can be a different row from the one being
+            // looked at, and printing this row's rule beside that row's verdict
+            // would be two facts about two rows read as one.
+            rule: self::matched($why->permission),
+            via: self::via($authority, $why->role),
+            until: self::until($authority, $why->permission, $why->role, $why->cause),
         );
     }
 
@@ -141,10 +162,6 @@ final readonly class Probe
     }
 
     /**
-     * @param  array<string, string>  $replace
-     */
-
-    /**
      * The title if warden generated one, the name if it did not, and nothing at
      * all when there is no row.
      */
@@ -163,5 +180,191 @@ final readonly class Probe
         $name = $model->getAttribute('name');
 
         return is_string($name) ? $name : null;
+    }
+
+    /**
+     * The rule the deciding row carries, read out as it will be evaluated.
+     *
+     * Off the row warden MATCHED and never off the row on screen. A condition is
+     * a row of the catalogue, so a narrowed grant points at a twin — same name,
+     * same entity, different `options` — and the twin is what answered. Printing
+     * this screen's rule beside that row's verdict would be two facts about two
+     * rows read as one, which is the shape of every wrong answer this card can
+     * give.
+     *
+     * Null in three of the nine causes and that is not a gap: `NoMatchingGrant`
+     * and `NotApplicable` carry no row at all, and a row with no conditions has
+     * no rule to print.
+     */
+    private static function matched(?Model $permission): ?string
+    {
+        if (! $permission instanceof Model) {
+            return null;
+        }
+
+        $narrowing = Narrowing::of($permission);
+
+        return $narrowing->rules === []
+            ? null
+            : $narrowing->preview(
+                Line::of('filament-warden::ui.conditions.authority'),
+                Line::of('filament-warden::ui.conditions.and'),
+                Line::of('filament-warden::ui.conditions.or'),
+            );
+    }
+
+    /**
+     * How the account reaches the role, when a role is how it reached at all.
+     *
+     * Only the two via-a-role causes carry one, so seven of the nine return here
+     * with nothing to say — asking `assigned_roles` for a role that is null
+     * would be a query for every direct grant on the screen.
+     *
+     * What it adds to the role's name is the RESTRICTION, and that is the half
+     * worth a query: an assignment tied to a context is invisible to
+     * `whereCan()`'s grant pass, so the count and the panel disagree about this
+     * account and neither of them says why. The unrestricted row wins when both
+     * exist, because it is the one that answers without a context in front of
+     * it.
+     *
+     * And the restricted branch is only reachable with a RECORD in the probe:
+     * `Explainer::source()` counts a restricted assignment only when the check
+     * carries a model that belongs to the context, so a class check names no
+     * role at all and lands on the null above.
+     */
+    private static function via(Model $authority, ?Model $role): ?string
+    {
+        if (! $role instanceof Model) {
+            return null;
+        }
+
+        $name = self::label($role);
+
+        if ($name === null) {
+            return null; // @codeCoverageIgnore
+        }
+
+        $restricted = Context::resolve()->assignedRoleClass()::query()
+            ->where('role_id', $role->getKey())
+            ->where('entity_type', $authority->getMorphClass())
+            ->where('entity_id', $authority->getKey())
+            ->tap(Expiry::live(...))
+            ->orderByRaw('case when restricted_to_type is null then 0 else 1 end')
+            ->first();
+
+        $type = $restricted?->getAttribute('restricted_to_type');
+
+        if (! is_string($type) || $type === '') {
+            return Line::of('filament-warden::ui.probe.via', ['role' => $name]);
+        }
+
+        // The alias and not the class: `Morph::model()` answers null for an
+        // alias whose class is gone, and a restriction whose class went away is
+        // still a restriction — saying its stored name is closer to the truth
+        // than saying nothing.
+        $class = Morph::model($type);
+
+        return Line::of('filament-warden::ui.probe.via_restricted', [
+            'role' => $name,
+            'context' => $class === null ? $type : Str::headline(class_basename($class)),
+        ]);
+    }
+
+    /**
+     * When this answer stops being this answer.
+     *
+     * Read from the two pivots and never from the explanation, because warden
+     * does not put it there: `AuthorizationExplanation` carries the deciding
+     * permission and role and no date at all, since expiry belongs to the ROW
+     * that points at one rather than to either of them.
+     *
+     * TWO rows can end this answer and the earlier of them is the horizon — the
+     * grant that matched, and, where a role is how it was reached, the
+     * assignment that reaches it. Which of the two is named, because they are
+     * moved in different places: a grant date is set from the role's grid, an
+     * assignment date from the account.
+     *
+     * Both reads keep the tenant scope, deliberately. `explain()` answered
+     * through that same filter, so the deciding row is one the filter allowed;
+     * reading wider could pick another tenant's row and print its date beside a
+     * verdict it had no part in. And both filter on live rows, because a lapsed
+     * twin of the same shape is a row warden already stopped reading.
+     */
+    private static function until(Model $authority, ?Model $permission, ?Model $role, WardenCause $cause): ?string
+    {
+        if (! $permission instanceof Model) {
+            return null;
+        }
+
+        $grant = self::ends(
+            Context::resolve()->grantClass()::query()
+                ->where('permission_id', $permission->getKey())
+                ->when(
+                    $role instanceof Model,
+                    static fn (Builder $query): Builder => $query
+                        ->where('entity_type', $role?->getMorphClass())
+                        ->where('entity_id', $role?->getKey()),
+                    static fn (Builder $query): Builder => match ($cause) {
+                        WardenCause::GrantedToEveryone, WardenCause::ForbiddenToEveryone => $query->whereNull('entity_id'),
+                        default => $query
+                            ->where('entity_type', $authority->getMorphClass())
+                            ->where('entity_id', $authority->getKey()),
+                    },
+                ),
+        );
+
+        $assignment = $role instanceof Model
+            ? self::ends(
+                Context::resolve()->assignedRoleClass()::query()
+                    ->where('role_id', $role->getKey())
+                    ->where('entity_type', $authority->getMorphClass())
+                    ->where('entity_id', $authority->getKey()),
+            )
+            : null;
+
+        $soonest = match (true) {
+            ! $grant instanceof CarbonImmutable => $assignment,
+            ! $assignment instanceof CarbonImmutable => $grant,
+            default => $grant->lessThanOrEqualTo($assignment) ? $grant : $assignment,
+        };
+
+        if (! $soonest instanceof CarbonImmutable) {
+            return null;
+        }
+
+        return Line::of(
+            'filament-warden::ui.probe.'.($soonest === $assignment && $grant !== $assignment ? 'until_assignment' : 'until_grant'),
+            ['date' => $soonest->toDayDateTimeString(), 'human' => $soonest->diffForHumans()],
+        );
+    }
+
+    /**
+     * The soonest end date among live rows, or nothing when none of them ends.
+     *
+     * A row with no date outlives every row that has one, so `orderBy` alone
+     * would answer `null` first on most engines and call an ending grant
+     * endless. The null rows are dropped instead: "none of these ends" and "the
+     * first one ends on" are the two answers, and a row without a date belongs
+     * to the first.
+     *
+     * The row type is a template rather than `Model`: `Builder`'s own `TModel`
+     * is not covariant, so a builder for warden's grant class is not a
+     * `Builder<Model>` to the analyser, and both callers build exactly that.
+     *
+     * @template TRow of Model
+     *
+     * @param  Builder<TRow>  $query
+     */
+    private static function ends(Builder $query): ?CarbonImmutable
+    {
+        $row = $query
+            ->tap(Expiry::live(...))
+            ->whereNotNull('expires_at')
+            ->orderBy('expires_at')
+            ->first();
+
+        $ends = $row?->getAttribute('expires_at');
+
+        return $ends instanceof DateTimeInterface ? CarbonImmutable::instance($ends) : null;
     }
 }

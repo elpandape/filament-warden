@@ -237,6 +237,10 @@ return [
         'no_record' => 'No row of that entity has that key, so nothing was asked. This is not the same answer as nothing matching.',
         'no_model' => 'This permission has no model behind it, so there is no row to put in front of it. It is asked without one.',
         'unresolved' => 'The entity this permission points at no longer resolves to a model. It does not fail loudly: it simply stops matching anything.',
+        'via' => 'Held through the role :role.',
+        'via_restricted' => 'Held through the role :role, and that assignment is tied to a :context. It answered because the row asked about belongs to that context; asked about the class, warden would not have used it at all. whereCan() does not see the restriction either, so the count answers for rows this account cannot reach.',
+        'until_grant' => 'The grant that answered ends on :date (:human). Past that moment warden abstains here and your policies decide. The date belongs to the grant and is set from the grid of the role that holds it.',
+        'until_assignment' => 'The assignment that reaches it ends on :date (:human), before the grant does. Past that moment this account stops holding the role, so the same question answers «abstains». The date is set from the account, not from the permission.',
         'unreadable' => 'This row carries no name, so there is no question to ask of it.',
     ],
 

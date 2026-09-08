@@ -237,6 +237,10 @@ return [
         'no_record' => 'Ninguna fila de esa entidad tiene esa clave, así que no se preguntó nada. No es la misma respuesta que «no casa».',
         'no_model' => 'Este permiso no tiene ningún modelo detrás, así que no hay fila que ponerle delante. Se pregunta sin ella.',
         'unresolved' => 'La entidad a la que apunta este permiso ya no resuelve a ningún modelo. No falla con ruido: simplemente deja de casar con nada.',
+        'via' => 'Lo tiene a través del rol :role.',
+        'via_restricted' => 'Lo tiene a través del rol :role, y esa asignación está atada a un :context. Contestó porque la fila por la que se preguntó pertenece a ese contexto; preguntada por la clase, warden no la habría usado siquiera. whereCan() tampoco ve la restricción, así que el recuento contesta por filas que esta cuenta no alcanza.',
+        'until_grant' => 'La concesión que contestó caduca el :date (:human). A partir de ese momento warden se abstiene aquí y deciden tus Policies. La fecha es de la concesión y se pone desde la rejilla del rol que la tiene.',
+        'until_assignment' => 'La asignación que llega hasta ella caduca el :date (:human), antes que la concesión. A partir de ese momento esta cuenta deja de tener el rol, así que la misma pregunta contesta «se abstiene». La fecha se pone desde la cuenta, no desde el permiso.',
         'unreadable' => 'Esta fila no tiene nombre, así que no hay pregunta que hacerle.',
     ],
 

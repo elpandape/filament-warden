@@ -163,3 +163,138 @@ test('a permission with no title is named by its name', function (): void {
 
     expect(Probe::run($user, probedPermission('viewAny'))->permission)->toBe('viewAny');
 });
+
+test('the rule the card prints is the twin that matched, not the row on screen', function (): void {
+    $user = makeUser();
+    $alpha = Post::query()->create(['title' => 'alpha']);
+
+    // Two rows of the catalogue with the same name and entity: the plain one
+    // and the narrowed twin the `where()` mints. The plain one is what a
+    // listing hands to this screen, and the twin is what answers — so a card
+    // that read the rule off its own record would print nothing beside a
+    // verdict that a condition decided.
+    $plain = makePermission('update');
+    $plain->forceFill(['entity_type' => Post::class])->save();
+
+    Warden::allow($user)->to('update', Post::class)->where('title', '=', 'alpha');
+
+    $probe = Probe::run($user, $plain, recordKey($alpha));
+
+    expect($probe->verdict)->toBe(Stance::Granted)
+        ->and($probe->rule)->not->toBeNull()
+        ->and($probe->rule)->toContain('title');
+});
+
+test('a rule with no conditions has no rule to print', function (): void {
+    $user = makeUser();
+
+    Warden::allow($user)->to('viewAny', Post::class);
+
+    expect(Probe::run($user, probedPermission('viewAny'))->rule)->toBeNull();
+});
+
+test('an assignment tied to a context says so beside the role', function (): void {
+    $user = makeUser();
+    $role = makeRole('editor');
+    $post = Post::query()->create(['title' => 'section']);
+
+    Warden::allow($role)->to('view', Post::class);
+    Warden::assign($role)->on($post)->to($user);
+
+    // The record is not decoration here: `Explainer::source()` only counts a
+    // restricted assignment when the check has a MODEL in front of it and that
+    // model belongs to the context, so asked about the class warden names no
+    // role at all and this sentence has nothing to attach to. Probing the row
+    // the assignment is tied to is the only way the restricted branch is
+    // reachable at all.
+    $probe = Probe::run($user, probedPermission('view'), recordKey($post));
+
+    // The restriction is the half that makes the panel and `whereCan()`
+    // disagree about this account — so it is said, not left for somebody to
+    // find.
+    expect($probe->via)->not->toBeNull()
+        ->and($probe->via)->toContain('Editor')
+        ->and($probe->via)->toContain('tied to');
+});
+
+test('an unrestricted assignment wins over a restricted one of the same role', function (): void {
+    $user = makeUser();
+    $role = makeRole('editor');
+    $post = Post::query()->create(['title' => 'section']);
+
+    Warden::allow($role)->to('view', Post::class);
+    Warden::assign($role)->to($user);
+    Warden::assign($role)->on($post)->to($user);
+
+    // Two rows, same role, and both usable for this question. Ordering the
+    // unrestricted one first is what keeps the card from warning about a
+    // restriction that is not in the way: that row answers with nothing in
+    // front of it, so the disagreement the other sentence describes does not
+    // apply to this account.
+    expect(Probe::run($user, probedPermission('view'), recordKey($post))->via)->not->toContain('tied to');
+});
+
+test('a direct grant with no role says nothing about how it was reached', function (): void {
+    $user = makeUser();
+
+    Warden::allow($user)->to('viewAny', Post::class);
+
+    expect(Probe::run($user, probedPermission('viewAny'))->via)->toBeNull();
+});
+
+test('a grant that ends says when, and where the date is set', function (): void {
+    $user = makeUser();
+
+    Warden::allow($user)->until(now()->addWeeks(2))->to('viewAny', Post::class);
+
+    $probe = Probe::run($user, probedPermission('viewAny'));
+
+    expect($probe->verdict)->toBe(Stance::Granted)
+        ->and($probe->until)->not->toBeNull()
+        ->and($probe->until)->toContain('The grant that answered ends on');
+});
+
+test('a grant that does not end says nothing about time', function (): void {
+    $user = makeUser();
+
+    Warden::allow($user)->to('viewAny', Post::class);
+
+    expect(Probe::run($user, probedPermission('viewAny'))->until)->toBeNull();
+});
+
+test('the assignment is named when it lapses before the grant does', function (): void {
+    $user = makeUser();
+    $role = makeRole('editor');
+
+    Warden::allow($role)->until(now()->addMonths(2))->to('viewAny', Post::class);
+    Warden::assign($role)->until(now()->addWeek())->to($user);
+
+    // Two rows can end this answer and the earlier one is the horizon. Naming
+    // which is not decoration: a grant date is moved from the role's grid and
+    // an assignment date from the account, so the sentence decides where
+    // somebody goes to change it.
+    expect(Probe::run($user, probedPermission('viewAny'))->until)
+        ->toContain('The assignment that reaches it ends on');
+});
+
+test('the grant is named when it lapses first, even reached through a role', function (): void {
+    $user = makeUser();
+    $role = makeRole('editor');
+
+    Warden::allow($role)->until(now()->addWeek())->to('viewAny', Post::class);
+    Warden::assign($role)->until(now()->addMonths(2))->to($user);
+
+    expect(Probe::run($user, probedPermission('viewAny'))->until)
+        ->toContain('The grant that answered ends on');
+});
+
+test('a grant to everybody that ends is read from the row that has no authority', function (): void {
+    $user = makeUser();
+
+    Warden::allowEveryone()->until(now()->addWeeks(3))->to('viewAny', Post::class);
+
+    $probe = Probe::run($user, probedPermission('viewAny'));
+
+    expect($probe->cause)->toBe(Cause::GrantedToEveryone)
+        ->and($probe->until)->toContain('The grant that answered ends on');
+});
