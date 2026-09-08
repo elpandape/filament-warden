@@ -1402,6 +1402,38 @@ tr:hover .fw-shortcuts,
     grid-row: 2;
 }
 
+/* Y la lectura apilada, que hasta aquí no existía.
+   Las dos pistas se escribieron para el constructor a ancho completo de la
+   ficha del permiso, donde `34rem` y lo que sobre es un reparto honesto. Dentro
+   del panel de 30rem no lo es: medido, la primera pista se lleva 414px y la
+   segunda calcula CERO, así que el aviso se dibuja en una columna de un
+   carácter de ancho y quinientos píxeles de alto. No se desborda ni se corta —
+   sale, y es ilegible, que es peor que faltar.
+
+   52rem = 34 de la primera pista + 2 del hueco + 16 que la nota necesita para
+   ser una nota y no una tira. Por debajo, todo a una columna en el orden en que
+   se lee: la regla, lo que añade, y después lo que la regla significa.
+
+   Una container query y no una media query, por lo mismo que la del panel: lo
+   que decide es el ancho que este campo recibió, y dentro del panel es 30rem
+   con la ventana en 1440. */
+@container (width < 52rem) {
+    .fw-conditions {
+        grid-template-columns: minmax(0, 1fr);
+        column-gap: 0;
+        row-gap: 0.75rem;
+    }
+
+    .fw-conditions > .fw-clause,
+    .fw-conditions > .fw-adds,
+    .fw-conditions > .fw-note,
+    .fw-conditions > .fw-warn,
+    .fw-conditions > .fw-preview {
+        grid-column: 1;
+        grid-row: auto;
+    }
+}
+
 .fw-conditions > .fw-clause,
 .fw-conditions > .fw-adds,
 .fw-conditions > .fw-note {

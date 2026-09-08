@@ -405,3 +405,20 @@ test('the two marks 3.0 adds are elements, because a button has only two pseudos
         ->and($sheet)->toMatch('/\.fw-mark-time \{[^}]*inset-block-end/')
         ->and($sheet)->toMatch('/\.fw-mark-lent \{[^}]*inset-block-start/');
 });
+
+test('the condition builder stacks before its second track collapses to nothing', function (): void {
+    $sheet = stylesheet();
+
+    // The two tracks were written for the builder at full width on the
+    // permission's own screen, where `34rem` and whatever is left is an honest
+    // split. Inside the 30rem panel it is not: measured in a browser, the first
+    // track takes 414px and the second computes to ZERO, so the note beside the
+    // rule renders one character wide and five hundred tall. It does not
+    // overflow and it is not clipped — it is drawn, and unreadable, which is
+    // worse than missing.
+    //
+    // 52rem = 34 for the first track + 2 for the gap + 16 the note needs to be
+    // a note rather than a strip.
+    expect($sheet)->toMatch('/@container \(width < 52rem\) \{\s*\.fw-conditions \{/')
+        ->and($sheet)->toContain('grid-template-columns: minmax(0, 34rem) minmax(0, 1fr);');
+});
