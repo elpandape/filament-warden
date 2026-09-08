@@ -1234,7 +1234,10 @@ test('a row is named by its entity, not by the buttons that sit beside it', func
     // is announced with the three button labels glued on: "Roles … read all
     // none", on every row. Seen in an accessibility tree dump, not guessed.
     expect($html)->toContain('aria-labelledby="')
-        ->and($html)->toMatch('/<th\s+class="fw-entity"\s+scope="row"\s+aria-labelledby="[^"]+-name [^"]+-model"/');
+        // `title` entra entre `scope` y `aria-labelledby` desde que la clase es
+        // opcional: se queda en la fila lleve o no el nombre debajo, así que
+        // apagar `grid.class_names` no pierde el dato, solo lo baja al ratón.
+        ->and($html)->toMatch('/<th\s+class="fw-entity"\s+scope="row"\s+title="[^"]*"\s+aria-labelledby="[^"]+-name [^"]+-model"/');
 
     // The spare-width column is gone: nothing in the head is a column header
     // without a name any more.
@@ -1511,4 +1514,30 @@ test('the entity label is capitalised whichever of the two sources it came from'
     // still gets its lowercase back.
     expect($html)->toContain('Roles')
         ->and($html)->toContain('Permissions');
+});
+
+test('the class name under an entity is an installation decision, and the title keeps it either way', function (): void {
+    $role = makeRole();
+
+    $on = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
+
+    expect($on)->toContain('class="fw-entity-model"');
+
+    config()->set('filament-warden.grid.class_names', false);
+
+    $off = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
+
+    // Gone from the row, and the `aria-labelledby` stops naming an id that is
+    // no longer there. A reference to a missing id is skipped in silence — the
+    // accessible name would come out the same — but pointing at something
+    // absent is a broken promise in the markup.
+    expect($off)->not->toContain('class="fw-entity-model"')
+        ->and($off)->not->toContain('-model"');
+
+    // And nothing is lost: the class is on the row's title in both readings,
+    // because a permission is stored against the CLASS and two models can share
+    // a label. `App\Models\User` and `App\Models\Security\User` are both
+    // «Users», and with neither the class nor the title they are two identical
+    // rows.
+    expect($off)->toContain('title="'.roleClass().'"');
 });

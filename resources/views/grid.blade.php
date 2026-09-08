@@ -13,6 +13,11 @@
     // the page, which is what a tab and its panel need to point at each other.
     $states = $grid->states();
     $ids = \ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView::domId($componentKey);
+
+    // Whether the class name is drawn under each entity. Read once here rather
+    // than per row: a matrix asks it once per entity and the accessor walks the
+    // packaged defaults every time.
+    $showsClassNames = \ElPandaPe\FilamentWarden\Support\Config::enabled('grid.class_names');
 @endphp
 <div
     x-load
@@ -288,13 +293,28 @@
                                                     Seen in an accessibility tree
                                                     dump, not guessed.
                                                 --}}
+                                                {{--
+                                                    El `aria-labelledby` nombra
+                                                    la clase solo si la clase se
+                                                    dibuja. Una referencia a un
+                                                    id que no existe se salta en
+                                                    silencio —el nombre saldría
+                                                    igual— pero apuntar a algo
+                                                    ausente es una promesa rota
+                                                    en el marcado, y el título de
+                                                    la fila sigue llevando la
+                                                    clase entera de todos modos.
+                                                --}}
                                                 <th
                                                     class="fw-entity"
                                                     scope="row"
-                                                    aria-labelledby="{{ $ids }}-row-{{ $loop->index }}-name {{ $ids }}-row-{{ $loop->index }}-model"
+                                                    title="{{ $row->model }}"
+                                                    aria-labelledby="{{ $ids }}-row-{{ $loop->index }}-name{{ $showsClassNames ? ' '.$ids.'-row-'.$loop->index.'-model' : '' }}"
                                                 >
                                                     <span class="fw-entity-name" id="{{ $ids }}-row-{{ $loop->index }}-name">{{ $row->label }}</span>
-                                                    <span class="fw-entity-model" id="{{ $ids }}-row-{{ $loop->index }}-model">{{ $row->model }}</span>
+                                                    @if ($showsClassNames)
+                                                        <span class="fw-entity-model" id="{{ $ids }}-row-{{ $loop->index }}-model">{{ $row->model }}</span>
+                                                    @endif
                                                     <span class="fw-shortcuts" @unless ($interactive) hidden @endunless>
                                                         @foreach (['read', 'all', 'clear'] as $preset)
                                                             <button
@@ -339,8 +359,10 @@
                                 @foreach ($tab->rows as $row)
                                     <details class="fw-stack-entity" x-show="shown(@js($row->key))" @if ($loop->first) open @endif>
                                         <summary>
-                                            <span class="fw-stack-name">{{ $row->label }}</span>
-                                            <span class="fw-stack-model">{{ $row->model }}</span>
+                                            <span class="fw-stack-name" title="{{ $row->model }}">{{ $row->label }}</span>
+                                            @if ($showsClassNames)
+                                                <span class="fw-stack-model">{{ $row->model }}</span>
+                                            @endif
                                             {{--
                                                 What the row's cells answer, for
                                                 the reading that folds them away.

@@ -203,6 +203,7 @@ test('every config key path is frozen, and so is the shape it holds', function (
         'grid.explain' => 'scalar',
         'grid.constraints' => 'scalar',
         'grid.expiry' => 'scalar',
+        'grid.class_names' => 'scalar',
         'guard.panel' => 'empty',
         'guard.pages' => 'scalar',
         'guard.widgets' => 'scalar',

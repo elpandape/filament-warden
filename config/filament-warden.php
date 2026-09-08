@@ -85,6 +85,16 @@ return [
         'explain' => true,
         'constraints' => true,
         'expiry' => true,
+        // El nombre de clase bajo cada entidad — `App\Models\Post` bajo
+        // «Publicaciones». Está encendido porque un permiso se guarda contra la
+        // CLASE y no contra la etiqueta, y dos modelos distintos pueden dar el
+        // mismo nombre: `App\Models\User` y `App\Models\Security\User` son los
+        // dos «Users», y sin la clase son dos filas idénticas.
+        //
+        // Apagarlo es razonable en una instalación donde eso no puede pasar, y
+        // no pierde nada más: la clase sigue estando en el `title` de la fila,
+        // así que el ratón la enseña igual.
+        'class_names' => true,
     ],
 
     /*

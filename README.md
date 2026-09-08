@@ -994,8 +994,15 @@ what every check answers, not merely what a screen draws. This package reads it 
     'explain'     => true,  // Inspector
     'constraints' => true,  // Show scope
     'expiry'      => true,  // May the grid set an end date
+    'class_names' => true,  // Draw the class under each entity
 ],
 ```
+
+> 🏷️ **`class_names` draws `App\Models\Post` under «Posts».** It is on because a permission is
+> stored against the CLASS and not against the label, and two models can share one: `App\Models\User`
+> and `App\Models\Security\User` are both "Users", and without the class they are two identical rows.
+> Turning it off is reasonable where that cannot happen, and loses nothing else — the class stays on
+> the row's `title`, so hovering still shows it.
 
 > ⏳ **`expiry` decides whether the grid may SET a date, never whether one is honoured.** Warden
 > stops reading a row past its date whatever this says, so a grid with this off still draws a lapsed

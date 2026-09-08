@@ -8,6 +8,51 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [3.2.0] - 2026-09-08
+
+Five things the panel got wrong once it moved below the grid, and one new config key.
+
+### Added
+
+- **`grid.class_names`**, on by default. Whether `App\Models\Post` is drawn under «Posts». It is on
+  because a permission is stored against the CLASS and not against the label, and two models can
+  share one — `App\Models\User` and `App\Models\Security\User` are both "Users", and without the
+  class they are two identical rows. Off, the class stays on the row's `title`, so hovering still
+  shows it, and the `aria-labelledby` stops naming an id that is no longer there.
+
+### Fixed
+
+- **The panel appeared before anybody clicked.** `panel || ! selected` was right while the inspector
+  was a column with its empty state inside it; as a bar stuck to the bottom it became a floating
+  strip that showed up the moment the form opened, telling you to click something that is right
+  there. It only exists with a cell selected now.
+- **«users» was lowercase while «Activity» was not.** An entity WITH a Filament resource took
+  `getPluralModelLabel()`, which is `Str::snake()` and comes back raw; one WITHOUT fell to this
+  package's own `humanize()`. Two sources, two spellings, in one column. Filament's title-case
+  variant fixes it and keeps the application's own wording — an app that turns
+  `hasTitleCaseModelLabel()` off still gets its lowercase.
+- **The date field looked foreign**: 0.75rem of text and a shadow for a border, next to Filament
+  inputs that are neither. It has the panel's chrome now, and a `color-scheme` for dark — the only
+  thing that repaints a native control Filament's `dark` class cannot reach.
+
+### Changed
+
+- **The panel's close button went.** A bar that covers nothing does not need dismissing: clicking
+  another cell moves it and *Customise* folds it. The X asked for a decision — close what, if it is
+  not in the way? — and left the grid with nothing selected. Escape still closes it and still hands
+  the focus back to the cell.
+- **The summary line above the matrix went**, one release after arriving. Half of it duplicated the
+  tab counters and the other half — narrowed, ending, inherited — is drawn on the cells themselves
+  and explained by the folded key, so it was a convenience rather than the only way to learn a fact.
+
+### Not included
+
+- **A Filament `DatePicker` with `->native(false)` for the end date.** That component is Livewire
+  bound to a server state path; this date is an entry in a per-cell map the browser changes with no
+  round trip. Using it would mean a request per click — the thing this panel exists to avoid — or
+  reimplementing its state binding by hand. The native input is styled to match instead, and the
+  reason is written into the stylesheet.
+
 ## [3.1.0] - 2026-09-08
 
 The inspector stops taking the grid's width. 3.0.0 shipped it as a column that pushes, and pushing
