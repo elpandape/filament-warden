@@ -124,8 +124,18 @@
    the bottom rather than a column: 30rem of a 48rem card is the matrix gone.
    A container query and not a media query, because what decides is the space
    this field was given, not the window — a panel with its own navigation rail
-   hands over less than the viewport says. */
-@container (width < 64rem) {
+   hands over less than the viewport says.
+
+   60rem and not the 64 this was written with, and the difference was measured
+   rather than argued. On a real Filament panel with its sidebar the field is
+   handed 1168px at 1680px and above, 1008px at 1440, and 934px at 1366 — it
+   never gets the viewport. At 64rem the two-track reading appeared only from
+   1680px up, so every 1440px laptop got the sheet, which is not what the
+   approved sketch shows and not what the width can afford: 1008px leaves the
+   matrix 512px beside a 480px panel, and 512px of matrix with its entity column
+   pinned and the rest scrolling IS the mechanism this design runs on. 1366px
+   stays a sheet, which is the line the number is drawn at. */
+@container (width < 60rem) {
     .fw-layout[data-open='true'] {
         grid-template-columns: minmax(0, 1fr);
     }

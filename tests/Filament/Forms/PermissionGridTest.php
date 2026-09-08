@@ -1390,8 +1390,11 @@ test('the panel takes its track only once a cell is opened, and gives it back', 
     // because opening is a click and not a round trip.
     expect($html)->toContain('data-open="false"')
         ->toContain('x-bind:data-open="panel ? \'true\' : \'false\'"')
-        // Escape on the panel and not on the window: a keystroke anywhere else
-        // on a Filament page is not this component's to swallow.
+        // Escape on the FIELD and not on the panel, measured in a browser: the
+        // panel is opened by clicking a cell, which leaves the focus on the
+        // cell — outside the panel — so a listener scoped to the panel never
+        // received the keystroke on the only path anybody takes to open it.
+        // Still not on the window: this covers the field and nothing else.
         ->toContain('x-on:keydown.escape="closePanel($root)"')
         ->toContain(__('filament-warden::ui.explain.close'));
 });

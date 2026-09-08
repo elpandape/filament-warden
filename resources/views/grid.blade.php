@@ -32,7 +32,27 @@
         is bound rather than rendered, because the panel opens and closes without
         a round trip.
     --}}
-    <div class="fw-layout" data-open="false" x-bind:data-open="panel ? 'true' : 'false'">
+    {{--
+        Escape lives HERE and not on the panel, and the difference was measured
+        in a browser rather than reasoned about. The panel is opened by clicking
+        a cell, which leaves the focus on the cell — inside the matrix, outside
+        the panel — so a listener scoped to the panel never received the
+        keystroke on the only path anybody takes to open it. Measured: the panel
+        stayed open on Escape every time.
+
+        Still not on the window: this covers the field and nothing else, so a
+        keystroke elsewhere on a Filament page is not this component's to
+        swallow, which is the whole of the original reasoning. What it adds is
+        the matrix, where Escape means nothing else. Inside the panel the
+        builder's own inputs handle it first and it bubbles here after, exactly
+        as before.
+    --}}
+    <div
+        class="fw-layout"
+        data-open="false"
+        x-bind:data-open="panel ? 'true' : 'false'"
+        x-on:keydown.escape="closePanel($root)"
+    >
         <div class="fw-main">
                 @if ($grid->isProtected)
                     <p class="fw-locked-notice">{{ __('filament-warden::ui.grid.locked') }}</p>
@@ -404,13 +424,6 @@
             data-fw-open="false"
             x-bind:data-fw-open="panel ? 'true' : 'false'"
             x-show="panel || ! selected"
-            {{--
-                Escape closes it, and the listener is on the panel rather than on
-                the window: a keystroke anywhere else on a Filament page is not
-                this component's to swallow, and the condition builder inside has
-                its own inputs where Escape means something to the browser first.
-            --}}
-            x-on:keydown.escape="closePanel($root)"
         >
             <div class="fw-inspector-head" x-show="selected" x-cloak>
                 <div class="fw-inspector-title" x-text="selected ? selected.title : ''"></div>

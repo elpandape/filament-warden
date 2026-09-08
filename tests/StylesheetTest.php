@@ -380,7 +380,12 @@ test('the sheet asks its container how wide it is before it becomes a column', f
     // The window is the wrong thing to ask: a host panel with its own navigation
     // rail hands this field less than the viewport says, so a media query would
     // open a 30rem column beside a matrix that has no room for one.
-    expect($sheet)->toMatch('/@container \(width < 64rem\) \{\s*\.fw-layout\[data-open=.true.\]/')
+    //
+    // 60rem, measured in a browser against a real panel on 2026-09-08: the field
+    // gets 1168px from 1680px of viewport upwards, 1008px at 1440 and 934px at
+    // 1366. At the 64rem this was written with, the two-track reading appeared
+    // only from 1680px up and every 1440px laptop got the sheet.
+    expect($sheet)->toMatch('/@container \(width < 60rem\) \{\s*\.fw-layout\[data-open=.true.\]/')
         ->and($sheet)->toContain('max-block-size: 50vh;');
 });
 
