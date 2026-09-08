@@ -413,8 +413,13 @@ test('a cell is named the way the grid names it, so a save says the same words',
         Panel::make()->id('labels')->resources([PostResource::class])->pages([Reports::class]),
     );
 
-    expect(GridView::cellLabel($catalog, Post::class, 'viewAny'))->toBe('posts · List')
-        ->and(GridView::cellLabel($catalog, Post::class, StateKey::MANAGE))->toBe('posts · Everything');
+    // `Posts` y no `posts`: la etiqueta sale de Filament, y de su variante en
+    // mayúscula inicial — la que Filament usa en sus propios títulos. La cruda
+    // devuelve `Str::snake()` en minúscula, así que una entidad CON recurso
+    // salía «users» mientras una SIN recurso caía al `humanize()` y salía
+    // «Activity»: dos grafías en la misma columna.
+    expect(GridView::cellLabel($catalog, Post::class, 'viewAny'))->toBe('Posts · List')
+        ->and(GridView::cellLabel($catalog, Post::class, StateKey::MANAGE))->toBe('Posts · Everything');
 });
 
 test('a door is named by its row alone, because its row is its only cell', function (): void {

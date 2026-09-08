@@ -454,7 +454,17 @@
             data-fw-expanded="false"
             x-bind:data-fw-open="panel ? 'true' : 'false'"
             x-bind:data-fw-expanded="expanded ? 'true' : 'false'"
-            x-show="panel || ! selected"
+            {{--
+                Solo con una celda seleccionada. Antes decía `panel || ! selected`,
+                que era correcto mientras el inspector era una columna con su
+                estado vacío dentro: al no haber nada elegido, la columna
+                enseñaba «pulsa una celda». Como barra pegada abajo eso es otra
+                cosa — una tira flotante que aparece nada más abrir el
+                formulario, sin que nadie haya pulsado nada, y que dice que
+                pulses algo. La invitación sobra: la rejilla está delante.
+            --}}
+            x-show="selected"
+            x-cloak
         >
             {{--
                 La barra plegada: una línea con el dibujo, la celda y el
@@ -489,14 +499,17 @@
                         : @js(__('filament-warden::ui.explain.expand'))"></span>
                 </button>
 
-                <button
-                    type="button"
-                    class="fw-inspector-close"
-                    x-on:click="closePanel($root)"
-                >
-                    <span class="fw-sr">{{ __('filament-warden::ui.explain.close') }}</span>
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                {{--
+                    Sin equis, a propósito. Una barra que no tapa nada no
+                    necesita descartarse: pulsar otra celda la mueve, y
+                    «Personalizar» la pliega. Una equis pedía una decisión
+                    —¿cerrar qué, si no estorba?— y dejaba la celda sin
+                    seleccionar, que es un estado que nadie pide.
+
+                    Escape SIGUE cerrándola, y sigue devolviendo el foco a la
+                    celda: es la salida que un teclado necesita y no ocupa
+                    píxeles.
+                --}}
             </div>
 
             <div class="fw-inspector-body" x-show="expanded || ! selected" x-cloak>

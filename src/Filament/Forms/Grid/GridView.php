@@ -635,7 +635,17 @@ final readonly class GridView
     {
         foreach ($entries as $entry) {
             if ($entry->source !== null && is_subclass_of($entry->source, \Filament\Resources\Resource::class)) {
-                return $entry->source::getPluralModelLabel();
+                // La variante en MAYÚSCULA INICIAL, que es la que Filament usa
+                // en sus propios títulos. `getPluralModelLabel()` devuelve la
+                // forma cruda —«users», en minúscula, porque sale de
+                // `Str::snake()`— mientras una entidad sin recurso cae al
+                // `humanize()` de abajo y sale «Activity». Dos fuentes, dos
+                // grafías, en la misma columna.
+                //
+                // Y respeta la decisión de la aplicación: `hasTitleCaseModelLabel()`
+                // apagado devuelve la forma cruda igualmente, así que quien
+                // quiera minúsculas las conserva.
+                return $entry->source::getTitleCasePluralModelLabel();
             }
         }
 

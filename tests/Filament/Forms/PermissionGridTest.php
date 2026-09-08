@@ -1395,8 +1395,13 @@ test('the panel takes its track only once a cell is opened, and gives it back', 
         // cell — outside the panel — so a listener scoped to the panel never
         // received the keystroke on the only path anybody takes to open it.
         // Still not on the window: this covers the field and nothing else.
+        //
+        // And it is now the ONLY way to dismiss it: the close button went. A bar
+        // that covers nothing does not need dismissing — clicking another cell
+        // moves it and «Customise» folds it — while Escape is the exit a
+        // keyboard needs and costs no pixels.
         ->toContain('x-on:keydown.escape="closePanel($root)"')
-        ->toContain(__('filament-warden::ui.explain.close'));
+        ->not->toContain('class="fw-inspector-close"');
 });
 
 test('the panel offers a date, and says which of the three noes stops it', function (): void {
@@ -1473,10 +1478,37 @@ test('closing the inspector puts the focus back on the cell that opened it', fun
     //
     // Both doors, because they are two listeners and only one of them is the
     // obvious one.
-    expect($html)->toContain('x-on:keydown.escape="closePanel($root)"')
-        ->and($html)->toContain('x-on:click="closePanel($root)"');
+    // Solo Escape: el botón de cerrar se retiró, así que la vuelta del foco
+    // cuelga de esa única puerta y es la que hay que fijar.
+    expect($html)->toContain('x-on:keydown.escape="closePanel($root)"');
 
     $script = (string) file_get_contents(dirname(__DIR__, 3).'/resources/js/permission-grid.js');
 
     expect($script)->toContain('cell.focus()');
+});
+
+test('the panel is not on the page until a cell has been picked', function (): void {
+    $html = livewire(GridHost::class, ['roleKey' => makeRole()->getKey()])->html();
+
+    // `panel || ! selected` was right while the inspector was a COLUMN with its
+    // empty state inside it: with nothing picked, the column said «pick a
+    // cell». As a bar stuck to the bottom it is another thing entirely — a
+    // floating strip that appears the moment the form opens, before anybody has
+    // clicked anything, telling them to click something. The grid is right
+    // there; the invitation is noise.
+    expect($html)->toContain('x-show="selected"')
+        ->and($html)->not->toContain('x-show="panel || ! selected"');
+});
+
+test('the entity label is capitalised whichever of the two sources it came from', function (): void {
+    $html = livewire(GridHost::class, ['roleKey' => makeRole()->getKey()])->html();
+
+    // A resource's label came back raw from `getPluralModelLabel()` —
+    // `Str::snake()`, so «users» — while an entity with no resource fell to
+    // `humanize()` and came back «Activity». Two sources, two spellings, in one
+    // column. Filament's own title-case variant fixes it and keeps the
+    // application's wording: an app that turns `hasTitleCaseModelLabel()` off
+    // still gets its lowercase back.
+    expect($html)->toContain('Roles')
+        ->and($html)->toContain('Permissions');
 });
