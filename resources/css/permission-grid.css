@@ -1008,51 +1008,6 @@ tr:hover .fw-shortcuts,
     color: var(--fw-muted);
 }
 
-/* Lo que la rejilla entera contesta, en una línea sobre la matriz.
-   Las cinco cifras del boceto: concedidas, prohibidas, estrechadas, las que
-   caducan y las heredadas. Las tres últimas son lo que la 3.0 añadió, y sin
-   esta línea solo se ven pasando el ratón por cada celda.
-   `column-gap` mayor que el de la palabra para que las cifras se lean como
-   cinco cosas y no como una frase corrida. */
-.fw-tally-line {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    column-gap: 1rem;
-    row-gap: 0.25rem;
-    margin-block: 0 0.75rem;
-    font-size: 0.75rem;
-    color: var(--fw-muted);
-}
-
-.fw-tally-item {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0.3125rem;
-}
-
-.fw-tally-item b {
-    font-weight: 600;
-    color: var(--fw-text);
-}
-
-/* Cada cifra con el color de lo que cuenta, en el punto y no en el número: el
-   número tiene que seguir siendo legible sobre cualquier tema del anfitrión, y
-   un punto de 6 px dice de qué habla sin apostar el contraste. */
-.fw-tally-item::before {
-    content: '';
-    inline-size: 0.375rem;
-    block-size: 0.375rem;
-    border-radius: 50%;
-    background: currentcolor;
-    opacity: 0.55;
-}
-
-.fw-tally-item[data-fw-of='granted']::before { background: var(--fw-yes); opacity: 1; }
-.fw-tally-item[data-fw-of='forbidden']::before { background: var(--fw-no); opacity: 1; }
-.fw-tally-item[data-fw-of='narrowed']::before { background: var(--fw-noted); opacity: 1; }
-.fw-tally-item[data-fw-of='expires']::before { background: var(--fw-time); opacity: 1; }
-.fw-tally-item[data-fw-of='inherited']::before { background: var(--fw-lent); opacity: 1; }
 
 .fw-legend-fold > summary {
     display: inline-flex;
