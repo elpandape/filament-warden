@@ -54,6 +54,9 @@
     --fw-surface: white;
 
     --fw-tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+    /* La lupa del buscador. `stroke` en gris y no en `currentcolor`: va como
+       imagen de fondo, donde `currentcolor` no llega. */
+    --fw-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
     --fw-clock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");
     --fw-link: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1'/%3E%3Cpath d='M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1'/%3E%3C/svg%3E");
     --fw-cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round'%3E%3Cpath d='M18 6 6 18'/%3E%3Cpath d='m6 6 12 12'/%3E%3C/svg%3E");
@@ -862,6 +865,97 @@ tr:hover .fw-shortcuts,
     padding-block-end: 0.875rem;
     border-block-end: 1px solid var(--fw-line);
 }
+
+/* El buscador de entidades, que hasta aquí no tenía ni una regla: el navegador
+   lo dibujaba como un `input` desnudo y se leía como texto suelto, no como algo
+   que se puede escribir. La lupa va de fondo y no como elemento — es
+   decoración, y un `<svg>` aquí sería un nodo más en el árbol de accesibilidad
+   diciendo lo que el `aria-label` ya dice.
+   Ancho acotado: un buscador a todo lo ancho de la tarjeta promete que hay
+   mucho que filtrar, y lo que filtra es una lista de entidades. */
+.fw-filter {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin-block-end: 0.625rem;
+}
+
+.fw-filter-field {
+    inline-size: min(20rem, 100%);
+    padding: 0.375rem 0.625rem 0.375rem 2rem;
+    border: 1px solid var(--fw-line);
+    border-radius: 0.5rem;
+    background-color: var(--fw-surface);
+    background-image: var(--fw-search);
+    background-repeat: no-repeat;
+    background-position: 0.5rem center;
+    background-size: 0.875rem;
+    font: inherit;
+    font-size: 0.8125rem;
+    color: var(--fw-text);
+}
+
+.fw-filter-field::placeholder {
+    color: var(--fw-muted);
+}
+
+.fw-filter-field:focus-visible {
+    outline: 2px solid var(--fw-accent);
+    outline-offset: -1px;
+    border-color: transparent;
+}
+
+.fw-filter-count {
+    font-size: 0.75rem;
+    color: var(--fw-muted);
+}
+
+/* Lo que la rejilla entera contesta, en una línea sobre la matriz.
+   Las cinco cifras del boceto: concedidas, prohibidas, estrechadas, las que
+   caducan y las heredadas. Las tres últimas son lo que la 3.0 añadió, y sin
+   esta línea solo se ven pasando el ratón por cada celda.
+   `column-gap` mayor que el de la palabra para que las cifras se lean como
+   cinco cosas y no como una frase corrida. */
+.fw-tally-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 1rem;
+    row-gap: 0.25rem;
+    margin-block: 0 0.75rem;
+    font-size: 0.75rem;
+    color: var(--fw-muted);
+}
+
+.fw-tally-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3125rem;
+}
+
+.fw-tally-item b {
+    font-weight: 600;
+    color: var(--fw-text);
+}
+
+/* Cada cifra con el color de lo que cuenta, en el punto y no en el número: el
+   número tiene que seguir siendo legible sobre cualquier tema del anfitrión, y
+   un punto de 6 px dice de qué habla sin apostar el contraste. */
+.fw-tally-item::before {
+    content: '';
+    inline-size: 0.375rem;
+    block-size: 0.375rem;
+    border-radius: 50%;
+    background: currentcolor;
+    opacity: 0.55;
+}
+
+.fw-tally-item[data-fw-of='granted']::before { background: var(--fw-yes); opacity: 1; }
+.fw-tally-item[data-fw-of='forbidden']::before { background: var(--fw-no); opacity: 1; }
+.fw-tally-item[data-fw-of='narrowed']::before { background: var(--fw-noted); opacity: 1; }
+.fw-tally-item[data-fw-of='expires']::before { background: var(--fw-time); opacity: 1; }
+.fw-tally-item[data-fw-of='inherited']::before { background: var(--fw-lent); opacity: 1; }
 
 .fw-legend-fold > summary {
     display: inline-flex;

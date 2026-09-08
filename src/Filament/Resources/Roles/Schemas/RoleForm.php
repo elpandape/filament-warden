@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ElPandaPe\FilamentWarden\Filament\Resources\Roles\Schemas;
 
 use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
+use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ViewRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Grants\Hierarchy;
 use ElPandaPe\FilamentWarden\Grants\Holders;
@@ -13,6 +14,7 @@ use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Support\Config as WardenConfig;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -34,11 +36,40 @@ final class RoleForm
     public static function configure(Schema $schema): Schema
     {
         return $schema
-            ->columns(1)
+            // Dos pistas arriba y la rejilla entera debajo, que es lo que el
+            // boceto aprobado dibuja: identidad y herencia son dos preguntas
+            // cortas y caben una al lado de la otra, mientras la matriz necesita
+            // todo el ancho que haya.
+            //
+            // La identidad ocupa las dos pistas cuando la herencia no está: media
+            // tarjeta con la otra mitad vacía es peor que una entera, y con
+            // `warden.roles.nested` apagado — el valor de fábrica — no hay nada
+            // que poner al lado.
+            ->columns(2)
             ->components([
                 Section::make(__('filament-warden::ui.resources.roles.sections.identity'))
                     ->icon(Heroicon::OutlinedIdentification)
-                    ->columns(2)
+                    // Las dos tarjetas de la fila llegan al mismo bajo, como el
+                    // boceto las dibuja. Filament ya estira el CONTENEDOR de cada
+                    // una — medido: los dos `.fi-sc-component` miden lo mismo —
+                    // pero la tarjeta de dentro se queda con su altura de
+                    // contenido, así que la que tiene menos texto flota sobre un
+                    // hueco.
+                    //
+                    // Estilo en línea y no una clase: el CSS del panel lo compila
+                    // la aplicación anfitriona y su build no escanea las vistas de
+                    // este paquete (§6.7), así que una utility que solo use el
+                    // plugin puede no compilarse. Y una regla en la hoja propia
+                    // tendría que apuntar a `.fi-sc-section`, que es de Filament y
+                    // está en toda la aplicación.
+                    ->extraAttributes(['style' => 'block-size: 100%'])
+                    ->columnSpan(static fn (): int => WardenConfig::nestedRoles() ? 1 : 2)
+                    // Apilados cuando la tarjeta va a media anchura y en dos
+                    // columnas cuando la ocupa entera: dos campos de texto uno
+                    // al lado del otro en media tarjeta son dos cajas
+                    // demasiado estrechas para el nombre de clase que a veces
+                    // llevan al lado.
+                    ->columns(static fn (): int => WardenConfig::nestedRoles() ? 1 : 2)
                     ->schema([
                         TextInput::make('name')
                             ->label(__('filament-warden::ui.resources.roles.fields.name'))
@@ -59,6 +90,8 @@ final class RoleForm
                 Section::make(__('filament-warden::ui.resources.roles.sections.inherits'))
                     ->description(__('filament-warden::ui.resources.roles.sections.inherits_help'))
                     ->icon(Heroicon::OutlinedLink)
+                    ->extraAttributes(['style' => 'block-size: 100%'])
+                    ->columnSpan(1)
                     ->visible(static fn (): bool => WardenConfig::nestedRoles())
                     ->schema([
                         Select::make('inherits')
@@ -83,11 +116,25 @@ final class RoleForm
                             // same reason: inheriting is how a role gets powers,
                             // so it is the grid by another door.
                             ->disabled(static fn (?Model $record): bool => $record instanceof Model && RoleResource::isProtected($record)),
+
+                        // Lo que la elección de arriba TRAE, contado: heredar de
+                        // dos roles puede traer cinco, y esa cifra no está en
+                        // ningún sitio del select. Es la misma frase que la ficha
+                        // de solo lectura ya dice, llamada y no copiada — dos
+                        // pantallas con dos redacciones del mismo hecho es lo que
+                        // §6.24 mide saliendo mal.
+                        TextEntry::make('chain')
+                            ->hiddenLabel()
+                            ->visible(static fn (?Model $record): bool => $record instanceof Model)
+                            ->state(static fn (?Model $record): string => $record instanceof Model
+                                ? ViewRole::chain($record)
+                                : ''),
                     ]),
 
                 Section::make(__('filament-warden::ui.grid.label'))
                     ->description(__('filament-warden::ui.grid.description'))
                     ->icon(Heroicon::OutlinedKey)
+                    ->columnSpanFull()
                     ->schema([
                         // The grid can only ever take power away from a protected
                         // role: it holds the wildcard, which is not a cell, so

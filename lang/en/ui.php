@@ -34,6 +34,12 @@ return [
                 'ending' => '{1} 1 ends soon|[2,*] :count end soon',
                 'held' => 'Held by',
             ],
+            'reach' => [
+                'nobody' => 'Nobody holds this role and no role inherits it, so what you change here reaches only whoever it is given to next.',
+                'held' => '{1} 1 account holds it.|[2,*] :count accounts hold it.',
+                'inherited' => '{1} 1 role inherits it.|[2,*] :count roles inherit it.',
+                'applies' => 'What you change applies to all of them, on save.',
+            ],
             'hierarchy' => [
                 'description' => 'What this role reaches through other roles, and what reaches it.',
                 'none' => 'This role inherits nothing, and nothing inherits it.',

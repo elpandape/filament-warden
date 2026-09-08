@@ -33,6 +33,62 @@ class ViewRole extends ViewRecord
     protected static string $resource = RoleResource::class;
 
     /**
+     * What this role reaches, and who reaches it, as counts rather than lists.
+     *
+     * A count and a folded chain, never the chain itself: the number of hops is
+     * NOT available — warden's `RoleClosure::for()` returns
+     * `[restriction type, restriction id, end date]` and carries no depth — and
+     * deriving one would mean walking the closure a second time, which is the
+     * one thing this package does not do with a rule warden already owns.
+     *
+     * Two figures and not one, because they are different facts: what somebody
+     * chose, and what the choice brought along. A single total hides which is
+     * which, and only the first is a thing anybody can change from a screen.
+     */
+    /**
+     * La cadena resuelta, para el formulario que ofrece la herencia.
+     *
+     * Pública porque `RoleForm` la dibuja bajo su propio select: heredar de dos
+     * roles puede traer cinco, y esa cifra no está en ningún sitio del select.
+     * Llamada y no copiada — dos pantallas con dos redacciones del mismo hecho
+     * es lo que §6.24 mide saliendo mal.
+     */
+    public static function chain(Model $record): string
+    {
+        return self::hierarchy($record);
+    }
+
+    /**
+     * A cuánta gente alcanza este rol, para el subtítulo de la pantalla de
+     * edición: lo tienen N y lo heredan N.
+     *
+     * Dos cifras y no una: quien lo tiene lo ejerce, y quien lo hereda reparte
+     * lo que este conceda a su propia gente. Un total las escondería, y son la
+     * diferencia entre «edito un rol» y «edito lo que N personas pueden hacer».
+     */
+    public static function reach(Model $record): string
+    {
+        $held = self::assignments($record)->count();
+        $reaching = count(Hierarchy::reaching($record));
+
+        if ($held === 0 && $reaching === 0) {
+            return (string) __('filament-warden::ui.resources.roles.reach.nobody');
+        }
+
+        $clauses = [];
+
+        if ($held > 0) {
+            $clauses[] = trans_choice('filament-warden::ui.resources.roles.reach.held', $held);
+        }
+
+        if ($reaching > 0) {
+            $clauses[] = trans_choice('filament-warden::ui.resources.roles.reach.inherited', $reaching);
+        }
+
+        return implode(' ', $clauses).' '.__('filament-warden::ui.resources.roles.reach.applies');
+    }
+
+    /**
      * Who holds it, added below the resource's own infolist rather than inside
      * it: `RoleInfolist` is shared with nothing else that would need this
      * section, and it answers a question — who, under the tenant this request
@@ -132,19 +188,6 @@ class ViewRole extends ViewRecord
         return $account instanceof Model && Access::granted($account, 'update', $record);
     }
 
-    /**
-     * What this role reaches, and who reaches it, as counts rather than lists.
-     *
-     * A count and a folded chain, never the chain itself: the number of hops is
-     * NOT available — warden's `RoleClosure::for()` returns
-     * `[restriction type, restriction id, end date]` and carries no depth — and
-     * deriving one would mean walking the closure a second time, which is the
-     * one thing this package does not do with a rule warden already owns.
-     *
-     * Two figures and not one, because they are different facts: what somebody
-     * chose, and what the choice brought along. A single total hides which is
-     * which, and only the first is a thing anybody can change from a screen.
-     */
     private static function hierarchy(Model $record): string
     {
         $hierarchy = Hierarchy::of($record);

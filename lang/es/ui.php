@@ -34,6 +34,12 @@ return [
                 'ending' => '{1} 1 termina pronto|[2,*] :count terminan pronto',
                 'held' => 'Lo tienen',
             ],
+            'reach' => [
+                'nobody' => 'Nadie tiene este rol y ningún rol lo hereda, así que lo que cambies aquí solo alcanza a quien se le dé después.',
+                'held' => '{1} Lo tiene 1 cuenta.|[2,*] Lo tienen :count cuentas.',
+                'inherited' => '{1} Lo hereda 1 rol.|[2,*] Lo heredan :count roles.',
+                'applies' => 'Lo que cambies se aplica a todos ellos al guardar.',
+            ],
             'hierarchy' => [
                 'description' => 'Lo que este rol alcanza a través de otros roles, y lo que lo alcanza a él.',
                 'none' => 'Este rol no hereda nada, y nada lo hereda.',

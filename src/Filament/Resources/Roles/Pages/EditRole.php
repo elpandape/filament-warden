@@ -19,6 +19,37 @@ class EditRole extends EditRecord
     protected static string $resource = RoleResource::class;
 
     /**
+     * The form catches up with what was actually written.
+     *
+     * `mutateFormDataBeforeSave()` rewrites the array that gets persisted, never
+     * the browser's copy of `data.name`, so without this the screen keeps
+     * showing a forged rename that never reached the store. The grid does not
+     * need it: its field re-reads itself after every save.
+     *
+     * The inheritance is written HERE and not through the form's own state,
+     * because the edges are rows in `assigned_roles` and not columns on this
+     * record — the field is `dehydrated(false)` for exactly that reason, the
+     * same way the grid is. Read from the RAW state: `getState()` drops a field
+     * that does not dehydrate, which is the whole point of the flag and would
+     * leave nothing here to write.
+     */
+    /**
+     * Qué se está tocando, dicho donde el boceto lo dibuja: bajo el título.
+     *
+     * Lo tienen N cuentas y lo heredan N roles — dos hechos que la rejilla de
+     * abajo no puede decir, porque habla de acciones y no de a quién alcanzan.
+     * Es lo que convierte «editar un rol» en «editar lo que N personas pueden
+     * hacer», y es la frase que hace pensar antes de tocar una celda.
+     *
+     * Las dos cifras vienen de donde ya viven, llamadas y no copiadas: la ficha
+     * de solo lectura dice lo mismo con las mismas palabras.
+     */
+    public function getSubheading(): ?string
+    {
+        return ViewRole::reach($this->getRecord());
+    }
+
+    /**
      * The `visible()` is the guarantee, not decoration: a delete button asks
      * `getDeleteAuthorizationResponse()`, which goes straight to the policy, so
      * the resource's `canDelete()` — where the protected list and the
@@ -61,21 +92,6 @@ class EditRole extends EditRecord
         return $data;
     }
 
-    /**
-     * The form catches up with what was actually written.
-     *
-     * `mutateFormDataBeforeSave()` rewrites the array that gets persisted, never
-     * the browser's copy of `data.name`, so without this the screen keeps
-     * showing a forged rename that never reached the store. The grid does not
-     * need it: its field re-reads itself after every save.
-     *
-     * The inheritance is written HERE and not through the form's own state,
-     * because the edges are rows in `assigned_roles` and not columns on this
-     * record — the field is `dehydrated(false)` for exactly that reason, the
-     * same way the grid is. Read from the RAW state: `getState()` drops a field
-     * that does not dehydrate, which is the whole point of the flag and would
-     * leave nothing here to write.
-     */
     protected function afterSave(): void
     {
         $raw = $this->form->getRawState();

@@ -122,7 +122,7 @@
                 --}}
                 <p class="fw-sr" role="status" x-text="said"></p>
 
-                <details class="fw-legend-fold">
+                <details class="fw-legend-fold" data-fw-inline="true">
                     <summary>{{ __('filament-warden::ui.grid.legend.title') }}</summary>
 
                     <div class="fw-key">
@@ -252,6 +252,35 @@
                             </div>
 
                             <p class="fw-filter-empty" x-show="matched(@js($tab->key)) === 0" x-cloak x-text="filterEmpty()"></p>
+
+                            {{--
+                                Lo que la rejilla entera contesta, en las cinco
+                                cifras que el boceto pone aquí. Las tres últimas
+                                son lo que la 3.0 añadió, y sin esta línea solo se
+                                ven pasando el ratón por cada celda.
+
+                                Dibujada por el servidor y no rebajada por el
+                                filtro: contesta «qué concede este rol», que es
+                                una pregunta sobre el rol y no sobre lo que hay
+                                en pantalla — la misma decisión que ya toman los
+                                contadores de las pestañas.
+                            --}}
+                            @php($tally = $grid->tally())
+                            <p class="fw-tally-line" x-show="matched(@js($tab->key)) > 0">
+                                @foreach ([
+                                    'granted' => $tally['granted'],
+                                    'forbidden' => $tally['forbidden'],
+                                    'narrowed' => $tally['narrowed'],
+                                    'expires' => $tally['ending'],
+                                    'inherited' => $tally['inherited'],
+                                ] as $word => $count)
+                                    @if ($count > 0)
+                                        <span class="fw-tally-item" data-fw-of="{{ $word }}">
+                                            <b>{{ $count }}</b> {{ $states[$word] }}
+                                        </span>
+                                    @endif
+                                @endforeach
+                            </p>
 
                             <div class="fw-scroll" x-show="matched(@js($tab->key)) > 0">
                                 <table class="fw-table">
