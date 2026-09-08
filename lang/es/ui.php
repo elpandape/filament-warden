@@ -266,6 +266,24 @@ return [
     ],
 
     'relations' => [
+        'permissions' => [
+            'label' => 'Permisos directos',
+            'polarity' => 'Polaridad',
+            'grant' => [
+                'label' => 'Conceder directamente',
+                'heading' => 'Dar un permiso a esta cuenta',
+                'description' => 'Sin rol de por medio. Es la misma fila del catálogo a la que apuntan los roles, así que editarla cambia también lo que tiene esta cuenta.',
+                'field' => 'Permiso',
+                'until_help' => 'Déjalo vacío para una concesión sin fin. Pasada la fecha warden deja de leerla solo, sin ejecutar ningún comando.',
+                'notified' => 'Escrito.',
+            ],
+            'revoke' => [
+                'label' => 'Quitarlo',
+                'description' => 'Se va la concesión; la fila del catálogo se queda, porque apuntan a ella otras cuentas y otros roles. No cambia nada más de lo que tiene esta cuenta.',
+                'notified' => 'Se quitó la concesión.',
+            ],
+            'elsewhere' => 'Escrita fuera del tenant en el que estás. Quitarla desde aquí no borraría nada y aun así diría que fue bien, así que se deja en paz.',
+        ],
         'roles' => [
             'label' => 'Roles',
             'concurrent' => [

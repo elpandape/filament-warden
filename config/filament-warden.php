@@ -23,6 +23,11 @@ return [
         'constraints' => true,      // the condition builder
         'only_owned' => true,       // the ownership checkbox
         'probe' => true,            // the test bench, built on explain()
+        // A permission handed straight to an account belongs to no role, so no
+        // role's grid draws it and nothing but this screen names it again. Off
+        // out of the box because turning it on does not only SHOW those grants
+        // — it hands them out.
+        'direct' => false,          // the direct-grants relation manager
     ],
 
     /*

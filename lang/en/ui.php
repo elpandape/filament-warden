@@ -266,6 +266,24 @@ return [
     ],
 
     'relations' => [
+        'permissions' => [
+            'label' => 'Direct permissions',
+            'polarity' => 'Polarity',
+            'grant' => [
+                'label' => 'Grant directly',
+                'heading' => 'Hand a permission to this account',
+                'description' => 'With no role in between. It is the same catalogue row every role points at, so editing that row changes what this account holds too.',
+                'field' => 'Permission',
+                'until_help' => 'Leave it empty for a grant with no end. Past the date warden stops reading it on its own, with no command run.',
+                'notified' => 'Written.',
+            ],
+            'revoke' => [
+                'label' => 'Take it back',
+                'description' => 'The grant goes; the catalogue row stays, because other accounts and roles point at it. Nothing else this account holds changes.',
+                'notified' => 'The grant was taken back.',
+            ],
+            'elsewhere' => 'Written outside the tenant you are in. Taking it back from here would delete nothing and still report success, so it is left alone.',
+        ],
         'roles' => [
             'label' => 'Roles',
             'concurrent' => [
