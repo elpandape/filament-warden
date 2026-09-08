@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Filament\RelationManagers;
 
+use Carbon\CarbonImmutable;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Grants\Assignment;
 use ElPandaPe\Warden\Context;
 use Filament\Actions\Action;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -146,9 +148,24 @@ class RolesRelationManager extends RelationManager
                         'elsewhere' => 'gray',
                         default => 'success',
                     }),
+
+                // Calculated like the badge above it, and for the same reason
+                // it carries no `sortable()`: there is no `ends_at` column on
+                // the roles table, and the date lives on the pivot row.
+                //
+                // There is no «expired» reading to draw. `Assignment` reads
+                // through `Expiry::live()`, so a lapsed assignment is invisible
+                // to the whole class and a role held only by one is not in this
+                // table at all — which is the honest answer: it is not held.
+                TextColumn::make('ends_at')
+                    ->label(__('filament-warden::ui.relations.roles.ends_column'))
+                    ->badge()
+                    ->color('info')
+                    ->placeholder('—')
+                    ->state(static fn (Model $record): ?string => self::endsAt($account, $record)),
             ])
             ->headerActions([$this->assignAction($account)])
-            ->recordActions([$this->retractAction($account)]);
+            ->recordActions([$this->renewAction($account), $this->retractAction($account)]);
     }
 
     /**
@@ -170,6 +187,46 @@ class RolesRelationManager extends RelationManager
             Assignment::isElsewhere($account, $key) => 'elsewhere',
             default => 'here',
         };
+    }
+
+    /**
+     * When this row runs out, worded, or nothing when it does not.
+     */
+    private static function endsAt(Model $account, Model $record): ?string
+    {
+        $key = $record->getKey();
+
+        if (! is_int($key) && ! is_string($key)) {
+            return null; // @codeCoverageIgnore
+        }
+
+        $ends = Assignment::endsAt($account, $key);
+
+        return $ends instanceof CarbonImmutable
+            ? $ends->toFormattedDayDateString().' · '.$ends->diffForHumans()
+            : null;
+    }
+
+    /**
+     * The date the picker opens on: whatever the assignment carries today.
+     */
+    private static function currentEnd(Model $account, Model $record): ?string
+    {
+        $key = $record->getKey();
+
+        if (! is_int($key) && ! is_string($key)) {
+            return null; // @codeCoverageIgnore
+        }
+
+        return Assignment::endsAt($account, $key)?->toDateString();
+    }
+
+    /**
+     * A date out of whatever the picker sent.
+     */
+    private function date(mixed $value): ?CarbonImmutable
+    {
+        return is_string($value) && $value !== '' ? CarbonImmutable::parse($value) : null;
     }
 
     private function offered(Model $account, Model $record): bool
@@ -211,6 +268,21 @@ class RolesRelationManager extends RelationManager
                     ->searchable()
                     ->options(static fn (): array => Assignment::options())
                     ->disableOptionWhen(static fn (mixed $value): bool => ! Assignment::offers($account, $value)),
+
+                // A date, and deliberately NOT a context. §6.21 settled that one
+                // and it has not moved: this package shows a restricted
+                // assignment, marks it and leaves it alone. Offering to create
+                // one here would mint rows this very screen then refuses to take
+                // back — `offers()` answers false for a restricted role, so both
+                // the retract action and the checkbox would go quiet on a row
+                // somebody had just made.
+                DatePicker::make('until')
+                    ->label(__('filament-warden::ui.relations.roles.assign.until'))
+                    ->helperText(__('filament-warden::ui.relations.roles.assign.until_help'))
+                    // Today is not in the future: warden reads the boundary
+                    // exclusively, so a row dated today stops counting at the
+                    // instant it names and would be handed out already over.
+                    ->after('today'),
             ])
             ->action(function (array $data) use ($account): void {
                 $role = $data['role'] ?? null;
@@ -225,7 +297,7 @@ class RolesRelationManager extends RelationManager
                     return;
                 }
 
-                if (! Assignment::give($account, $role)) {
+                if (! Assignment::give($account, $role, $this->date($data['until'] ?? null))) {
                     return;
                 }
 
@@ -233,6 +305,53 @@ class RolesRelationManager extends RelationManager
                     ->title(__('filament-warden::ui.relations.roles.assign.notified'))
                     ->success()
                     ->send();
+            });
+    }
+
+    /**
+     * The row action: move the end date on a role already held.
+     *
+     * A second action and not a flag on the first, because they answer opposite
+     * questions — `give()` refuses a role already held, so once handed out
+     * nothing on this screen could reach the date again. It is offered under
+     * exactly the same conditions as the retract beside it: `offers()` is what
+     * says this screen may write to that assignment at all.
+     *
+     * Clearing the field is a real answer and not a no-op: warden moves the date
+     * only when a chain declared one, so an empty picker sends `until(null)` and
+     * turns an ending assignment into one with no end.
+     */
+    private function renewAction(Model $account): Action
+    {
+        return Action::make('renew')
+            ->label(__('filament-warden::ui.relations.roles.renew.label'))
+            ->icon(Heroicon::OutlinedClock)
+            ->modalHeading(__('filament-warden::ui.relations.roles.renew.heading'))
+            ->visible(fn (Model $record): bool => ! $this->isReadOnly() && $this->offered($account, $record))
+            ->schema([
+                DatePicker::make('until')
+                    ->label(__('filament-warden::ui.relations.roles.assign.until'))
+                    ->helperText(__('filament-warden::ui.relations.roles.renew.help'))
+                    ->after('today')
+                    ->default(static fn (Model $record): ?string => self::currentEnd($account, $record)),
+            ])
+            ->action(function (Model $record, array $data) use ($account): void {
+                $key = $record->getKey();
+
+                // Repeated, and for the same reason the header action repeats
+                // its own: `Action::call()` consults neither `isDisabled()` nor
+                // `isVisible()`, so anything arriving by that route has only
+                // this line in front of it.
+                $moved = ! $this->isReadOnly()
+                    && (is_int($key) || is_string($key))
+                    && Assignment::renew($account, $key, $this->date($data['until'] ?? null));
+
+                if ($moved) {
+                    Notification::make()
+                        ->title(__('filament-warden::ui.relations.roles.renew.notified'))
+                        ->success()
+                        ->send();
+                }
             });
     }
 

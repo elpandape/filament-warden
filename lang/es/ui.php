@@ -277,6 +277,8 @@ return [
             'restricted' => 'Esta cuenta tiene este rol en un contexto. Quitarlo desde aquí se llevaría todos los contextos, así que se deja en paz.',
             'elsewhere' => 'Esta cuenta tiene este rol fuera del tenant en el que estás. Quitárselo desde aquí no borraría nada y aun así diría que sí, así que se deja en paz. Cambia de tenant para tocarlo.',
             'held_column' => 'Cómo se tiene',
+            'ends_column' => 'Caduca el',
+            'ends' => 'Caduca el :date (:human). Una casilla no puede llevar fecha, así que volver a marcarla solo la dejaría como está; la fecha se mueve desde la tabla de roles de esta página.',
             'held' => [
                 'here' => 'Aquí',
                 'elsewhere' => 'En otro sitio',
@@ -286,7 +288,15 @@ return [
                 'label' => 'Asignar rol',
                 'heading' => 'Asignar un rol',
                 'field' => 'Rol',
+                'until' => 'Caduca el',
+                'until_help' => 'Déjalo vacío para una asignación sin fin. Pasada la fecha la cuenta deja de tener el rol sola, sin ejecutar ningún comando — `warden:clean --expired` solo borra la fila.',
                 'notified' => 'El rol se ha repartido.',
+            ],
+            'renew' => [
+                'label' => 'Mover la fecha',
+                'heading' => '¿Cuándo caduca esta asignación?',
+                'help' => 'Vacío significa que deja de caducar: la cuenta conserva el rol hasta que alguien se lo quite. Warden mueve la fecha en vez de escribir una segunda asignación.',
+                'notified' => 'Se movió la fecha.',
             ],
             'retract' => [
                 'label' => 'Retirar',

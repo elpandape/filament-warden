@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Grants;
 
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
@@ -132,6 +134,24 @@ final class Assignment
 
             if ($reason !== null) {
                 $descriptions[$key] = (string) __('filament-warden::ui.relations.roles.'.$reason);
+
+                continue;
+            }
+
+            // A date on a box that cannot carry one. The field writes «held,
+            // with no end» and says so in its own help, but a role that ALREADY
+            // ends is a fact about this account that the box would otherwise
+            // hide — and the person unticking it deserves to know it was going
+            // to lapse anyway. Only on rows with nothing else to say: a reason
+            // is why the box is closed, and that outranks a date on a box
+            // nobody can move.
+            $ends = self::endsAt($account, $key);
+
+            if ($ends instanceof CarbonImmutable) {
+                $descriptions[$key] = (string) __('filament-warden::ui.relations.roles.ends', [
+                    'date' => $ends->toFormattedDayDateString(),
+                    'human' => $ends->diffForHumans(),
+                ]);
             }
         }
 
@@ -354,7 +374,7 @@ final class Assignment
      * role already held and a caller reporting success on "no exception" would
      * report it for a no-op.
      */
-    public static function give(Model $account, int|string $role): bool
+    public static function give(Model $account, int|string $role, ?DateTimeInterface $until = null): bool
     {
         if (! self::offers($account, $role) || self::isHeld($account, $role)) {
             return false;
@@ -368,8 +388,9 @@ final class Assignment
             // the date when a chain declared one. Measured: without this, ticking
             // a box whose assignment had lapsed found the dead row, changed
             // nothing, and reported success. A checkbox carries no date, so what
-            // it can mean is "held, with no end".
-            Warden::assign($model)->until(null)->to($account);
+            // it can mean is "held, with no end" — which is what the default
+            // argument keeps saying for every caller that carries no date.
+            Warden::assign($model)->until($until)->to($account);
 
             // The memo `offers()`/`isHeld()` just read from is exactly what
             // this line makes stale: a caller reading `Assignment::of()` (or
@@ -438,6 +459,92 @@ final class Assignment
         }
 
         return $retracted > 0;
+    }
+
+    /**
+     * When this account's assignment of one role runs out, if it does.
+     *
+     * The SOONEST of the live rows and not the last, because the soonest is the
+     * one that changes something: a role held both globally and under a tenant
+     * is two rows, and the earlier date is when half of what it answers goes
+     * away. There is no row here that has already lapsed — `assignments()` reads
+     * through `Expiry::live()`, so a dead assignment is invisible to this whole
+     * class, which is also why the screen has no «expired» badge to draw.
+     */
+    public static function endsAt(Model $account, int|string $role): ?CarbonImmutable
+    {
+        $soonest = null;
+
+        foreach (self::assignments($account) as $assignment) {
+            $key = $assignment->getAttribute('role_id');
+
+            // Compared as text, like `isHeld()` and unlike the two sibling
+            // readers above: a key arriving from a `Select` is a string even
+            // where the column holds an int, and this method is reached from
+            // both directions.
+            if (! is_int($key) && ! is_string($key)) {
+                continue; // @codeCoverageIgnore
+            }
+
+            if ((string) $key !== (string) $role) {
+                continue;
+            }
+
+            $ends = $assignment->getAttribute('expires_at');
+
+            if (! $ends instanceof DateTimeInterface) {
+                // A row with no date outlives every row that has one, so the
+                // whole role does: nothing this account holds of it runs out.
+                return null;
+            }
+
+            $ends = CarbonImmutable::instance($ends);
+
+            if (! $soonest instanceof CarbonImmutable || $ends->lessThan($soonest)) {
+                $soonest = $ends;
+            }
+        }
+
+        return $soonest;
+    }
+
+    /**
+     * Moves the end date on an assignment this account already holds.
+     *
+     * A second entrance and not a flag on `give()`, because they answer opposite
+     * questions: `give()` refuses a role already held — its `isHeld()` guard is
+     * there so an unconditional `bumpCacheVersion()` does not throw the whole
+     * scope's cache away for a row nothing changed — and this one refuses a role
+     * that is NOT held, since there is no date to move on an assignment that
+     * does not exist.
+     *
+     * `until()` before `to()`, and `until(null)` written out rather than skipped:
+     * warden moves the date only when a chain declared one, so clearing an end
+     * date has to say so. `Expiry::apply()` on warden's side reports whether the
+     * value actually changed, so handing back the same date writes nothing and
+     * this returns false.
+     */
+    public static function renew(Model $account, int|string $role, ?DateTimeInterface $until): bool
+    {
+        if (! self::offers($account, $role) || ! self::isHeld($account, $role)) {
+            return false;
+        }
+
+        $model = self::role($role);
+
+        $moved = false;
+
+        if ($model instanceof Model) {
+            $moved = self::endsAt($account, $role)?->toDateTimeString() !== ($until instanceof DateTimeInterface
+                ? CarbonImmutable::instance($until)->toDateTimeString()
+                : null);
+
+            Warden::assign($model)->until($until)->to($account);
+
+            self::forgetAssignments();
+        }
+
+        return $moved;
     }
 
     /**

@@ -277,6 +277,8 @@ return [
             'restricted' => 'This account holds this role in a context. Taking it back from here would take every context with it, so it is left alone.',
             'elsewhere' => 'This account holds this role outside the tenant you are in. Taking it back from here would delete nothing and still report success, so it is left alone. Switch tenant to change it.',
             'held_column' => 'Held as',
+            'ends_column' => 'Ends on',
+            'ends' => 'Ends on :date (:human). A box cannot carry a date, so ticking this one again would only keep it as it is; the roles table on this page is where the date moves.',
             'held' => [
                 'here' => 'Here',
                 'elsewhere' => 'Elsewhere',
@@ -286,7 +288,15 @@ return [
                 'label' => 'Assign role',
                 'heading' => 'Assign a role',
                 'field' => 'Role',
+                'until' => 'Ends on',
+                'until_help' => 'Leave it empty for an assignment with no end. Past the date the account stops holding the role on its own, with no command run — `warden:clean --expired` only removes the row.',
                 'notified' => 'The role was handed out.',
+            ],
+            'renew' => [
+                'label' => 'Move the date',
+                'heading' => 'When does this assignment end?',
+                'help' => 'Empty means it stops ending: the account keeps the role until somebody takes it back. Warden moves the date rather than writing a second assignment.',
+                'notified' => 'The date was moved.',
             ],
             'retract' => [
                 'label' => 'Retract',

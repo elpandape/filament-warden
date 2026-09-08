@@ -571,7 +571,7 @@ test('canViewForRecord() closes with the packaged Policy, not a guess at an unre
  * `configureTable()` from ever running, so nothing but `assign`/`retract` is
  * ever cached.
  */
-test('the flat action list is exactly assign and retract, never the edit/delete RolesTable would leak in', function (): void {
+test("the flat action list is exactly this screen's own, never the edit/delete RolesTable would leak in", function (): void {
     signInAsRoleManager();
 
     $account = makeUser();
@@ -585,7 +585,7 @@ test('the flat action list is exactly assign and retract, never the edit/delete 
     $names = array_keys($manager->getTable()->getFlatActions());
     sort($names);
 
-    expect($names)->toBe(['assign', 'retract']);
+    expect($names)->toBe(['assign', 'renew', 'retract']);
 });
 
 /**
@@ -796,4 +796,165 @@ test('a raw call to the retract action off ViewRecord retracts it', function ():
     $test->call('callMountedAction', []);
 
     expect(Assignment::of($account))->toBeEmpty();
+});
+
+test('a role handed out with a date carries it into the table', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    livewire(RolesRelationManager::class, ['ownerRecord' => $account, 'pageClass' => EditRole::class])
+        ->callTableAction('assign', arguments: [], data: [
+            'role' => heldKey($role),
+            'until' => now()->addWeeks(2)->toDateString(),
+        ])
+        ->assertNotified();
+
+    expect(Assignment::endsAt($account, heldKey($role)))->not->toBeNull();
+});
+
+test('a role handed out with no date carries none, which is what a box means', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    livewire(RolesRelationManager::class, ['ownerRecord' => $account, 'pageClass' => EditRole::class])
+        ->callTableAction('assign', arguments: [], data: ['role' => heldKey($role)])
+        ->assertNotified();
+
+    expect(Assignment::endsAt($account, heldKey($role)))->toBeNull();
+});
+
+test('the date on an assignment already held can be moved', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::assign($role)->until(now()->addWeek())->to($account);
+    Assignment::forget();
+
+    // A second action and not a flag on the first: `give()` refuses a role
+    // already held, so without this nothing on this screen could reach the date
+    // once it had been handed out.
+    livewire(RolesRelationManager::class, ['ownerRecord' => $account, 'pageClass' => EditRole::class])
+        ->callTableAction('renew', $role, ['until' => now()->addMonths(3)->toDateString()])
+        ->assertNotified();
+
+    Assignment::forget();
+
+    expect(Assignment::endsAt($account, heldKey($role))?->isAfter(now()->addMonths(2)))->toBeTrue();
+});
+
+test('clearing the date is a real answer, not a no-op', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::assign($role)->until(now()->addWeek())->to($account);
+    Assignment::forget();
+
+    // Warden moves the date only when a chain declared one, so an empty picker
+    // has to send `until(null)` rather than skip the call — otherwise emptying
+    // the field would find the row, change nothing and report success.
+    livewire(RolesRelationManager::class, ['ownerRecord' => $account, 'pageClass' => EditRole::class])
+        ->callTableAction('renew', $role, ['until' => null])
+        ->assertNotified();
+
+    Assignment::forget();
+
+    expect(Assignment::endsAt($account, heldKey($role)))->toBeNull();
+});
+
+test('handing back the same date writes nothing and says nothing', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+    $date = now()->addWeek()->startOfDay();
+
+    Warden::assign($role)->until($date)->to($account);
+    Assignment::forget();
+
+    // `Expiry::apply()` reports whether the value actually changed, so a modal
+    // opened on the current date and submitted untouched must not claim a move.
+    livewire(RolesRelationManager::class, ['ownerRecord' => $account, 'pageClass' => EditRole::class])
+        ->callTableAction('renew', $role, ['until' => $date->toDateString()])
+        ->assertNotNotified();
+});
+
+test('a lapsed assignment is not held, so there is no expired row to draw', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::assign($role)->until(now()->addWeek())->to($account);
+
+    // Backdated by hand: warden refuses a date in the past on the way in, which
+    // leaves this the only way to build the row an installation gets by waiting.
+    Context::resolve()->assignedRoleClass()::query()
+        ->where('entity_id', $account->getKey())
+        ->update(['expires_at' => now()->subDay()]);
+
+    Assignment::forget();
+
+    // `Assignment` reads through `Expiry::live()`, so the row is invisible to
+    // the whole class — which is the honest answer rather than a gap: the role
+    // is not held. There is no «expired» badge because there is nothing to
+    // badge.
+    expect(Assignment::of($account))->toBeEmpty()
+        ->and(Assignment::endsAt($account, heldKey($role)))->toBeNull();
+});
+
+test('a role that ends says so under its own checkbox', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    Warden::assign($role)->until(now()->addWeeks(2))->to($account);
+    Assignment::forget();
+
+    $descriptions = Assignment::descriptions($account);
+
+    expect($descriptions[heldKey($role)] ?? '')->toContain('Ends on');
+});
+
+test('a reason a box is closed outranks a date it cannot move', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+    $post = Post::query()->create(['title' => 'section']);
+
+    Warden::assign($role)->until(now()->addWeeks(2))->on($post)->to($account);
+    Assignment::forget();
+
+    // Two things are true of this row and only one of them is actionable. The
+    // restriction is why nothing here can touch it; the date is a fact about a
+    // box nobody can move either way, so it would be noise under the sentence
+    // that explains the lock.
+    expect(Assignment::descriptions($account)[heldKey($role)] ?? '')
+        ->toContain('holds this role in a context')
+        ->not->toContain('Ends on');
+
+    expect(Access::grantedToCurrentUser('update', $role))->toBeTrue();
+});
+
+test('a date cannot be moved on an assignment that does not exist', function (): void {
+    signInAsRoleManager();
+
+    $account = makeUser();
+    $role = makeRole('editor');
+
+    // The mirror of `give()`'s own guard and the opposite question: there is no
+    // date to move on a role nobody holds, and warden's `firstOrCreate` would
+    // happily MAKE the assignment — handing the role out through a button that
+    // says it is only moving a date.
+    expect(Assignment::renew($account, heldKey($role), now()->addWeek()))->toBeFalse()
+        ->and(Assignment::of($account))->toBeEmpty();
 });
