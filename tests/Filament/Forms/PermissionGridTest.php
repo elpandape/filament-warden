@@ -1228,6 +1228,10 @@ test('a click still announces with the inspector and the builder both switched o
 });
 
 test('a row is named by its entity, not by the buttons that sit beside it', function (): void {
+    // On, because the two-id form is the one worth pinning: with the class off
+    // the label points at one span and there is no order to get wrong.
+    config()->set('filament-warden.grid.class_names', true);
+
     $html = livewire(GridHost::class, ['roleKey' => makeRole()->getKey()])->html();
 
     // The presets live inside the row header, so a header named by its contents
@@ -1524,20 +1528,23 @@ test('the entity label is capitalised whichever of the two sources it came from'
 test('the class name under an entity is an installation decision, and the title keeps it either way', function (): void {
     $role = makeRole();
 
+    // Off is what a fresh installation gets, so that is the reading taken
+    // first — a test that had to switch it on to see the default would be
+    // pinning the packaged value backwards.
+    $off = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
+
+    // Absent from the row, and the `aria-labelledby` names one id instead of
+    // two. A reference to a missing id is skipped in silence — the accessible
+    // name would come out the same — but pointing at something absent is a
+    // broken promise in the markup.
+    expect($off)->not->toContain('class="fw-entity-model"')
+        ->and($off)->not->toContain('-model"');
+
+    config()->set('filament-warden.grid.class_names', true);
+
     $on = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
 
     expect($on)->toContain('class="fw-entity-model"');
-
-    config()->set('filament-warden.grid.class_names', false);
-
-    $off = livewire(GridHost::class, ['roleKey' => $role->getKey()])->html();
-
-    // Gone from the row, and the `aria-labelledby` stops naming an id that is
-    // no longer there. A reference to a missing id is skipped in silence — the
-    // accessible name would come out the same — but pointing at something
-    // absent is a broken promise in the markup.
-    expect($off)->not->toContain('class="fw-entity-model"')
-        ->and($off)->not->toContain('-model"');
 
     // And nothing is lost: the class is on the row's title in both readings,
     // because a permission is stored against the CLASS and two models can share
