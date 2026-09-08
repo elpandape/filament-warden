@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Catalog;
 
+use Carbon\CarbonImmutable;
 use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Conditions\Ownership;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
@@ -45,6 +46,7 @@ final readonly class Audit
      * @param  list<string>  $misconfigured  config entries this package reads and drops
      * @param  list<string>  $unsatisfiable  catalogue rows whose condition can never be true
      * @param  list<string>  $dormant  role-to-role edges that would come alive if nesting were turned on
+     * @param  list<string>  $expired  pivot rows past their date, counted per pivot
      */
     public function __construct(
         public array $open = [],
@@ -61,6 +63,7 @@ final readonly class Audit
         public array $misconfigured = [],
         public array $unsatisfiable = [],
         public array $dormant = [],
+        public array $expired = [],
     ) {}
 
     public static function run(): self
@@ -145,6 +148,7 @@ final readonly class Audit
             misconfigured: self::misconfigured(),
             unsatisfiable: self::unsatisfiable(),
             dormant: self::dormant(),
+            expired: self::expired(),
         );
     }
 
@@ -195,7 +199,7 @@ final readonly class Audit
      */
     public function isSilent(): bool
     {
-        return $this->isClean() && $this->orphans === [] && $this->stranded === [] && $this->unwalkable === [] && $this->dormant === [];
+        return $this->isClean() && $this->orphans === [] && $this->stranded === [] && $this->unwalkable === [] && $this->dormant === [] && $this->expired === [];
     }
 
     /**
@@ -565,6 +569,44 @@ final readonly class Audit
                 if (! array_key_exists((string) $key, $alive)) {
                     $findings[] = $type.':'.$key;
                 }
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Rows that ran out, counted by which pivot they are in.
+     *
+     * Informational, and it is the third bucket with that shape rather than a
+     * defect: an installation collects these by doing nothing wrong at all — a
+     * date arrives, and warden stops reading the row without touching it.
+     *
+     * Worth naming anyway, because a dead row is not inert everywhere. It still
+     * follows its permission or its role down a foreign key, so it still blocks
+     * a delete under `roles.delete => 'unassigned'` and still locks a name under
+     * `permissions.update => 'loose'` — both deliberately, since the cascade
+     * takes it like any other. `warden:clean --expired` is what removes them,
+     * and that is the sentence this bucket exists to be able to print.
+     *
+     * @return list<string>
+     */
+    private static function expired(): array
+    {
+        $context = Context::resolve();
+        $now = CarbonImmutable::now();
+
+        $findings = [];
+
+        foreach (['grants' => $context->grantClass(), 'assignments' => $context->assignedRoleClass()] as $label => $class) {
+            $count = $class::query()
+                ->withoutGlobalScopes()
+                ->whereNotNull('expires_at')
+                ->where('expires_at', '<=', $now)
+                ->count();
+
+            if ($count > 0) {
+                $findings[] = $label.': '.$count;
             }
         }
 

@@ -7,7 +7,9 @@ use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\PostResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
+use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
+use Filament\Facades\Filament;
 use Filament\Panel;
 
 /**
@@ -75,6 +77,7 @@ function auditWith(string $bucket): Audit
         misconfigured: $bucket === 'misconfigured' ? $finding : [],
         unsatisfiable: $bucket === 'unsatisfiable' ? $finding : [],
         dormant: $bucket === 'dormant' ? $finding : [],
+        expired: $bucket === 'expired' ? $finding : [],
     );
 }
 
@@ -114,7 +117,7 @@ test('the gate reads exactly the buckets this file names, no more and no fewer',
     ));
 
     expect($reaching)->toBe(gateBuckets())
-        ->and(declaredBuckets())->toHaveCount(count(gateBuckets()) + 4);
+        ->and(declaredBuckets())->toHaveCount(count(gateBuckets()) + 5);
 });
 
 test('this file puts a finding in every bucket the audit carries', function (string $bucket): void {
@@ -215,4 +218,36 @@ test('an ownership row whose entity type resolves nothing is left to the drifted
     $audit = Audit::of([Panel::make()->id('owning')->resources([PostResource::class])]);
 
     expect($audit->unownable)->toBeEmpty();
+});
+
+test('a pivot row past its date is counted, and does not redden the build', function (): void {
+    $role = makeRole('editor');
+    $account = makeUser();
+
+    Warden::allow($account)->until(now()->addWeek())->to('viewAny', roleClass());
+    Warden::assign($role)->until(now()->addWeek())->to($account);
+
+    // Backdated by hand: warden refuses a past date on the way in, so this is
+    // the only way to build the rows an installation gets by waiting.
+    Context::resolve()->grantClass()::query()->withoutGlobalScopes()->update(['expires_at' => now()->subDay()]);
+    Context::resolve()->assignedRoleClass()::query()->update(['expires_at' => now()->subDay()]);
+
+    $audit = Audit::of([Filament::getPanel('test')]);
+
+    // Both pivots, counted apart: `warden:clean --expired` sweeps both, and a
+    // number that folded them would not say which side to look at.
+    expect($audit->expired)->toHaveCount(2)
+        ->and($audit->expired[0])->toStartWith('grants: ')
+        ->and($audit->expired[1])->toStartWith('assignments: ');
+});
+
+test('a row still ahead of its date is not counted as expired', function (): void {
+    $account = makeUser();
+
+    Warden::allow($account)->until(now()->addWeek())->to('viewAny', roleClass());
+
+    // The boundary is warden's, exclusive: a row counts until the instant it
+    // names. Without this the bucket would report every dated row in the
+    // installation and mean nothing.
+    expect(Audit::of([Filament::getPanel('test')])->expired)->toBeEmpty();
 });

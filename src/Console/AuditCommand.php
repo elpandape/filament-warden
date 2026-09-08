@@ -58,6 +58,7 @@ final class AuditCommand extends Command
         $this->report(__('filament-warden::ui.console.audit.unsatisfiable'), $audit->unsatisfiable);
         $this->report(__('filament-warden::ui.console.audit.stranded'), $audit->stranded, red: false);
         $this->report(__('filament-warden::ui.console.audit.dormant'), $audit->dormant, red: false);
+        $this->report(__('filament-warden::ui.console.audit.expired'), $audit->expired, red: false);
 
         if ($audit->isSilent()) {
             $this->components->info((string) __('filament-warden::ui.console.audit.clean'));
