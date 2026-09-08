@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Grants;
 
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use ElPandaPe\FilamentWarden\Support\Morph;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Tenancy\TenantScope;
@@ -57,6 +59,8 @@ final class Holders
     /**
      * @param  list<string>  $roles  every role that holds it, named
      * @param  list<string>  $accounts  the first accounts that hold it, named
+     * @param  int  $ending  live grants that carry a date
+     * @param  int  $lapsed  grants that already ran out
      */
     public function __construct(
         public readonly array $roles = [],
@@ -65,6 +69,8 @@ final class Holders
         public readonly int $accountCount = 0,
         public readonly bool $everyone = false,
         public readonly int $forbidden = 0,
+        public readonly int $ending = 0,
+        public readonly int $lapsed = 0,
     ) {}
 
     public static function of(Model $permission): self
@@ -182,10 +188,28 @@ final class Holders
         $byType = [];
         $everyone = false;
         $forbidden = 0;
+        $ending = 0;
+        $lapsed = 0;
+        $now = CarbonImmutable::now();
 
         foreach ($grants as $grant) {
             if ((bool) $grant->getAttribute('forbidden')) {
                 $forbidden++;
+            }
+
+            // Both tallies come off the rows this pass already loaded, so they
+            // cost nothing beyond the loop — which is why the screen asks here
+            // rather than running its own count.
+            //
+            // The boundary is warden's: exclusive, so a row expires AT the
+            // instant it names rather than a tick later. Read in PHP and not in
+            // SQL because this query is deliberately the wide one — it answers
+            // what a delete destroys — and adding `Expiry::live()` to it would
+            // change that answer rather than add to it.
+            $ends = $grant->getAttribute('expires_at');
+
+            if ($ends instanceof DateTimeInterface) {
+                CarbonImmutable::instance($ends)->greaterThan($now) ? $ending++ : $lapsed++;
             }
 
             $type = $grant->getAttribute('entity_type');
@@ -221,6 +245,8 @@ final class Holders
             accountCount: $accountCount,
             everyone: $everyone,
             forbidden: $forbidden,
+            ending: $ending,
+            lapsed: $lapsed,
         );
     }
 

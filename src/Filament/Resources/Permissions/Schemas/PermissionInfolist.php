@@ -8,8 +8,6 @@ use ElPandaPe\FilamentWarden\Catalog\Catalog;
 use ElPandaPe\FilamentWarden\Catalog\Provenance;
 use ElPandaPe\FilamentWarden\Conditions\Narrowing;
 use ElPandaPe\FilamentWarden\Grants\Holders;
-use ElPandaPe\Warden\Context;
-use ElPandaPe\Warden\Support\Expiry;
 use Filament\Facades\Filament;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
@@ -79,7 +77,7 @@ final class PermissionInfolist
                 Section::make(__('filament-warden::ui.resources.permissions.sections.holders'))
                     ->icon(Heroicon::OutlinedUsers)
                     ->description(__('filament-warden::ui.resources.permissions.holders.description').' '.__('filament-warden::ui.resources.permissions.holders.every_tenant'))
-                    ->columns(5)
+                    ->columns(6)
                     ->schema([
                         TextEntry::make('roles')
                             ->label(__('filament-warden::ui.resources.permissions.holders.roles'))
@@ -113,32 +111,21 @@ final class PermissionInfolist
                         TextEntry::make('ending')
                             ->label(__('filament-warden::ui.resources.permissions.holders.ending'))
                             ->badge()
-                            ->color(static fn (Model $record): string => self::ending($record) > 0 ? 'info' : 'gray')
-                            ->state(static fn (Model $record): int => self::ending($record)),
+                            ->color(static fn (Model $record): string => Holders::of($record)->ending > 0 ? 'info' : 'gray')
+                            ->state(static fn (Model $record): int => Holders::of($record)->ending),
+
+                        // The other half of the same fact, and the reason the
+                        // four figures beside it can stay wide: they count what
+                        // a delete destroys, and a lapsed grant is destroyed
+                        // like any other. This is how many of them are already
+                        // answering nothing.
+                        TextEntry::make('lapsed')
+                            ->label(__('filament-warden::ui.resources.permissions.holders.lapsed'))
+                            ->badge()
+                            ->color(static fn (Model $record): string => Holders::of($record)->lapsed > 0 ? 'warning' : 'gray')
+                            ->state(static fn (Model $record): int => Holders::of($record)->lapsed),
                     ]),
             ]);
-    }
-
-    /**
-     * How many live grants on this row carry an end date.
-     *
-     * Live and not every one, unlike `Holders`, and the two answer different
-     * questions on purpose: that class counts what a DELETE destroys, so a
-     * lapsed grant belongs in its tally — the cascade takes it either way. This
-     * counts what is about to stop answering, and a row that already stopped is
-     * not about to do anything.
-     *
-     * Read across every tenant for the same reason `Holders` is: a grant ends or
-     * it does not, and that question has no scope.
-     */
-    private static function ending(Model $record): int
-    {
-        return Context::resolve()->grantClass()::query()
-            ->withoutGlobalScopes()
-            ->where('permission_id', $record->getKey())
-            ->whereNotNull('expires_at')
-            ->tap(Expiry::live(...))
-            ->count();
     }
 
     /**

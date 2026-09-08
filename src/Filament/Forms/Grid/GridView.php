@@ -166,7 +166,7 @@ final readonly class GridView
      *     states: array<string, string>,
      *     filter: array{count: string, empty: string},
      *     summary: array{ratio: string, forbidden: string},
-     *     until: array{forbidden: string, unwritten: string},
+     *     until: array{forbidden: string, unwritten: string, off: string},
      *     operators: list<string>,
      *     authority: string,
      *     boolean: string,
@@ -175,6 +175,7 @@ final readonly class GridView
      *     modes: array<string, array{name: string, hint: string}>,
      *     explain: bool,
      *     constraints: bool,
+     *     expiry: bool,
      * }
      */
     public function alpine(): array
@@ -217,16 +218,23 @@ final readonly class GridView
                 'ratio' => self::translated('filament-warden::ui.grid.summary.ratio', ':granted / :total'),
                 'forbidden' => self::translated('filament-warden::ui.grid.summary.forbidden', ':count'),
             ],
-            // The two sentences the date control says when it cannot be used.
-            // Handed over whole rather than composed: the browser picks one out
-            // of a map, exactly as it does with `states`, so no stance name and
-            // no reason ever lives in the script.
+            // The three sentences the date control says when it cannot be
+            // used. Handed over whole rather than composed: the browser picks
+            // one out of a map, exactly as it does with `states`, so no stance
+            // name and no reason ever lives in the script.
             'until' => [
                 'forbidden' => self::translated('filament-warden::ui.grid.until.forbidden', 'forbidden'),
                 'unwritten' => self::translated('filament-warden::ui.grid.until.unwritten', 'unwritten'),
+                'off' => self::translated('filament-warden::ui.grid.until.off', 'off'),
             ],
             'explain' => Config::enabled('grid.explain'),
             'constraints' => Config::enabled('grid.constraints'),
+            // The control stays on the screen with this off, disabled and with
+            // the reason beside it, rather than disappearing. A date already on
+            // a cell is still DRAWN — reading is not writing, and warden honours
+            // the row whatever this says — so a segment that vanished would take
+            // the only explanation of the clock mark with it.
+            'expiry' => Config::enabled('grid.expiry'),
             ...Words::all(),
         ];
     }

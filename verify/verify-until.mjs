@@ -76,9 +76,14 @@ function makeGrid(stances = { [ROW]: { viewAny: 'granted' } }, until = {}) {
                 expires: 'expires',
                 inherited: 'inherited',
             },
-            until: { forbidden: 'a forbid does not expire', unwritten: 'nothing here to date' },
+            until: { forbidden: 'a forbid does not expire', unwritten: 'nothing here to date', off: 'not set from this screen' },
             explain: false,
             constraints: false,
+            // `grid.expiry` reaches the browser since the config key gained a
+            // reader: with it false the control is disabled and says so, so a
+            // fixture that omitted it would exercise the OFF path while
+            // claiming to test the on one.
+            expiry: true,
             words: {},
             operators: [],
             columns: {},
@@ -158,9 +163,28 @@ seven.setUntil(ROW, 'viewAny', '2026-10-12')
 check('the region names the state', seven.said.includes('granted'))
 check('and the date', seven.said.includes('expires'))
 
+console.log('\n=== 8. With `grid.expiry` off, the control refuses and says why ===')
+
+// The config half of the same guard, and it has to be checked in the browser
+// because that is where the refusal lives: the server drops an unwanted date
+// whatever arrives, so a screen with a live-looking control would take a date,
+// report a save and lose it silently. Off, the control stays on the screen —
+// reading is not writing, and the clock mark on an existing cell still needs
+// its explanation — but it is disabled and carries the reason.
+const eight = makeGrid({ [ROW]: { viewAny: 'granted' } })
+
+eight.grid.expiry = false
+
+check('the control is closed even on a granted cell', eight.untilEnabled(ROW, 'viewAny') === false)
+check('and it says the installation, not the stance', eight.untilReason(ROW, 'viewAny') === 'not set from this screen')
+
+eight.setUntil(ROW, 'viewAny', '2026-10-12')
+
+check('and nothing was written', eight.state.until?.[ROW]?.viewAny === undefined)
+
 console.log(
     failures === 0
-        ? '\nALL CHECKS PASSED — the date rides the same spread as everything else, and is refused where warden would throw.'
+        ? '\nALL CHECKS PASSED — the date rides the same spread as everything else, and is refused where warden would throw or where the installation said not to.'
         : `\n${failures} CHECK(S) FAILED`,
 )
 

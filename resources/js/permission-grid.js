@@ -664,10 +664,14 @@ function grid({ state, grid, interactive }) {
          * question again and drops the date whatever arrives.
          */
         untilEnabled(row, action) {
-            return this.stanceOf(row, action) === this.grid.order[1]
+            return this.grid.expiry && this.stanceOf(row, action) === this.grid.order[1]
         },
 
         untilReason(row, action) {
+            if (! this.grid.expiry) {
+                return this.grid.until.off
+            }
+
             const stance = this.stanceOf(row, action)
 
             if (stance === this.grid.order[2]) {

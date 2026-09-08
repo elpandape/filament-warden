@@ -9,6 +9,7 @@ use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 pest()->extend(TestCase::class);
 
@@ -298,4 +299,59 @@ test('an account that both grants and forbids the same permission counts once', 
 
     expect($holders->accountCount)->toBe(1)
         ->and($holders->accounts)->toBe(['Amaru Quispe']);
+});
+
+test('a grant that ends and one that already has are counted apart', function (): void {
+    $permission = makePermission('export-reports');
+
+    $live = makeUser('Live');
+    $dead = makeUser('Dead');
+    $endless = makeUser('Endless');
+
+    Warden::allow($live)->until(now()->addWeeks(2))->to($permission);
+    Warden::allow($dead)->until(now()->addWeeks(2))->to($permission);
+    Warden::allow($endless)->to($permission);
+
+    // Backdated by hand: warden refuses a past date on the way in, which leaves
+    // this the only way to build the row an installation gets by waiting.
+    Context::resolve()->grantClass()::query()
+        ->withoutGlobalScopes()
+        ->where('entity_id', $dead->getKey())
+        ->update(['expires_at' => now()->subDay()]);
+
+    Holders::forget($permission);
+
+    $holders = Holders::of($permission);
+
+    // The four figures stay WIDE — they answer what a delete destroys, and the
+    // cascade takes a lapsed grant like any other. These two are how the screen
+    // can say that without the counts lying: one is about to stop, one already
+    // has, and the third row is in neither.
+    expect($holders->accountCount)->toBe(3)
+        ->and($holders->ending)->toBe(1)
+        ->and($holders->lapsed)->toBe(1);
+});
+
+test('the two tallies cost nothing beyond the pass that was already running', function (): void {
+    $permission = makePermission('export-reports');
+
+    Warden::allow(makeUser('Holder'))->until(now()->addWeek())->to($permission);
+
+    Holders::forget($permission);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    $holders = Holders::of($permission);
+
+    $queries = count(DB::getQueryLog());
+
+    DB::disableQueryLog();
+
+    // Three: the grants, the roles named by them, and the accounts. The dates
+    // are read off rows this pass had already loaded, so asking for them adds
+    // none — which is why the screen asks here rather than running its own
+    // count, as it did when the figure was first written.
+    expect($queries)->toBeLessThanOrEqual(3)
+        ->and($holders->ending)->toBe(1);
 });
