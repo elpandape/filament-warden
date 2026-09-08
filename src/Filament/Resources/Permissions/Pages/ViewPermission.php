@@ -16,8 +16,14 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Notifications\Notification;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Actions as SchemaActions;
+use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\EmbeddedSchema;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
 
@@ -39,6 +45,30 @@ class ViewPermission extends ViewRecord
         'email' => "email like ? escape '!'",
         'title' => "title like ? escape '!'",
     ];
+
+    /**
+     * What the bench is being asked, and what it answered.
+     *
+     * Two properties and not one: the question survives the answer, so somebody
+     * can change the record and ask again without retyping the account — which
+     * is the whole shape of using this thing, and the reason it stopped being a
+     * modal. A modal threw the question away on every submit.
+     *
+     * @var array<string, mixed>
+     */
+    public array $ask = ['account' => null, 'record' => null];
+
+    /**
+     * The card, already worded.
+     *
+     * Strings and not a `Probe`: a Livewire property survives the round trip by
+     * being serialised, and a readonly object holding two models would not come
+     * back the same object. The wording happens once, where the store is, and
+     * what travels is what the page prints.
+     *
+     * @var array<string, string|null>|null
+     */
+    public ?array $answered = null;
 
     protected static string $resource = PermissionResource::class;
 
@@ -136,15 +166,114 @@ class ViewPermission extends ViewRecord
     }
 
     /**
-     * Three actions, and only the probe is optional.
+     * The page, with the bench between the record and its relation managers.
      *
-     * Both visibilities are written by hand: an edit or delete button asks
-     * `getEditAuthorizationResponse()` / `getDeleteAuthorizationResponse()`,
-     * which go straight to the policy, and the resource's `canEdit()` and
-     * `canDelete()` — where `permissions.update` and the orphan rule live — are
-     * never on that path. The modal description is the table's own, because a
-     * delete takes the grants with it below Eloquent and this is the last moment
-     * anybody is told.
+     * Written out rather than appended to `parent::content()`, because a
+     * `Schema` has no "add one more" — `components()` replaces. The parent's two
+     * branches are kept as they are, including the one where relation managers
+     * are combined into tabs with the content: there the bench rides inside the
+     * content tab, by `getContentTabComponent()`, so an installation that turns
+     * that on does not silently lose it.
+     */
+    public function content(Schema $schema): Schema
+    {
+        if ($this->hasCombinedRelationManagerTabsWithContent()) {
+            return $schema->components([$this->getRelationManagersContentComponent()]);
+        }
+
+        return $schema->components([
+            $this->getInfolistContentComponent(),
+            ...$this->bench(),
+            $this->getRelationManagersContentComponent(),
+        ]);
+    }
+
+    public function getContentTabComponent(): Tab
+    {
+        return parent::getContentTabComponent()->schema([
+            $this->getInfolistContentComponent(),
+            ...$this->bench(),
+        ]);
+    }
+
+    /**
+     * The test bench: `explain()` asked the way the application asks it, with a
+     * real account and — when the permission has a model — a real row.
+     *
+     * On the page since 3.0, and no longer in a modal. The reason the modal
+     * carried is gone: it was there for the searchable select, which any schema
+     * gives, and what it cost was the whole shape of using this thing. Every
+     * submit threw the question away, so changing only the record meant finding
+     * the account again — and the answer arrived as a notification, beside the
+     * screen rather than under the question it answers.
+     */
+    public function probeForm(Schema $schema): Schema
+    {
+        return $schema
+            ->statePath('ask')
+            ->components([
+                Section::make(__('filament-warden::ui.resources.permissions.probe.label'))
+                    ->icon(Heroicon::OutlinedBeaker)
+                    ->description(__('filament-warden::ui.resources.permissions.probe.description'))
+                    ->columns(3)
+                    ->schema([
+                        Select::make('account')
+                            ->label(__('filament-warden::ui.resources.permissions.probe.account'))
+                            ->required()
+                            ->searchable()
+                            ->getSearchResultsUsing($this->accounts(...))
+                            ->getOptionLabelUsing(static fn (mixed $value): ?string => self::accountLabel($value)),
+
+                        TextInput::make('record')
+                            ->label(__('filament-warden::ui.resources.permissions.probe.record'))
+                            ->helperText(__('filament-warden::ui.resources.permissions.probe.record_help'))
+                            ->visible(fn (): bool => $this->getRecord()->getAttribute('entity_type') !== null),
+
+                        SchemaActions::make([
+                            Action::make('ask')
+                                ->label(__('filament-warden::ui.resources.permissions.probe.submit'))
+                                ->icon(Heroicon::OutlinedBeaker)
+                                ->action(function (): void {
+                                    $this->answer();
+                                }),
+                        ])->key('bench')->verticallyAlignEnd(),
+                    ]),
+
+                Section::make(__('filament-warden::ui.resources.permissions.probe.answer'))
+                    ->icon(Heroicon::OutlinedChatBubbleLeftRight)
+                    // A card that is not there is the honest empty state: the
+                    // question has not been asked, so there is nothing to say
+                    // and nothing to leave stale under the next question.
+                    ->visible(fn (): bool => $this->answered !== null)
+                    ->schema([
+                        TextEntry::make('verdict')
+                            ->hiddenLabel()
+                            ->badge()
+                            ->color(fn (): string => match ($this->answered['status'] ?? '') {
+                                'granted' => 'success',
+                                'forbidden' => 'danger',
+                                default => 'warning',
+                            })
+                            ->state(fn (): string => $this->answered['verdict'] ?? ''),
+
+                        TextEntry::make('summary')
+                            ->hiddenLabel()
+                            ->state(fn (): string => $this->answered['summary'] ?? ''),
+
+                        ...$this->rows(),
+                    ]),
+            ]);
+    }
+
+    /**
+     * Two actions, and both visibilities are written by hand.
+     *
+     * An edit or delete button asks `getEditAuthorizationResponse()` /
+     * `getDeleteAuthorizationResponse()`, which go straight to the policy, and
+     * the resource's `canEdit()` and `canDelete()` — where `permissions.update`
+     * and the orphan rule live — are never on that path. The modal description
+     * is the table's own, because a delete takes the grants with it below
+     * Eloquent and this is the last moment anybody is told.
      *
      * @return array<int, Action>
      */
@@ -157,8 +286,6 @@ class ViewPermission extends ViewRecord
             DeleteAction::make()
                 ->modalDescription(static fn (Model $record): string => PermissionsTable::warning($record))
                 ->visible(fn (Model $record): bool => PermissionResource::canDelete($record)),
-
-            ...$this->probe(),
         ];
     }
 
@@ -172,86 +299,104 @@ class ViewPermission extends ViewRecord
     }
 
     /**
-     * The test bench: `explain()` asked the way the application asks it, with a
-     * real account and — when the permission has a model — a real row.
+     * Whether the bench is on the page at all.
      *
-     * It lives in a modal rather than on the page because that is where Filament
-     * gives a searchable select for free, and an installation's account table can
-     * be very large. The answer comes back as a notification that stays put.
-     *
-     * @return array<int, Action>
+     * Two conditions and neither is the other: `permissions.probe` is a choice
+     * an installation makes, and an account model that does not resolve is a
+     * question nobody could put — the select would have nothing to search.
      */
-    private function probe(): array
+    /**
+     * @return array<int, Component>
+     */
+    private function bench(): array
     {
-        if (! Config::enabled('permissions.probe') || Columns::authorityModel() === null) {
-            return [];
-        }
-
-        return [
-            Action::make('probe')
-                ->label(__('filament-warden::ui.resources.permissions.probe.label'))
-                ->icon(Heroicon::OutlinedBeaker)
-                ->modalSubmitActionLabel(__('filament-warden::ui.resources.permissions.probe.submit'))
-                ->schema([
-                    Select::make('account')
-                        ->label(__('filament-warden::ui.resources.permissions.probe.account'))
-                        ->required()
-                        ->searchable()
-                        ->getSearchResultsUsing($this->accounts(...))
-                        ->getOptionLabelUsing(static fn (mixed $value): ?string => self::accountLabel($value)),
-
-                    TextInput::make('record')
-                        ->label(__('filament-warden::ui.resources.permissions.probe.record'))
-                        ->helperText(__('filament-warden::ui.resources.permissions.probe.record_help'))
-                        ->visible(fn (): bool => $this->getRecord()->getAttribute('entity_type') !== null),
-                ])
-                ->action(function (array $data): void {
-                    $this->answer($data);
-                }),
-        ];
+        return Config::enabled('permissions.probe') && Columns::authorityModel() !== null
+            ? [EmbeddedSchema::make('probeForm')]
+            : [];
     }
 
     /**
-     * @param  array<mixed>  $data
+     * The four rows under the summary, each of which is absent rather than empty
+     * when the store had nothing to put in it.
+     *
+     * A row with no content is a promise the answer did not make: a grant with
+     * no conditions has no rule, a direct grant has no role to reach through,
+     * and a grant with no date does not end. Drawing an em dash in those slots
+     * would say "we looked and found nothing", which is only true of one of the
+     * three.
+     *
+     * @return array<int, Component>
      */
-    private function answer(array $data): void
+    private function rows(): array
     {
+        $rows = [
+            'note' => 'filament-warden::ui.probe.narrowed_label',
+            'rule' => 'filament-warden::ui.explain.matched',
+            'via' => 'filament-warden::ui.resources.permissions.probe.via',
+            'until' => 'filament-warden::ui.resources.permissions.probe.until',
+            'reach' => 'filament-warden::ui.resources.permissions.probe.reach',
+        ];
+
+        $components = [];
+
+        foreach ($rows as $key => $label) {
+            $components[] = TextEntry::make($key)
+                ->label(__($label))
+                ->visible(fn (ViewPermission $livewire): bool => ($livewire->answered[$key] ?? null) !== null)
+                ->state(fn (ViewPermission $livewire): string => (string) ($livewire->answered[$key] ?? ''));
+        }
+
+        return $components;
+    }
+
+    /**
+     * Ask the store, and word the answer once.
+     *
+     * The reach is worked out here and nowhere else: one `whereCan()` costs a
+     * handful of queries with no cache and no memo, so it happens when somebody
+     * asks and never on a render.
+     */
+    private function answer(): void
+    {
+        /** @var array<string, mixed> $data */
+        $data = $this->getSchema('probeForm')?->getState() ?? [];
+
         $account = self::account($data['account'] ?? null);
+
+        // Unreachable from the page, and kept anyway. The select validates its
+        // value with `getInValidationRuleValues()`, which for a single
+        // searchable field calls `getOptionLabel()` — this class's own
+        // `accountLabel()`, resolving through the same `account()` — and returns
+        // an empty list when it comes back blank, so `getState()` above throws
+        // before this line for any key nobody could pick. Measured: a probe set
+        // to a key that names no row never enters this method's body past the
+        // validation.
+        //
+        // What it still answers is the race the validation cannot: the row
+        // going away between that check and this one, two queries apart. And
+        // without it `Probe::run()` would be handed a `?Model`, which is the
+        // other reason it is not a comment.
+        if (! $account instanceof Model) {
+            return; // @codeCoverageIgnore
+        }
+
         $record = $data['record'] ?? null;
 
-        // The select validates against its own options, so an account that does
-        // not resolve is one whose row went away between opening the modal and
-        // submitting it. There is nothing to answer, and nothing to say.
-        if ($account instanceof Model) {
-            $this->tell(
-                Probe::run(
-                    $account,
-                    $this->getRecord(),
-                    is_string($record) && $record !== '' ? $record : null,
-                ),
-                Reach::of($this->getRecord(), $account),
-            );
-        }
-    }
+        $probe = Probe::run(
+            $account,
+            $this->getRecord(),
+            is_string($record) && $record !== '' ? $record : null,
+        );
 
-    /**
-     * The verdict, and — where it can be counted — how far it reaches.
-     *
-     * The reach is worked out here and nowhere else: one `whereCan()` is seven
-     * queries with no cache, so it happens when somebody asks and never on a
-     * render.
-     */
-    private function tell(Probe $probe, Reach $reach): void
-    {
-        Notification::make()
-            ->title(__('filament-warden::ui.stances.'.$probe->verdict->value))
-            ->body(mb_trim($probe->summary.' '.($probe->note ?? '').' '.$reach->sentence()))
-            ->status(match ($probe->verdict->value) {
-                'granted' => 'success',
-                'forbidden' => 'danger',
-                default => 'warning',
-            })
-            ->persistent()
-            ->send();
+        $this->answered = [
+            'status' => $probe->verdict->value,
+            'verdict' => (string) __('filament-warden::ui.stances.'.$probe->verdict->value),
+            'summary' => $probe->summary,
+            'note' => $probe->note,
+            'rule' => $probe->rule,
+            'via' => $probe->via,
+            'until' => $probe->until,
+            'reach' => Reach::of($this->getRecord(), $account)->sentence(),
+        ];
     }
 }
