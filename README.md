@@ -110,6 +110,53 @@ php artisan filament:assets
 
 > 💡 **Tip:** Add `php artisan filament:assets` to Composer's `post-autoload-dump` so it runs on every deploy.
 
+### Upgrading to 3.0 from 2.x
+
+`filament-warden 3.x` requires `elpandape/warden ^3.0`. **Run warden's migration before anybody
+uses the panel**, then re-copy the assets: this release changed both `grid.blade.php` and the
+stylesheet, and it ships a screen the panel did not have.
+
+```bash
+# 1. Both packages together — the floor is a major on warden's side
+composer require elpandape/warden:^3.0 elpandape/filament-warden:^3.0
+
+# 2. Publish and run warden's UPGRADE migration for THIS major.
+#    Not `warden-migrations`, which is the CREATE migration and stops on
+#    tables you already have; not `-v2`, which is the previous one.
+php artisan vendor:publish --tag=warden-migrations-v3
+php artisan migrate
+
+# 3. Re-copy the assets. Not optional: the stylesheet and the script both moved
+php artisan filament:assets
+
+# 4. Check the store, and ask warden's own doctor
+php artisan filament-warden:audit --check
+php artisan warden:doctor
+```
+
+`upgrade_warden_to_v3` adds one nullable `expires_at` column to **both** pivots — `grants` and
+`assigned_roles` — with an index, and asks before each step, so a run interrupted halfway finishes
+on the next one. Nothing is backfilled and nothing changes meaning: every existing row has no end
+date, which is what every existing row already meant.
+
+**Four things to look at afterwards, none of them urgent:**
+
+- **Published views have to be reintegrated.** `grid.blade.php` grew two marks, a date control and
+  a close button; a published copy from 2.x renders the 3.0 payload without any of them, and the
+  clock and link marks simply will not appear.
+- **Published translations arrive in English until you copy the new keys across.**
+  `FileLoader::loadNamespaceOverrides()` merges recursively, so a stale copy does not swallow the
+  new keys — it just does not translate them. Nothing was renamed in this release, so no key has to
+  be moved.
+- **A published config does not have the new keys, and that is handled.** `permissions.direct` and
+  `grid.expiry` fall back to the packaged defaults through this package's own accessor, which is why
+  it never reads `config()` bare. `permissions.direct` is `false` there, so the new direct-grants
+  tab does not appear until you decide it should.
+- **`filament-warden:audit` grew two buckets.** *Rows whose condition can never be true* turns
+  `--check` red — warden refuses to write new ones, so anything listed predates that and has been
+  authorising nothing. *Rows past their end date* is informational and will be empty on the day you
+  upgrade, since nothing could have set a date before there was a column.
+
 ### Upgrading to 2.0 from 1.x
 
 `filament-warden 2.x` requires `elpandape/warden ^2.2.2`, and the jump to warden 2.x is the whole reason `2.0.0` was a major. **Run warden's migration before anybody uses the panel.**
@@ -627,12 +674,26 @@ title and their class name, in both readings at once, and says how many matched.
 
 ### Permission Inspector
 
-Click any cell to see:
-- **Cause**: Why does this cell have this value?
-- **Permission**: Which specific rule decided it
-- **Role**: Which role it came from
+Click any cell and a panel opens beside the matrix — 30rem of it, pushing the grid rather than
+covering it, so you can keep clicking cells and it keeps answering. Escape or the close button
+shuts it and hands the focus back to the cell that opened it. Below 64rem it becomes a sheet
+against the bottom of the screen.
 
-> 🔍 The inspector is queried on demand (not automatically) to avoid hundreds of queries.
+It says:
+- **Cause**: why this cell answers what it answers
+- **Permission**: which rule decided it
+- **Role**: which role it came from, and — when the answer arrives through a role this one inherits
+  — which of them
+- **Ends on**: when the grant that answered runs out, and what happens after
+- **The rule**, when there is one, read out as it will be evaluated
+
+> 🔍 It is queried on demand, never on render. One `explain()` is three to five queries with no
+> cache, so a grid of thirty-five cells explaining itself on sight would be a hundred and fifty.
+
+> ⏳ **The date is set here too, on a granted cell.** Not on a prohibition — warden refuses one
+> outright, `until(null)` included — and not on a cell with no rule of its own to date. Each of the
+> three noes is a different sentence rather than one greyed control, and an installation can close
+> the whole thing with `grid.expiry`, which says so as a fourth.
 
 ### Cell Reach
 
@@ -684,8 +745,15 @@ Lists the `permissions` **table** — the rows warden has actually created — a
 
 - **Provenance**: derived from a policy, loose, the wildcard, or an entity nothing declares any more
 - **Reach**: every row, only what the account owns, with conditions — or **one record only**, when the row is pinned to a single record
-- **Holders**: how many roles hold it, with denials counted apart
-- **Test bench**: ask warden about a real account, from the screen
+- **Held by**: roles, accounts and denials, counted apart, from one grouped query per page
+- **Health**: whether the row's condition can ever be true. Warden refuses to write a new one that
+  cannot, so anything listed here predates that and has been authorising nothing
+- **Test bench**: ask warden about a real account, on the page rather than in a modal — the account
+  stays put between questions, so comparing two records costs one field
+
+The view screen adds what the listing cannot afford per row: the rule as it will be evaluated, how
+many of its grants end and how many already have, and **Grant to an account** — the direct write,
+with a date, whose way back is the [direct-permissions tab](#grant-a-permission-straight-to-an-account).
 
 > ℹ️ **On a fresh install this screen is empty, and that is correct.** Warden creates a permission row the first time something is granted, so nothing exists until you hand something out. The roles screen is the one that shows the whole catalogue derived from your policies, row or no row. To see the catalogue itself — without opening a screen, and whether or not it has a row yet — run [`filament-warden:catalog`](#catalog-command).
 
@@ -735,6 +803,9 @@ It writes nothing, and reports eleven things:
 - **grants and role assignments past their end date** — *informational: this one never turns `--check` red*. Not a defect and not something anybody did: a date arrived, and warden stopped reading the row without touching it. They are not inert, though — a dead row still follows its permission or its role down a foreign key, so it still blocks a delete under `roles.delete => 'unassigned'` and still locks a name under `permissions.update => 'loose'`, both deliberately. `warden:clean --expired` removes them;
 - **roles assigned to other roles while `warden.roles.nested` is off** — *informational, and the only bucket here that reports something which is not a defect: it is what a SWITCH would do.* Such an edge has always been writable and has always granted nothing, so an installation can have collected them without knowing — and turning the flag on is what makes them live, so a grant somebody wrote years ago as a no-op becomes access on the next check. Warden's own upgrade note asks for this count before you flip it. With nesting on the list is empty by definition;
 - **catalogue rows whose condition can never be true** — a boolean value against a column the model does not cast to `bool`, or the reverse. As a grant they authorise nothing; as a prohibition they are inert, and the grant they were written to narrow keeps applying. Warden 3.0 refuses to write new ones, so this bucket only ever shrinks — which is why it is red rather than informational: correcting the condition or adding the cast empties it, and nothing can refill it;
+- **permissions restricted to what the holder owns, on a model that resolves no ownership** — they grant nothing and forbid nothing: there is no attribute to compare, and the query side fails closed. `Warden::ownedVia()` is what registers it, or the row comes out;
+- **warden's catalogue still in its pre-2.0 shape** — no `identity_key` column, so the first permission anybody saves fails. It turns `--check` red on purpose and stays permanently empty once migrated, which is what it is for: a deploy pipeline should learn this before the deploy, not after;
+- **config entries this package reads and cannot use** — each one was dropped in silence, so what is missing from a screen never said why;
 - **grants and role assignments whose authority no longer exists** — *informational, like the permissions-the-catalogue-declares-that-no-grant-points-at bucket above (third bullet): this one never turns `--check` red either*. Warden's schema puts a foreign key on `assigned_roles.role_id` and on `grants.permission_id`, never on the two columns that name a grant's authority, so no database cascade reaches them. Warden 2.0 sweeps some: `CacheInvalidations::markCascade()` deletes the grants of a deleted role, but only when the model's class is exactly the configured role class — an account, a role subclass, and anything deleted by query builder or raw SQL are all left behind, because it hangs off `eloquent.deleted`. `warden:clean --stranded` sweeps the rest — both pivots since warden 3.0, because nesting let `assigned_roles` hold an edge whose authority is a role — and it is opt-in. This bucket reports what is left over. Reported once per stranded authority — the deduplicated `type:key` a whole cluster of grants can share — and once per authority type this installation cannot even resolve.
 
 `--check` returns 1 for every finding above except the two informational ones.
@@ -1006,15 +1077,15 @@ Two different kinds of thing are in that list, and both matter for the same reas
 |---|---|
 | Permission prefixes | `page:`, `widget:`, `panel:` and `PermissionName`, which mints them and reads them back |
 | Plugin | `FilamentWardenPlugin`, its ID `filament-warden`, and its six methods: `make()`, `getId()`, `register()`, `boot()`, `roles()`, `permissions()` |
-| Fields | `PermissionGrid`, `PermissionGridEntry`, `ConditionBuilder`, `RoleAssignment`, the `{stances, narrowing, baseline}` state envelope a form receives — adding a key to it is a minor — and the key `RoleAssignment` keeps beside its own list, `__filament_warden_roles_baseline`, which sits in your page's state array |
+| Fields | `PermissionGrid`, `PermissionGridEntry`, `ConditionBuilder`, `RoleAssignment`, the `{stances, narrowing, until, inherited, baseline}` state envelope a form receives — adding a key to it is a minor — and the key `RoleAssignment` keeps beside its own list, `__filament_warden_roles_baseline`, which sits in your page's state array |
 | Relation managers | `RolesRelationManager` and `PermissionsRelationManager`'s class names — a consuming application's own `UserResource::getRelations()` stores them by name, so renaming either breaks every installation that attached it |
 | Traits | `AuthorizesPageAccess`, `AuthorizesWidgetView`, `AccessesPanels` |
 | Authorization | `WardenPolicy`, `Access` |
 | Catalog | `Catalog` and its seven public methods — `for()`, `relationManagers()`, `resourceClasses()`, `pageClasses()`, `widgetClasses()`, `union()`, `forget()` — plus `Entry` and its `key()`, `Origin`, `Scope` |
 | Guard | `PanelIsOpen` |
-| Config | Every key path of `config/filament-warden.php` — all 27 of them, each pinned with the shape it holds. The pin stops at a key whose value is a list or an empty array: what goes inside those is your data, not our schema |
+| Config | Every key path of `config/filament-warden.php` — all 29 of them, counted against the file rather than remembered, each pinned with the shape it holds. The pin stops at a key whose value is a list or an empty array: what goes inside those is your data, not our schema |
 | Translations | Every key path of `lang/*/ui.php`, in both locales |
-| Commands | `filament-warden:assign`, `filament-warden:audit` and `filament-warden:catalog`, with their arguments |
+| Commands | `filament-warden:assign`, `filament-warden:audit` and `filament-warden:catalog`, with their arguments and, for `audit`, its `--check` option |
 
 **Adding to one of these — a translation key, a config key, a key in the grid's state envelope — is a minor, not a major**: nothing you wrote stops working. Only removing or renaming one is a break. Both pins list every path and compare in order, so on our side an addition also turns the build red — deliberately, so that a new key is a line somebody typed on purpose rather than a diff nobody read.
 

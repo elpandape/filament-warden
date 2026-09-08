@@ -251,3 +251,23 @@ test('a row still ahead of its date is not counted as expired', function (): voi
     // installation and mean nothing.
     expect(Audit::of([Filament::getPanel('test')])->expired)->toBeEmpty();
 });
+
+test('the README names every bucket this class carries, and none it does not', function (): void {
+    $readme = (string) file_get_contents(dirname(__DIR__, 2).'/README.md');
+
+    $section = mb_substr(
+        $readme,
+        (int) mb_strpos($readme, '### Audit'),
+        (int) mb_strpos($readme, '### Catalog Command') - (int) mb_strpos($readme, '### Audit'),
+    );
+
+    $bullets = preg_match_all('/^- \*\*/m', $section);
+
+    // Counted rather than matched by wording: the sentences are prose and are
+    // meant to read differently from the translated ones the command prints.
+    // What the count catches is a bucket added to the class and never written
+    // down — three of them had gone unlisted before this test existed, and the
+    // section reads perfectly well without them, which is exactly why nobody
+    // noticed.
+    expect($bullets)->toBe(count(declaredBuckets()));
+});

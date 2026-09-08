@@ -327,7 +327,7 @@ return [
     'console' => [
         'audit' => [
             'unknown_panel' => 'No hay ningún panel con el id [:panel].',
-            'unmigrated' => 'El catálogo de warden sigue en su forma anterior a la 2.0: no tiene columna `identity_key`. Publica y ejecuta la migración de warden —`php artisan vendor:publish --tag=warden-migrations-v2` y después `php artisan migrate`— o el primer permiso que alguien guarde fallará. Si la migración se para en duplicados, ejecuta antes `php artisan warden:clean --duplicates`.',
+            'unmigrated' => 'El catálogo de warden sigue en su forma anterior a la 2.0: no tiene columna `identity_key`. Publica y ejecuta la migración de warden —`php artisan vendor:publish --tag=warden-migrations-v2` y después `php artisan migrate` (y `--tag=warden-migrations-v3` a continuación, para la columna de la 3.x)— o el primer permiso que alguien guarde fallará. Si la migración se para en duplicados, ejecuta antes `php artisan warden:clean --duplicates`.',
             'open' => 'Pantallas que no deciden quién entra. Filament contesta que sí por ellas, así que están abiertas a cualquiera que llegue al panel.',
             'unpoliced' => 'Recursos cuyo modelo no tiene Policy. Es el caso en el que Filament falla abierto.',
             'orphans' => 'Permisos a los que no apunta ninguna concesión. Nada los consulta. Quien los borra es `warden:clean`.',

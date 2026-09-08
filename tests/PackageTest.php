@@ -183,8 +183,16 @@ test('the publish tag the upgrade tells people to run is the one that ships the 
 
     $provider = (string) file_get_contents($root.'/vendor/elpandape/warden/src/WardenServiceProvider.php');
 
+    // The stub for THIS major, read off warden's own provider rather than typed
+    // a second time. The v2.0.2 release is why: the note said
+    // `warden-migrations`, which ships the CREATE and not the upgrade, and
+    // `create_warden_tables` has no `hasTable` guard — so on the only kind of
+    // installation the note is written for, `migrate` stopped on the first table
+    // and `identity_key` never arrived. The lesson generalises past that tag:
+    // every major ships a new one, and the day warden renames it, the three
+    // places that print it go red together instead of quietly ageing.
     $upgrade = preg_match(
-        "/upgrade_warden_to_v2\.php\.stub.*?\], '([a-z0-9-]+)'/s",
+        "/upgrade_warden_to_v3\.php\.stub.*?\], '([a-z0-9-]+)'/s",
         $provider,
         $parts,
     );

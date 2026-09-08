@@ -8,6 +8,126 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [3.0.0] - 2026-09-07
+
+Warden 3.0 gave both pivots an end date, roles the ability to inherit roles, and a doctor that
+names a rule which can never be true. This release is the panel catching up: a grant can now be
+handed out with a date and the date is drawn where it applies, an inherited cell says which role
+answers it, and the two ways a permission reaches an account — through a role, and straight to the
+account — finally have a screen each.
+
+The screens moved with it. The inspector is a panel that opens beside the matrix and pushes it
+rather than sitting between a cell and its explanation; the permission's test bench left its modal
+for the page it belongs on; and the permission form reads left to right with what a row costs
+beside it.
+
+### Breaking
+
+- **`elpandape/warden` floors at `^3.0`.** The whole reason this is a major. Warden's own upgrade
+  migration adds `expires_at` to `grants` and `assigned_roles`; run it before anybody opens the
+  panel. See *Upgrading to 3.0 from 2.x* in the README.
+- **The field's envelope gained two keys**, in this order: `{stances, narrowing, until, inherited,
+  baseline}`. `until` carries the end date the grid may write, `inherited` says which role answers
+  a cell this role does not hold itself. Both are read back through `RoleState`, and `FrozenTest`
+  pins the shape — a host that composes the payload by hand has to add them, and an envelope
+  missing `until` reads as "this screen has no opinion" rather than as "clear every date", which is
+  the safe half of that distinction.
+- **`Grants\Assignment::give()` takes a third argument.** `?DateTimeInterface $until = null`,
+  defaulted so every existing caller keeps meaning "held, with no end".
+- **`Catalog\Audit` gained two buckets**, `unsatisfiable` and `expired`. The first is in
+  `isClean()` and turns `--check` red; the second is informational. Anything reading `Audit`'s
+  constructor positionally has to move.
+- **A published `grid.blade.php` has to be reintegrated.** It grew two marks, a date control and a
+  close button; a 2.x copy renders the 3.0 payload without any of them.
+- **No translation key was renamed or removed.** Ninety were added, in both locales — 245 to 335,
+  counted against `main` rather than remembered — and a published copy receives them in English
+  until somebody copies them across.
+
+### Added
+
+- **Expiry, everywhere warden now allows it.** The grid writes an end date on a granted cell and
+  refuses one on a prohibition, because `ForbidsPermissions::until()` throws unconditionally —
+  `null` included, which is why the two polarities are two chains rather than one with an argument.
+  A role's own *Hand out*, the account's relation manager, the permission's *Grant to an account*
+  and the new direct-permissions manager all carry the same field, and all of them call `until()`
+  BEFORE `to()`, since both writes execute on `to()`.
+- **A cell that ends draws a clock, and one that arrives through an inherited role draws a link.**
+  Both are elements rather than pseudo-elements, because a pseudo-element cannot carry a name and
+  each of these has a word said in the same list the cell already speaks.
+- **Nested roles, where warden allows them.** An *Inherits from* field on the role form, searched
+  in the server, excluding the role itself and everything that already reaches it — an edge either
+  of those would build is a cycle warden caps rather than throws on, leaving two roles quietly
+  holding less than they look like they hold. A *Hierarchy* section counts what a role reaches and
+  what reaches it. The whole walk is `RoleClosure`'s: called, never copied.
+- **Warden's doctor, on screen.** A *Health* column and a filter on the permission listing, an
+  error on the value rather than an amber warning on the form, and a red audit bucket. A rule that
+  can never be true authorises nothing as a grant and is inert as a prohibition — the grant it was
+  written to narrow keeps applying, which is the half that is not obvious.
+- **Direct permissions.** `PermissionsRelationManager`, off out of the box behind
+  `permissions.direct`, listing what an account holds without a role in between, with its polarity,
+  its reach and its date. Off by default because turning it on does not only show those grants: it
+  hands them out.
+- **The test bench moved onto the permission's page**, and its card grew three rows warden's own
+  explanation does not carry — the rule that matched (read off the twin that answered, never off
+  the row on screen), how the account reached it, and when the answer stops being this answer,
+  taken from whichever of the grant and the assignment ends first.
+- **The inspector is a panel with its own track.** It opens beside the matrix and pushes it, closes
+  on Escape or the button, and hands the focus back to the cell that opened it.
+- **Two audit buckets and `warden:doctor` in the README**, plus a `Direct permissions` section and
+  a nested-roles section saying why there is no `roles.nested` key here: it is warden's, it is part
+  of warden's cache key, and turning it on is not a write — an edge stored years ago as a no-op
+  becomes access on the next check.
+
+### Fixed
+
+- **A rule that can never be true is refused before it is written.** Typing `title = true` against
+  a text column used to leave `options = null`, which draws as "every row" and answers a class
+  check — so a rule meant to narrow a grant widened it instead. Under warden 2.2.2 the same write
+  was inert; the floor bump is what made it dangerous, and the guard is what closes it.
+- **An assignment the clock retired stopped counting as held.** Every read in `Grants\Assignment`
+  goes through `Expiry::live()`, so a lapsed row is invisible to the whole class — which is the
+  honest answer rather than a gap: the role is not held.
+- **The date control says why it is closed.** A disabled input keeps its label in the accessibility
+  tree and takes no focus, so a sentence beside it is read in browse mode and never in focus mode.
+  Pointed at from the input now, and only while there is a reason.
+
+### Not included
+
+- **`Cause::Expired`.** Warden has no such cause, so a lapsed grant still reads as `NoMatchingGrant`
+  and this package writes the sentence beside warden's own. Filed upstream; when warden adds one,
+  `Cause::of()` is a `from()` and will throw rather than go quiet, which is the failure mode wanted.
+- **A date on the `RoleAssignment` checkbox list.** A box cannot carry one and the field is frozen,
+  so it stays what it was and its help now says where the date is set instead.
+- **A context on the role relation manager's hand-out.** The plan asked for one; §6.21 already
+  settled it, and offering it would mint rows this very screen then refuses to take back —
+  `offers()` answers false for a restricted role, so the retract action and the checkbox would both
+  go quiet on a row somebody had just made.
+- **Paginated per-class holder tables on the two view screens.** Each figure opening its own table
+  needs `InteractsWithTable` and a page view of this package's own, since a Filament page has one
+  table and warden has no inverse relation from a permission towards accounts. Deferred with the
+  reason recorded rather than half-built.
+- **An expired badge on the roles relation manager.** There is nothing to badge: a lapsed
+  assignment is not held, so it is not in the table. The plan predicted a state warden had already
+  made impossible.
+
+### Measured
+
+Numbers here were measured against this tree on 2026-09-07 and nowhere else.
+
+- **The nine gates**: 1152 tests, 5535 assertions, 100 % of lines and 100 % of types, PHPStan at
+  `level: max` with no baseline on both runs — the runtime's and the floor's.
+- **The lowest dependency set installs and passes**: filament/filament 5.7.6, laravel/framework
+  13.20.0, livewire/livewire 4.3.4, all 1152 tests green. Worth checking rather than assuming: this
+  release uses `EmbeddedSchema`, `ViewRecord::content()` and `getContentTabComponent()`, and none of
+  the three was obviously in 5.7.
+- **Every cost bound re-measured**, by setting each cap to -1 and reading the number back. Three
+  test names carried a figure that had stopped being true — 25 → 26, 9 → 10, 17 → 19 — and the last
+  had one of headroom, so it was raised from 20 to 24.
+- **`Holders` still costs three queries** with the two expiry tallies folded into the pass it was
+  already running, where the permission screen used to pay for one of them separately.
+- **The flattened translation list regenerated from the language file and compared to the pin**:
+  335 keys, identical in order and content, zero drift across forty-four commits.
+
 ## [2.11.0] - 2026-09-07
 
 The grid keeps the width its own empty column used to waste, the key folds away above the tabs
