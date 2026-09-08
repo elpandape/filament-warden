@@ -41,22 +41,34 @@ final class RolesTable
      */
     public static function configure(Table $table): Table
     {
+        // Anotados: los dos viajan por referencia a varios cierres, y a
+        // `level: max` una variable capturada por referencia es `mixed` desde el
+        // segundo lector — cualquiera de ellos puede haberla escrito.
+        /** @var array<int|string, array{held: int, ending: int}>|null $heldCounts */
         $heldCounts = null;
+        /** @var array<int|string, int>|null $ruleCounts */
+        $ruleCounts = null;
         $assignedRoleIds = null;
         $inherits = null;
 
         return $table
             ->defaultSort('name')
             ->columns([
-                TextColumn::make('name')
-                    ->label(__('filament-warden::ui.resources.roles.columns.name'))
-                    ->searchable()
-                    ->sortable(),
-
+                // Una columna y no dos, como el boceto y como la tabla de
+                // permisos ya hacen: la fila se lee por cómo la gente LLAMA al
+                // rol, y el nombre de código va debajo en mono porque es lo que
+                // las concesiones apuntan. Dos columnas obligaban a mirar dos
+                // sitios para identificar una fila.
+                //
+                // Ordena y busca por el TÍTULO, que es lo que se ve; el nombre
+                // entra en la búsqueda igualmente, porque quien lo teclea sabe
+                // exactamente lo que busca.
                 TextColumn::make('title')
-                    ->label(__('filament-warden::ui.resources.roles.columns.title'))
-                    ->placeholder('—')
-                    ->toggleable(),
+                    ->label(__('filament-warden::ui.resources.roles.columns.role'))
+                    ->description(static fn (Model $record): string => self::nameOf($record))
+                    ->placeholder(static fn (Model $record): string => self::nameOf($record))
+                    ->searchable(['name', 'title'])
+                    ->sortable(),
 
                 // Neither sortable nor searchable: both fall back to the
                 // column's own name and would ask the database for a column
@@ -80,25 +92,54 @@ final class RolesTable
                         return (is_int($key) || is_string($key)) ? ($inherits[$key] ?? []) : [];
                     }),
 
+                // Cuántas reglas ha escrito el rol. Del mismo agrupado por página
+                // que los titulares y por el mismo motivo: una consulta por fila
+                // es lo que la v1.5.0 midió en 22 MB.
+                //
+                // Lo que ESCRIBIÓ y no lo que contesta: contestar exige resolver
+                // el catálogo entero por rol, que es el coste que esta tabla no
+                // puede pagar. Un rol con el comodín escribe una regla y contesta
+                // todas, y esa distinción la cuenta la rejilla, que es donde se
+                // ve.
+                TextColumn::make('rules')
+                    ->label(__('filament-warden::ui.resources.roles.columns.rules'))
+                    ->badge()
+                    ->color('gray')
+                    ->state(static function (Model $record) use (&$ruleCounts): int {
+                        // Estrechado en una local: a `level: max` una variable
+                        // capturada por referencia y leída desde más de un
+                        // cierre vuelve a ser `mixed` en cada lectura, porque
+                        // cualquiera de ellos pudo escribirla. El `@var` de la
+                        // declaración no alcanza; el de aquí sí.
+                        /** @var array<int|string, int> $counts */
+                        $counts = $ruleCounts ??= self::ruleCounts();
+
+                        $key = $record->getKey();
+
+                        return is_int($key) || is_string($key) ? ($counts[$key] ?? 0) : 0;
+                    }),
+
                 TextColumn::make('held')
                     ->label(__('filament-warden::ui.resources.roles.columns.held'))
                     ->badge()
                     ->state(static function (Model $record) use (&$heldCounts): int {
-                        $heldCounts ??= self::heldCounts();
+                        /** @var array<int|string, array{held: int, ending: int}> $counts */
+                        $counts = $heldCounts ??= self::heldCounts();
 
                         $key = $record->getKey();
 
-                        return (is_int($key) || is_string($key)) ? ($heldCounts[$key]['held'] ?? 0) : 0;
+                        return (is_int($key) || is_string($key)) ? ($counts[$key]['held'] ?? 0) : 0;
                     })
                     // Under the count and not beside it: it is a subset of the
                     // number above, so a second badge would read as a second
                     // population. Absent when there is none, rather than a zero
                     // nobody needs.
                     ->description(static function (Model $record) use (&$heldCounts): ?string {
-                        $heldCounts ??= self::heldCounts();
+                        /** @var array<int|string, array{held: int, ending: int}> $counts */
+                        $counts = $heldCounts ??= self::heldCounts();
 
                         $key = $record->getKey();
-                        $ending = (is_int($key) || is_string($key)) ? ($heldCounts[$key]['ending'] ?? 0) : 0;
+                        $ending = (is_int($key) || is_string($key)) ? ($counts[$key]['ending'] ?? 0) : 0;
 
                         return $ending === 0
                             ? null
@@ -202,6 +243,72 @@ final class RolesTable
         }
 
         return $labels;
+    }
+
+    /**
+     * How many rows each role has in `assigned_roles`, scoped, one row per
+     * role: a badge that informs keeps its scope, or it shows a number
+     * `retract()` from this screen could not act on.
+     *
+     * The aggregate is what bounds it — reducing in PHP answers the same
+     * question and hydrates the whole table, which a statement count cannot
+     * see. A holder restricted to a context counts like any other.
+     *
+     * `count(*)` is whatever the driver hands back and `AssignedRole` declares
+     * no casts, so it is narrowed with `is_numeric()` rather than assumed. The
+     * other values this class reads are keys, not aggregates, and take
+     * `is_int() || is_string()`.
+     *
+     * @return array<int|string, array{held: int, ending: int}>
+     */
+    /**
+     * El nombre de código de un rol, o nada si la fila no lo lleva.
+     *
+     * Leído con guarda porque la suite corre bajo `Model::shouldBeStrict()` y
+     * el modelo es el que la instalación configure: preguntar por una columna
+     * que no tiene lanza.
+     */
+    private static function nameOf(Model $record): string
+    {
+        $name = $record->getAttribute('name');
+
+        return is_string($name) ? $name : '';
+    }
+
+    /**
+     * Cuántas filas de `grants` ha escrito cada rol, en una consulta por página.
+     *
+     * Sin `Expiry::live()`: una concesión vencida SIGUE escrita, y esta columna
+     * cuenta lo que hay en la tienda, no lo que contesta hoy. Quitarla de aquí
+     * haría que un rol pareciera no tener nada mientras sus filas siguen ahí
+     * bloqueando su borrado.
+     *
+     * @return array<int|string, int>
+     */
+    private static function ruleCounts(): array
+    {
+        $counts = [];
+
+        $context = Context::resolve();
+
+        $rows = $context->grantClass()::query()
+            ->withoutGlobalScopes()
+            ->where('entity_type', new ($context->roleClass())()->getMorphClass())
+            ->select('entity_id')
+            ->selectRaw('count(*) as written')
+            ->groupBy('entity_id')
+            ->get();
+
+        foreach ($rows as $row) {
+            $key = $row->getAttribute('entity_id');
+            $written = $row->getAttribute('written');
+
+            if ((is_int($key) || is_string($key)) && is_numeric($written)) {
+                $counts[$key] = (int) $written;
+            }
+        }
+
+        return $counts;
     }
 
     /**

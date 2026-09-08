@@ -1899,3 +1899,49 @@ test('a role created with an inheritance keeps it, and does not drop it on the f
     // hook existed.
     expect(Hierarchy::of($outer)->direct)->toContain($inner->getKey());
 });
+
+test('a role is one column with its code name under it, not two to read across', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    makeRole('editor');
+
+    // Una columna y no dos, como la tabla de permisos ya hacía: la fila se lee
+    // por cómo la gente LLAMA al rol, y el nombre de código va debajo porque es
+    // lo que las concesiones apuntan. Con dos columnas había que mirar dos
+    // sitios para identificar una fila.
+    livewire(ListRoles::class)
+        ->assertSee('Editor')
+        ->assertSee('editor')
+        ->assertDontSee(__('filament-warden::ui.resources.roles.columns.name'));
+});
+
+test('the rules a role has written are counted from one query, not one per row', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    $role = makeRole('editor');
+    Warden::allow($role)->to('viewAny', roleClass());
+    Warden::allow($role)->to('view', roleClass());
+
+    // Lo que ESCRIBIÓ y no lo que contesta: contestar exige resolver el catálogo
+    // entero por rol, que es el coste que esta tabla no puede pagar. Un rol con
+    // el comodín escribe una regla y contesta todas, y esa distinción la cuenta
+    // la rejilla, que es donde se ve.
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    livewire(ListRoles::class)->assertSee('2');
+
+    $grouped = array_filter(
+        DB::getQueryLog(),
+        static fn (array $entry): bool => str_contains($entry['query'], 'group by')
+            && str_contains($entry['query'], 'entity_id'),
+    );
+
+    DB::disableQueryLog();
+
+    // Una agrupada para las reglas y otra para los titulares: dos por página,
+    // nunca dos por fila.
+    expect(count($grouped))->toBeLessThanOrEqual(2);
+});

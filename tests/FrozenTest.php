@@ -254,6 +254,8 @@ test('the translation keys an application overrides are frozen', function (): vo
         'resources.roles.fields.name_protected',
         'resources.roles.fields.title_help',
         'resources.roles.fields.title',
+        'resources.roles.columns.role',
+        'resources.roles.columns.rules',
         'resources.roles.columns.name',
         'resources.roles.columns.title',
         'resources.roles.columns.inherits',

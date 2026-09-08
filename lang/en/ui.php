@@ -28,6 +28,8 @@ return [
                 'title' => 'Title',
             ],
             'columns' => [
+                'role' => 'Role',
+                'rules' => 'Rules written',
                 'name' => 'Name',
                 'title' => 'Title',
                 'inherits' => 'Inherits from',
