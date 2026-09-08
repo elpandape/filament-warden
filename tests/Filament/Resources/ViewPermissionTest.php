@@ -8,6 +8,7 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Document;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Vault;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
+use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\Auth;
@@ -456,4 +457,95 @@ test('the bench survives relation managers folded into the content tab', functio
     livewire(CombinedTabsViewPermission::class, ['record' => $key])
         ->assertOk()
         ->assertSee('Ask the store');
+});
+
+test('a permission can be handed straight to an account, with an end date', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $holder = makeUser('Holder');
+    $row = makePermission('export-reports');
+
+    livewire(ViewPermission::class, ['record' => $row->getKey()])
+        ->callAction('give', [
+            'account' => $holder->getKey(),
+            'forbidden' => 0,
+            'until' => now()->addWeeks(2)->toDateString(),
+        ])
+        ->assertNotified();
+
+    $grant = Context::resolve()->grantClass()::query()
+        ->withoutGlobalScopes()
+        ->where('permission_id', $row->getKey())
+        ->where('entity_id', $holder->getKey())
+        ->firstOrFail();
+
+    expect($grant->getAttribute('forbidden'))->toBeFalsy()
+        ->and($grant->getAttribute('expires_at'))->not->toBeNull();
+});
+
+test('a prohibition is written without a date, because warden refuses one', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $holder = makeUser('Holder');
+    $row = makePermission('export-reports');
+
+    // The date is not merely hidden on this branch: `ForbidsPermissions::until()`
+    // throws unconditionally, `null` included, so a screen that passed one
+    // along — even an empty one — would 500 instead of writing.
+    livewire(ViewPermission::class, ['record' => $row->getKey()])
+        ->callAction('give', ['account' => $holder->getKey(), 'forbidden' => 1])
+        ->assertNotified();
+
+    $grant = Context::resolve()->grantClass()::query()
+        ->withoutGlobalScopes()
+        ->where('permission_id', $row->getKey())
+        ->where('entity_id', $holder->getKey())
+        ->firstOrFail();
+
+    expect($grant->getAttribute('forbidden'))->toBeTruthy()
+        ->and($grant->getAttribute('expires_at'))->toBeNull();
+});
+
+test('an authority that may not edit the row may not hand it out either', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+
+    $row = makePermission('export-reports');
+    $holder = makeUser('Holder');
+
+    // Reading is not handing out. Without `update` the button is not offered —
+    // and Filament refuses to mount an action it will not show, so the bare
+    // livewire pair writes nothing either.
+    livewire(ViewPermission::class, ['record' => $row->getKey()])
+        ->assertActionHidden('give')
+        ->call('mountAction', 'give', [])
+        ->call('callMountedAction', []);
+
+    expect(Context::resolve()->grantClass()::query()->withoutGlobalScopes()->where('entity_id', $holder->getKey())->count())->toBe(0);
+});
+
+test('the counts beside the button are re-read after a hand-out', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+    Warden::allow($user)->to('update', permissionClass());
+
+    $holder = makeUser('Holder');
+    $row = makePermission('export-reports');
+
+    // `Holders` memoises by instance, and the page keeps the same record across
+    // the write and the re-render — so without the forget the accounts figure
+    // would still be the one from before the button was pressed.
+    livewire(ViewPermission::class, ['record' => $row->getKey()])
+        ->assertSee('Accounts')
+        ->callAction('give', ['account' => $holder->getKey(), 'forbidden' => 0]);
+
+    expect(ElPandaPe\FilamentWarden\Grants\Holders::of($row->fresh() ?? $row)->accountCount)->toBe(1);
 });

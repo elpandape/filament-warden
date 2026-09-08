@@ -4,25 +4,34 @@ declare(strict_types=1);
 
 namespace ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages;
 
+use Carbon\CarbonImmutable;
 use ElPandaPe\FilamentWarden\Conditions\Columns;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\PermissionResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Tables\PermissionsTable;
 use ElPandaPe\FilamentWarden\Grants\Holders;
 use ElPandaPe\FilamentWarden\Grants\Probe;
 use ElPandaPe\FilamentWarden\Grants\Reach;
+use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Support\Config;
+use ElPandaPe\FilamentWarden\Support\Line;
+use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Facades\Filament;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Actions as SchemaActions;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
@@ -280,6 +289,8 @@ class ViewPermission extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            $this->give(),
+
             EditAction::make()
                 ->visible(fn (Model $record): bool => PermissionResource::canEdit($record)),
 
@@ -289,6 +300,20 @@ class ViewPermission extends ViewRecord
         ];
     }
 
+    /**
+     * Whether the toggle is on the forbidding side.
+     *
+     * Read through `filled()`-free comparison rather than a cast: the state
+     * arrives as the option key, which is an int on the way out of the browser
+     * and a bool on a default, and `(bool) '0'` is false while `(bool) 'false'`
+     * is true. Comparing against the two keys the field actually declares is
+     * the only reading that cannot drift from the options above it.
+     */
+    private static function forbidding(Get $get): bool
+    {
+        return in_array($get('forbidden'), [1, '1', true], true);
+    }
+
     private static function account(mixed $key): ?Model
     {
         $model = Columns::authorityModel();
@@ -296,6 +321,139 @@ class ViewPermission extends ViewRecord
         return $model === null || ! is_int($key) && ! is_string($key)
             ? null
             : $model::query()->whereKey($key)->first();
+    }
+
+    /**
+     * Asked twice on purpose — once for the button, once for the write.
+     */
+    private function mayGive(Model $record): bool
+    {
+        $account = Filament::auth()->user();
+
+        return $account instanceof Model && Access::granted($account, 'update', $record);
+    }
+
+    /**
+     * The way in from the permission: a grant straight to an account, with no
+     * role in between.
+     *
+     * `update` on the permission is what it asks for, and it is the same choice
+     * the role screen made for the same reason: handing this row out is changing
+     * who holds it, which is the power the edit screen already needs — and
+     * re-pointing a row somebody holds moves what they hold without touching a
+     * single grant of theirs, so that ability is already this heavy. `view`
+     * would let somebody who may only look hand out everything the row carries,
+     * and `create` would be a lie: nothing is created.
+     *
+     * The `visible()` is written by hand and checked again inside, because an
+     * action's authorization response goes straight to the policy through
+     * `Page::getDefaultActionAuthorizationResponse()` and never passes through
+     * the resource (§6.16, §6.23).
+     */
+    private function give(): Action
+    {
+        return Action::make('give')
+            ->label(__('filament-warden::ui.resources.permissions.grant.label'))
+            ->icon(Heroicon::OutlinedUserPlus)
+            ->modalDescription(__('filament-warden::ui.resources.permissions.grant.description'))
+            ->visible(fn (Model $record): bool => Columns::authorityModel() !== null && $this->mayGive($record))
+            ->schema([
+                Select::make('account')
+                    ->label(__('filament-warden::ui.resources.permissions.grant.account'))
+                    ->required()
+                    ->searchable()
+                    ->getSearchResultsUsing(static fn (string $search): array => self::accounts($search))
+                    ->getOptionLabelUsing(static fn (mixed $value): ?string => self::accountLabel($value)),
+
+                ToggleButtons::make('forbidden')
+                    ->label(__('filament-warden::ui.resources.permissions.grant.polarity'))
+                    ->inline()
+                    ->live()
+                    ->default(false)
+                    ->options([
+                        0 => __('filament-warden::ui.resources.permissions.grant.granted'),
+                        1 => __('filament-warden::ui.resources.permissions.grant.forbidden'),
+                    ])
+                    ->colors([0 => 'success', 1 => 'danger'])
+                    // `Line::of()` and not `__()`: the latter is declared
+                    // `array|string`, which a closure typed `?string` cannot
+                    // return at level max.
+                    ->helperText(static fn (Get $get): ?string => self::forbidding($get)
+                        ? Line::of('filament-warden::ui.resources.permissions.grant.forbidden_help')
+                        : null),
+
+                DatePicker::make('until')
+                    ->label(__('filament-warden::ui.resources.permissions.grant.until'))
+                    ->helperText(__('filament-warden::ui.resources.permissions.grant.until_help'))
+                    // Today is not in the future and warden reads the boundary
+                    // exclusively: a row stops counting AT the instant it names,
+                    // so a date of today would write something already over.
+                    ->after('today')
+                    // Not merely hidden: a prohibition CANNOT carry one.
+                    // `ForbidsPermissions::until()` throws unconditionally —
+                    // `null` included — so there is no date to offer and no way
+                    // to pass one along. The reason is said above the toggle
+                    // rather than left as a field that quietly disappeared.
+                    ->visible(static fn (Get $get): bool => ! self::forbidding($get)),
+            ])
+            ->action(function (Model $record, array $data): void {
+                /** @var array<string, mixed> $data */
+                // The second of two, and the first is the `visible()` above.
+                // Unreachable while that one is right — Filament refuses to
+                // mount an action it will not show — and kept for the day
+                // somebody edits one without the other (§6.24).
+                if (! $this->mayGive($record)) {
+                    return; // @codeCoverageIgnore
+                }
+
+                $this->write($record, $data);
+            });
+    }
+
+    /**
+     * The write, through the fluent API and in warden's own order.
+     *
+     * `until()` before `to()`, because a grant executes ON `to()` and warden
+     * throws rather than let a date be added afterwards — and `until(null)`
+     * rather than skipping the call, so a row whose earlier grant lapsed has its
+     * date moved instead of being found dead and left alone.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function write(Model $record, array $data): void
+    {
+        $account = self::account($data['account'] ?? null);
+
+        if (! $account instanceof Model) {
+            return; // @codeCoverageIgnore
+        }
+
+        $until = $data['until'] ?? null;
+        $forbidding = in_array($data['forbidden'] ?? false, [1, '1', true], true);
+
+        if ($forbidding) {
+            Warden::forbid($account)->to($record);
+        } else {
+            Warden::allow($account)
+                ->until(is_string($until) && $until !== '' ? CarbonImmutable::parse($until) : null)
+                ->to($record);
+        }
+
+        // The counts on this page are read per render and `Holders` memoises by
+        // instance, so the figures beside the button would still be the ones
+        // from before the write.
+        Holders::forget($record);
+
+        Notification::make()
+            ->title(__('filament-warden::ui.resources.permissions.grant.done'))
+            // Both keys written out rather than composed: a key built by
+            // concatenation is one `LanguageTest` cannot see being read, and a
+            // sentence nothing reads is how a translation goes stale in silence.
+            ->body($forbidding
+                ? Line::of('filament-warden::ui.resources.permissions.grant.done_forbidden', ['account' => Holders::label($account)])
+                : Line::of('filament-warden::ui.resources.permissions.grant.done_granted', ['account' => Holders::label($account)]))
+            ->success()
+            ->send();
     }
 
     /**
