@@ -8,6 +8,65 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [3.1.0] - 2026-09-08
+
+The inspector stops taking the grid's width. 3.0.0 shipped it as a column that pushes, and pushing
+turned out to be the worse of the two costs: measured on a real Filament panel, the matrix fell
+from 1008px to 512 — half of what a permission grid needs — to hand 480 to something that most of
+the time says one sentence.
+
+It is now a bar below the matrix. Collapsed it is one line; expanded it takes the whole width, and
+that is the point rather than a side effect.
+
+### Fixed
+
+- **The condition builder was drawn one character wide.** `.fw-conditions` is a two-column grid —
+  the rule on the left, what the rule MEANS on the right — and it had no stacked reading at any
+  width. That was fine while it only ever ran at full width on the permission's own screen; inside
+  the 30rem panel the first track took 414px and the second computed to **zero**, so the note
+  rendered fifteen pixels wide and five hundred tall. It did not overflow and it was not clipped:
+  it was drawn, and unreadable, which is worse than missing. Below 52rem it stacks now, and at full
+  width the two tracks measure 544px and 398px.
+- **The create screen dropped the inheritance it offered.** The *Inherits from* select was drawn,
+  filled in, and its picks went nowhere: the field is `dehydrated(false)` — correctly, the edges are
+  rows in `assigned_roles` and not columns on the record — so only `EditRole` had a hook that read
+  it back. A role could be created inheriting three roles and be born inheriting none, with no error
+  and no notice.
+
+### Changed
+
+- **The inspector is a bar below the grid, not a column beside it.** Collapsed: the glyph, the cell,
+  and what the store answers plus the date. `Customise` expands it to the full width. Stuck to the
+  bottom while collapsed — a cell in row 3 of forty opens an answer that would otherwise be off
+  screen — and static once expanded, because it stops being a footnote. Closing still hands the
+  focus back to the cell that opened it.
+- **The role's edit screen matches the approved sketch.** Identity and inheritance side by side,
+  their two cards reaching the same bottom, the identity fields stacked while it is half-width, and
+  the resolved chain under the select. The page says under its title how many accounts hold the role
+  and how many roles inherit it.
+- **The grid says what it answers as a whole**, above the matrix: granted, forbidden, narrowed,
+  ending, inherited. The last three are what 3.0 added and without this line they were only visible
+  by hovering every cell. Counted from what the cells ANSWER, never from what was written.
+- **The entity filter looks like a field.** It had no CSS at all: the browser drew a bare input and
+  it read as loose text rather than as something you can type in.
+
+### Added
+
+- Four translation keys in both locales — `resources.roles.reach.*` for the subheading — and two
+  more, `explain.expand` and `explain.collapse`, for the bar's own toggle. A published copy receives
+  them in English until somebody copies them across; nothing was renamed or removed.
+
+### Measured
+
+Against a real Filament panel at 1440px, on 2026-09-08.
+
+- The matrix keeps **1008px** at every state, where 3.0.0 took it to 512 while the panel was open.
+- The expanded panel is **1008px** and the builder's two tracks are **544px** and **398px**, where
+  the side column gave them **414px** and **0**.
+- The two identity cards measured 313px and 345px before and 345px each after.
+- Nine gates green: 1156 tests, 5596 assertions, 100 % of lines and 100 % of types, PHPStan at
+  `level: max` on both runs.
+
 ## [3.0.0] - 2026-09-07
 
 Warden 3.0 gave both pivots an end date, roles the ability to inherit roles, and a doctor that

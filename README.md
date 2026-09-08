@@ -674,10 +674,11 @@ title and their class name, in both readings at once, and says how many matched.
 
 ### Permission Inspector
 
-Click any cell and a panel opens beside the matrix — 30rem of it, pushing the grid rather than
-covering it, so you can keep clicking cells and it keeps answering. Escape or the close button
-shuts it and hands the focus back to the cell that opened it. Below 64rem it becomes a sheet
-against the bottom of the screen.
+Click any cell and a bar appears below the matrix with the answer in one line: the glyph, the cell,
+and what the store says plus its end date. **Customise** expands it to the full width of the card.
+The matrix never gives up a pixel — it did in 3.0.0, and half of it was too much to pay for a panel
+that usually says one sentence. Escape or the close button shuts it and hands the focus back to the
+cell that opened it.
 
 It says:
 - **Cause**: why this cell answers what it answers
