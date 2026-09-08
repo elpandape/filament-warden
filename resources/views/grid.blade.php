@@ -451,12 +451,44 @@
             class="fw-inspector"
             aria-label="{{ __('filament-warden::ui.explain.title') }}"
             data-fw-open="false"
+            data-fw-expanded="false"
             x-bind:data-fw-open="panel ? 'true' : 'false'"
+            x-bind:data-fw-expanded="expanded ? 'true' : 'false'"
             x-show="panel || ! selected"
         >
-            <div class="fw-inspector-head" x-show="selected" x-cloak>
-                <div class="fw-inspector-title" x-text="selected ? selected.title : ''"></div>
-                <div class="fw-inspector-sub" x-text="selected ? selected.subtitle : ''"></div>
+            {{--
+                La barra plegada: una línea con el dibujo, la celda y el
+                veredicto. Ahí acaba lo que la mayoría de los clics quiere saber,
+                y es lo que deja que el resto solo aparezca cuando alguien lo
+                pide — que es lo que le devuelve a la matriz su ancho entero.
+
+                El dibujo va `aria-hidden` y con `tabindex="-1"`: repite el
+                estado que la frase de al lado ya dice, y un botón más en el
+                recorrido de teclado por decir dos veces lo mismo es ruido.
+            --}}
+            <div class="fw-inspector-bar" x-show="selected" x-cloak>
+                <span
+                    class="fw-box"
+                    aria-hidden="true"
+                    tabindex="-1"
+                    x-bind:data-state="selected ? drawn(selected.row, selected.action, selected.name) : 'abstain'"
+                ></span>
+
+                <span class="fw-inspector-cell" x-text="selected ? selected.title : ''"></span>
+
+                <span class="fw-inspector-gist" x-text="gist()"></span>
+
+                <button
+                    type="button"
+                    class="fw-inspector-more"
+                    x-bind:aria-expanded="expanded ? 'true' : 'false'"
+                    x-on:click="expanded = ! expanded"
+                >
+                    <span x-text="expanded
+                        ? @js(__('filament-warden::ui.explain.collapse'))
+                        : @js(__('filament-warden::ui.explain.expand'))"></span>
+                </button>
+
                 <button
                     type="button"
                     class="fw-inspector-close"
@@ -467,7 +499,7 @@
                 </button>
             </div>
 
-            <div class="fw-inspector-body">
+            <div class="fw-inspector-body" x-show="expanded || ! selected" x-cloak>
                 {{--
                     Empty from the first paint on purpose: a live region added to
                     the page at the same moment its content appears is not

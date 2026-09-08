@@ -234,11 +234,22 @@ function grid({ state, grid, interactive }) {
 
         selected: null,
 
-        // Whether the panel has the layout's second track. Separate from
-        // `selected` on purpose: a cell stays selected when the panel closes, so
-        // the grid keeps showing WHICH cell was being read, and reopening does
-        // not have to ask the server again for something it still holds.
+        // Whether the panel is on the page at all. Separate from `selected` on
+        // purpose: a cell stays selected when the panel closes, so the grid keeps
+        // showing WHICH cell was being read, and reopening does not have to ask
+        // the server again for something it still holds.
         panel: false,
+
+        // And whether it is showing more than one line. A third flag rather than
+        // a second meaning on `panel`, because they answer different questions:
+        // `panel` is «is there an answer on screen», `expanded` is «is somebody
+        // working on it». Collapsing keeps the answer and the selection; closing
+        // gives the focus back to the cell.
+        //
+        // It survives a click on another cell on purpose: somebody comparing two
+        // rules wants the second one open the way the first was, and re-opening
+        // by hand on every cell is the shape this panel exists to avoid.
+        expanded: false,
 
         why: null,
 
@@ -667,8 +678,32 @@ function grid({ state, grid, interactive }) {
          * — leaves nothing to focus, and leaving the focus where it is beats
          * moving it somewhere arbitrary.
          */
+        /**
+         * The one line the collapsed bar says.
+         *
+         * What the STORE answers plus, when there is one, the date — which is
+         * the pair somebody reads a cell for. Not the cause: that is a sentence,
+         * and a sentence in a bar that must stay one line is a sentence read to
+         * its ellipsis.
+         *
+         * Composed here and not on the server for the reason every other reading
+         * in this file is: the bar has to be right the instant a cell is clicked,
+         * and the server has not been asked yet.
+         */
+        gist() {
+            if (! this.selected) {
+                return ''
+            }
+
+            const stance = this.stateOf(this.selected.row, this.selected.action, this.selected.name)
+            const ends = this.timeMark(this.selected.row, this.selected.action)
+
+            return ends ? `${stance} · ${ends}` : stance
+        },
+
         closePanel(root) {
             this.panel = false
+            this.expanded = false
 
             if (! root || ! this.selected) {
                 return

@@ -233,6 +233,8 @@ return [
         'loading' => 'Preguntando al almacén…',
         'unsaved' => 'Este rol todavía no se ha guardado, así que no hay nada en el almacén que explicar. Lo que pongas aquí se escribe al crearlo.',
         'failed' => 'La respuesta no llegó nunca: no se pudo alcanzar el almacén. Vuelve a pulsar la celda.',
+        'expand' => 'Personalizar',
+        'collapse' => 'Menos',
         'close' => 'Cerrar este panel',
         'no_permission' => 'ningún permiso',
         'narrowed' => 'Hay una regla estrechada para esta celda. Con condiciones, la concesión solo responde con un registro delante — y una comprobación de clase, como la que hace un listado, falla cerrada.',

@@ -358,35 +358,37 @@ test('the fold outranks everything it collapses, by being the last rule in the f
     expect(byteOffsetOf('/\S(?!.*\S)/s', $sheet))->toBe($close);
 });
 
-test('the panel takes width only while it is open, and gives it back', function (): void {
+test('the panel never takes width from the matrix, and sticks until it is opened', function (): void {
     $sheet = stylesheet();
 
-    // 2.11 measured a FIXED side column and threw it away: it took 19rem off the
-    // grid at every width, read or not. This one is conditional, and the whole
-    // difference is the attribute — a rule without it would be that column
-    // again, wider.
-    expect($sheet)->toContain(".fw-layout[data-open='true'] {")
-        ->and($sheet)->toContain('grid-template-columns: minmax(0, 1fr) 30rem;')
-        // What absorbs the width the panel takes: the matrix scrolls sideways
-        // with its entity column pinned. `minmax(0, …)` is what allows that — a
-        // plain `1fr` refuses to shrink below the table and pushes the panel off
-        // the card instead.
-        ->and($sheet)->toContain('minmax(0, 1fr) 30rem');
+    // 3.0.0 shipped it as a column that pushed, and pushing turned out to be the
+    // worse of the two costs: the matrix fell from 1008px to 512 — half of what
+    // a permission grid needs — to hand 480 to a panel that most of the time
+    // says one sentence. There is no second track any more, at any width.
+    expect($sheet)->not->toContain("[data-open='true']")
+        ->and($sheet)->not->toContain('minmax(0, 1fr) 30rem');
+
+    // Collapsed it is stuck to the bottom, because a cell in row 3 of forty
+    // opens an answer that would otherwise be off the screen. Expanded it stops
+    // sticking: it is no longer a footnote, it is where the work is.
+    expect($sheet)->toContain('.fw-inspector {')
+        ->and($sheet)->toContain('inset-block-end: 0;')
+        ->and($sheet)->toMatch("/\.fw-inspector\[data-fw-expanded='true'\] \{[^}]*position: static;/s");
 });
 
-test('the sheet asks its container how wide it is before it becomes a column', function (): void {
+test('the condition builder is what the width was needed for, and it gets it', function (): void {
     $sheet = stylesheet();
 
-    // The window is the wrong thing to ask: a host panel with its own navigation
-    // rail hands this field less than the viewport says, so a media query would
-    // open a 30rem column beside a matrix that has no room for one.
+    // The reason the panel moved below the matrix rather than shrinking it: the
+    // builder's two tracks — the rule on the left, what the rule MEANS on the
+    // right — are the pairing 2.11 measured, and 446px of a 30rem side column
+    // could not hold them at all. Full width it has 1008px and they fit.
     //
-    // 60rem, measured in a browser against a real panel on 2026-09-08: the field
-    // gets 1168px from 1680px of viewport upwards, 1008px at 1440 and 934px at
-    // 1366. At the 64rem this was written with, the two-track reading appeared
-    // only from 1680px up and every 1440px laptop got the sheet.
-    expect($sheet)->toMatch('/@container \(width < 60rem\) \{\s*\.fw-layout\[data-open=.true.\]/')
-        ->and($sheet)->toContain('max-block-size: 50vh;');
+    // The stacked reading stays for the widths where they genuinely do not:
+    // 52rem = 34 for the first track, 2 for the gap, 16 the note needs to be a
+    // note rather than a strip.
+    expect($sheet)->toContain('grid-template-columns: minmax(0, 34rem) minmax(0, 1fr);')
+        ->and($sheet)->toMatch('/@container \(width < 52rem\) \{\s*\.fw-conditions \{/');
 });
 
 test('the two marks 3.0 adds are elements, because a button has only two pseudos', function (): void {

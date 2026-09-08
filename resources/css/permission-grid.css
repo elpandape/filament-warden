@@ -56,6 +56,9 @@
     --fw-tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
     /* La lupa del buscador. `stroke` en gris y no en `currentcolor`: va como
        imagen de fondo, donde `currentcolor` no llega. */
+    /* La punta de flecha del plegado del inspector, `mask`-eada y no de fondo,
+       para que tome el color del texto en los dos temas. */
+    --fw-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
     --fw-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
     --fw-clock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");
     --fw-link: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1'/%3E%3Cpath d='M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1'/%3E%3C/svg%3E");
@@ -107,52 +110,105 @@
     gap: 1rem;
 }
 
-/* The panel that pushes, and why it is not the side column 2.11 threw away.
-   That one was FIXED: it took 19rem off the grid at every width, including the
-   ones where the matrix needed them, and it took them whether anybody was
-   reading it or not. This one exists only while a cell is selected, and the
-   matrix takes the width back the moment it closes.
-   30rem and not less: at 24rem the builder's own container query drops to its
-   stacked reading and the rule stops sitting beside what it means, which is the
-   pairing 2.11 measured and this file inherits. What absorbs the loss is the
-   matrix scrolling sideways with its entity column pinned — the mechanism the
-   fixed column never had.
-   `minmax(0, …)` on the first track, or a table wider than the space would
-   refuse to shrink and push the panel off the card instead of scrolling. */
-.fw-layout[data-open='true'] {
-    grid-template-columns: minmax(0, 1fr) 30rem;
+/* El inspector va DEBAJO de la matriz, a ancho completo, y nunca le quita
+   espacio. La 3.0 lo publicó como columna que empuja, y empujar resultó ser el
+   peor de los dos costes: la matriz caía de 1008px a 512 —la mitad de lo que
+   una rejilla de permisos necesita— para dar 480 a un panel que la mayor parte
+   del tiempo solo dice una frase.
+
+   Plegado es una barra de una línea: el dibujo, la celda y el veredicto. Ahí
+   acaba lo que la mayoría de los clics quiere saber. Expandido toma el ancho
+   entero, y ese es el punto: el constructor de condiciones recupera sus dos
+   pistas —la regla a la izquierda, lo que la regla SIGNIFICA a la derecha— que
+   es el emparejamiento que la 2.11 midió y que en 446px no cabía de ninguna
+   manera.
+
+   Pegado abajo mientras está plegado: se abre pulsando una celda que puede
+   estar en la fila 3 de una tabla de cuarenta, y una respuesta que aparece
+   fuera de la pantalla es una respuesta que nadie lee. Expandido deja de
+   pegarse — ya no es una nota al pie, es donde se está trabajando. */
+.fw-inspector {
+    position: sticky;
+    inset-block-end: 0;
+    z-index: 4;
+    background: var(--fw-surface);
+    border: 1px solid var(--fw-line);
+    border-radius: 0.75rem;
+    /* Hacia arriba: lo que hay encima es la matriz. */
+    box-shadow: 0 -2px 8px -2px color-mix(in oklab, var(--gray-950) 12%, transparent);
 }
 
-/* Below the width where two tracks stop being honest, the panel is a sheet at
-   the bottom rather than a column: 30rem of a 48rem card is the matrix gone.
-   A container query and not a media query, because what decides is the space
-   this field was given, not the window — a panel with its own navigation rail
-   hands over less than the viewport says.
+.fw-inspector[data-fw-expanded='true'] {
+    position: static;
+    max-block-size: none;
+    box-shadow: none;
+}
 
-   60rem and not the 64 this was written with, and the difference was measured
-   rather than argued. On a real Filament panel with its sidebar the field is
-   handed 1168px at 1680px and above, 1008px at 1440, and 934px at 1366 — it
-   never gets the viewport. At 64rem the two-track reading appeared only from
-   1680px up, so every 1440px laptop got the sheet, which is not what the
-   approved sketch shows and not what the width can afford: 1008px leaves the
-   matrix 512px beside a 480px panel, and 512px of matrix with its entity column
-   pinned and the rest scrolling IS the mechanism this design runs on. 1366px
-   stays a sheet, which is the line the number is drawn at. */
-@container (width < 60rem) {
-    .fw-layout[data-open='true'] {
-        grid-template-columns: minmax(0, 1fr);
-    }
+/* La barra plegada: una línea, y todo en ella cabe en una línea a propósito.
+   `align-items: center` y no `baseline`, porque el dibujo de la celda es una
+   caja y no texto. */
+.fw-inspector-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem 0.875rem;
+}
 
-    .fw-inspector {
-        position: sticky;
-        inset-block-end: 0;
-        z-index: 4;
-        max-block-size: 50vh;
-        overflow-y: auto;
-        background: var(--fw-surface);
-        /* Upwards, because the sheet is what sits on top of the matrix here. */
-        box-shadow: 0 -1px 3px 0 color-mix(in oklab, var(--gray-950) 10%, transparent);
-    }
+.fw-inspector-bar .fw-box {
+    flex: 0 0 auto;
+    cursor: default;
+}
+
+.fw-inspector-cell {
+    flex: 0 0 auto;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--fw-text);
+}
+
+/* La frase se corta antes que envolver: la barra es de una línea y lo que no
+   quepa está entero un clic más allá, en «Personalizar». */
+.fw-inspector-gist {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8125rem;
+    color: var(--fw-muted);
+}
+
+.fw-inspector-more {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border: 1px solid var(--fw-line);
+    border-radius: 0.5rem;
+    background: var(--fw-raised);
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--fw-text);
+    cursor: pointer;
+}
+
+.fw-inspector-more:hover {
+    background: var(--fw-line);
+}
+
+.fw-inspector-more::after {
+    content: '';
+    inline-size: 0.75rem;
+    block-size: 0.75rem;
+    background: currentcolor;
+    mask: var(--fw-chev) center / contain no-repeat;
+    transition: transform 75ms;
+}
+
+.fw-inspector[data-fw-expanded='true'] .fw-inspector-more::after {
+    transform: rotate(180deg);
 }
 
 .fw-main {
