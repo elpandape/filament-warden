@@ -174,6 +174,22 @@ test('the screen that mints a permission is shut at both of its gates, and at th
     livewire(CreatePermission::class)->assertForbidden();
 });
 
+test('the create screen says what a hand-written row is, not which key opened it', function (): void {
+    $user = signIn();
+
+    config()->set('filament-warden.permissions.create', true);
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('create', permissionClass());
+
+    // The key is named because somebody handed the URL deserves to know which
+    // switch made the page answer; the sentence that MATTERS is the second one,
+    // and asserting only the key name would go green on a subheading that said
+    // nothing else.
+    livewire(CreatePermission::class)
+        ->assertSee('permissions.create')
+        ->assertSee('until your own code does');
+});
+
 test('an authority the store trusts sees the catalogue', function (): void {
     $user = signIn();
     Warden::allow($user)->to('viewAny', permissionClass());

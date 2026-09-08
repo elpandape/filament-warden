@@ -100,6 +100,9 @@ return [
                 'heading' => 'Nothing has been granted yet',
                 'description' => 'The store fills as roles are given permissions: open a role and use its grid. To see what the panels declare before any of it is stored, run `php artisan filament-warden:catalog`.',
             ],
+            'create' => [
+                'subheading' => 'Only with `permissions.create` on, and it is off out of the box. A permission no policy declares is one nothing asks for until your own code does, so the audit reads it as loose until `catalog.custom` names it.',
+            ],
             'fields' => [
                 'name' => 'Name',
                 'name_help_derived' => 'The policy method that declares it writes this. Changing it does not break anything loudly — it disconnects the row from the code that asks for it.',

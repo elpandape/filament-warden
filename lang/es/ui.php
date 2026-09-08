@@ -100,6 +100,9 @@ return [
                 'heading' => 'Todavía no se ha concedido nada',
                 'description' => 'La tienda se llena conforme se dan permisos a los roles: abre un rol y usa su rejilla. Para ver lo que declaran los paneles antes de que nada esté guardado, ejecuta `php artisan filament-warden:catalog`.',
             ],
+            'create' => [
+                'subheading' => 'Solo con `permissions.create` encendido, y de fábrica está apagado. Un permiso que ninguna Policy declara es uno que nadie consulta hasta que lo pregunte tu propio código, así que la auditoría lo lee como suelto mientras `catalog.custom` no lo nombre.',
+            ],
             'fields' => [
                 'name' => 'Nombre',
                 'name_help_derived' => 'Lo escribe el método de la Policy que lo declara. Cambiarlo no rompe nada con ruido: desconecta la fila del código que la pregunta.',

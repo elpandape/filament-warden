@@ -15,6 +15,26 @@ class CreatePermission extends CreateRecord
     protected static string $resource = PermissionResource::class;
 
     /**
+     * What this screen costs, said where somebody about to use it will read it.
+     *
+     * `permissions.create` is off out of the box and the listing does not offer
+     * the button, so anybody standing here either turned it on or was handed the
+     * URL — and the second is worth catching. The sentence is not about the key:
+     * it is about what a hand-written row IS. Nothing derives it, so nothing asks
+     * for it until the installation's own code does, and the audit reads it as
+     * loose until `catalog.custom` names it. That is the part people find out a
+     * release later.
+     *
+     * Unconditional, unlike the listing's, whose sentence only holds while
+     * warden is reading every tenant at once. This one is true every time this
+     * page renders, because reaching it is what makes it true.
+     */
+    public function getSubheading(): ?string
+    {
+        return (string) __('filament-warden::ui.resources.permissions.create.subheading');
+    }
+
+    /**
      * The catalogue's unique index, reported as a field error rather than a 500.
      *
      * Warden 2.0 put a unique index on `(name, identity_key)`, where the
