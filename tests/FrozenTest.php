@@ -286,6 +286,7 @@ test('the translation keys an application overrides are frozen', function (): vo
         'resources.permissions.columns.held_count',
         'resources.permissions.columns.forbidden_count',
         'resources.permissions.health.unsatisfiable',
+        'resources.permissions.health.warning',
         'resources.permissions.filters.held',
         'resources.permissions.filters.any',
         'resources.permissions.filters.held_yes',

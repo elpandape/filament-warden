@@ -1592,3 +1592,31 @@ test('the held badge counts roles and accounts, and keeps the denial apart', fun
 
     expect($permission->refresh()->getKey())->not->toBeNull();
 });
+
+test('the doctor banner appears only when there is something, and only unfiltered', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+
+    Warden::allow(makeRole())->to('export');
+
+    // Nothing wrong: no banner. A page that warns whatever it finds trains
+    // people to stop reading it.
+    livewire(ListPermissions::class)
+        ->assertDontSee(trans_choice('filament-warden::ui.resources.permissions.health.warning', 1));
+
+    permissionWithOptions(Post::class, [
+        'v' => 1,
+        'g' => ['t' => 'group', 'i' => [['and', ['t' => 'value', 'c' => 'published', 'o' => '=', 'v' => 'true']]]],
+    ]);
+
+    livewire(ListPermissions::class)
+        ->assertSee(trans_choice('filament-warden::ui.resources.permissions.health.warning', 1));
+
+    // And gone on a filtered reading: over a page already showing exactly those
+    // rows it is noise, and over a page filtered to something else it names a
+    // problem that is not on the screen. Same oracle as the empty state, which
+    // 2.4.0 measured for the same reason (§6.42).
+    livewire(ListPermissions::class)
+        ->filterTable('unsatisfiable')
+        ->assertDontSee(trans_choice('filament-warden::ui.resources.permissions.health.warning', 1));
+});

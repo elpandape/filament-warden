@@ -54,6 +54,25 @@ final class PermissionsTable
             ->emptyStateDescription(static fn (Table $table): ?string => $table->getFilterIndicators() === []
                 ? Line::of('filament-warden::ui.resources.permissions.empty.description')
                 : null)
+            // Only when the doctor found something, and only on an unfiltered
+            // reading: a banner over a page that is already showing exactly
+            // those rows is noise, and one over a page filtered to something
+            // else names a problem that is not on the screen. Same oracle as the
+            // empty state above, and the same reason it is Filament's own
+            // (§6.42) — it covers search, per-column search and every filter,
+            // and costs no query.
+            ->description(static function (Table $table): ?string {
+                if ($table->getFilterIndicators() !== []) {
+                    return null;
+                }
+
+                $found = count(self::unsatisfiableKeys());
+
+                return $found === 0 ? null : trans_choice(
+                    'filament-warden::ui.resources.permissions.health.warning',
+                    $found,
+                );
+            })
             ->columns([
                 TextColumn::make('title')
                     ->label(__('filament-warden::ui.resources.permissions.columns.title'))

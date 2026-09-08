@@ -81,6 +81,7 @@ return [
             ],
             'health' => [
                 'unsatisfiable' => 'Nunca cierta',
+                'warning' => '{1} 1 regla de este catálogo nunca puede ser cierta. Como concesión no autoriza nada; como prohibición es inerte, y la concesión que venía a estrechar sigue aplicando. `warden:doctor` la lista entera.|[2,*] :count reglas de este catálogo nunca pueden ser ciertas. Como concesiones no autorizan nada; como prohibiciones son inertes, y las concesiones que venían a estrechar siguen aplicando. `warden:doctor` las lista enteras.',
             ],
             'filters' => [
                 'held' => 'En poder de alguien',

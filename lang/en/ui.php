@@ -81,6 +81,7 @@ return [
             ],
             'health' => [
                 'unsatisfiable' => 'Never true',
+                'warning' => '{1} 1 rule in this catalogue can never be true. As a grant it authorises nothing; as a prohibition it is inert, and the grant it was written to narrow keeps applying. `warden:doctor` lists it in full.|[2,*] :count rules in this catalogue can never be true. As grants they authorise nothing; as prohibitions they are inert, and the grants they were written to narrow keep applying. `warden:doctor` lists them in full.',
             ],
             'filters' => [
                 'held' => 'Held by somebody',
