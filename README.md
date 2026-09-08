@@ -183,6 +183,23 @@ The tag matters. `warden-migrations` publishes `create_warden_tables`, whose `Sc
 
 **Existing titles are not rewritten by the upgrade itself.** Warden 2.0 changed how it generates a title — `viewAny` on `Post` is `View any posts` now, where 1.x wrote `ViewAny posts` — and neither warden nor this package retitles rows in place when you upgrade, so an upgraded catalogue shows mixed wording until somebody converges it. `php artisan warden:retitle` is what does that, since warden 2.1: it rewrites a title an older warden generated, leaves a title a person typed alone, and leaves a `null` null. `--dry-run` reports the count first. Nothing here is urgent — what this package guarantees meanwhile is that it still RECOGNISES the old wording, asking warden which titles warden has ever written, so renaming a permission still regenerates it whichever generation the row carries.
 
+### Upgrading to 3.3 from 3.2
+
+`composer update`, then **run `php artisan filament:assets`** — the stylesheet and `grid.blade.php`
+both changed.
+
+One default moved. `grid.class_names` shipped **on** in `3.2.0` and is **off** from here: the class
+under each entity is drawn only where you ask for it. If you published the config in `3.2.0` your
+copy already says `true` and nothing changes; if you did not, the class comes off the rows and stays
+on their `title`, where hovering shows it. Put it back with one line:
+
+```php
+'grid' => ['class_names' => true],
+```
+
+Nothing else moves: no database, no config keys, no change to the
+`{stances, narrowing, until, inherited, baseline}` envelope.
+
 ### Upgrading to 2.11 from 2.10
 
 `composer update`, then **run `php artisan filament:assets`** — this release grew the stylesheet
@@ -994,15 +1011,16 @@ what every check answers, not merely what a screen draws. This package reads it 
     'explain'     => true,  // Inspector
     'constraints' => true,  // Show scope
     'expiry'      => true,  // May the grid set an end date
-    'class_names' => true,  // Draw the class under each entity
+    'class_names' => false, // Draw the class under each entity
 ],
 ```
 
-> 🏷️ **`class_names` draws `App\Models\Post` under «Posts».** It is on because a permission is
-> stored against the CLASS and not against the label, and two models can share one: `App\Models\User`
-> and `App\Models\Security\User` are both "Users", and without the class they are two identical rows.
-> Turning it off is reasonable where that cannot happen, and loses nothing else — the class stays on
-> the row's `title`, so hovering still shows it.
+> 🏷️ **`class_names` draws `App\Models\Post` under «Posts».** It is off because in most
+> installations the namespace repeats on every row and tells the rows apart on none of them: it is
+> noise in the column people read most. Nothing is lost — the class stays on the row's `title`, so
+> hovering still shows it. Turn it on where two models produce the same label: `App\Models\User` and
+> `App\Models\Security\User` are both "Users", and since a permission is stored against the CLASS
+> and not against the label, without it those two are identical rows.
 
 > ⏳ **`expiry` decides whether the grid may SET a date, never whether one is honoured.** Warden
 > stops reading a row past its date whatever this says, so a grid with this off still draws a lapsed

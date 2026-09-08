@@ -8,6 +8,39 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [3.3.0] - 2026-09-08
+
+The roles listing reads like the sketch, Escape closes the panel, and the class under an entity is
+off out of the box.
+
+### Added
+
+- **A `Rules written` column on the roles table.** How many rules the role has written, from the
+  same grouped-per-page query the holders already come from — one read per row is what `v1.5.0`
+  measured at 22 MB. It counts what the role WROTE and not what it answers: answering means
+  resolving the whole catalogue per role, which is a cost a listing cannot pay, and a role holding
+  the wildcard writes one rule and answers every cell. That distinction is the grid's to draw.
+
+### Changed
+
+- **`Name` and `Title` are one column.** The sketch has one and the permissions table had already
+  settled it: the title reads, the code name goes underneath in mono, because that is what a grant
+  points at. Sorted and searched by both.
+- **`grid.class_names` is off by default**, one release after it arrived on. In most installations
+  the namespace repeats on every row and tells the rows apart on none of them — it is noise in the
+  column people read most. Nothing is lost either way: the class stays on the row's `title`, so
+  hovering shows it. Turn it on where two models produce the same label, which is the case it was
+  written for.
+
+### Fixed
+
+- **Escape did not close the inspector.** `x-show="selected"` alone was what the panel got when it
+  moved below the grid, and `closePanel()` lowers `panel` while leaving `selected` alone — on
+  purpose, because the cell keeps its ring to say which one was being read. So the panel stayed on
+  screen after being dismissed. It is `panel && selected` now, and both halves are load-bearing:
+  `panel` alone brings back the floating empty state. Seen in a browser; none of the nine gates
+  could.
+
 ## [3.2.0] - 2026-09-08
 
 Five things the panel got wrong once it moved below the grid, and one new config key.
