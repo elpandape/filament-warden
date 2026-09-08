@@ -973,7 +973,7 @@ test("a permission's card reads its holders once per record, capped at 5 over th
     expect(grantReads())->toBeLessThanOrEqual(5);
 });
 
-test('the listing asks anyFor() per row and not the full Holders, capped at 20 over the 17 measured', function (): void {
+test('the listing asks anyFor() per row and not the full Holders, capped at 24 over the 19 measured', function (): void {
     $user = signIn();
     Warden::allow($user)->to('viewAny', permissionClass());
     Warden::allow($user)->to('view', permissionClass());
@@ -987,7 +987,12 @@ test('the listing asks anyFor() per row and not the full Holders, capped at 20 o
 
     livewire(ListPermissions::class);
 
-    expect(count(DB::getQueryLog()))->toBeLessThanOrEqual(20);
+    // Re-measured 2026-09-07 against the final 3.0 tree: 19, where the name
+    // said 17. The listing grew a health column, a grouped held-by count and
+    // the doctor's banner since that figure was written, and a cap one above
+    // the measurement is a cap that goes red on the next incidental read
+    // rather than on a regression. Five over, the same margin §6.25 chose.
+    expect(count(DB::getQueryLog()))->toBeLessThanOrEqual(24);
 });
 
 test('a row a single holder has says so too, and one nobody has says nothing', function (): void {

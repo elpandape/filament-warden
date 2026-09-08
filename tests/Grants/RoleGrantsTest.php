@@ -1109,7 +1109,7 @@ test('three cells on the same entity land in the group their own stance owns, no
         ->and($stances['update'])->toBe('forbidden');
 });
 
-test('writing five cells sharing an entity and stance is capped at 28, twenty-five measured grouped', function (): void {
+test('writing five cells sharing an entity and stance is capped at 28, twenty-six measured grouped', function (): void {
     $role = makeRole();
     $catalog = gridCatalog();
 
@@ -1131,7 +1131,7 @@ test('writing five cells sharing an entity and stance is capped at 28, twenty-fi
         ->and(grantCount())->toBe(5);
 });
 
-test('writing one cell alone still costs what grouping cannot shrink, capped at 12, nine measured', function (): void {
+test('writing one cell alone still costs what grouping cannot shrink, capped at 12, ten measured', function (): void {
     $role = makeRole();
     $catalog = gridCatalog();
 
