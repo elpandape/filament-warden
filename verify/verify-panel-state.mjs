@@ -145,9 +145,51 @@ three.selected = null
 
 check('the selection is gone, which is what the second flag exists to prevent', three.selected === null)
 
+console.log('\n=== 7. Closing hands the focus back to the cell that opened it ===')
+
+// The half no PHP test can reach: `closePanel()` looks a cell up from the root
+// it was handed and focuses it. A fake root records what was asked for and what
+// was focused, so this checks the SELECTOR as well as the call — a lookup that
+// matched nothing would leave the focus on a hidden button, and the page would
+// answer the next keystroke from the top of the document.
+const focused = []
+
+// Two cells, so the lookup has to pick rather than take the first thing it
+// finds — a `find()` with the wrong comparison would focus the neighbour and
+// every check below would still pass.
+const fakeCells = [
+    { dataset: { fwRow: ROW, fwAction: 'update' }, focus: () => focused.push('update') },
+    { dataset: { fwRow: ROW, fwAction: 'viewAny' }, focus: () => focused.push('viewAny') },
+]
+
+const fakeRoot = {
+    asked: [],
+    querySelectorAll(selector) {
+        this.asked.push(selector)
+
+        return fakeCells
+    },
+}
+
+const five = makeGrid()
+
+five.select(ROW, 'viewAny', 'List', 'viewAny')
+five.closePanel(fakeRoot)
+
+check('the focus went back to a cell', focused.length === 1)
+check('and to the RIGHT one, not the first in the list', focused[0] === 'viewAny')
+
+// The control: with nothing selected there is no cell to go back to, and
+// leaving the focus where it is beats moving it somewhere arbitrary.
+const six = makeGrid()
+
+six.closePanel(fakeRoot)
+
+check('a closed panel with no selection focuses nothing', focused.length === 1)
+
 console.log(
     failures === 0
-        ? '\nALL CHECKS PASSED — the panel is a layout flag of its own, and the selection outlives it.'
+        ? '\nALL CHECKS PASSED — the panel is a layout flag of its own, the selection outlives it, and the focus comes back.'
         : `\n${failures} CHECK(S) FAILED`,
 )
 

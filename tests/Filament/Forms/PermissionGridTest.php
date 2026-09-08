@@ -1392,7 +1392,7 @@ test('the panel takes its track only once a cell is opened, and gives it back', 
         ->toContain('x-bind:data-open="panel ? \'true\' : \'false\'"')
         // Escape on the panel and not on the window: a keystroke anywhere else
         // on a Filament page is not this component's to swallow.
-        ->toContain('x-on:keydown.escape="closePanel()"')
+        ->toContain('x-on:keydown.escape="closePanel($root)"')
         ->toContain(__('filament-warden::ui.explain.close'));
 });
 
@@ -1442,4 +1442,38 @@ test('the panel names the role that lends a cell before anybody clicks it', func
     // than editing theirs, which is the part somebody has to know first.
     expect($html)->toContain('fw-inspector-lent')
         ->toContain('inheritedAt(selected.row, selected.action).role');
+});
+
+test('why a date cannot be set is pointed at by the control it is about', function (): void {
+    $html = livewire(GridHost::class, ['roleKey' => makeRole()->getKey()])->html();
+
+    // The same lesson the scope rail paid for in the v2.6.0 tree dump, applied
+    // to the one control 3.0 adds. A disabled input keeps its label in the
+    // accessibility tree and takes no focus, so a sentence sitting beside it is
+    // read in browse mode and never in focus mode — which is the mode somebody
+    // tabbing through the panel is in.
+    expect($html)->toContain('-until-why"')
+        ->and($html)->toMatch('/x-bind:aria-describedby="untilReason\(/');
+
+    // And only while there IS a reason. Describing a usable control with an
+    // empty paragraph would announce a pause where the value belongs.
+    expect($html)->toMatch('/untilReason\([^)]*\) \? \'[^\']*-until-why\' : null/');
+});
+
+test('closing the inspector puts the focus back on the cell that opened it', function (): void {
+    $html = livewire(GridHost::class, ['roleKey' => makeRole()->getKey()])->html();
+
+    // The panel is opened by clicking a cell and closed by a button inside it,
+    // so without this the focus is left on an element that has just been
+    // hidden — and a hidden element with focus drops the caret to the top of
+    // the document, which on a keyboard means starting the page again.
+    //
+    // Both doors, because they are two listeners and only one of them is the
+    // obvious one.
+    expect($html)->toContain('x-on:keydown.escape="closePanel($root)"')
+        ->and($html)->toContain('x-on:click="closePanel($root)"');
+
+    $script = (string) file_get_contents(dirname(__DIR__, 3).'/resources/js/permission-grid.js');
+
+    expect($script)->toContain('cell.focus()');
 });

@@ -410,7 +410,7 @@
                 this component's to swallow, and the condition builder inside has
                 its own inputs where Escape means something to the browser first.
             --}}
-            x-on:keydown.escape="closePanel()"
+            x-on:keydown.escape="closePanel($root)"
         >
             <div class="fw-inspector-head" x-show="selected" x-cloak>
                 <div class="fw-inspector-title" x-text="selected ? selected.title : ''"></div>
@@ -418,7 +418,7 @@
                 <button
                     type="button"
                     class="fw-inspector-close"
-                    x-on:click="closePanel()"
+                    x-on:click="closePanel($root)"
                 >
                     <span class="fw-sr">{{ __('filament-warden::ui.explain.close') }}</span>
                     <span aria-hidden="true">&times;</span>
@@ -488,9 +488,20 @@
                             x-bind:disabled="! untilEnabled(selected.row, selected.action)"
                             x-bind:value="(untilAt(selected.row, selected.action) ?? '').slice(0, 10)"
                             x-on:change="setUntil(selected.row, selected.action, $event.target.value)"
+                            {{--
+                                Pointed at FROM the control, and only while there
+                                is a reason: a disabled input keeps its label in
+                                the accessibility tree but takes no focus, so a
+                                sentence sitting beside it is read in browse mode
+                                and never in focus mode. It is the same lesson the
+                                scope rail paid for in the v2.6.0 tree dump, on
+                                the one control 3.0 added.
+                            --}}
+                            x-bind:aria-describedby="untilReason(selected.row, selected.action) ? '{{ $ids }}-until-why' : null"
                         >
                         <p
                             class="fw-until-why"
+                            id="{{ $ids }}-until-why"
                             x-show="untilReason(selected.row, selected.action)"
                             x-text="untilReason(selected.row, selected.action)"
                             x-cloak

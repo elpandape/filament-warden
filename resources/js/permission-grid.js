@@ -646,8 +646,46 @@ function grid({ state, grid, interactive }) {
          * not moved, so throwing it away would buy nothing and cost a round trip
          * the next time the same cell is opened.
          */
-        closePanel() {
+        /**
+         * Shuts the panel and puts the focus back where it came from.
+         *
+         * The root arrives as an argument for the same reason the tab list does:
+         * this model never reaches for the document, so every DOM lookup starts
+         * from an element the markup handed over. `$root` is Alpine's own magic
+         * for the component's outermost element, which is the one the grid and
+         * the panel both live inside.
+         *
+         * Returning the focus is not a nicety. The panel is opened by clicking a
+         * cell and closed by a button INSIDE it, so without this the focus is
+         * left on an element that has just been hidden — and a hidden element
+         * with focus drops the caret to the top of the document, which for
+         * somebody on a keyboard means starting the whole page again.
+         *
+         * The selection outlives the panel on purpose (that is what the second
+         * flag is for), so the cell to go back to is still named. A cell that
+         * has gone from the DOM since — a filter typed while the panel was open
+         * — leaves nothing to focus, and leaving the focus where it is beats
+         * moving it somewhere arbitrary.
+         */
+        closePanel(root) {
             this.panel = false
+
+            if (! root || ! this.selected) {
+                return
+            }
+
+            // Walked and compared, never built into a selector. A row key is a
+            // fully qualified class name — backslashes and all — and quoting one
+            // into an attribute selector is exactly the kind of escaping that
+            // works until somebody's namespace has the wrong character in it.
+            // `stepTab()` reads `dataset` for the same reason.
+            const cell = Array.from(root.querySelectorAll('[data-fw-row]')).find(
+                (one) => one.dataset.fwRow === this.selected.row && one.dataset.fwAction === this.selected.action,
+            )
+
+            if (cell) {
+                cell.focus()
+            }
         },
 
         /**
