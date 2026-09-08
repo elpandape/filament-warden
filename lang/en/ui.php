@@ -74,11 +74,19 @@ return [
                 'entity' => 'Entity',
                 'provenance' => 'Provenance',
                 'reach' => 'Reach',
+                'health' => 'Health',
+                'held' => 'Held by',
+                'held_count' => '{1} 1 holder|[2,*] :count holders',
+                'forbidden_count' => '{1} 1 forbidden|[2,*] :count forbidden',
+            ],
+            'health' => [
+                'unsatisfiable' => 'Never true',
             ],
             'filters' => [
                 'held' => 'Held by somebody',
                 'any' => 'Any',
                 'held_yes' => 'Held',
+                'unsatisfiable' => 'Rules that can never be true',
                 'held_no' => 'Orphaned',
             ],
             'empty' => [

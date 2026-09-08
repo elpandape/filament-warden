@@ -74,11 +74,19 @@ return [
                 'entity' => 'Entidad',
                 'provenance' => 'Procedencia',
                 'reach' => 'Alcance',
+                'health' => 'Salud',
+                'held' => 'Lo tienen',
+                'held_count' => '{1} 1 titular|[2,*] :count titulares',
+                'forbidden_count' => '{1} 1 prohibido|[2,*] :count prohibidos',
+            ],
+            'health' => [
+                'unsatisfiable' => 'Nunca cierta',
             ],
             'filters' => [
                 'held' => 'En poder de alguien',
                 'any' => 'Cualquiera',
                 'held_yes' => 'En poder de alguien',
+                'unsatisfiable' => 'Reglas que nunca pueden ser ciertas',
                 'held_no' => 'Huérfano',
             ],
             'empty' => [

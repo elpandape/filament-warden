@@ -1544,3 +1544,51 @@ test('a rule that can never be true is refused on the field, not saved and audit
 
     expect($permission->refresh()->getAttribute('options'))->toBe($before);
 });
+
+test('the health badge and its filter agree, row by row', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+
+    // One row whose condition can never be true, one whose can, and one plain.
+    // The pairing is what matters: §6.17 measured a provenance badge and its
+    // filter disagreeing row by row, because each carried its own version of
+    // one rule — so this asserts they answer the same question and not that
+    // each answers something.
+    $broken = permissionWithOptions(Post::class, [
+        'v' => 1,
+        'g' => ['t' => 'group', 'i' => [['and', ['t' => 'value', 'c' => 'published', 'o' => '=', 'v' => 'true']]]],
+    ]);
+
+    permissionWithOptions(Post::class, [
+        'v' => 1,
+        'g' => ['t' => 'group', 'i' => [['and', ['t' => 'value', 'c' => 'title', 'o' => '=', 'v' => 'alpha']]]],
+    ]);
+
+    Warden::allow(makeRole())->to('export');
+
+    livewire(ListPermissions::class)
+        ->assertCanSeeTableRecords([$broken], inOrder: false)
+        ->filterTable('unsatisfiable')
+        ->assertCanSeeTableRecords([$broken])
+        ->assertCountTableRecords(1);
+});
+
+test('the held badge counts roles and accounts, and keeps the denial apart', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+
+    $permission = makePermission('export');
+
+    Warden::allow(makeRole('one'))->to('export');
+    Warden::allow(makeUser('Amaru Quispe'))->to('export');
+    Warden::forbid(makeRole('two'))->to('export');
+
+    // Two holders and one denial, and the denial is NOT folded into the count:
+    // a row two roles are forbidden is not a row nobody holds — a denial is a
+    // state, which is the distinction this package has drawn since 0.6.0.
+    livewire(ListPermissions::class)
+        ->assertSee(trans_choice('filament-warden::ui.resources.permissions.columns.held_count', 2))
+        ->assertSee(trans_choice('filament-warden::ui.resources.permissions.columns.forbidden_count', 1));
+
+    expect($permission->refresh()->getKey())->not->toBeNull();
+});
