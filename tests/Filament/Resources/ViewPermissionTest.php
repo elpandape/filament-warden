@@ -420,10 +420,12 @@ test('a row with nothing to say about time says nothing about time', function ()
         ->set('ask.account', $holder->getKey())
         ->callAction(TestAction::make('ask')->schemaComponent('bench', 'probeForm'))
         ->assertSet('answered.until', null)
-        // The row is absent rather than empty: an em dash here would say «we
-        // looked and found no date», when the truth is that this grant does not
-        // end at all.
-        ->assertDontSee('The grant that answered ends on');
+        // The LABEL and not the sentence. Asserting the sentence away was true
+        // whether the row was absent or present-and-empty — measured, by
+        // dropping the visibility guard and watching this stay green. What the
+        // guard decides is whether the word «Until» is on the page at all, so
+        // that is what is asked about.
+        ->assertDontSee('Until');
 });
 
 test('a class check against a narrowed rule prints the note it needs', function (): void {
