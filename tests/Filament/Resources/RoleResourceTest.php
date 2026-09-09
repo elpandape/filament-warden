@@ -753,6 +753,41 @@ test('a role nobody holds says so on the edit screen too', function (): void {
         );
 });
 
+test('the listing offers a way into the screen that reads a role', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', roleClass());
+
+    $role = makeRole();
+
+    // The screen `ViewRole` draws has existed since `v0.4.0` — route registered,
+    // page written, tests green — and nothing in the product ever pointed at it:
+    // `recordActions()` declared edit and delete and Filament adds no third of
+    // its own, so the only way in was typing the URL. `git log -S ViewAction`
+    // over this resource returns nothing, so it is not a regression: it never
+    // had one. §6.23, one screen further along.
+    //
+    // Asserted on the LISTING and not on the resource's `getPages()`: the route
+    // was always registered, so a test on the route would have been green
+    // throughout the whole time this was broken.
+    livewire(ListRoles::class)
+        ->assertTableActionExists('view', record: $role);
+});
+
+test('the way in closes when the policy says no, and no config rule reopens it', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+
+    $role = makeRole();
+
+    // No `visible()` of its own, unlike edit and delete beside it: the resource
+    // leaves `canView()` alone, so the policy is the whole gate — and that is
+    // what this pins, because a hand-written `visible()` added later "to be
+    // consistent" would be a second gate that could disagree with the first.
+    livewire(ListRoles::class)
+        ->assertTableActionHidden('view', record: $role);
+});
+
 test("the listing's delete modal says what it takes with it too", function (): void {
     $user = signIn();
     Warden::allow($user)->to('viewAny', roleClass());

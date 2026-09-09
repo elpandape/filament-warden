@@ -13,6 +13,7 @@ use ElPandaPe\Warden\Support\Config as WardenConfig;
 use ElPandaPe\Warden\Support\Expiry;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
@@ -147,6 +148,20 @@ final class RolesTable
                     }),
             ])
             ->recordActions([
+                // The screen it opens has existed since `v0.4.0` and nothing
+                // ever pointed at it: the route was registered, the page was
+                // written and tested, and the listing offered edit and delete
+                // only — so the only way in was typing the URL. It is §6.23 one
+                // screen over, and the same cure: Filament adds no action a
+                // table does not declare.
+                //
+                // No `visible()` of its own, unlike the two below it. The
+                // resource leaves `canView()` alone, so the policy closes this
+                // on its own; the config rules that make `canEdit()`/
+                // `canDelete()` say more than the policy does have no reading
+                // half to speak of.
+                ViewAction::make(),
+
                 EditAction::make(),
                 // The config and the protected list have their say before the
                 // policy does; the action disappears rather than failing later.
