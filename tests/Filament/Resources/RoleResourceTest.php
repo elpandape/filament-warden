@@ -1466,7 +1466,7 @@ test('a role whose only assignment has lapsed is still not deletable', function 
     Carbon::setTestNow();
 });
 
-test('the holders sentence drops a lapsed assignment; the delete warning keeps it', function (): void {
+test('the holders tally drops a lapsed assignment; the delete warning keeps it', function (): void {
     $user = signIn();
     $role = makeRole();
     $account = makeUser('Amaru Quispe');
@@ -1478,17 +1478,21 @@ test('the holders sentence drops a lapsed assignment; the delete warning keeps i
 
     Warden::assign($role)->until(Carbon::parse('2026-09-08 12:00:00'))->to($account);
 
-    // The positive half first, and it is not decoration: without it an
-    // `assertDontSee` proves only that the page never named anybody, which is
-    // exactly how a screen with the section switched off passes this (§6.34).
-    livewire(ViewRole::class, ['record' => $role->getKey()])->assertSee('Amaru Quispe');
+    // The positive half first, and it is not decoration: without it the negative
+    // one proves only that the page never drew a tally, which is exactly how a
+    // screen with the section switched off passes this (§6.34).
+    livewire(ViewRole::class, ['record' => $role->getKey()])
+        ->assertSee(__('filament-warden::ui.resources.roles.holders.held', ['count' => 1]));
 
     Carbon::setTestNow('2026-09-09 12:00:00');
 
-    // Same page, same row, one day later. The holders sentence reports and drops
-    // it; the delete warning beside it counts it, because the cascade takes it
-    // whatever the clock says. Same table, two questions.
-    livewire(ViewRole::class, ['record' => $role->getKey()])->assertDontSee('Amaru Quispe');
+    // Same page, same row, one day later. The tally drops it and says so in
+    // words; the delete warning beside it counts it AND names it, because the
+    // cascade takes it whatever the clock says. Same table, two questions —
+    // and the wide read is the one that still names people, because there the
+    // names are what somebody is about to destroy.
+    livewire(ViewRole::class, ['record' => $role->getKey()])
+        ->assertSee('Nobody holds this role here');
 
     expect(RolesTable::warning($role->refresh()))->toContain('Amaru Quispe');
 
@@ -1838,29 +1842,53 @@ test('the hierarchy section counts what a role reaches and what reaches it', fun
     Warden::allow($user)->to('view', roleClass());
 
     $outer = makeRole('outer');
+    // Titled by hand so the assertion below names a string this test chose,
+    // rather than one warden generated — which would be asserting the package
+    // against itself.
     $middle = makeRole('middle');
+    $middle->setAttribute('title', 'The middle one');
+    $middle->save();
+
     $inner = makeRole('inner');
     $alone = makeRole('alone');
 
     Warden::assign($middle)->to($outer);
     Warden::assign($inner)->to($middle);
 
-    // Counts and a folded chain, never the chain itself — and never a number of
-    // HOPS: `RoleClosure::for()` carries `[restriction type, restriction id, end
-    // date]` and no depth, so a hop count would mean walking the closure a
-    // second time, which is the one thing this package does not do with a rule
-    // warden already owns.
+    // Counts and the names they resolve to, never a chain drawn out — and never
+    // a number of HOPS: `RoleClosure::for()` carries `[restriction type,
+    // restriction id, end date]` and no depth, so a hop count would mean walking
+    // the closure a second time, which is the one thing this package does not do
+    // with a rule warden already owns.
+    //
+    // Two labelled rows since 3.4 and not one sentence, which is what the
+    // approved sketch draws: "inherits from" and "inherited by" are two
+    // questions, and one sentence answering both cannot label either.
     livewire(ViewRole::class, ['record' => $outer->getKey()])
         ->assertSee(trans_choice('filament-warden::ui.resources.roles.hierarchy.inherits', 1, [
             'brought' => 1,
             'total' => 2,
         ]))
-        ->assertSee(trans_choice('filament-warden::ui.resources.roles.hierarchy.reaching', 0));
+        ->assertSee(trans_choice('filament-warden::ui.resources.roles.hierarchy.reaching', 0))
+        // The names under the count, which is the folded chain flattened: the
+        // row says how many and the line under it says which.
+        //
+        // The TITLE and not the name, because that is what every other screen
+        // calls a role: `Holders::label()` reads `title` first, so asserting
+        // the lowercase code name would look for a string this package never
+        // draws.
+        ->assertSee('The middle one');
 
     // And the branch where there is nothing either way, which is what an
-    // installation that just turned nesting on sees on every role.
+    // installation that just turned nesting on sees on every role. Both rows
+    // still answer — a zero here is a fact somebody came to read, not an empty
+    // cell — and that is what the `{0}` arm on each line is for.
     livewire(ViewRole::class, ['record' => $alone->getKey()])
-        ->assertSee(__('filament-warden::ui.resources.roles.hierarchy.none'));
+        ->assertSee(trans_choice('filament-warden::ui.resources.roles.hierarchy.inherits', 0, [
+            'brought' => 0,
+            'total' => 0,
+        ]))
+        ->assertSee(trans_choice('filament-warden::ui.resources.roles.hierarchy.reaching', 0));
 });
 
 test('a hand-out naming an account that is not one writes nothing', function (): void {

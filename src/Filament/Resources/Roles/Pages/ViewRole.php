@@ -9,23 +9,17 @@ use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages\ViewPermission
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Tables\RolesTable;
 use ElPandaPe\FilamentWarden\Grants\Hierarchy;
+use ElPandaPe\FilamentWarden\Grants\RoleHolders;
 use ElPandaPe\FilamentWarden\Support\Access;
-use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
-use ElPandaPe\Warden\Support\Config as WardenConfig;
-use ElPandaPe\Warden\Support\Expiry;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
 class ViewRole extends ViewRecord
@@ -68,7 +62,7 @@ class ViewRole extends ViewRecord
      */
     public static function reach(Model $record): string
     {
-        $held = self::assignments($record)->count();
+        $held = RoleHolders::of($record)->total;
         $reaching = count(Hierarchy::reaching($record));
 
         if ($held === 0 && $reaching === 0) {
@@ -89,42 +83,21 @@ class ViewRole extends ViewRecord
     }
 
     /**
-     * Who holds it, added below the resource's own infolist rather than inside
-     * it: `RoleInfolist` is shared with nothing else that would need this
-     * section, and it answers a question — who, under the tenant this request
-     * is in — that only makes sense once a record is already resolved, which
-     * is what this page, and not the schema, has.
+     * The title, under the heading, because the heading is the code name.
      *
-     * Tenant-scoped, and deliberately not the delete warning's wide read: this
-     * section informs rather than decides a delete, and §6.24's rule for an
-     * informing read is to keep the scope — reading wide here would name an
-     * assignment this screen's own delete button, and `retract()`, cannot act
-     * on (§6.21).
+     * `recordTitleAttribute` is `name` — grants point at it, so it is what a
+     * breadcrumb and a global search have to say — and that leaves the title
+     * with nowhere to go once the identity card is gone. The sketch's header
+     * carries both, and this is where Filament puts the second one.
+     *
+     * Null and not an empty string when there is no title: a subheading that is
+     * `''` still draws its paragraph, and warden lets a role have no title.
      */
-    public function infolist(Schema $schema): Schema
+    public function getSubheading(): ?string
     {
-        $schema = parent::infolist($schema);
+        $title = $this->getRecord()->getAttribute('title');
 
-        return $schema->components([
-            ...$schema->getComponents(),
-            Section::make(__('filament-warden::ui.resources.roles.sections.hierarchy'))
-                ->icon(Heroicon::OutlinedLink)
-                ->description(__('filament-warden::ui.resources.roles.hierarchy.description'))
-                ->visible(static fn (): bool => WardenConfig::nestedRoles())
-                ->schema([
-                    TextEntry::make('hierarchy')
-                        ->hiddenLabel()
-                        ->state(static fn (Model $record): string => self::hierarchy($record)),
-                ]),
-            Section::make(__('filament-warden::ui.resources.roles.sections.holders'))
-                ->icon(Heroicon::OutlinedUsers)
-                ->description(__('filament-warden::ui.resources.roles.holders.description'))
-                ->schema([
-                    TextEntry::make('holders')
-                        ->hiddenLabel()
-                        ->state(static fn (Model $record): string => self::holders($record)),
-                ]),
-        ]);
+        return is_string($title) && $title !== '' ? $title : null;
     }
 
     /**
@@ -176,6 +149,12 @@ class ViewRole extends ViewRecord
         Warden::assign($record)
             ->until(is_string($until) && $until !== '' ? CarbonImmutable::parse($until) : null)
             ->to($holder);
+
+        // The tally beside this action was read before the write and the page
+        // redraws in the same request: without this it would come back saying
+        // what it said a moment ago, which is the one thing a screen that just
+        // handed a role out must not do.
+        RoleHolders::forget($record);
     }
 
     /**
@@ -213,42 +192,6 @@ class ViewRole extends ViewRecord
         $clauses[] = trans_choice('filament-warden::ui.resources.roles.hierarchy.reaching', count($reaching));
 
         return implode('. ', $clauses).'.';
-    }
-
-    private static function holders(Model $record): string
-    {
-        $rows = self::assignments($record);
-
-        if ($rows->isEmpty()) {
-            return (string) __('filament-warden::ui.resources.roles.holders.nobody');
-        }
-
-        return (string) __('filament-warden::ui.resources.roles.holders.held', [
-            'count' => $rows->count(),
-            'names' => implode(', ', RolesTable::labels($rows)),
-        ]);
-    }
-
-    /**
-     * Kept to the tenant this request is in, unlike `RolesTable::warning()`'s
-     * own wide read — see this class's `infolist()` docblock for why the two
-     * disagree on purpose.
-     *
-     * @return Collection<int, Model>
-     */
-    private static function assignments(Model $record): Collection
-    {
-        /** @var Collection<int, Model> $rows */
-        $rows = Context::resolve()->assignedRoleClass()::query()
-            ->where('role_id', $record->getKey())
-            // Who holds it, and a lapsed row is not one of them — unlike
-            // `RolesTable::warning()`, which counts them because the cascade
-            // takes them whatever the clock says.
-            ->tap(Expiry::live(...))
-            ->orderBy('id')
-            ->get();
-
-        return $rows;
     }
 
     /**

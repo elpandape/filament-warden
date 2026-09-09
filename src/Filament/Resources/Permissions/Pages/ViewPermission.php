@@ -275,6 +275,25 @@ class ViewPermission extends ViewRecord
     }
 
     /**
+     * The title, under the heading, because the heading is the code name.
+     *
+     * `recordTitleAttribute` is `name` — a grant points at it, so it is what a
+     * breadcrumb and a global search have to say — which leaves the title with
+     * nowhere to go once the identity card is gone. The sketch's header carries
+     * both, and this is where Filament puts the second one.
+     *
+     * Null and not an empty string when there is none: a subheading that is `''`
+     * still draws its paragraph, and warden only generates a title on `creating`
+     * and only when one was not given.
+     */
+    public function getSubheading(): ?string
+    {
+        $title = $this->getRecord()->getAttribute('title');
+
+        return is_string($title) && $title !== '' ? $title : null;
+    }
+
+    /**
      * Two actions, and both visibilities are written by hand.
      *
      * An edit or delete button asks `getEditAuthorizationResponse()` /

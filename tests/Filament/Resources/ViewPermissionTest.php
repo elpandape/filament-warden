@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use ElPandaPe\FilamentWarden\Filament\Resources\Permissions\Pages\ViewPermission;
+use ElPandaPe\FilamentWarden\Policies\RolePolicy;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\CombinedTabsViewPermission;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Document;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
@@ -51,6 +52,48 @@ test('the screen names the permission, where it came from and how far it reaches
         ->assertSee('From a policy')
         ->assertSee('Every row')
         ->assertOk();
+});
+
+test('the provenance card names the policy method that put the row there', function (): void {
+    $key = readablePermission();
+
+    // The badge said WHAT kind of provenance since 0.6; the sentence under it
+    // says WHICH method, which is the half somebody can act on. A policy method
+    // renamed leaves the permission behind — matching nothing, in silence — and
+    // this is the only screen that can hand over the class and method to go and
+    // look at.
+    livewire(ViewPermission::class, ['record' => $key])
+        ->assertSee('From a policy')
+        ->assertSee(RolePolicy::class.'::viewAny()')
+        ->assertOk();
+});
+
+test('a permission no policy declares says that instead, and names nothing', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', permissionClass());
+    Warden::allow($user)->to('view', permissionClass());
+
+    // A loose permission: nothing derives it, so there is no method to name and
+    // none is guessed. Naming one would be the wrong reason for a true badge.
+    $loose = Warden::permission(['name' => 'export']);
+    $loose->save();
+
+    livewire(ViewPermission::class, ['record' => recordKey($loose)])
+        ->assertSee('No policy in this installation declares it')
+        ->assertDontSee('::export()')
+        ->assertOk();
+});
+
+test('the heading carries the code name and the subheading the title', function (): void {
+    $key = readablePermission();
+
+    // `recordTitleAttribute` is `name`, because that is what a grant points at
+    // and what a breadcrumb has to say. That leaves the title with nowhere to go
+    // once the identity card is gone, and this is where Filament puts it.
+    /** @var ViewPermission $page */
+    $page = livewire(ViewPermission::class, ['record' => $key])->instance();
+
+    expect($page->getSubheading())->toBe($page->getRecord()->getAttribute('title'));
 });
 
 test('a permission pinned to one record says so where the reach goes', function (): void {

@@ -45,8 +45,9 @@ return [
             'hierarchy' => [
                 'description' => 'Lo que este rol alcanza a través de otros roles, y lo que lo alcanza a él.',
                 'none' => 'Este rol no hereda nada, y nada lo hereda.',
-                'inherits' => '{1} Hereda de 1 rol, que trae :brought más: :total en total|[2,*] Hereda de :count roles, que traen :brought más: :total en total',
+                'inherits' => '{0} No hereda de nada|{1} Hereda de 1 rol, que trae :brought más: :total en total|[2,*] Hereda de :count roles, que traen :brought más: :total en total',
                 'reaching' => '{0} No lo hereda nadie|{1} Lo hereda 1 rol|[2,*] Lo heredan :count roles',
+                'inherited_by' => 'Lo heredan',
             ],
             'hand_out' => [
                 'label' => 'Repartir',
@@ -55,9 +56,10 @@ return [
                 'until_help' => 'Déjalo vacío para una asignación sin fin. Pasada la fecha la cuenta deja de tener el rol sola, sin que corra ningún comando: `warden:clean --expired` solo quita la fila.',
             ],
             'holders' => [
+                'ending' => 'Caducan',
                 'description' => 'Contado bajo el tenant en el que estás. Una asignación hecha en otro tenant no aparece aquí; una restringida a un contexto sí, contada igual que cualquier otra.',
                 'nobody' => 'Nadie tiene este rol aquí.',
-                'held' => 'Lo tienen :count — :names.',
+                'held' => 'Lo tienen :count, bajo este tenant.',
             ],
             'delete' => [
                 'nobody' => 'Nadie tiene este rol, así que no se lleva nada.',
@@ -73,6 +75,11 @@ return [
                 'held' => 'Quién lo tiene',
                 'expiry' => 'Caducidad',
                 'holders' => 'Quién lo tiene',
+            ],
+            'provenance' => [
+                'declared_by' => 'La declara :method. Si ese método se renombra, esta fila deja de casar en silencio y `filament-warden:audit` la lista como olvidada.',
+                'undeclared' => 'Ninguna Policy de esta instalación la declara. Nadie la consulta hasta que tu propio código pregunte por ella por su nombre.',
+                'rule_help' => 'Con condiciones, esto solo contesta con un registro delante. Preguntado por la clase —que es lo que pregunta una rejilla de rol— warden se abstiene antes de evaluar una sola cláusula, y una abstención se lee igual que si la regla no estuviera.',
             ],
             'entity' => [
                 'none' => 'Ninguna: permiso suelto',

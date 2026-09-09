@@ -5,6 +5,7 @@ declare(strict_types=1);
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\CreateRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\EditRole;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages\ViewRole;
+use ElPandaPe\FilamentWarden\Grants\RoleHolders;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Facades\Warden;
@@ -289,7 +290,7 @@ test('the screen says who holds it, and says nothing when nobody does', function
         ->assertSee('Nobody holds this role here');
 });
 
-test('the screen names an account that holds it', function (): void {
+test('the screen counts an account that holds it, and never names one', function (): void {
     $user = signIn();
     $role = makeRole();
     Warden::assign($role)->to(makeUser('Amaru Quispe'));
@@ -298,10 +299,19 @@ test('the screen names an account that holds it', function (): void {
     Warden::allow($user)->to('view', $role);
 
     livewire(ViewRole::class, ['record' => $role->getKey()])
-        ->assertSee('Amaru Quispe');
+        ->assertSee(__('filament-warden::ui.resources.roles.holders.held', ['count' => 1]))
+        // The count is the whole answer. A role can be held by every account in
+        // the installation, so ten names out of a thousand decorate rather than
+        // inform — the one screen that names holders is the delete modal, where
+        // the names are what is about to be destroyed.
+        //
+        // Positive assertion first and on purpose: an `assertDontSee` alone
+        // passes just as well on a page that drew no holders section at all
+        // (§6.34).
+        ->assertDontSee('Amaru Quispe');
 });
 
-test('the screen names a holder restricted to a context too', function (): void {
+test('a holder restricted to a context is counted as restricted, not as here', function (): void {
     $user = signIn();
     $role = makeRole();
     $post = Post::query()->create(['title' => 'A post']);
@@ -310,8 +320,19 @@ test('the screen names a holder restricted to a context too', function (): void 
     Warden::allow($user)->to('viewAny', roleClass());
     Warden::allow($user)->to('view', $role);
 
+    // It counts in the total, and the breakdown says which of the three it is —
+    // which is more than the old sentence could say, and it is the half that
+    // matters: a restricted assignment is one this screen shows and deliberately
+    // will not take back (§6.21).
+    $tally = RoleHolders::of($role);
+
+    expect($tally->total)->toBe(1)
+        ->and($tally->restricted)->toBe(1)
+        ->and($tally->here)->toBe(0);
+
     livewire(ViewRole::class, ['record' => $role->getKey()])
-        ->assertSee('Amaru Quispe');
+        ->assertSee(__('filament-warden::ui.relations.roles.held.restricted'))
+        ->assertDontSee('Amaru Quispe');
 });
 
 test('the section stays under the tenant you are in, unlike the delete warning beside it', function (): void {
@@ -326,8 +347,96 @@ test('the section stays under the tenant you are in, unlike the delete warning b
     });
 
     Warden::tenant()->onceTo(8, function () use ($role): void {
+        // Nobody, from over here — and it is the empty state in words rather
+        // than four zeros, which is what the section draws when the tally is
+        // empty. `assertDontSee` on a name would pass on any page since this
+        // screen stopped naming holders at all, so the assertion that carries
+        // the guarantee is the positive one.
         livewire(ViewRole::class, ['record' => $role->getKey()])
             ->assertSee('Nobody holds this role here')
-            ->assertDontSee('Amaru Quispe');
+            ->assertDontSee(__('filament-warden::ui.resources.roles.holders.held', ['count' => 1]));
     });
+});
+
+test('the heading carries the code name and the subheading the title', function (): void {
+    $user = signIn();
+    $role = makeRole();
+
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('view', $role);
+
+    // `recordTitleAttribute` is `name`, because that is what a grant points at
+    // and what a breadcrumb has to say. That leaves the title with nowhere to go
+    // once the identity card is gone, and this is where Filament puts it.
+    /** @var ViewRole $page */
+    $page = livewire(ViewRole::class, ['record' => $role->getKey()])->instance();
+
+    expect($page->getSubheading())->toBe($role->getAttribute('title'));
+
+    // A role warden never titled gets no subheading rather than an empty one:
+    // Filament still draws the paragraph for `''`.
+    $role->setAttribute('title', null);
+    $role->save();
+
+    /** @var ViewRole $untitled */
+    $untitled = livewire(ViewRole::class, ['record' => $role->getKey()])->instance();
+
+    expect($untitled->getSubheading())->toBeNull();
+});
+
+test('an assignment written at another scope is counted apart from the ones here', function (): void {
+    $role = makeRole();
+
+    Warden::tenant()->onceTo(7, static function () use ($role): void {
+        Warden::assign($role)->to(makeUser('Amaru Quispe'));
+    });
+
+    Warden::assign($role)->to(makeUser('Nayra Mamani'));
+
+    // Read from inside tenant 7: the global row is the one this tenant cannot
+    // take back, because `retract()->from()` filters on `scope` exactly and
+    // would delete nothing while reporting success (§6.21). The tally says which
+    // is which, so the two figures are not the same number twice.
+    Warden::tenant()->onceTo(7, static function () use ($role): void {
+        $tally = RoleHolders::of($role->refresh());
+
+        expect($tally->total)->toBe(2)
+            ->and($tally->here)->toBe(1)
+            ->and($tally->elsewhere)->toBe(1)
+            ->and($tally->restricted)->toBe(0);
+    });
+});
+
+test('an assignment that ends is still held, and counted twice on purpose', function (): void {
+    $role = makeRole();
+
+    Warden::assign($role)->until(now()->addWeek())->to(makeUser('Amaru Quispe'));
+
+    // A separate axis and not a fourth kind of holder: the row is held today by
+    // whoever holds it, and counted in whichever of the three names them. What
+    // `ending` says is when that stops being true with nobody doing anything —
+    // the same shape `Holders::ending` already has for a permission.
+    $tally = RoleHolders::of($role);
+
+    expect($tally->total)->toBe(1)
+        ->and($tally->here)->toBe(1)
+        ->and($tally->ending)->toBe(1);
+});
+
+test('the memo lets go when the store moves under it', function (): void {
+    $role = makeRole();
+
+    expect(RoleHolders::of($role)->total)->toBe(0);
+
+    Warden::assign($role)->to(makeUser('Amaru Quispe'));
+
+    // Still the answer read before the write, which is the point of a memo and
+    // the trap in one: the hand-out action writes and the page redraws in the
+    // same request, so without an escape hatch the tally beside the button
+    // would report what it said a moment ago.
+    expect(RoleHolders::of($role)->total)->toBe(0);
+
+    RoleHolders::forget($role);
+
+    expect(RoleHolders::of($role)->total)->toBe(1);
 });

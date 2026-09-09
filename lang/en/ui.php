@@ -45,8 +45,9 @@ return [
             'hierarchy' => [
                 'description' => 'What this role reaches through other roles, and what reaches it.',
                 'none' => 'This role inherits nothing, and nothing inherits it.',
-                'inherits' => '{1} Inherits from 1 role, which brings :brought more — :total in total|[2,*] Inherits from :count roles, which bring :brought more — :total in total',
+                'inherits' => '{0} Inherits from nothing|{1} Inherits from 1 role, which brings :brought more — :total in total|[2,*] Inherits from :count roles, which bring :brought more — :total in total',
                 'reaching' => '{0} Nothing inherits it|{1} 1 role inherits it|[2,*] :count roles inherit it',
+                'inherited_by' => 'Inherited by',
             ],
             'hand_out' => [
                 'label' => 'Hand out',
@@ -55,9 +56,10 @@ return [
                 'until_help' => 'Leave it empty for an assignment with no end. Past the date the account stops holding the role on its own, with no command run — `warden:clean --expired` only removes the row.',
             ],
             'holders' => [
+                'ending' => 'Ending',
                 'description' => 'Counted under the tenant you are in. An assignment made elsewhere does not show here; one restricted to a context does, counted the same as any other.',
                 'nobody' => 'Nobody holds this role here.',
-                'held' => 'Held by :count — :names.',
+                'held' => 'Held by :count, under this tenant.',
             ],
             'delete' => [
                 'nobody' => 'Nobody holds this role, so nothing goes with it.',
@@ -73,6 +75,11 @@ return [
                 'held' => 'Who holds it',
                 'expiry' => 'Expiry',
                 'holders' => 'Who holds it',
+            ],
+            'provenance' => [
+                'declared_by' => 'Declared by :method. Rename that method and this row stops matching in silence — `filament-warden:audit` lists it as forgotten.',
+                'undeclared' => 'No policy in this installation declares it. Nothing consults it until your own code asks for it by name.',
+                'rule_help' => 'With conditions, this only answers with a record in front of it. Asked about the class — which is what a role grid asks — warden abstains before a single clause is evaluated, and an abstention reads exactly like a rule that is not there.',
             ],
             'entity' => [
                 'none' => 'None: a loose permission',

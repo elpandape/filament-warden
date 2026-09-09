@@ -6,6 +6,7 @@ use ElPandaPe\FilamentWarden\Catalog\Abilities;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Comment;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Tag;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Policies\PostPolicy;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 
 pest()->extend(TestCase::class);
@@ -29,4 +30,22 @@ test('a gate hook and the helpers a policy inherits are not actions', function (
         ->not->toContain('denyWithStatus')
         ->not->toContain('denyAsNotFound')
         ->not->toContain('label');
+});
+
+test('the declaring policy method is named the way somebody would go and open it', function (): void {
+    expect(Abilities::declaredBy(Post::class, 'update'))
+        ->toBe(PostPolicy::class.'::update()');
+});
+
+test('an action no policy declares has no declarer, and none is guessed', function (): void {
+    // Three ways of not being declared, and all three are the same answer: a
+    // model with no policy at all, an action that policy does not have, and one
+    // it inherits from `HandlesAuthorization` — which is public on every policy
+    // and would otherwise be named as the declarer of a permission called
+    // `denyWithStatus`. A true sentence about the wrong thing is worse than
+    // none (§6.34).
+    expect(Abilities::declaredBy(Comment::class, 'update'))->toBeNull()
+        ->and(Abilities::declaredBy(Tag::class, 'update'))->toBeNull()
+        ->and(Abilities::declaredBy(Post::class, 'denyWithStatus'))->toBeNull()
+        ->and(Abilities::declaredBy(Post::class, 'before'))->toBeNull();
 });
