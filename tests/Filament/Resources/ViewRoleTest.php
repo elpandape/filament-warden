@@ -300,6 +300,10 @@ test('the screen counts an account that holds it, and never names one', function
 
     livewire(ViewRole::class, ['record' => $role->getKey()])
         ->assertSee(__('filament-warden::ui.resources.roles.holders.held', ['count' => 1]))
+        // And the empty state is not drawn beside the tally it contradicts: the
+        // two are alternatives, and without the `visible()` on each of them the
+        // card would say "Nobody holds this role here" over a count of one.
+        ->assertDontSee('Nobody holds this role here')
         // The count is the whole answer. A role can be held by every account in
         // the installation, so ten names out of a thousand decorate rather than
         // inform — the one screen that names holders is the delete modal, where
@@ -373,15 +377,20 @@ test('the heading carries the code name and the subheading the title', function 
 
     expect($page->getSubheading())->toBe($role->getAttribute('title'));
 
-    // A role warden never titled gets no subheading rather than an empty one:
-    // Filament still draws the paragraph for `''`.
-    $role->setAttribute('title', null);
-    $role->save();
+    // Two ways of having no title, and both answer null. `''` is not
+    // hypothetical: §6.24 measured a disabled field arriving ABSENT rather than
+    // null and a `?? null` reading it back as `''`, and Filament still draws the
+    // subheading paragraph for an empty string — an empty line under the
+    // heading, with nothing in it.
+    foreach ([null, ''] as $stored) {
+        $role->setAttribute('title', $stored);
+        $role->save();
 
-    /** @var ViewRole $untitled */
-    $untitled = livewire(ViewRole::class, ['record' => $role->getKey()])->instance();
+        /** @var ViewRole $untitled */
+        $untitled = livewire(ViewRole::class, ['record' => $role->getKey()])->instance();
 
-    expect($untitled->getSubheading())->toBeNull();
+        expect($untitled->getSubheading())->toBeNull();
+    }
 });
 
 test('an assignment written at another scope is counted apart from the ones here', function (): void {
@@ -439,4 +448,33 @@ test('the memo lets go when the store moves under it', function (): void {
     RoleHolders::forget($role);
 
     expect(RoleHolders::of($role)->total)->toBe(1);
+});
+
+test('a row that is both restricted and written elsewhere is counted as restricted', function (): void {
+    $role = makeRole();
+    $post = Post::query()->create(['title' => 'A post']);
+
+    // Both at once, which is the ONLY fixture the priority of the two arms
+    // decides. Measured: swapping them with a merely-restricted row leaves the
+    // suite green, because a restriction written at this scope never reaches
+    // the `elsewhere` arm at all — §6.30, the test goes on what the branch
+    // DECIDES and not on how it is written.
+    Warden::tenant()->onceTo(7, static function () use ($role, $post): void {
+        Warden::assign($role)->on($post)->to(makeUser('Amaru Quispe'));
+    });
+
+    // Read with no tenant and the packaged `all`, so the row from tenant 7 is
+    // visible: `readFilter()` adds no predicate, and `writeScope()` is null, so
+    // the row answers true to both questions at once.
+    $tally = RoleHolders::of($role);
+
+    expect($tally->total)->toBe(1)
+        // Restricted first, and it is the more useful of the two to say: it is
+        // the half somebody can act on, and `Assignment::descriptions()` and
+        // `RolesRelationManager::heldAs()` already order it this way about one
+        // account's row. Three screens saying it in three orders is what §6.24
+        // measures going wrong.
+        ->and($tally->restricted)->toBe(1)
+        ->and($tally->elsewhere)->toBe(0)
+        ->and($tally->here)->toBe(0);
 });
