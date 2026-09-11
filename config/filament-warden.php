@@ -76,8 +76,8 @@ return [
     | whether one is honoured: warden stops reading a row past its date whatever
     | this says, so a grid with this off still draws a lapsed cell as the
     | abstention it is. Switching it off makes the screen answer "no opinion"
-    | rather than "no date" — an empty answer would end every timed grant on the
-    | grid the first time anybody saved it.
+    | rather than "no date", so the store keeps every end date whatever the
+    | browser sends back.
     |
     */
 
@@ -85,16 +85,15 @@ return [
         'explain' => true,
         'constraints' => true,
         'expiry' => true,
-        // El nombre de clase bajo cada entidad — `App\Models\Post` bajo
-        // «Publicaciones». Está apagado porque en la mayoría de instalaciones
-        // el espacio de nombres se repite en cada fila y no distingue ninguna:
-        // es ruido en la columna que más se lee.
+        // The class name under each entity — `App\Models\Post` under "Posts".
+        // Off by default: in most installations the namespace repeats on every
+        // row and tells none apart, so it is noise in the most-read column.
         //
-        // Y apagarlo no pierde el dato, solo lo baja al ratón: la clase sigue
-        // en el `title` de la fila. Encenderlo es lo correcto donde dos modelos
-        // dan la misma etiqueta —`App\Models\User` y `App\Models\Security\User`
-        // son los dos «Users»—, porque un permiso se guarda contra la CLASE y
-        // sin ella esas dos son filas idénticas.
+        // Turning it off loses nothing, it only moves to the hover: the class
+        // stays in the row's `title`. Turn it on where two models share a label
+        // — `App\Models\User` and `App\Models\Security\User` are both "Users" —
+        // because a permission is stored against the CLASS, and without it
+        // those two rows read the same.
         'class_names' => false,
     ],
 
