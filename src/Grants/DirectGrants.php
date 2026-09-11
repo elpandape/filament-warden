@@ -27,11 +27,14 @@ use Illuminate\Database\Eloquent\Model;
  * Read against `grants` by hand and never through a relation, for the reasons
  * `Holders` gives.
  *
- * Read across every tenant — `withoutGlobalScopes()` — where
- * `Assignment::assignments()` and `RoleHolders` keep the active one. A write
- * here targets one exact scope, so a row from another tenant is shown, marked
- * and left alone: `disallow()` would delete nothing outside it and still
- * report success.
+ * Read under the active tenant, like `Assignment::assignments()` and
+ * `RoleHolders`: this is a list somebody acts on, and a list that informs
+ * keeps its scope. `Holders` reads wider because it counts what a delete
+ * destroys, and a delete cascades blind to the scope. A row the tenant still
+ * sees from another scope — a global one, or every tenant's when warden reads
+ * them all — is shown, marked and left alone: a write here targets one exact
+ * scope, and `disallow()` would delete nothing outside it and still report
+ * success.
  */
 final readonly class DirectGrants
 {
@@ -60,7 +63,6 @@ final readonly class DirectGrants
         $permissionClass = $context->permissionClass();
 
         $grants = $context->grantClass()::query()
-            ->withoutGlobalScopes()
             ->where('entity_type', $account->getMorphClass())
             ->where('entity_id', $account->getKey())
             ->tap(Expiry::live(...))

@@ -282,6 +282,34 @@ test('a grant written in another tenant is shown, marked, and left alone', funct
     $page->assertSee('outside the tenant you are in');
 });
 
+test('a grant written in one tenant is not listed from another', function (): void {
+    $account = makeUser('Holder');
+    $row = makePermission('export-reports');
+
+    Warden::tenant()->onceTo(7, static fn () => Warden::allow($account)->to($row));
+
+    // Read from a tenant, never without one: with no tenant active, warden's
+    // `all` default reads every scope and the row is listed either way. Tenant
+    // 7 is the control — without it, an empty list from anywhere would pass.
+    $fromSeven = Warden::tenant()->onceTo(7, static fn (): array => DirectGrants::of($account));
+    $fromEight = Warden::tenant()->onceTo(8, static fn (): array => DirectGrants::of($account));
+
+    expect($fromSeven)->toHaveCount(1)
+        ->and($fromEight)->toBeEmpty();
+});
+
+test('a global grant is listed under a tenant, marked as from elsewhere', function (): void {
+    $account = makeUser('Holder');
+
+    Warden::allow($account)->to(makePermission('export-reports'));
+
+    /** @var list<DirectGrants> $held */
+    $held = Warden::tenant()->onceTo(8, static fn (): array => DirectGrants::of($account));
+
+    expect($held)->toHaveCount(1)
+        ->and($held[0]->elsewhere)->toBeTrue();
+});
+
 test('a rule pinned to one record says so, and does not borrow a shape', function (): void {
     signInAsGrantManager();
 

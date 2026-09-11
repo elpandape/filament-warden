@@ -45,6 +45,10 @@ what is covered is listed under **Stability** in the README and pinned by
   round: until something declares it the audit reports it — among the red `forgotten` rows when
   nobody holds it, among the strays when somebody does — and `catalog.custom` can only declare one
   over no model; one over a model needs a policy method.
+- Keep an account's direct permissions tab to the active tenant. It read every tenant's grants, so
+  an account opened under one tenant listed what it had been handed under another. It now reads what
+  that tenant and the global scope hold, like the roles tab beside it. The tab is off out of the box
+  (`permissions.direct`).
 - Correct the test bench's note for a narrowed rule asked about the class, in both languages. It
   said warden skips the rule and answers that nothing matched, which is true only of a rule limited
   to what the account owns: a grant with conditions answers that its conditions were not met, and a
