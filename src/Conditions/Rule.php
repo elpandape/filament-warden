@@ -72,8 +72,9 @@ final readonly class Rule
         $operator = ComparisonOperator::tryFrom(self::read($payload, 'operator'));
         $column = self::read($payload, 'column');
 
-        // `Not` is in the enum and the serializer refuses any group carrying it:
-        // letting one through would store a rule that stops being readable.
+        // `Not` is in the enum and nowhere else: `ConstraintSerializer` refuses
+        // to store it, `Group::passes()` throws on it, and `applyTo()` below
+        // would quietly write it as `and`.
         if ($logic === null || $logic === LogicalOperator::Not || $operator === null) {
             return null;
         }
@@ -104,8 +105,9 @@ final readonly class Rule
     }
 
     /**
-     * The line as warden's own object, for the one screen that writes the
-     * catalogue row itself instead of pointing a grant at a twin.
+     * The line as warden's own object, for the two places that need one: the
+     * permission screen, which writes the catalogue row itself instead of
+     * pointing a grant at a twin, and `Narrowing::unsatisfiableColumns()`.
      */
     public function constraint(): Constraint
     {
@@ -150,9 +152,6 @@ final readonly class Rule
         ];
     }
 
-    /**
-     * The line as a person reads it.
-     */
     public function text(string $authority): string
     {
         $right = $this->authorityColumn === null

@@ -53,8 +53,11 @@ final readonly class Narrowing
             return self::all();
         }
 
-        // The first line's logic is ignored when the group is evaluated. It is
-        // normalised so two identical rules cannot produce two different twins.
+        // The first line's logic is ignored when the group is evaluated, and
+        // warden's `ConstraintSerializer::sameRule()` already reads both
+        // spellings as one twin — but the normalisation stays: `is()` compares
+        // payloads with `===` and `Rule::toPayload()` carries the logic, so
+        // without it two readings of one rule could disagree.
         $rules[0] = $rules[0]->with(LogicalOperator::And);
 
         return new self(Shape::Conditions, $rules);
@@ -81,12 +84,12 @@ final readonly class Narrowing
      * A rule warden would refuse to write, kept exactly as the store has it.
      *
      * Its own reason rather than `corrupt`: this rule parses fine and says
-     * something perfectly clear, it just can never be true. And unlike a corrupt
-     * blob it is inert in BOTH polarities — warden's own changelog says the
-     * forbid it makes is inert — so nothing is being protected by leaving it
-     * there. What locking buys is the opposite: a screen that offered to rewrite
-     * it would have its save refused by warden, and the refusal arrives after
-     * the plain grant beneath the condition is already written.
+     * something perfectly clear, it just can never be true. With a record in
+     * front of it `ComparisonOperator::compare()` answers false for the
+     * mismatched pair in both polarities; without one warden never evaluates it,
+     * so as a prohibition it still forbids every class check. Locking keeps that
+     * prohibition, and keeps a screen from offering a rewrite warden would
+     * refuse only after the plain grant beneath the condition is written.
      *
      * @param  list<Rule>  $rules
      */
@@ -106,16 +109,13 @@ final readonly class Narrowing
      * Warden's writes target one exact scope: `disallow()` filters on it and
      * deletes nothing when the row belongs to another. A cell like that could be
      * switched off, saved, reported as saved — and come back green on reload.
-     * Measured. So it is shown, marked and left alone.
+     * So it is shown, marked and left alone.
      */
     public static function elsewhere(): self
     {
         return new self(Shape::Elsewhere, reason: 'elsewhere');
     }
 
-    /**
-     * What one catalogue row says about itself.
-     */
     public static function of(Model $permission): self
     {
         // Ask the column, not the cast. `HasAttributes::fromJson()` flattens
@@ -123,8 +123,9 @@ final readonly class Narrowing
         // string, and the JSON literal `null` — and reading them as "no
         // conditions" turns a rule nobody can decode into an unconditional
         // grant, editable, which the next save then writes for real. Warden's
-        // three engines moved off the cast for this, and `deserialize()` takes
-        // the string: it has an `is_string()` branch behind `json_validate()`.
+        // three engines read the raw column for the same reason, and
+        // `deserialize()` takes the string: it has an `is_string()` branch
+        // behind `json_validate()`.
         $options = $permission->getAttributes()['options'] ?? null;
         $owned = (bool) $permission->getAttribute('only_owned');
 
@@ -169,8 +170,7 @@ final readonly class Narrowing
         //
         // The lines are carried unnormalised, unlike `conditions()`: `clauses()`
         // ignores the first line's logic, `toGroup()` refuses this shape and the
-        // diff skips it, so nothing here can ever be written back and there is no
-        // twin identity to keep stable.
+        // diff skips it, so nothing here can ever be written back.
         if ($owned) {
             return self::unreadable('owned_with_conditions', $rules);
         }
@@ -292,11 +292,6 @@ final readonly class Narrowing
     }
 
     /**
-     * The rule as warden's own group, or nothing when there is no rule. Only the
-     * permission screen needs it: everywhere else a condition is written by the
-     * fluent API, which serializes for itself.
-     */
-    /**
      * The columns whose condition can never hold for this entity.
      *
      * Warden's rule, called and not copied: `Group::unsatisfiableColumns()` is
@@ -324,6 +319,12 @@ final readonly class Narrowing
         return $group->unsatisfiableColumns(new $entity);
     }
 
+    /**
+     * The rule as warden's own group, or nothing for any shape but
+     * `Conditions`. The permission screen writes it to the catalogue row and
+     * `unsatisfiableColumns()` hands it to warden; everywhere else a condition
+     * is written by the fluent API, which serializes for itself.
+     */
     public function toGroup(): ?Group
     {
         if ($this->shape !== Shape::Conditions) {

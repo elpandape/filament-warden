@@ -38,17 +38,16 @@ enum Shape: string
      * `Tangled` is the one shape where the two answers differ. It means the
      * store holds two rules of one polarity for one cell, so the screen cannot
      * draw it and must not round it off into either — but emptying it reads
-     * nothing and rebuilds nothing, and warden has been able to reach both rows
-     * precisely since its `2.0.0` gave revocation by permission model. Without
-     * this, a cell that got tangled was stuck for the life of the installation
-     * with no way out of the panel at all.
+     * nothing and rebuilds nothing, and revoking by permission model reaches
+     * both rows precisely. Without this, a tangled cell would have no way out
+     * of the panel at all.
      *
      * The other two unwritable shapes stay unwritable in both directions, for
      * reasons that are not symmetric with this one. `Elsewhere` is another
-     * tenant's row and a write targets one exact scope, so clearing it would
-     * delete nothing and report success. `Unreadable` is a rule this version
-     * cannot parse — and a corrupt PROHIBITION fails closed, so taking it away
-     * removes protection nobody could read well enough to consent to losing.
+     * tenant's row, where a write deletes nothing and reports success (see
+     * `Narrowing::elsewhere()`). `Unreadable` is a rule this version cannot
+     * parse — and a corrupt PROHIBITION fails closed, so taking it away removes
+     * protection nobody could read well enough to consent to losing.
      */
     public function isClearable(): bool
     {
@@ -56,8 +55,9 @@ enum Shape: string
     }
 
     /**
-     * Every rule that does not hold for every row needs a record in front of it,
-     * and therefore never matches a class check.
+     * Every rule that does not hold for every row needs a record in front of it:
+     * a class check resolves no ownership and evaluates no condition, so such a
+     * grant never matches one.
      */
     public function isNarrowed(): bool
     {

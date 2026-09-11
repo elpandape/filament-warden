@@ -12,9 +12,10 @@ use ElPandaPe\Warden\Enums\ComparisonOperator;
  * browser.
  *
  * The two screens that draw a condition — the cell inspector and the permission
- * form — say the same things, so they read them from the same place. What the
- * browser is never given is a rule: the only one it decides for itself is the
- * clause cut, and its authority is `Narrowing::clauses()`.
+ * form — say the same things, so they read them from the same place. Only the
+ * words, though: what the browser re-derives between keystrokes — the clause
+ * cut, the preview line, the boolean warnings — keeps its authority in
+ * `Narrowing`.
  */
 final class Words
 {
@@ -39,22 +40,10 @@ final class Words
             'boolean' => self::line('boolean'),
             'boolean_column' => self::line('boolean_column'),
             // Written out by hand and never derived from `LogicalOperator::cases()`,
-            // and warden 3.0 says so itself: the enum's own docblock now reads
-            // "Do not derive a connector list from cases(): the third one is not
-            // a connector anything will store."
-            //
-            // The reason changed with that release and got sharper, so the old
-            // one is not worth keeping: `Not` used to read as a conjunction in a
-            // hand-built group and be refused on the way to disk, which made a
-            // derived list an operator no SAVE could accept. It now THROWS when
-            // the group is evaluated. So a derived list would offer an operator
-            // that saves fine and blows up on the next check — later, and worse.
-            //
-            // The 2.x note said closing this needed a published signature to
-            // move and therefore could not land in a minor. It landed in 3.0
-            // without moving one: `Contracts\Constraint::passes()` kept its
-            // signature. Aligning the two lists is not the answer either way —
-            // warden has ruled the third case out of any list, permanently.
+            // as the enum's own docblock in warden asks: "Do not derive a
+            // connector list from cases(): the third one is not a connector
+            // anything will store." `Not` is refused on the way to disk and
+            // throws when a group is evaluated.
             'joiners' => [
                 'and' => self::line('and'),
                 'or' => self::line('or'),

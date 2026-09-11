@@ -22,8 +22,7 @@ use Throwable;
  * would resolve the default one.
  *
  * `getColumns()` rather than `getColumnListing()` because the rows carry the
- * schema's type name, which `texts()` needs. `booleans()` is a different
- * question and asks the model's casts instead.
+ * schema's type name, which `texts()` needs.
  */
 final class Columns
 {
@@ -94,21 +93,19 @@ final class Columns
     }
 
     /**
-     * The class behind that guard, when there is one to name.
-     *
      * @return class-string<Model>|null
      */
     public static function authorityModel(): ?string
     {
-        // Asked of the auth manager and not of the guard: `getProvider()` is not
-        // on the `Guard` contract, so a panel guard that is not a session guard
-        // would not answer it.
         // Nullable in the signature and never null in fact: it throws when there
         // is no panel at all, which is the only way it could answer null.
         /** @var Panel $panel */
         $panel = Filament::getCurrentOrDefaultPanel();
         $name = config('auth.guards.'.$panel->getAuthGuard().'.provider');
 
+        // Asked of the auth manager and not of the guard: `getProvider()` is not
+        // on the `Guard` contract, so a panel guard that is not a session guard
+        // would not answer it.
         $provider = Auth::createUserProvider(is_string($name) ? $name : null);
 
         // Only an eloquent provider knows a model, and only a model has a table.
