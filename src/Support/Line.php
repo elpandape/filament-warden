@@ -9,9 +9,8 @@ use Illuminate\Support\Str;
 /**
  * A translated line, under one of the two fallback policies that are shared.
  *
- * Seven places wrote one of these out, and the copies were not identical, which
- * is the part worth keeping rather than the count. Two of the policies are
- * general and live here; which one a caller needs depends on **whose key it is**:
+ * Two of the policies are general and live here; which one a caller needs
+ * depends on **whose key it is**:
  *
  * - `of()` is for a key this package ships. It must exist, so there is nothing
  *   to fall back to; the only guard is against a translation file handing back

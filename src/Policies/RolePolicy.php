@@ -8,8 +8,8 @@ use ElPandaPe\Warden\Context;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Registered by this package's own service provider: the model lives in vendor
- * and Laravel's policy guessing only ever looks beside it, never here.
+ * Registered by `FilamentWardenServiceProvider::registerPolicies()`, which
+ * says why Laravel's own guessing never finds it.
  *
  * Six actions and no more. Neither model has soft deletes, so there is no restore
  * and no force delete; the grid neither reorders nor replicates. Under

@@ -19,8 +19,7 @@ use Illuminate\Database\Eloquent\Model;
  *
  * It only hands roles OUT. You lock yourself out by not having a role, never by
  * having one, and a console command that takes access away turns a typo into
- * lost access — the same reason the audit command of a later version does not
- * delete.
+ * lost access — the same reason `filament-warden:audit` does not delete.
  */
 final class AssignRoleCommand extends Command
 {

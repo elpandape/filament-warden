@@ -9,9 +9,8 @@ use RuntimeException;
 /**
  * A panel that would have started with a screen nobody guards.
  *
- * Thrown at panel boot rather than reported, because reporting is what the
- * generation before this one did: a test that says who gets in, and nothing that
- * stops them. Filament's own `canAccess()` and `canView()` return `true`
+ * Thrown at panel boot rather than reported: a report says who gets in and
+ * stops nobody. Filament's own `canAccess()` and `canView()` return `true`
  * literally and `->strictAuthorization()` never reaches a page or a widget, so
  * this is the only thing standing between an unguarded screen and everybody.
  *

@@ -59,9 +59,6 @@ final class Catalog
      * a `RelationManagerConfiguration` whose `$relationManager` is public and
      * readonly — the same unwrapping a widget configuration already gets.
      *
-     * A group built with a closure instead of an array makes `getManagers()`
-     * fatal, so it is asked for its managers inside a guard rather than trusted.
-     *
      * @param  class-string<\Filament\Resources\Resource>  $resource
      * @return list<class-string<RelationManager>>
      */
@@ -79,9 +76,8 @@ final class Catalog
     }
 
     /**
-     * Public for the same reason `pageClasses()` is: the audit reports on exactly
-     * the resources the catalogue walks, and two walks that could disagree would
-     * be worse than a wider door.
+     * Public for the same reason as `pageClasses()`: the audit reports on
+     * exactly the resources the catalogue walks.
      *
      * @return list<class-string<\Filament\Resources\Resource>>
      */
@@ -143,10 +139,10 @@ final class Catalog
     /**
      * Every panel's catalogue at once, deduplicated.
      *
-     * The permissions table is not per panel and the catalogue is, so a row
-     * derived from another panel's resource read as declared by nobody while
-     * the audit — which has walked every panel since it learned to — said the
-     * opposite. The screen and the command now ask the same question.
+     * The permissions table is not per panel and the catalogue is: asked of one
+     * panel, a row derived from another panel's resource would read as declared
+     * by nobody, while the audit, which walks every panel, says otherwise. The
+     * union is the question both ask.
      *
      * The panel list arrives explicitly, the way `Audit::of()` takes it, so
      * this is testable against panels built by hand; a method that reached for
@@ -185,13 +181,12 @@ final class Catalog
 
     /**
      * NOT what protects a suite rebuilding a panel under the same id per test:
-     * that is `read()`'s `===` check, and emptying this body leaves the whole
-     * suite green even run sequentially.
+     * that is `read()`'s `===` check.
      *
      * What it bounds is how many entries a long-running process minting
-     * short-lived ids can accumulate. And it is the one thing that would notice
-     * a test reusing the very same `Panel` object across two cases with
-     * different config, which defeats the identity check by construction.
+     * short-lived ids can accumulate. And it is the only reset for a test
+     * reusing the very same `Panel` object across two cases with different
+     * config, which defeats the identity check by construction.
      */
     public static function forget(): void
     {
@@ -200,25 +195,21 @@ final class Catalog
     }
 
     /**
-     * Keyed by panel id and not by the panel object: it is the id a caller
-     * actually has (`Filament::getCurrentPanel()`, a route parameter), never the
-     * object, and `PanelRegistry::register()` keys its own array by id the same
-     * way. But an id alone can lie — this very suite builds a fresh
-     * `Panel::make()->id('scratch')` in dozens of tests — so the stored panel is
-     * compared with `===` on every read: a second object sharing an old id is
-     * never served the first one's catalogue. A memo that could hand back the
-     * wrong panel's rows would not be a slow screen, it would be a permission
-     * grid answering for someone else's panel. `Panel` has no `Stringable`
-     * contract and no value-equality of its own to fall back on, so identity
-     * is the only honest comparison available.
+     * Keyed by panel id, the way `PanelRegistry::register()` keys its own
+     * array, so a later `Panel` under the same id replaces the slot rather than
+     * adding one: growth is bounded by distinct ids. But an id alone can lie —
+     * this very suite builds a fresh `Panel::make()->id('scratch')` in dozens
+     * of tests — so the stored panel is compared with `===` on every read: a
+     * second object sharing an old id is never served the first one's
+     * catalogue. A memo that could hand back the wrong panel's rows would not
+     * be a slow screen, it would be a permission grid answering for someone
+     * else's panel. `Panel` has no `Stringable` contract and no value-equality
+     * of its own to fall back on, so identity is the only honest comparison
+     * available.
      *
-     * The slot keeps a STRONG reference to `$panel`, which is what makes `===`
-     * trustworthy: PHP recycles an object handle only once nothing holds it
-     * live, and this memo does. A weak one would reopen the handle-reuse hole
-     * `Holders` names.
-     *
-     * A later `Panel` under the same id replaces the slot rather than adding
-     * one, so growth is bounded by distinct ids.
+     * The slot holds `$panel` itself, so its handle cannot be recycled while
+     * the entry lives, and `===` compares instances rather than an id PHP can
+     * hand to a new object once the old one is gone.
      */
     private static function read(Panel $panel): self
     {
@@ -283,8 +274,8 @@ final class Catalog
      * owner model built and the relation method run, which can hit an abstract
      * class, a `booted()` that throws, or a relation that reads request state and
      * dies in console — and a `MorphTo` does not fail at all: it quietly answers
-     * with the OWNER's model. So the free half is walked here, and the rest is
-     * named by the audit with the line of `catalog.models` that settles it.
+     * with the OWNER's model. So the free half is walked here, and
+     * `Audit::unwalkable()` names the rest.
      *
      * @return list<Entry>
      */
@@ -304,9 +295,6 @@ final class Catalog
     }
 
     /**
-     * The resources a resource's relation managers point at, for the ones that
-     * point at all.
-     *
      * @param  class-string<\Filament\Resources\Resource>  $resource
      * @return list<class-string<\Filament\Resources\Resource>>
      */
@@ -358,9 +346,12 @@ final class Catalog
     }
 
     /**
-     * The package's own two models. Today they have a policy and no resource,
-     * which is exactly what `catalog.models` describes; from the version that
-     * registers their resources, the resource entry wins the deduplication.
+     * Warden's role and permission models, which carry this package's
+     * policies. Where the plugin's resources are registered their resource
+     * entries win the deduplication, since `fromResources()` runs before this in
+     * `read()` and `deduplicate()` keeps the first entry per key; on a panel
+     * without them — `roles(false)`, `permissions(false)` or no plugin at all —
+     * this is what keeps their actions in the catalogue.
      *
      * @return list<Entry>
      */
@@ -448,7 +439,7 @@ final class Catalog
         // `Resource::getModel()` GUESSES `App\Models\{Basename}` when the
         // resource does not declare one, so a resource that forgot it points at a
         // class nobody wrote. Without this the whole grid dies on an `Error`
-        // naming that class — measured. The audit names the resource instead.
+        // naming that class; the audit names the resource instead.
         if (! class_exists($model)) {
             return [];
         }

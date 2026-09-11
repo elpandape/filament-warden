@@ -61,7 +61,7 @@ final class Abilities
      * and open it — `App\Policies\PostPolicy::update()`.
      *
      * Asked through the same guard `of()` uses and never a second copy of it:
-     * `Gate::getPolicyFor()` is not total (§6.9), and a screen that let a
+     * `Gate::getPolicyFor()` is not total, and a screen that let a
      * BindingResolutionException out would take a whole infolist with it over a
      * sentence.
      *
@@ -70,8 +70,8 @@ final class Abilities
      * `HandlesAuthorization`, and naming it as the declarer of a permission
      * called `denyWithStatus` would be a true sentence about the wrong thing.
      *
-     * Null when nothing declares it, which is a real answer and the one the
-     * audit calls forgotten — never a guessed class name.
+     * Null when nothing declares it, which is a real answer and never a guessed
+     * class name.
      *
      * @param  class-string  $model
      */
@@ -81,13 +81,12 @@ final class Abilities
             return null;
         }
 
-        // No `try` of its own, and no null branch either: `of()` above has
-        // already asked this exact question through the guard that catches
-        // (§6.9), and it answers `[]` for every case where this call throws or
-        // comes back null — so the `in_array` guard has already returned by
-        // then. A second catch here would be a line nothing can reach, and this
-        // project's coverage gate runs at 100% with no baseline, which is what
-        // turns "looks careful" into "is dead".
+        // No `try` of its own: `of()` above has already asked this exact
+        // question through the guard that catches, and it answers `[]` for
+        // every case where this call throws or comes back null — so the
+        // `in_array` guard has already returned by then. A second catch would
+        // be a line coverage can never reach; the `null` below is there for the
+        // type, not for a case that happens.
         $policy = Gate::getPolicyFor($model);
 
         return is_object($policy) ? $policy::class.'::'.$action.'()' : null;

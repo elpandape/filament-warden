@@ -14,8 +14,8 @@ use Illuminate\Database\Eloquent\Model;
  *
  * It brings no abilities of its own, and that is the point: the methods a policy
  * declares are exactly the actions that exist for its model. A base serving
- * twelve as a matter of course would put restore and force delete in front of an
- * administrator for a model that has neither.
+ * every conventional ability as a matter of course would put restore and force
+ * delete in front of an administrator for a model that has neither.
  */
 abstract class WardenPolicy
 {

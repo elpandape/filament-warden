@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Model;
  * `Unknown` is the interesting one: nothing in the panel declares this
  * permission, so nothing will ever ask for it — a renamed policy method, a typo
  * in a seeder, a screen that was deleted. It is the silent mistake warden cannot
- * detect, and the audit command of a later version reports it in bulk.
+ * detect, and `filament-warden:audit` reports it in bulk.
  */
 enum Provenance: string
 {
@@ -67,8 +67,8 @@ enum Provenance: string
      * catalogue through both.
      *
      * The declared half is an OR of exact pairs, which is the only portable way
-     * to ask `(name, entity_type) in (…)`. A catalogue is dozens of entries, not
-     * thousands, and the chain is built once per request.
+     * to ask `(name, entity_type) in (…)`: at most one pair per catalogue
+     * entry, and the chain is built once per request.
      *
      * @template TModel of Model
      *
@@ -79,7 +79,7 @@ enum Provenance: string
         // Null-safe on purpose. `entity_type = '*'` is UNKNOWN and not false for
         // a loose permission, so `NOT (… OR …)` is UNKNOWN too and SQL drops the
         // row — every loose permission would fall out of every filter but the
-        // wildcard's, silently. Same family as `where('col', null)`.
+        // wildcard's, silently.
         $wildcard = static function (Builder $query): void {
             $query->where('name', '*')
                 ->orWhere(static function (Builder $query): void {
@@ -93,7 +93,6 @@ enum Provenance: string
             return;
         }
 
-        // Everything below is "not the wildcard, and declared like this".
         $query->whereNot($wildcard);
 
         $everything = $this === self::Unknown;
@@ -109,7 +108,7 @@ enum Provenance: string
                         // Spelled out rather than left to `where()`, which
                         // already redirects a null value to `whereNull()` on
                         // its own. Defensive, not corrective: the branch is
-                        // here so a reader does not have to know that (§6.24).
+                        // here so a reader does not have to know that.
                         $entry->entityType === null
                             ? $query->where('name', $entry->name)->whereNull('entity_type')
                             : $query->where('name', $entry->name)->where('entity_type', $entry->entityType);

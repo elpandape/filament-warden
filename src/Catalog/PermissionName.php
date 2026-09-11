@@ -66,7 +66,7 @@ final class PermissionName
      * somebody else's database, so a new shape is a MAJOR and `FrozenTest` says
      * so. Nothing here may delegate to a moving target — and "warden's answer
      * for today" IS one: warden replaces a shape rather than adding one, which
-     * drops the wording an installation already carried (§6.40). Warden's half
+     * drops the wording an installation already carried. Warden's half
      * comes from `PermissionTitle::generations()`, which is frozen per release
      * on warden's side; the two shapes below are this package's own and are
      * frozen here.
@@ -86,8 +86,7 @@ final class PermissionName
         }
 
         return [
-            // What warden writes for a permission with no entity, in both the
-            // shape it writes today and the one it wrote before 2.0.
+            // Every shape warden has written for a permission with no entity.
             ...self::wardens($name, null, false),
             // What `0.9.1` wrote: the screen, with no verb at all.
             $screen,
@@ -97,15 +96,9 @@ final class PermissionName
     }
 
     /**
-     * Warden's answer for this row, in every shape warden has written it.
-     *
-     * Asked of warden rather than transcribed here, which is the whole point:
-     * this list used to hold warden's answer for TODAY beside a frozen copy of
-     * `1.x`, and warden `2.0.1` then corrected `2.0.0`'s wording — so the shape
-     * `2.0.0` had already written into real catalogues fell out of the list and
-     * stopped being recognised as warden's. `generations()` is frozen per
-     * warden release and only ever grows, so the shape a row was titled with
-     * survives the generator moving on.
+     * Warden's answer for this row, in every shape warden has written it —
+     * asked of warden rather than transcribed, for the reason `generated()`
+     * gives.
      *
      * @return list<string>
      */
@@ -114,10 +107,6 @@ final class PermissionName
         return PermissionTitle::generations($name, $entityType, null, $onlyOwned);
     }
 
-    /**
-     * `canAccess()` for a page and a panel, `canView()` for a widget — Filament's
-     * own two questions, and the reason this package has two traits and not one.
-     */
     private static function verb(string $name): string
     {
         return str_starts_with($name, 'widget:') ? 'View' : 'Access';

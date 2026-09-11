@@ -20,11 +20,8 @@ use Illuminate\Console\Command;
  * whole of Filament, the HTTP middleware, so no artisan command ever starts a
  * panel.
  *
- * Two of the lists are informational and never reach the exit code: permissions the
- * catalogue declares that no grant points at, and grants whose authority no longer
- * exists. Turning a grid cell off leaves exactly the first behind, so a build that
- * went red on it would go red on every save and stay red; and the second has no cure
- * inside this package at all.
+ * The informational lists never reach the exit code: `Audit::isClean()` is the
+ * one place that decides which, and says why.
  */
 final class AuditCommand extends Command
 {
@@ -74,11 +71,11 @@ final class AuditCommand extends Command
     /**
      * The panels to audit, or null when the name given matches none.
      *
-     * The same shape `filament-warden:catalog` carries, and it
-     * gets its own sentence rather than borrowing that command's: the two are
-     * separate keys because a published translation may have one and not the
-     * other, and a reader chasing "no panel with that id" should land on the
-     * command that said it.
+     * The same shape `filament-warden:catalog` carries, and it gets its own
+     * sentence rather than borrowing that command's: the two are separate keys
+     * because a published translation may have one and not the other, and a
+     * reader chasing "no panel with that id" should land on the command that
+     * said it.
      *
      * @return list<Panel>|null
      */
