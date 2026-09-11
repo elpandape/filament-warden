@@ -23,10 +23,9 @@ use WeakMap;
  * A denial is a state and not an absence, so it is counted apart rather than
  * left out.
  *
- * Memoised per record, by identity: `PermissionInfolist` alone asks `of()`
- * five times over the same `$record`, and the two lock checks on
- * `PermissionResource` ask `anyFor()` again on every field they gate — three
- * times over for `name` alone once Filament re-evaluates its `helperText()`.
+ * Memoised per record, by identity: `PermissionInfolist` asks `of()` for every
+ * count it shows over the same `$record`, and `PermissionResource`'s lock
+ * checks ask `anyFor()` again each time Filament re-evaluates them.
  *
  * A `WeakMap<Model, self>` and never `once()`, which is a trap from a static
  * context: `Onceable::objectFromTrace()` reads `$trace[1]['object']`, which a
@@ -36,10 +35,6 @@ use WeakMap;
  * collected. A permission read, freed and replaced at the same address would
  * inherit the first one's holders. A `WeakMap` keys on the object itself and
  * drops its entry when the model is collected.
- *
- * Every read here is pure, so the answer can only go stale if other code
- * writes a grant and hands back the same instance. `forget()` is the escape
- * hatch for that, and it is exercised rather than decorative.
  */
 final class Holders
 {
@@ -85,17 +80,12 @@ final class Holders
      * forbidden, to a role, an account or everyone — without building a
      * single label.
      *
-     * `isOrphaned()` answers the same question for every row this class ever
-     * reads for real: `build()` folds a forbidding-only grant into the tally
-     * exactly like a granting one, and BOTH authorities are counted from the
-     * keys the grants carry rather than from the records those keys resolve to
-     * — so a grant whose role or account has since been deleted still counts,
-     * and the only way `isOrphaned()` comes back true is that no `grants` row
-     * named this permission at all, which is this method's `EXISTS`,
-     * unqualified. Counting the roles from the records instead is what made
-     * this sentence false: nothing cascades a role's own grants (there is no
-     * foreign key on `grants.entity_type`/`entity_id`), so those rows outlive
-     * their authority and a screen that counted labels called them nobody.
+     * The same answer as `! of($permission)->isOrphaned()`: `build()` folds a
+     * forbidding-only grant into the tally like a granting one, and counts both
+     * authorities from the keys the grants carry rather than from the records
+     * those keys resolve to. An account's grants outlive the account, and a
+     * role's outlive a role deleted without model events — warden sweeps only a
+     * role's own grants, on `eloquent.deleted` — and those rows still count.
      */
     public static function anyFor(Model $permission): bool
     {
@@ -111,13 +101,9 @@ final class Holders
      * Drops the memoised answer for one record, so the next `of()` or
      * `anyFor()` reads the store again.
      *
-     * Nothing in `src/` calls this today: no screen this class serves writes
-     * a grant and then asks about the same permission again in the same
-     * request. It exists because a memo that cannot be told "that answer is
-     * stale now" is not a cache, it is a trap with the same shape as the one
-     * this class's own docblock rejects — and the test that pins the
-     * read-write-read guarantee calls it directly to prove the escape hatch
-     * actually opens.
+     * Every read here is pure, so an answer only goes stale when a grant is
+     * written and the same instance is asked again in one request — which is
+     * what `ViewPermission` does after a hand-out.
      */
     public static function forget(Model $permission): void
     {
@@ -168,15 +154,12 @@ final class Holders
         // CASCADE IS BLIND TO THE SCOPE. Counting only the active tenant's would
         // promise a smaller loss than the delete actually causes.
         //
-        // It is the one place in this package that reads wider than warden would
-        // answer, and the screen says so.
-        //
-        // Wider in the other axis too, since 3.0: no `Expiry::live()` here
-        // either. A lapsed grant authorises nothing and the cascade still takes
-        // it, so counting it over-warns about a delete and over-locks a name —
-        // both in the safe direction. Splitting this into a live count and a
-        // doomed one is a screen's question, not this class's: it answers what
-        // a delete destroys.
+        // Wider in the other axis too: no `Expiry::live()` here either. A lapsed
+        // grant authorises nothing and the cascade still takes it, so counting
+        // it over-warns about a delete and over-locks a name — both in the safe
+        // direction. Splitting this into a live count and a doomed one is a
+        // screen's question, not this class's: it answers what a delete
+        // destroys.
         $grants = $context->grantClass()::query()
             ->withoutGlobalScope(TenantScope::class)
             ->where('permission_id', $permission->getKey())
@@ -202,10 +185,8 @@ final class Holders
             // rather than running its own count.
             //
             // The boundary is warden's: exclusive, so a row expires AT the
-            // instant it names rather than a tick later. Read in PHP and not in
-            // SQL because this query is deliberately the wide one — it answers
-            // what a delete destroys — and adding `Expiry::live()` to it would
-            // change that answer rather than add to it.
+            // instant it names rather than a tick later. Read in PHP because the
+            // query above has to stay the wide one.
             $ends = $grant->getAttribute('expires_at');
 
             if ($ends instanceof DateTimeInterface) {

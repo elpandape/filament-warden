@@ -11,24 +11,22 @@ use ElPandaPe\FilamentWarden\Conditions\Narrowing;
  * What a role says today, in the shape the grid holds it.
  *
  * `narrowings` is how far each cell reaches: every row, only what it owns, with
- * these conditions — or one of the two states this screen can read and cannot
- * draw, which are shown and left alone.
+ * these conditions — or a state this screen can read and cannot draw, which is
+ * shown and never rewritten.
  *
  * `wider` is what the grid cannot hold at all — a rule written over `*`, every
  * entity at once. It owns no cell, so it is reported rather than drawn as one:
  * the role that holds everything must not read as a role that holds nothing.
  *
  * `records` is the opposite mistake waiting to happen — a rule narrower than a
- * cell, pinned to one row. It answers no class check, so it is neither a cell
- * nor a wider rule: it is reported, and nothing here offers to change it.
+ * cell, pinned to one row: reported, and never offered for change
+ * (`RecordGrant` says why).
  *
  * `inherited` is a cell this role answers through another: nesting puts an
  * inner role's grants behind the outer one's, so a cell nobody wrote here can
  * still say yes. It carries the LENDER's name, because a hollow tick with no
- * link is the wildcard mistake of §6.11 wearing another hat — the most
- * dangerous role in an installation reading as a role that holds nothing. Only
- * cells with no rule of their own are in it: a rule of its own is what is in
- * force, and an inherited answer underneath it is noise.
+ * link says yes without saying who does. Only cells with no rule of their own
+ * are in it (`RoleGrants::inheritedCells()` says why).
  *
  * `untils` is when a cell stops. It is per GRANT, never per catalogue row: two
  * roles pointing at the same permission can end on different days, which is the
@@ -70,11 +68,11 @@ final readonly class RoleState
     /**
      * The store, in the shape the browser holds it.
      *
-     * Both screens hand alpine this and nothing else: the form as a live binding
-     * it writes back, the screen that only reads as a literal. It has to be the
-     * whole thing either way, because every cell is re-derived from it the
-     * moment alpine boots — a screen that handed over an empty object drew an
-     * empty grid over a correct one and tallied zero.
+     * Both screens hand alpine this: the form as a live binding it writes back,
+     * with a copy beside it as its baseline, the screen that only reads as a
+     * literal. It has to be the whole thing either way, because every cell is
+     * re-derived from it the moment alpine boots — an empty object draws an
+     * empty grid over a correct one and tallies zero.
      *
      * Only the narrowed cells travel: one that is not in the map reaches every
      * row. And only the ones a screen can draw — a rule it cannot is drawn from

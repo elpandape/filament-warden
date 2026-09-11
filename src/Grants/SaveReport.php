@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace ElPandaPe\FilamentWarden\Grants;
 
 /**
- * What a save did, once two people can be editing the same role at once.
+ * What a save did, including where somebody else was editing the same role,
+ * or the same account, at once.
  *
  * A payload compared straight against the store reads every difference as
  * something this person wanted. Compared against the baseline the screen was
- * showing, a save has three outcomes instead of one (§6.36):
+ * showing, a save has three outcomes instead of one:
  *
  * - `written`: cells this person moved, with nobody else in the way.
  * - `preserved`: cells this person did NOT move and somebody else did. Nothing
@@ -18,6 +19,11 @@ namespace ElPandaPe\FilamentWarden\Grants;
  * - `refused`: cells this person moved that somebody else moved too, to
  *   something else. Their intent was not applied, and that is the half a
  *   notification has to say out loud rather than count.
+ *
+ * Three more lists name cells the save left alone for a reason of their own:
+ *
+ * - `unresolved`: cells holding more than one rule, asked to become anything
+ *   but empty. The screen cannot draw them, so it will not rebuild them.
  *
  * - `lapsed`: cells this person asked to grant until a moment that has already
  *   passed. Nothing was written, and nothing could have been: warden stops
@@ -28,27 +34,23 @@ namespace ElPandaPe\FilamentWarden\Grants;
  *   chasing the wrong problem.
  *
  * - `impossible`: cells whose rule can never be true — a boolean value against
- *   a column the model does not cast to bool, or the mirror of it. Warden
- *   refuses the write, and this package refuses it FIRST, because warden's
- *   refusal arrives after the plain grant beneath the condition is already
- *   written and a catch meant for two other causes swallows it.
+ *   a column the model does not cast to bool, or the mirror of it. Refused
+ *   before warden is asked, for the reason `RoleGrants::plan()` gives.
  *
- * `refused`, `unresolved`, `lapsed` and `impossible` carry the cell's own keys rather than a
- * sentence, because the words belong to the screen: the row and action keys the
- * grid is drawn from, so a caller looks their titles up in the catalogue it
- * already has.
+ * `refused`, `unresolved`, `lapsed` and `impossible` carry the cell's own keys
+ * rather than a sentence, because the words belong to the screen: the row and
+ * action keys the grid is drawn from, so a caller looks their titles up in the
+ * catalogue it already has.
  *
  * `granted`, `forbidden` and `revoked` split `written` by the stance each cell
  * was moved TO, so a save can say what it did rather than how much of it there
  * was. They are the grid's own breakdown and stay at zero on the account
  * screen, where a role is held or it is not and no stance exists to count.
  *
- * The account screen shares this class and never fills that list — a role is
- * held or it is not, so two people can only ever have moved one the same way,
- * and `Assignment::apply()` explains why the branch does not exist. The shape
- * stays the grid's for the reason a wider one cost: typed as any map, pushing
- * a key `PermissionGrid::refusedCells()` does not read passes `level: max` and
- * fails at runtime instead. A shape no code produces is not worth a static guarantee.
+ * The account screen never fills `refused` either (`Assignment::apply()` says
+ * why), and the list keeps the grid's shape anyway: typed as any map, a key
+ * `PermissionGrid::refusedCells()` does not read would pass `level: max` and
+ * fail at runtime instead.
  */
 final readonly class SaveReport
 {
@@ -71,10 +73,8 @@ final readonly class SaveReport
     ) {}
 
     /**
-     * Whether anybody else's edit met this one.
-     *
-     * A save that met nobody keeps the notification it has always had; only
-     * this answers whether there is anything more to say.
+     * Whether anybody else's edit met this one — what decides whether a save
+     * says anything about other people at all.
      */
     public function metAnother(): bool
     {

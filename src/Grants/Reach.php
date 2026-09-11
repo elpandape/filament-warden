@@ -16,25 +16,15 @@ use Throwable;
  *
  * Asked and never volunteered: one `whereCan()` costs a handful of queries with
  * no memoisation and no cache, so a listing column would multiply it by every
- * row on the page. The count is deliberately not written down as one number —
- * it depends on the grant's shape, measured against a query log on warden 2.2.1
- * at five for a plain one, four of them preamble and one the caller's own
- * select, and more for a `toOwn()`, whose ownership check asks the schema and
- * pays twice for it on sqlite. Warden 2.2.0 partitions a single `assigned_roles`
- * read in PHP where it used to run three, so the preamble went from six to four.
- * It does not hydrate the whole candidate catalogue either: warden filters the
- * candidates in SQL by name, entity type and a `whereExists` on the grant.
+ * row on the page. How many depends on the grant's shape, which is why no
+ * number is written down here.
  *
- * And the number is a LOWER BOUND, not the truth. `whereCan()` and the panel's
- * own checks do not answer the same thing, measured in both directions, and a
- * single assignment misses both ways: `WhereCan::activeKeys()` leaves a role
- * assigned with a context out of the grant pass and counts it in the forbid
- * pass, so such a role grants rows the query cannot see and blocks rows the
- * panel lets through. It also never consults the Gate, so a policy that denies
- * is invisible to it — and that one is true of every count, not only the
- * partial ones, which is why both sentences carry it. So this says when it
- * cannot be trusted, rather than printing a number and letting somebody decide
- * on it.
+ * And the number is not the panel's answer. `whereCan()` never consults the
+ * Gate, so a policy that denies is invisible to it and the panel may answer for
+ * fewer rows — true of every count, which is why both sentences carry it. A
+ * role assigned with a context pulls the other way (see `restricted()`): with
+ * one, the count is only a lower bound. So this says when it cannot be trusted,
+ * rather than printing a number and letting somebody decide on it.
  */
 final readonly class Reach
 {
@@ -73,17 +63,12 @@ final readonly class Reach
         try {
             $total = $model::query()->count();
 
-            // The scope the trait adds, which is exactly what was checked for
-            // just above.
             $matched = $model::query()->whereCan($authority, $name)->count();
         } catch (Throwable $throwable) {
             // A stored condition naming a column the table does not have is
             // compiled into the query, and the database refuses the statement.
-            //
-            // Ownership used to land here too and no longer does: warden's
-            // `1.1.0` put a `hasColumn()` in front of it in
-            // `Checks/Queries/WhereCan.php`, so that half now fails closed and
-            // answers no rows instead of throwing.
+            // Ownership never lands here: `WhereCan::ownershipAttribute()`
+            // checks the column first and fails closed instead of throwing.
             return new self(false, reason: self::line('failed', ['message' => $throwable->getMessage()]));
         }
 
@@ -95,9 +80,6 @@ final readonly class Reach
         );
     }
 
-    /**
-     * The sentence a person reads, with the caveat where the caveat belongs.
-     */
     public function sentence(): string
     {
         if (! $this->available) {
@@ -132,7 +114,7 @@ final readonly class Reach
      *
      * A restricted assignment is excluded from the grant pass of `whereCan()` and
      * included in its forbid pass, so either way the count can disagree with what
-     * the panel answers. Measured both ways.
+     * the panel answers.
      */
     private static function restricted(Model $authority): bool
     {

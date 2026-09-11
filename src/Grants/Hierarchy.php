@@ -14,10 +14,10 @@ use Illuminate\Database\Eloquent\Model;
  * Which roles a role reaches, and which reach it.
  *
  * The walk is warden's — `RoleClosure::for()` and `::reaching()` — and it is
- * called, never copied: it honours `warden.roles.nested`, stops at
- * `warden.roles.max_depth` instead of throwing on a cycle, and filters expiry
- * on every edge. A second implementation here would be a second answer to the
- * question the engine already decides checks with.
+ * called, never copied: both stop at `warden.roles.max_depth` instead of
+ * throwing on a cycle and filter expiry on every edge, and `for()` honours
+ * `warden.roles.nested`. A second implementation here would be a second answer
+ * to the question the engine already decides checks with.
  *
  * The direct edges are read separately rather than picked out of the closure,
  * because the closure cannot tell them apart: `for()` returns every reachable
@@ -28,9 +28,8 @@ use Illuminate\Database\Eloquent\Model;
  *
  * `Role::nestedRoles()` is deliberately not used for either. It is a plain
  * `belongsToMany` with a pivot condition and NO expiry filter, so it lists an
- * edge the engine has already stopped reading — and writing through it would
- * lose the events, the actor and `until()` (§6.18, and the watchfulness rule
- * pinned in `PackageTest`).
+ * edge the engine has already stopped reading; `apply()` says why nothing
+ * writes through it either.
  */
 final readonly class Hierarchy
 {
@@ -169,8 +168,6 @@ final readonly class Hierarchy
     }
 
     /**
-     * The roles assigned straight to this one, live edges only.
-     *
      * @return list<int|string>
      */
     private static function edges(Model $role): array

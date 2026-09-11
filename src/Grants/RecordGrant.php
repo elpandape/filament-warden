@@ -40,8 +40,8 @@ final readonly class RecordGrant
      * to say.
      *
      * A rule pinned to one record and reaching every row of it is already what
-     * the line reads as, so repeating "Every row" beside it would be the same
-     * lie the permission screen's badge told.
+     * the line reads as, and "Every row" beside it would read as every row of
+     * the table.
      */
     public function reach(): ?string
     {

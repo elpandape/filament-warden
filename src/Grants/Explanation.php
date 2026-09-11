@@ -14,20 +14,17 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Why one cell is the way it is, in words.
  *
- * Three things it does that warden's own explanation cannot:
+ * Three things it adds to warden's own explanation:
  *
- *   - It tells "explicitly forbidden" apart from "warden abstains and your
- *     policies decide". `allowed()` is the only helper warden ships and it
- *     conflates them, which is exactly the distinction this panel exists for.
+ *   - It keeps "explicitly forbidden" apart from "warden abstains and your
+ *     policies decide", reading the verdict and never `allowed()`, which folds
+ *     the two together — and that distinction is what this panel exists for.
  *   - It says a rule is narrowed, and says WHY it could not have matched.
- *     Warden 2.0 answers `ConditionsNotMet` with the rejected row attached, so
- *     it no longer reads as "there is no such grant", and warden's own sentence
- *     stopped naming a record in its `2.0.1` after this package reported that it
- *     did. What stays this package's to draw is the half underneath: on a role
- *     grid a cell is asked about a CLASS, so a narrowed rule fails closed before
- *     a single condition is evaluated — "its conditions were not satisfied" is
- *     true and still not the reason. That is what the separate narrowed line
- *     says, and why it is not redundant with the cause.
+ *     `ConditionsNotMet` carries the rejected row, but on a role grid a cell is
+ *     asked about a CLASS, and a class check evaluates no condition and
+ *     resolves no ownership — "its conditions were not satisfied" is true and
+ *     still not the reason. That is what the separate narrowed line says, and
+ *     why it is not redundant with the cause.
  *   - It says when the screen and the store disagree, because the answer is
  *     always about what is stored and the person may have cycled the cell.
  */
@@ -61,8 +58,6 @@ final readonly class Explanation
 
         $cause = Cause::of($why->cause);
 
-        // Never `! allowed()`: forbidden and abstained are different answers, and
-        // telling them apart is the whole point of the panel.
         $verdict = match (true) {
             $why->verdict->isGranted() => Stance::Granted,
             $why->verdict->isForbidden() => Stance::Forbidden,
@@ -70,12 +65,11 @@ final readonly class Explanation
         };
 
         // Both are null in different causes, and not symmetrically. The role is
-        // null in seven of the nine — only the two via-a-role causes carry one.
-        // The permission is null in `NoMatchingGrant` and `NotApplicable`, and
-        // since warden 2.0 it is NOT null in the third abstaining cause:
-        // `ConditionsNotMet` hands back the very row whose conditions rejected
-        // the check. And a role only carries name, title and scope — reading
-        // anything else off it throws under strict mode.
+        // null in all but the two via-a-role causes. The permission is null in
+        // `NoMatchingGrant` and `NotApplicable` and NOT in the third abstaining
+        // cause: `ConditionsNotMet` hands back the very row whose conditions
+        // rejected the check. And a role only carries name, title and scope —
+        // reading anything else off it throws under strict mode.
         $permission = self::label($why->permission);
         $roleName = self::label($why->role);
 
@@ -105,13 +99,11 @@ final readonly class Explanation
      *
      * `explain()` reads the store, and on a create form there is nothing in it
      * to read: every cell abstains because none has been saved, not because
-     * warden looked and found nothing. Answering `[]` here was not silence —
-     * `[]` is truthy in the browser, and the template drew its verdict box with
-     * three undefined values in it, on the first screen a new admin opens.
+     * warden looked and found nothing. An empty array would not be silence —
+     * `[]` is truthy in the browser — so this is a real answer.
      *
-     * There is no cause, and none is invented. The raw case is printed beside
-     * the sentence so somebody can trace a verdict that does not add up; a
-     * borrowed one would be a false trail, which is worse than an empty slot.
+     * There is no cause, and none is invented: a borrowed one would be a false
+     * trail, which is worse than an empty slot.
      */
     public static function unsaved(): self
     {
@@ -142,7 +134,7 @@ final readonly class Explanation
     /**
      * The date beside warden's cause, never instead of it.
      *
-     * `Cause::Expired` does not exist: warden 3.0 filters expiry in SQL, so a
+     * `Cause::Expired` does not exist: warden filters expiry in SQL, so a
      * lapsed grant comes back as `NoMatchingGrant` — byte for byte what a cell
      * nobody ever wrote answers. The cause is true and it is not the story, so
      * this sentence goes alongside it rather than replacing it, the same way the
@@ -176,10 +168,6 @@ final readonly class Explanation
         return Line::of($key, $replace);
     }
 
-    /**
-     * The title if warden generated one, the name if it did not, and nothing at
-     * all when there is no row.
-     */
     private static function label(?Model $model): ?string
     {
         if (! $model instanceof Model) {

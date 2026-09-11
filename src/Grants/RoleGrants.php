@@ -29,10 +29,11 @@ use Illuminate\Support\Facades\DB;
 /**
  * Between what the grid says and what warden stores.
  *
- * It writes through the fluent API and never through the relation: the seven
- * places that invalidate the check cache all live inside warden's action
- * classes, so an `attach()` would leave every authority answering from a stale
- * payload.
+ * It writes through the fluent API and never through the relation: narrowing
+ * a grant (`where()` and the twin rows it resolves) and warden's grant events
+ * live only in its action classes, and `permissions()` fixes its write scope
+ * when the relation is built, so one held across a tenant switch would write
+ * at the scope it was born with.
  */
 final class RoleGrants
 {
@@ -47,27 +48,16 @@ final class RoleGrants
         $doors = self::doorNames($catalog);
 
         // Warden picks the scope of a write from the authority, and every write
-        // this class makes has the role as that authority. The read has to ask
-        // the same question: an installation keeping role grants global writes
-        // them at NULL while a tenant is active, and comparing them against the
-        // tenant reads a writable row as somebody else's.
+        // this class makes has the role as that authority, so the read asks the
+        // same question — `writable()` says what goes wrong when it does not.
         $forRoleGrant = $role instanceof (Context::resolve()->roleClass());
 
         // One reading of the clock for the whole pass. Two would let a row sit
         // on the live side of one comparison and the expired side of the next.
         $now = CarbonImmutable::now();
 
-        // What this role reaches through nesting. The flag IS read here, and the
-        // first version of this said it was not: `RoleClosure::for()` returns
-        // the DIRECT edges whether nesting is on or off, because for an account
-        // those direct edges are simply its roles. For a role authority they are
-        // the nesting edge itself, and with the flag off warden lends nothing
-        // through them — measured, with a role→role edge in the store reading as
-        // inherited when it grants nothing at all.
-        //
-        // The names come with it because a cell has to say WHICH role answers
-        // it; a tick with no link is the wildcard mistake of §6.11 wearing
-        // another hat.
+        // What this role reaches through nesting, by name, because a cell drawn
+        // from an inner role has to say WHICH role answers it.
         $inheritedFrom = self::inheritedFrom($role);
         $ownKey = self::identifier($role->getKey());
 
@@ -133,16 +123,14 @@ final class RoleGrants
                 continue;
             }
 
-            // No translation from warden's stored name to the grid's state key,
-            // because there is none to make: `StateKey::MANAGE` is DEFINED as the
-            // very name warden stores the extra column under, and the write half
-            // in `cells()` pairs the two on purpose. A ternary between them reads
-            // as a guard while both sides answer the same string, and no test can
-            // tell its branches apart — worse, it would absorb the one change that
-            // must not pass quietly. Measured: with the ternary in place, moving
-            // `MANAGE` off `'*'` kept every test green, and a policy declaring its
-            // own `manage` action would then have driven two writes from one cell.
-            // Without it, the pin in `RoleGrantsTest` goes red.
+            // No translation from warden's stored name to the grid's state key:
+            // `StateKey::MANAGE` is DEFINED as the very name warden stores, and
+            // `cells()` pairs the two on purpose. A ternary between them would
+            // read as a guard and absorb the one change that must not pass
+            // quietly — moving `MANAGE` to a name a policy can declare, such as
+            // `manage`, which would drive two writes from one cell.
+            // Without it, the pin in `RoleGrantsTest` goes red instead.
+            //
             // The entity travels with the pair because the reach cannot be judged
             // without it: whether a rule can ever be true is a question about the
             // model's casts. A door has none, and a door carries no conditions.
@@ -215,29 +203,19 @@ final class RoleGrants
             return $report;
         }
 
-        // One transaction for the whole grid, opened on warden's own
-        // connection rather than the default one. `Context::resolve()` is
-        // where every write in this class already asks, so a transaction on
-        // the wrong connection wraps queries that never run on it, leaving the
-        // ones that matter to commit one at a time as they go — and it
-        // silently disables a promise warden already makes:
-        // `CacheInvalidations::bump()` only schedules its after-commit second
-        // bump when `Context::resolve()->grantClass()`'s OWN connection reports
-        // `transactionLevel() > 0`. On a split-connection install a transaction
-        // on the default connection leaves that check reading zero always, so
-        // the second bump — the one that orphans a payload a concurrent reader
-        // rebuilt from pre-commit rows — never registers.
+        // One transaction for the whole grid, on warden's own connection: a
+        // transaction on another one wraps queries that never run on it, and
+        // `CacheInvalidations::bump()` schedules its after-commit second bump —
+        // the one that orphans a payload a concurrent reader rebuilt from
+        // pre-commit rows — only when `grantClass()`'s OWN connection reports
+        // `transactionLevel() > 0`.
         //
-        // Warden opens one of its own INSIDE this, and only sometimes:
-        // `GrantsPermissions::reconstrain()` wraps its per-permission loop in a
-        // transaction on that same connection, so a narrowing chain nests here
-        // rather than running bare. It arrives too late to replace this one.
-        // `to()` and `toOwn()` are wrapped only in `asOneWrite()`, which
-        // coalesces cache bumps and is not a database transaction, so without
-        // this wrapper the UNCONSTRAINED grant would already be committed —
-        // visible, and authorizing every instance — before `reconstrain()`
-        // opened anything. And a plain grant or revoke never calls
-        // `reconstrain()` at all, so it is this wrapper or nothing for them.
+        // The transaction `GrantsPermissions::reconstrain()` opens nests inside
+        // this one and cannot replace it: `to()` and `toOwn()` run only inside
+        // `asOneWrite()`, which coalesces cache bumps and is no database
+        // transaction, so the UNCONSTRAINED grant would commit — authorizing
+        // every instance — before `reconstrain()` opened anything. A plain
+        // grant or revoke never reaches `reconstrain()` at all.
         DB::connection(Context::resolve()->connection())->transaction(static function () use ($role, $changes): void {
             self::revoke($role, $changes);
             self::grant($role, $changes);
@@ -264,7 +242,7 @@ final class RoleGrants
      * A payload is not an intent. It is what the store held when the screen
      * opened PLUS whatever this person changed, and separating the two halves
      * is what keeps a cell somebody else moved from being quietly moved back —
-     * over every drawn cell, not only the ones this person touched (§6.36).
+     * over every drawn cell, not only the ones this person touched.
      *
      * With the baseline the screen was showing, each cell answers two questions
      * instead of one — did THIS person move it, and did the store move under
@@ -284,8 +262,7 @@ final class RoleGrants
      * A caller that passes no baseline is asserting a state outright rather
      * than relaying a form somebody had open — a console script, a seeder, a
      * test. There is no earlier screen to have drifted under, so every cell
-     * counts as touched, which is what this method did before there was a
-     * baseline at all.
+     * counts as touched.
      *
      * @param  array<string, array<string, string>>  $desired
      * @param  array<string, array<string, mixed>>|null  $narrowings
@@ -323,10 +300,10 @@ final class RoleGrants
             // A cell the grid cannot draw is a cell it must not write: rewriting
             // it would round it off into something it is not. Emptying one is a
             // different question — it reads no reach and rebuilds none — and for
-            // a tangled cell it is the only way out of the panel there has ever
-            // been. Anything else asked of a tangled cell is reported rather
-            // than skipped: the screen let the stance move, so silence would
-            // read as a save that worked.
+            // a tangled cell it is the only way out the panel offers. Anything
+            // else asked of a tangled cell is reported rather than skipped: the
+            // screen let the stance move, so silence would read as a save that
+            // worked.
             if (! $stored->isEditable()) {
                 if (! $stored->isClearable() || $from === $to) {
                     continue;
@@ -389,8 +366,8 @@ final class RoleGrants
             // narrowing gets written — the store's, or the one the browser sent
             // — and whether the DATE moved only decides that something has to be
             // written at all. Folding them into one flag would make a date-only
-            // edit rebuild the rule from a payload, which is the shape §6.33
-            // exists to keep shut.
+            // edit rebuild the rule from the payload, where every value travels
+            // as text and can come back as another type (see the write below).
             $reachMoved = ! $stored->is($wanted);
             $untilMoved = $storedUntil?->getTimestamp() !== $wantedUntil?->getTimestamp();
 
@@ -413,8 +390,8 @@ final class RoleGrants
                 // and that is the whole point: a substituted `Narrowing` can
                 // neutralise `is($wanted)` or `is($stored)` but never both, and
                 // the one it misses collapses into "the reach changed", which is
-                // true of every cleared cell. That refused a lone administrator's
-                // own revoke and told them a colleague had been editing.
+                // true of every cleared cell, so a lone administrator's own
+                // revoke would be refused as if a colleague had been editing.
                 $wasReach = $narrowings === null
                     ? null
                     : self::wanted($wasNarrowings[$row][$action] ?? null, $entity);
@@ -452,18 +429,12 @@ final class RoleGrants
 
             // A rule that can never be true is not written, in either half.
             //
-            // Warden refuses it since 3.0.0, and `narrow()` catches
-            // `ConfigurationException` for two other causes — so without this the
-            // refusal is swallowed and the PLAIN grant that `narrow()` already
-            // asked for stands. Measured on this branch: typing `title = true`
-            // against a text column and asking for a narrowed grant left one row
-            // with `options = null`, the cell redrawn as every row, and the check
-            // answering true for a record the rule never named. Under 2.2.2 the
-            // same write stored an inert condition and granted nothing, so the
-            // polarity of the failure inverted with the floor.
-            //
-            // Asked BEFORE warden rather than caught after it, because by the
-            // time it throws the plain grant is already written.
+            // Warden refuses it, and `narrow()` catches `ConfigurationException`
+            // for two other causes, so without this the refusal is swallowed
+            // and the PLAIN grant `narrow()` already asked for stands: the cell
+            // reads as every row, and the check answers true for records the
+            // rule never named. Asked BEFORE warden rather than caught after
+            // it, because by the time it throws the plain grant is written.
             $writing = $reachMoved ? $wanted : $stored;
 
             if ($entity !== null && $writing->unsatisfiableColumns($entity) !== []) {
@@ -559,11 +530,10 @@ final class RoleGrants
      * Whether a row at this scope is one this screen could write.
      *
      * Asked the way warden asks it. `writeScope()` bare answers the active
-     * tenant even for a grant warden itself would write at NULL, so an
-     * installation keeping role grants global had every one of them judged
-     * somebody else's: drawn locked, marked as another tenant's, and dropped
-     * from the diff — while `disallow()` would have deleted it. The pessimism
-     * was not conservative, it was wrong in both directions.
+     * tenant even for a grant warden itself writes at NULL, so an installation
+     * keeping role grants global would see every one of them judged somebody
+     * else's — drawn locked and dropped from the diff, while `disallow()`
+     * deletes it. That pessimism is wrong in both directions.
      *
      * Compared as text on purpose: warden types a tenant `int|string` while the
      * column is an integer, so a resolver handing back `'5'` must still match a
@@ -607,9 +577,8 @@ final class RoleGrants
 
     /**
      * Every step takes away whatever was there before it writes, for every
-     * change in the batch at once — and always before `grant()` runs, which
-     * grouping makes structural rather than a habit `write()` happened to
-     * follow per cell.
+     * change in the batch at once — and always before `grant()` runs, an order
+     * `apply()` makes structural by calling the two in turn.
      *
      * A grant chain does not make this redundant.
      * `GrantsPermissions::reconstrain()` does sweep every sibling twin of the
@@ -640,24 +609,16 @@ final class RoleGrants
      * believed was there.
      *
      * Grouped by entity rather than run once per changed cell:
-     * `RevokesPermissions::revoke()` accepts a list of names, resolves it with
-     * one `whereIn()` lookup through `ResolvesPermissions::findPermissions()`
-     * and, when there is anything
-     * to remove, one `delete()` — so four warden calls clear an entire
-     * entity's worth of changed cells instead of four calls PER cell. This is
-     * free of the TWIN problem specifically: revoking never creates one, so
-     * there is no `reconstrain()` to confuse by handing it more than one
-     * permission at a time.
+     * `RevokesPermissions::revoke()` takes a list of names, resolves it in one
+     * lookup and deletes once, so four warden calls clear an entity's changed
+     * cells. Revoking never creates a twin, so there is no `reconstrain()` to
+     * confuse by handing it more than one permission at a time.
      *
-     * It is not free of everything else. `revoke()`'s own cache bump and
-     * `PermissionRevoked`/`PermissionUnforbidden` event are gated on whether
-     * the `delete()` removed at least one row (`RevokesPermissions::revoke()`),
-     * and that gate now covers the WHOLE group. A name with nothing to revoke
-     * used to mean no bump and no event for it at all;
-     * grouped, that same name can ride inside a bump and an event that fire
-     * only because a sibling in the same call had a row removed — the
-     * event's collection still names every permission the group resolved,
-     * not only the one actually deleted.
+     * The gate widens with the group. `revoke()`'s cache bump and its
+     * `PermissionRevoked`/`PermissionUnforbidden` event fire when the
+     * `delete()` removed any row, so a name with nothing to revoke rides
+     * inside a sibling's bump and event, and the event names every permission
+     * the group resolved, not only the ones deleted.
      *
      * This path carries a pre-event, and it can veto a whole group.
      * `RevokesPermissions::revoke()` fires
@@ -762,27 +723,19 @@ final class RoleGrants
     /**
      * Every change that is not abstaining, written in up to two passes.
      *
-     * The honest promise is not "one write for the whole grid": it is that
-     * the warden calls a changed cell used to cost — up to four revokes
-     * (two for a door or loose name, which has no entity and so no
-     * `toOwn()` pair to revoke) plus one grant — become up to that same
-     * count per GROUP instead of per cell. A cell narrowed to `Shape::All`
-     * never reaches `toOwn()` at all — that call belongs to `Shape::Owned`,
-     * which is not grouped — so it costs nothing past its one `to()` call,
-     * and every such cell that shares (entity, stance) is asked for in one
-     * call. A cell narrowed any other way — `Shape::Owned`,
-     * `Shape::Conditions` — still runs alone, through `narrow()`, exactly as
-     * before: `where()`'s `reconstrain()` re-points EVERY permission
-     * in the chain's `lastGranted` at the same twin, and two different cells
-     * asking for two different conditions must never share one.
+     * A cell whose reach is `Shape::All` needs one `to()` call and nothing
+     * else, so every such cell sharing a stance, an entity and — for a grant
+     * — an end date is asked for in one call. A cell narrowed any other way
+     * runs alone, through `narrow()`: `where()`'s `reconstrain()` re-points
+     * EVERY permission in the chain's `lastGranted` at the same twin, and two
+     * cells asking for two different conditions must never share one.
      *
      * Grouping a grant changes more than its query count:
      * `GrantsPermissions::to()` fires one
      * `GrantingPermission`/`ForbiddingPermission` event per call, carrying
-     * every name it resolved, not one event per name. An application listening for that
-     * event to veto a single cell vetoes the whole group its cell landed in.
-     * Pinned by "a veto scoped to one name in the list kills every name
-     * grouped with it".
+     * every name it resolved. An application listening for that event to veto
+     * a single cell vetoes the whole group its cell landed in. Pinned by "a
+     * veto scoped to one name in the list kills every name grouped with it".
      *
      * @param  list<Change>  $changes
      */
@@ -824,10 +777,10 @@ final class RoleGrants
     }
 
     /**
-     * One `to()` call per entity, for cells that share it with nothing left to
-     * narrow. `settleTitle()` still runs once per name: it is a catalogue
-     * concern, not a grant one, and grouping the write must not skip it for
-     * any name that was in the group.
+     * One `to()` call per group of cells with nothing left to narrow.
+     * `settleTitle()` still runs once per name: it is a catalogue concern, not
+     * a grant one, and grouping the write must not skip it for any name that
+     * was in the group.
      *
      * @param  callable(): GrantsPermissions  $chain
      * @param  array<string, list<Change>>  $byEntity
@@ -836,8 +789,8 @@ final class RoleGrants
     {
         foreach ($byEntity as $group) {
             // Read off the group rather than parsed back out of its key: the key
-            // now carries the date too, and a key that has to be taken apart
-            // again is a second place the two halves can disagree.
+            // carries the date too, and a key that has to be taken apart again
+            // is a second place the two halves can disagree.
             $first = $group[0] ?? null;
 
             if (! $first instanceof Change) {
@@ -852,7 +805,7 @@ final class RoleGrants
             // Same reason as `narrow()`: a forbid chain refuses the call itself,
             // not just a date in it. The forbidden groups never carry one — the
             // plan drops it before a `Change` is built — so this is the second
-            // line holding one guarantee, and both are on the server (§6.24).
+            // line holding one guarantee, and both are on the server.
             if ($first->to === Stance::Granted) {
                 $started->until($first->until);
             }
@@ -876,10 +829,10 @@ final class RoleGrants
 
         // Before `to()`, and only on a grant. The write executes at `to()` and
         // warden throws rather than let a date be added to something already
-        // written — and `ForbidsPermissions::until()` throws UNCONDITIONALLY,
-        // measured: passing `null` is not a way to say "no end" to a forbid, it
-        // is still an error. So the stance decides whether the call happens at
-        // all, not what goes in it.
+        // written — and `ForbidsPermissions::until()` throws UNCONDITIONALLY:
+        // passing `null` is not a way to say "no end" to a forbid, it is still
+        // an error. So the stance decides whether the call happens at all, not
+        // what goes in it.
         if ($change->to === Stance::Granted) {
             $chain->until($change->until);
         }
@@ -899,7 +852,7 @@ final class RoleGrants
                 $rule->applyTo($chain, $index === 0);
             }
         } catch (ConfigurationException) {
-            // TWO causes reach here, not one, and neither is an error of this
+            // TWO causes reach here, and neither is an error of this
             // screen. A narrowing needs a grant in front of it, and an
             // application listening to `GrantingPermission` can veto the one
             // just asked for: nothing was granted, so there is nothing to
@@ -909,11 +862,13 @@ final class RoleGrants
             // asking for one, so a hand-written blob on such a row arrives here
             // as `Shape::Conditions` with nothing to compare against.
             //
-            // Catching is the whole handling because warden refuses BEFORE it
-            // writes: `reconstrain()` walks `lastGranted` and throws ahead of
-            // its own transaction, so the plain grant this method already asked
-            // for stands and only the condition is dropped. Guarding the call
-            // site instead was tried and measured to change nothing.
+            // Catching is the whole handling for those two because warden
+            // refuses BEFORE it writes the condition: `reconstrain()` throws
+            // ahead of its own transaction, so the plain grant this method
+            // already asked for stands and only the condition is dropped. The
+            // same order is why a third cause must never get here: a rule that
+            // can never be true throws the same way, and the plain grant left
+            // standing would answer for every row. `plan()` refuses it first.
         }
     }
 
@@ -1004,8 +959,8 @@ final class RoleGrants
             ->where(static function (Builder $authority) use ($role, $alsoAsRoleKeys): void {
                 // One query for the role and everything it inherits from, never
                 // one per inner role: `of()` runs on every grid render, and a
-                // hierarchy costing a query per level is the shape §6.35 exists
-                // to keep out.
+                // query per level would make every render pay for the depth of
+                // the hierarchy.
                 $authority->where('entity_id', $role->getKey());
 
                 if ($alsoAsRoleKeys !== []) {
@@ -1067,16 +1022,16 @@ final class RoleGrants
      * A stored reach this screen may offer to change, or a locked one.
      *
      * A rule warden would refuse to write is a rule this screen must not offer
-     * to rewrite: the save would be refused and the catch above `narrow()` would
-     * turn the refusal into a PLAIN grant. A 2.x database carries such rows —
-     * warden migrates none of them — so this is not a hypothetical.
+     * to rewrite, for the reason `Narrowing::unsatisfiable()` gives: the save
+     * would be refused, and the catch in `narrow()` would turn the refusal into
+     * a PLAIN grant. A database written before warden refused such rules still
+     * carries them, and warden migrates none.
      *
      * Locked rather than cleared. An unsatisfiable rule is inert in both
      * polarities, so taking it away would lose nothing, but `isClearable()` is a
-     * property of the SHAPE and `Unreadable` covers four other reasons where
-     * clearing does lose something. Making one of them clearable is a bigger
-     * decision than this fix; `warden:doctor` names the row and the permission's
-     * own screen owns the rule.
+     * property of the SHAPE, and the other reasons `Unreadable` covers do lose
+     * something when cleared. `warden:doctor` names the row and the
+     * permission's own screen owns the rule.
      *
      * @param  class-string<Model>|null  $entity
      */
@@ -1094,10 +1049,10 @@ final class RoleGrants
      *
      * Empty when `warden.roles.nested` is off, and asked here because warden's
      * closure cannot answer it: `RoleClosure::for()` returns direct edges under
-     * either setting, since for an ACCOUNT those are its roles. A role→role edge
-     * has always been writable and has always granted nothing, so with the flag
-     * off it must read as nothing here too — the alternative is a grid showing
-     * an inheritance the engine does not honour.
+     * either setting, since for an ACCOUNT those are its roles. With the flag
+     * off a role→role edge is still writable and grants nothing, so it must
+     * read as nothing here too — the alternative is a grid showing an
+     * inheritance the engine does not honour.
      *
      * @return array<int|string, string>
      */

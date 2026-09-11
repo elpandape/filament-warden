@@ -45,9 +45,10 @@ use WeakMap;
  * filters `restricted_to_type`/`restricted_to_id` only when `on()` named a
  * context, so a bare retraction takes every restricted row of the scope with it
  * exactly as a detach would — which is why `isRestricted()` shows such a row and
- * leaves it alone rather than trusting the writer. Warden's 2.2.2 states that
- * narrowing by scope and not by restriction is deliberate, so this is settled
- * rather than pending: the three reasons above are the whole of it.
+ * leaves it alone rather than trusting the writer. Warden documents narrowing
+ * by scope and not by restriction as deliberate, on
+ * `ScopedMorphToMany::newPivotQuery()`, so the three reasons above are the
+ * whole of it.
  */
 final class Assignment
 {
@@ -68,8 +69,8 @@ final class Assignment
     /**
      * One account's rows off `assigned_roles`, memoised. Without it
      * `disableOptionWhen()` re-runs the query once per option and `offers()`
-     * reads it twice: 405 statements to open the assign modal against 200
-     * roles, against 3 with the memo, and the same 3 against 20.
+     * reads it twice, so the cost of opening the assign modal grows with the
+     * catalogue — `RolesRelationManagerTest` caps it against 200 roles.
      *
      * A `WeakMap` on the instance, the pattern `Holders` uses: an entry dies
      * with the object it was built for, so nothing has to guess when a request
@@ -82,8 +83,8 @@ final class Assignment
      * freeze whichever context asked first.
      *
      * What the map cannot notice is a write. That is `forgetAssignments()`,
-     * called by all three writers here — `give()`, `take()` and `apply()` —
-     * once a write commits.
+     * called by every writer here — `give()`, `take()`, `renew()` and
+     * `apply()` — once a write commits.
      *
      * @var WeakMap<Model, array<string, Collection<int, Model>>>
      */
@@ -138,8 +139,8 @@ final class Assignment
                 continue;
             }
 
-            // A date on a box that cannot carry one. The field writes «held,
-            // with no end» and says so in its own help, but a role that ALREADY
+            // A date on a box that cannot carry one. The field writes "held,
+            // with no end" and says so in its own help, but a role that ALREADY
             // ends is a fact about this account that the box would otherwise
             // hide — and the person unticking it deserves to know it was going
             // to lapse anyway. Only on rows with nothing else to say: a reason
@@ -187,9 +188,9 @@ final class Assignment
      * Whether the signed-in account may hand this role out — which is whether it
      * may edit it.
      *
-     * Property 3 of this package says whoever may edit roles hands out
-     * everything, and this is that sentence as a check. It needs no permission of
-     * its own: `update` over a role is already in the catalogue.
+     * Whoever may edit roles hands out everything, and this is that rule as a
+     * check. It needs no permission of its own: `update` over a role is already
+     * in the catalogue.
      */
     public static function mayHandOut(Model $role): bool
     {
@@ -197,9 +198,7 @@ final class Assignment
     }
 
     /**
-     * Whether this screen may hand that role out at all: a real account, a key
-     * that names a role, a role this account may edit, and no assignment of it
-     * narrowed to a context.
+     * Whether this screen may hand that role out at all.
      */
     public static function offers(?Model $account, mixed $value): bool
     {
@@ -239,8 +238,8 @@ final class Assignment
      * `retract()->from()` filters on `Tenancy::writeScope()` exactly and only
      * bumps the cache when it deleted something: unticking a global assignment
      * from inside a tenant removes nothing, reports success, and comes back
-     * ticked on reload. Measured. So it is shown, marked and left alone — the
-     * same answer the grid gives a grant from another tenant.
+     * ticked on reload. So it is shown, marked and left alone — the same answer
+     * the grid gives a grant from another tenant.
      *
      * A role held both globally and here answers true as well, and that is
      * right: retracting would leave the global row behind and the box would come
@@ -287,18 +286,15 @@ final class Assignment
         //
         // Null means no screen behind the call — a test asserting a state
         // outright, or a caller an application writes — so every role counts as
-        // touched, which is what this method did before there was a baseline.
-        // Nothing in this package calls it that way; the field always sends one
-        // when it has anywhere to keep it.
+        // touched. Nothing in this package calls it that way; the field always
+        // sends one when it has anywhere to keep it.
         $was = is_array($baseline) ? array_values($baseline) : null;
 
         $written = 0;
         $preserved = 0;
 
-        // Opened on warden's own connection, not the default one: every write
-        // this loop makes goes through `Context::resolve()` already, and a
-        // transaction on the wrong connection wraps queries that never run on
-        // it while the ones that matter commit one at a time as they go.
+        // On warden's own connection, for the reason `RoleGrants::apply()`
+        // gives: a transaction anywhere else wraps none of these writes.
         DB::connection(Context::resolve()->connection())->transaction(static function () use ($account, $wanted, $held, $was, &$written, &$preserved): void {
             foreach (self::byKey() as $key => $role) {
                 if (! self::mayHandOut($role)
@@ -343,17 +339,13 @@ final class Assignment
             }
         });
 
-        // The one writer of the three that does not clear the memo inline as
-        // it goes: `self::of($account)` above already populated
-        // `$assignmentsByAccount` from BEFORE any of this transaction's
-        // writes, and every `isRestricted()`/`isElsewhere()` call inside the
-        // loop deliberately keeps reading that same pre-write snapshot — each
-        // role in the catalogue is visited once, so nothing in the loop ever
-        // needs to see an earlier iteration's write. Once the transaction
-        // commits, though, that snapshot is exactly what a caller must not
-        // be handed back; `AssignmentTest.php`'s "a key that arrives as text
-        // still names the same role" reads `Assignment::of($account)`
-        // straight after this method returns and is what pins it.
+        // Cleared once the transaction commits, not per write: every
+        // `isRestricted()`/`isElsewhere()` call in the loop deliberately reads
+        // the snapshot `of()` took before it — each role is visited once, so no
+        // iteration needs an earlier one's write — and that snapshot is exactly
+        // what a caller must not be handed back. `AssignmentTest`'s "a key that
+        // arrives as text still names the same role" reads `of()` straight
+        // after this returns.
         self::forgetAssignments();
 
         return new SaveReport($written, $preserved);
@@ -385,11 +377,11 @@ final class Assignment
         if ($model instanceof Model) {
             // `until(null)` and not a bare `to()`, because `firstOrCreate` FINDS
             // an expired row rather than making a new one, and warden only moves
-            // the date when a chain declared one. Measured: without this, ticking
-            // a box whose assignment had lapsed found the dead row, changed
-            // nothing, and reported success. A checkbox carries no date, so what
-            // it can mean is "held, with no end" — which is what the default
-            // argument keeps saying for every caller that carries no date.
+            // the date when a chain declared one: a bare `to()` on a lapsed
+            // assignment would find the dead row, change nothing, and report
+            // success. A checkbox carries no date, so what it can mean is "held,
+            // with no end" — which is what the default argument keeps saying for
+            // every caller that carries no date.
             Warden::assign($model)->until($until)->to($account);
 
             // The memo `offers()`/`isHeld()` just read from is exactly what
@@ -401,12 +393,10 @@ final class Assignment
         }
 
         // Never actually false here: `offers()` already resolved this same
-        // `$role` through `role()` and answered true, so `$model` cannot be
-        // null on this path. Written as a plain boolean rather than a second
-        // early return so there is no line only the impossible branch reaches
-        // — an explicit `if (! $model instanceof Model) { return false; }`
-        // measured uncoverable, and this project runs the coverage gate at
-        // 100% with no baseline.
+        // `$role` through `role()` and answered true. Written as a plain
+        // boolean rather than a second early return, so no line exists that
+        // only the impossible branch reaches — a line the 100% coverage gate
+        // would demand and no test can reach.
         return $model instanceof Model;
     }
 
@@ -423,21 +413,16 @@ final class Assignment
      * It is NOT what makes the answer honest — `retractedCount()` is. Warden
      * reports how many rows the delete actually removed, and a retraction
      * targets one exact scope, so a role held only at another one is deleted
-     * from nowhere and counted zero. What went away is the tautology: this used
-     * to end in `return $model instanceof Model` on a path that had already
-     * resolved the role twice, so the return said nothing about the write.
+     * from nowhere and counted zero.
      *
-     * `isElsewhere()` inside `offers()` makes the same scope comparison, so the
-     * two overlap — but they are two INDEPENDENT defences of the same answer,
-     * measured by breaking each alone: with `isElsewhere()` gone the count still
-     * refuses a role at another scope, and with the count back to an inference
-     * `isElsewhere()` still does. Only removing both lets a no-op report
-     * success. Neither is the other's decoration.
+     * `isElsewhere()` inside `offers()` makes the same scope comparison, and
+     * the two are INDEPENDENT defences of the same answer: without
+     * `isElsewhere()` the count still refuses a role at another scope, and
+     * with the count replaced by an inference `isElsewhere()` still does. Only
+     * removing both lets a no-op report success.
      *
-     * The null arm is STILL unreachable for the same reason it always was, and
-     * is still written as a guarded block rather than an early return so no
-     * line exists that only the impossible branch reaches — the 100% gate ran
-     * red on exactly that when this was first written the other way round.
+     * The null arm is unreachable for the reason `give()` gives, and is written
+     * as a guarded block for the same reason.
      */
     public static function take(Model $account, int|string $role): bool
     {
@@ -469,7 +454,7 @@ final class Assignment
      * is two rows, and the earlier date is when half of what it answers goes
      * away. There is no row here that has already lapsed — `assignments()` reads
      * through `Expiry::live()`, so a dead assignment is invisible to this whole
-     * class, which is also why the screen has no «expired» badge to draw.
+     * class, which is also why the screen has no "expired" badge to draw.
      */
     public static function endsAt(Model $account, int|string $role): ?CarbonImmutable
     {
@@ -512,17 +497,15 @@ final class Assignment
      * Moves the end date on an assignment this account already holds.
      *
      * A second entrance and not a flag on `give()`, because they answer opposite
-     * questions: `give()` refuses a role already held — its `isHeld()` guard is
-     * there so an unconditional `bumpCacheVersion()` does not throw the whole
-     * scope's cache away for a row nothing changed — and this one refuses a role
-     * that is NOT held, since there is no date to move on an assignment that
-     * does not exist.
+     * questions: `give()` refuses a role already held (`isHeld()` says why) and
+     * this one refuses a role that is NOT held, since there is no date to move
+     * on an assignment that does not exist.
      *
      * `until()` before `to()`, and `until(null)` written out rather than skipped:
      * warden moves the date only when a chain declared one, so clearing an end
-     * date has to say so. `Expiry::apply()` on warden's side reports whether the
-     * value actually changed, so handing back the same date writes nothing and
-     * this returns false.
+     * date has to say so. Handing back the same date writes nothing on warden's
+     * side (`Expiry::apply()`), and since `to()` does not report that, this
+     * compares the two dates itself and returns false.
      */
     public static function renew(Model $account, int|string $role, ?DateTimeInterface $until): bool
     {
@@ -547,9 +530,6 @@ final class Assignment
         return $moved;
     }
 
-    /**
-     * One role by key, or nothing when the key names none.
-     */
     public static function role(int|string $key): ?Model
     {
         foreach (self::byKey() as $candidate => $role) {
@@ -583,9 +563,10 @@ final class Assignment
      * arriving from a `Select` is a string even where the column is not.
      *
      * In `give()` it is not about a duplicate row — `AssignsRoles::to()` writes
-     * through `firstOrCreate()` and finds the existing one. It is about the
-     * `bumpCacheVersion()` that runs unconditionally either way, invalidating
-     * every cached check at that scope for nothing changed.
+     * through `firstOrCreate()` and finds the existing one. It keeps `give()`
+     * from reaching `until($until)->to()` on a role already held, which would
+     * move the end date that assignment has — or clear it, with the default
+     * `null` — while reporting a hand-out.
      */
     private static function isHeld(Model $account, int|string $role): bool
     {
@@ -593,10 +574,8 @@ final class Assignment
     }
 
     /**
-     * Compared as text on purpose, mirroring `RoleGrants::writable()`: warden
-     * types a tenant `int|string` while `assigned_roles.scope` is an uncast
-     * integer column, so a resolver handing back `'5'` still has to match a
-     * row stamped `5`.
+     * Compared as text for the reason `RoleGrants::writable()` gives, here for
+     * `assigned_roles.scope`, an uncast integer column.
      */
     private static function sameScope(mixed $rowScope, int|string|null $writeScope): bool
     {
@@ -613,14 +592,8 @@ final class Assignment
      *
      * Memoised: `options()` reads it once and a `Select`'s `disableOptionWhen()`
      * reads it once per option with no memo of its own
-     * (`CanDisableOptions::isOptionDisabled()`), so an unmemoised `byKey()` paid
-     * a full `roles` table query per option in the assign modal — for the
-     * 200-role installation this screen exists to serve, hundreds of identical
-     * queries to open one modal, the exact shape of cost the `give()`/`take()`
-     * ruling existed to avoid. Measured before this memo: 202 `roles` reads
-     * mounting that modal against 200 roles. After: 2, and neither of those two
-     * scales with the catalogue — one is `options()`'s own first read, the
-     * other the table's separate pagination count query.
+     * (`CanDisableOptions::isOptionDisabled()`), so unmemoised the assign modal
+     * would pay a `roles` query per option. `AssignmentTest` caps the reads.
      *
      * @return array<int|string, Model>
      */
@@ -668,9 +641,9 @@ final class Assignment
      * Memoised per account instance and per tenant: see
      * `$assignmentsByAccount`'s own docblock for both halves.
      *
-     * Kept under warden's tenant scope on purpose (§6.24): this read
-     * INFORMS a screen about what exists here, and reading wide would offer
-     * an assignment `retract()` from this scope cannot remove.
+     * Kept under warden's tenant scope on purpose: this read INFORMS a screen
+     * about what exists here, and reading wide would offer an assignment
+     * `retract()` from this scope cannot remove.
      *
      * @return Collection<int, Model>
      */
@@ -703,18 +676,15 @@ final class Assignment
     }
 
     /**
-     * Drops EVERY memoised row list — called by every writer this class has
-     * (`give()`, `take()`, `apply()`) right after a write commits, never
-     * before.
+     * Drops EVERY memoised row list, after a write and never before it.
      *
-     * Not just the written account's entry, and not just the active tenant's.
-     * One account can be behind more than one live instance in a request —
-     * the object a screen was handed and the object a component rehydrated
-     * from its own snapshot are two different keys in this map for the same
-     * row in the store — so an invalidation aimed at the instance that
-     * carried the write would leave the others answering from before it. A
-     * write here is rare and a re-read is one query; being precise about
-     * which entry to drop buys nothing but a way to be wrong.
+     * Not just the written account's entry, and not just the active tenant's:
+     * the object a screen was handed and the one a component rehydrated from
+     * its own snapshot are two keys in this map for the same row in the store,
+     * so dropping only the instance that carried the write would leave the
+     * other answering from before it. A write here is rare and a re-read is
+     * one query; being precise about which entry to drop buys nothing but a
+     * way to be wrong.
      */
     private static function forgetAssignments(): void
     {

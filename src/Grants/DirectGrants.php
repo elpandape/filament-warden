@@ -20,32 +20,22 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * What one account holds without a role in between.
  *
- * Warden has allowed this since it existed — `allow($account)->to(...)` writes a
- * `grants` row whose authority is the account — and until 3.0 the panel had no
- * way to look at it. A permission handed straight to somebody is the hardest
- * kind of access to find later: it belongs to no role, so no role's grid shows
- * it, and the only screen that could name it was the permission's own, one row
- * at a time.
+ * `allow($account)->to(...)` writes a `grants` row whose authority is the
+ * account. A permission handed straight to somebody is the hardest kind of
+ * access to find later: it belongs to no role, so no role's grid shows it.
  *
- * Read against `grants` by hand and never through a relation. `Permission` has
- * no inverse towards accounts at all, and the one relation that exists — the
- * roles side — mixes denials in with grants and welds a raw tenant predicate on
- * `grants.scope` that no scope removal can strip.
+ * Read against `grants` by hand and never through a relation, for the reasons
+ * `Holders` gives.
  *
- * Under the ACTIVE tenant, unlike `Holders`, and the two are answering different
- * questions on purpose: that class counts what a delete destroys, and a delete
- * cascades blind to the scope, so it has to read wider than warden would. This
- * one lists what a person may act on, and a write here targets one exact scope —
- * `disallow()` deletes nothing outside it, reports success and comes back
- * unchanged on reload. A row from another tenant is shown, marked and left
- * alone, which is the same answer the grid gives a grant from elsewhere.
+ * Read across every tenant — `withoutGlobalScopes()` — where
+ * `Assignment::assignments()` and `RoleHolders` keep the active one. A write
+ * here targets one exact scope, so a row from another tenant is shown, marked
+ * and left alone: `disallow()` would delete nothing outside it and still
+ * report success.
  */
 final readonly class DirectGrants
 {
     /**
-     * One row of the screen: the catalogue row, its polarity, its end date, and
-     * whether this screen may write to it.
-     *
      * @param  Model  $permission  the catalogue row the grant points at
      */
     public function __construct(
@@ -80,10 +70,10 @@ final readonly class DirectGrants
             return [];
         }
 
-        // Joined on the model rather than on a table name and a literal `id`:
-        // both sides come off the same instance, so an installation that swaps
-        // the permission model for one with its own `$primaryKey` still lines up
-        // (§6.24).
+        // Keyed on the model rather than on a table name and a literal `id`: the
+        // key name comes off the same class that runs the query, so an
+        // installation that swaps the permission model for one with its own
+        // `$primaryKey` still lines up.
         $permissions = $permissionClass::query()
             ->withoutGlobalScopes()
             ->whereIn(new $permissionClass()->getKeyName(), $grants->pluck('permission_id')->all())
@@ -120,9 +110,8 @@ final readonly class DirectGrants
      * The union of every panel's catalogue and not one panel's: a grant is a row
      * of the store, and an account can be handed something another panel
      * declares. What is left OUT is the wildcard — `entity_type = '*'` is not a
-     * row any screen in this package hands out (property 6), and handing it to
-     * an account from a dropdown would be the one write that gives away
-     * everything.
+     * row any screen in this package hands out, and handing it to an account
+     * from a dropdown would be the one write that gives away everything.
      *
      * @return array<int|string, string>
      */
@@ -146,9 +135,9 @@ final readonly class DirectGrants
             ->where(static fn (Builder $query): Builder => $query->whereNull('entity_type')->orWhere('entity_type', '!=', '*'))
             ->when($search !== '', static function (Builder $query) use ($search): void {
                 // `!` as the escape character and the clause spelled out, for
-                // the reason `ViewPermission` measured on three engines: without
-                // it SQLite matches nothing at all, and a backslash is a syntax
-                // error on MySQL (§6.38).
+                // the reason `ViewPermission::accounts()` gives: without the
+                // clause SQLite matches nothing at all, and a backslash is a
+                // syntax error on MySQL.
                 $term = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
 
                 $query->where(static function (Builder $inner) use ($term): void {
@@ -185,9 +174,6 @@ final readonly class DirectGrants
         return Access::grantedToCurrentUser('update', $permission);
     }
 
-    /**
-     * One catalogue row by key, or nothing.
-     */
     public static function permission(mixed $key): ?Model
     {
         return is_int($key) || is_string($key)
@@ -202,7 +188,7 @@ final readonly class DirectGrants
      * unique index — so a screen that only wrote the new state would leave both
      * rows behind and a cell in two states at once. Each write is paired with
      * the removal of its opposite, which is the same rule the grid follows for
-     * every step of its cycle (§6.11).
+     * every step of its cycle.
      *
      * `until()` before `to()`, because a grant executes on `to()` and warden
      * throws rather than let a date be added afterwards. A prohibition takes no
@@ -235,7 +221,7 @@ final readonly class DirectGrants
      * guessed would leave the other behind. Counted rather than trusted:
      * neither `disallow()` nor `unforbid()` reports what it deleted, and a
      * write aimed at another tenant's scope removes nothing while raising no
-     * error at all — so success is measured by the row being gone.
+     * error at all — so success is judged by the row being gone.
      */
     public static function revoke(Model $account, Model $permission): bool
     {
@@ -268,9 +254,6 @@ final readonly class DirectGrants
             : Narrowing::of($this->permission)->shape->value;
     }
 
-    /**
-     * Two scope values that mean the same tenant, `null` included.
-     */
     private static function sameScope(mixed $left, mixed $right): bool
     {
         return $left === null && $right === null

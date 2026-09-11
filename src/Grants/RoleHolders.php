@@ -20,29 +20,26 @@ use WeakMap;
  * interesting axis is the one warden's own writes are filtered on — the scope
  * the row was written at.
  *
- * Kept to the tenant this request is in, which is §6.24's informing read rather
- * than its deciding one: `RolesTable::warning()` reads wide because a delete's
- * cascade is blind to scope, and this says who holds the role today under the
- * tenant somebody is looking from. Reading wide here would name an assignment
- * that this screen's own hand-out and retract cannot act on.
+ * Kept to the tenant this request is in, because this read informs rather than
+ * decides: `RolesTable::warning()` reads wide because a delete's cascade is
+ * blind to scope, and this says who holds the role under the tenant somebody is
+ * looking from. Reading wide here would name an assignment that this screen's
+ * own hand-out and retract cannot act on.
  *
  * The three words are `RolesRelationManager::heldAs()`'s, on purpose and to the
  * letter: that screen says "here", "restricted" and "elsewhere" about one
  * account's row, this counts the same three over a role's rows, and two
- * redactions of the same fact is what §6.24 measures going wrong. The reading is
- * the rows' own columns rather than `Assignment::isRestricted()` /
- * `isElsewhere()`, which take an ACCOUNT and hydrate that account's whole
- * assignment list — asked once per holder, that is a read per person on a screen
- * that already has every row in hand.
+ * wordings of one fact drift apart. The reading is the rows' own columns rather
+ * than `Assignment::isRestricted()` / `isElsewhere()`, which take an ACCOUNT and
+ * hydrate that account's whole assignment list — asked once per holder, that is
+ * a read per person on a screen that already has every row in hand.
  *
- * Not a `readonly class`, and the memo is why: §6.35 measured that one cannot
- * hold a mutable static, so the immutability drops to the promoted properties
- * — which is the shape `Holders` beside it already has.
+ * Not a `readonly class`, and the memo is why: a readonly class cannot
+ * declare a static property, so the immutability drops to the promoted
+ * properties — the shape `Holders` beside it already has.
  *
- * Memoised on the instance and not on its key, for the reason §6.35 measured:
- * `spl_object_hash()` is reusable the moment the object it named is collected,
- * so a role read, released and replaced at the same address would inherit the
- * first one's holders. A `WeakMap` clings to identity and lets go on its own.
+ * Memoised in a `WeakMap` on the instance and never through `once()`, for the
+ * reason `Holders` gives: it clings to identity and lets go on its own.
  */
 final class RoleHolders
 {
@@ -114,8 +111,8 @@ final class RoleHolders
             restricted: $restricted,
             elsewhere: $elsewhere,
             // A separate axis from the three above rather than a fourth kind of
-            // holder, exactly as `Holders::ending` is: a row that ends is held
-            // today by whoever holds it, and counted in whichever of the three
+            // holder, exactly as `Holders::ending` is: a row that ends is still
+            // held by whoever holds it, and counted in whichever of the three
             // names them. What it says is when that stops being true with
             // nobody doing anything.
             ending: $ending,

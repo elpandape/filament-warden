@@ -26,11 +26,9 @@ use Illuminate\Support\Str;
  * question is asked the way the application asks it — with a real authority and
  * a real row — rather than about a class with nothing in front of it.
  *
- * Which is also why it is worth having: a narrowed rule can never match a class
- * check. Warden 2.0 at least NAMES that — `ConditionsNotMet` carries the row it
- * consulted and rejected, where before the cause was indistinguishable from
- * "there is no such grant" — but naming it is not the same as answering it. On
- * a class check the conditions were never tested; here they are.
+ * Which is also why it is worth having: on a class check warden never tests a
+ * narrowed rule — no condition is evaluated and no ownership resolved — and
+ * here, with a record chosen, both are.
  */
 final readonly class Probe
 {
@@ -88,7 +86,6 @@ final readonly class Probe
 
         $cause = Cause::of($why->cause);
 
-        // Never `! allowed()`: forbidden and abstained are different answers.
         $verdict = match (true) {
             $why->verdict->isGranted() => Stance::Granted,
             $why->verdict->isForbidden() => Stance::Forbidden,
@@ -106,21 +103,12 @@ final readonly class Probe
             ]),
             permission: $label,
             role: self::label($why->role),
-            // The half warden's own cause cannot carry: it names the rejected
-            // row and says the conditions were not satisfied, which is true and
-            // is not the reason. Asked about a class there is nothing to satisfy
-            // them against, so the rule was never evaluated at all.
+            // On a class check warden never tests a narrowed rule, and its
+            // cause never says so: an owned rule reads as no match, a grant
+            // with conditions as conditions not met.
             note: Narrowing::of($permission)->isNarrowed() && ! $entity instanceof Model
                 ? Line::of('filament-warden::ui.probe.narrowed')
                 : null,
-            // The three rows of the card, and each one is read from a place
-            // warden's answer does not carry.
-            //
-            // The rule comes off `$why->permission` and not off the row on
-            // screen: a condition is a row of the catalogue, so the twin that
-            // actually matched can be a different row from the one being
-            // looked at, and printing this row's rule beside that row's verdict
-            // would be two facts about two rows read as one.
             rule: self::matched($why->permission),
             via: self::via($authority, $why->role),
             until: self::until($authority, $why->permission, $why->role, $why->cause),
@@ -161,10 +149,6 @@ final readonly class Probe
         );
     }
 
-    /**
-     * The title if warden generated one, the name if it did not, and nothing at
-     * all when there is no row.
-     */
     private static function label(?Model $model): ?string
     {
         if (! $model instanceof Model) {
@@ -192,9 +176,8 @@ final readonly class Probe
      * rows read as one, which is the shape of every wrong answer this card can
      * give.
      *
-     * Null in three of the nine causes and that is not a gap: `NoMatchingGrant`
-     * and `NotApplicable` carry no row at all, and a row with no conditions has
-     * no rule to print.
+     * Null when warden hands back no row — `NoMatchingGrant` and `NotApplicable`
+     * — or a row with no conditions: neither is a gap.
      */
     private static function matched(?Model $permission): ?string
     {
@@ -214,18 +197,14 @@ final readonly class Probe
     }
 
     /**
-     * How the account reaches the role, when a role is how it reached at all.
-     *
-     * Only the two via-a-role causes carry one, so seven of the nine return here
-     * with nothing to say — asking `assigned_roles` for a role that is null
-     * would be a query for every direct grant on the screen.
+     * How the account reaches the role, when a role is how it reached at all —
+     * which only the two via-a-role causes carry.
      *
      * What it adds to the role's name is the RESTRICTION, and that is the half
      * worth a query: an assignment tied to a context is invisible to
-     * `whereCan()`'s grant pass, so the count and the panel disagree about this
-     * account and neither of them says why. The unrestricted row wins when both
-     * exist, because it is the one that answers without a context in front of
-     * it.
+     * `whereCan()`'s grant pass, so `Reach` counts only a lower bound for this
+     * account. The unrestricted row wins when both exist, because it is the one
+     * that answers without a context in front of it.
      *
      * And the restricted branch is only reachable with a RECORD in the probe:
      * `Explainer::source()` counts a restricted assignment only when the check
