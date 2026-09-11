@@ -1,11 +1,8 @@
 {{--
     The conditions themselves, shared by the cell inspector and the permission
-    form. Each screen says where the rule lives; this only draws it.
-
-    `words` is every sentence, worked out in PHP. `source` is what a condition
-    can be built from here: the columns of the entity and of the account. The
-    only rule this file's script decides is the clause cut, and its authority is
-    `Narrowing::clauses()`.
+    form, which each say where the rule lives; this only draws it. What the
+    script decides here, and which PHP each rule pairs with, is indexed at the
+    top of `resources/js/permission-grid.js`.
 --}}
     <div class="fw-conditions">
         <template x-for="(clause, group) in clauses()" :key="group">

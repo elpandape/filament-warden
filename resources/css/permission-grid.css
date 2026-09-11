@@ -6,7 +6,7 @@
  * never scans this package's views, so a utility class used only here would not
  * be compiled and the markup would arrive unstyled.
  *
- * Four rules this file obeys, each of them paid for once:
+ * Four rules this file obeys:
  *
  *   - The palette variables are the bare `--primary-600` form. `--color-*` is a
  *     Tailwind v4 alias layer that the shipped build tree-shakes away.
@@ -14,13 +14,10 @@
  *     never `rgb(var(--x) / .1)`.
  *   - Dark mode is a `dark` class on the root element, never a media query.
  *     There is not one `prefers-color-scheme` rule in the whole panel theme.
- *   - Text and marks that carry meaning use `--fw-muted` and nothing fainter.
- *     Measured against Filament's default `--gray-*`, which is `Color::Zinc`
- *     (`support/src/Colors/ColorManager.php`): light `--gray-600` is 7.73:1 on
- *     `--fw-surface` and 7.01:1 on `--fw-raised`; dark `--gray-400` is 6.74:1
- *     and 5.78:1. The floor is measured against the background the rule is
- *     painted on — `--gray-500` clears 4.5:1 on the surface and misses it on a
- *     raised one. A host theme that overrides the palette moves all of it.
+ *   - Text and marks that carry meaning use `--fw-muted` and nothing fainter,
+ *     judged against the background each rule is painted on: with Filament's
+ *     default zinc greys, `--gray-500` passes AA on the surface and fails it on
+ *     a raised one. A host theme that overrides the palette moves all of it.
  *
  * Nothing here carries `!important`: a stylesheet shipped as a plain asset is
  * unlayered, so it already outranks every rule Filament puts in `@layer`.
@@ -35,9 +32,9 @@
     --fw-no-line: color-mix(in oklab, var(--danger-600) 34%, transparent);
     --fw-accent: var(--primary-600);
     --fw-noted: var(--warning-600);
-    /* Expiry gets `info`, which is the one colour of the panel this package had
-       never spent. Not `warning`: an end date somebody set on purpose is not a
-       problem, and the amber corner two millimetres away already means one. */
+    /* Expiry gets `info`, a panel colour nothing else in this sheet spends. Not
+       `warning`: an end date somebody set on purpose is not a problem, and amber
+       already marks a narrowed rule on the same cell. */
     --fw-time: var(--info-600);
     /* Inheritance is not a state of the rule, so it does not take a state
        colour: it says where the answer came from, which is the same job the
@@ -54,11 +51,11 @@
     --fw-surface: white;
 
     --fw-tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
-    /* La lupa del buscador. `stroke` en gris y no en `currentcolor`: va como
-       imagen de fondo, donde `currentcolor` no llega. */
-    /* La punta de flecha del plegado del inspector, `mask`-eada y no de fondo,
-       para que tome el color del texto en los dos temas. */
+    /* Masked rather than a background, so it takes the text colour in both
+       themes. */
     --fw-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+    /* A literal grey stroke and not `currentcolor`: as a background image the
+       SVG never sees the element's colour. */
     --fw-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
     --fw-clock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");
     --fw-link: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1'/%3E%3Cpath d='M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1'/%3E%3C/svg%3E");
@@ -66,10 +63,9 @@
 
     /* What the panel's container query below resolves against. The window is
        the wrong thing to ask: a host panel with its own navigation rail hands
-       this field less than the viewport says, and a sheet that opened as a
-       column at 1280px would be a matrix with nothing left of it.
-       `.fw-builder` declares its own further in, so this does not steal its
-       query — the nearest container wins and that one is nearer. */
+       this field less than the viewport says. `.fw-builder` declares its own
+       further in, so this does not steal its query — the nearest container wins
+       and that one is nearer. */
     container-type: inline-size;
 
     font-size: 0.875rem;
@@ -93,12 +89,8 @@
 
 /* The layout: the grid, and the panel that explains it ------------------- */
 
-/* One column, always. A fixed side column took 19rem off the grid at exactly
-   the width where the matrix needs it most — and a wide matrix needs more than
-   what was left. The figures behind that were measured in a consuming panel
-   with its own navigation rail, which nothing in this repository builds, so
-   they are recorded in the CHANGELOG rather than restated here as if this file
-   could check them.
+/* One column, always: a side column takes its width off the matrix at exactly
+   the width where the matrix needs it most.
    The explicit single track is what carries the layout, not a tidier way of
    writing the default: the implicit track is `auto`, which sizes to content,
    and the content is a table as wide as the matrix. It is also what keeps
@@ -110,20 +102,10 @@
     gap: 1rem;
 }
 
-/* El inspector va DEBAJO de la matriz, a ancho completo, y nunca le quita
-   espacio. La 3.0 lo publicó como columna que empuja, y empujar resultó ser el
-   peor de los dos costes: la matriz caía de 1008px a 512 —la mitad de lo que
-   una rejilla de permisos necesita— para dar 480 a un panel que la mayor parte
-   del tiempo solo dice una frase.
-
-   Plegado es una barra de una línea: el dibujo, la celda y el veredicto. Ahí
-   acaba lo que la mayoría de los clics quiere saber. Expandido toma el ancho
-   entero, y ese es el punto: el constructor de condiciones recupera sus dos
-   pistas —la regla a la izquierda, lo que la regla SIGNIFICA a la derecha— que
-   es el emparejamiento que la 2.11 midió y que en 446px no cabía de ninguna
-   manera.
-
-   El panel permanece en el flujo de la página en ambos estados. */
+/* Below the matrix at full width, never beside it: see `.fw-layout`. Collapsed
+   it is a bar with the glyph, the cell and the verdict, which is all most
+   clicks want to know; the rest opens under it on request. In the page's flow
+   in both states. */
 .fw-inspector {
     position: static;
     background: var(--fw-surface);
@@ -138,9 +120,7 @@
     box-shadow: none;
 }
 
-/* La barra plegada: una línea, y todo en ella cabe en una línea a propósito.
-   `align-items: center` y no `baseline`, porque el dibujo de la celda es una
-   caja y no texto. */
+/* `center` and not `baseline`: the cell glyph is a box, not text. */
 .fw-inspector-bar {
     display: flex;
     align-items: center;
@@ -160,8 +140,8 @@
     color: var(--fw-text);
 }
 
-/* La frase se corta antes que envolver: la barra es de una línea y lo que no
-   quepa está entero un clic más allá, en «Personalizar». */
+/* Cut short rather than wrapped: whatever does not fit is one click away, in
+   the expanded panel. */
 .fw-inspector-gist {
     flex: 1 1 auto;
     min-inline-size: 0;
@@ -209,10 +189,6 @@
     min-inline-size: 0;
 }
 
-/* A band under the grid, not a card beside it. The border, the radius and the
-   surface fill went together with the column: a full-width raised bar no longer
-   reads as this panel's own header, and `overflow: hidden` existed only to clip
-   that bar to the radius. */
 .fw-inspector {
     border-block-start: 1px solid var(--fw-line);
     padding-block-start: 1rem;
@@ -222,14 +198,6 @@
     font-weight: 600;
 }
 
-/* The head becomes a row once it has a control at the end of it.
-
-   The title and the subtitle are NOT placed explicitly, and that is deliberate
-   rather than an omission: a second block for `.fw-inspector-sub` is invisible
-   to `declarationsOf()` in this suite's own stylesheet gate, which reads one
-   block per selector — the lesson 2.11 wrote down after a declaration existed
-   and did not win. With the button placed, auto-placement puts these two in the
-   first column by source order and no second block is needed. */
 .fw-inspector-head {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -270,10 +238,6 @@
     min-inline-size: 0;
 }
 
-/* Who lends this cell its answer. Above the two voices rather than inside the
-   stored one: it is not a second reading of the same rule, it is a different
-   rule belonging to a different role — and the part somebody has to know
-   BEFORE they click. */
 .fw-inspector-lent {
     margin: 0;
     padding: 0.5rem 0.625rem;
@@ -283,8 +247,6 @@
     font-size: 0.75rem;
 }
 
-/* The date control, in the shape of a panel field like every other control on
-   this grid. */
 .fw-until {
     display: grid;
     gap: 0.25rem;
@@ -295,17 +257,14 @@
     font-weight: 500;
 }
 
-/* Un `input type=date` nativo, y a la vista se notaba: 0.75rem de letra, un
-   borde de sombra y el `dd/mm/aaaa` del navegador junto a campos de Filament
-   que son otra cosa. Esto le da el cromo del panel — la misma altura, el mismo
-   radio, el mismo foco — sin dejar de ser nativo.
-
-   NO es un `DatePicker` de Filament con `->native(false)`, y no puede serlo:
-   ese componente es Livewire atado a una ruta de estado del servidor, y esta
-   fecha es una entrada de un mapa por celda que cambia en el navegador sin ida
-   y vuelta. Ponerlo aquí sería o una petición por clic —justo lo que este panel
-   existe para evitar— o reimplementar su enlace de estado a mano. Queda
-   anotado como lo que es: una decisión, no un olvido. */
+/* A native `input type=date` with a panel field's border, radius and focus
+   ring: left to the browser it keeps its own chrome beside fields that look
+   like something else.
+   Not a Filament `DatePicker` with `->native(false)`, and it cannot be: that
+   component is Livewire bound to a state path on the server, and this date is
+   one entry of a per-cell map that changes in the browser without a round
+   trip. Using it would take a request per click, or its state binding
+   rewritten by hand. A decision, not an oversight. */
 .fw-until-date {
     justify-self: start;
     min-block-size: 2.25rem;
@@ -325,9 +284,8 @@
     border-color: transparent;
 }
 
-/* El icono del calendario, que en claro sale casi negro y en oscuro casi
-   invisible: `color-scheme` es lo único que lo repinta, porque el control lo
-   dibuja el navegador y ninguna regla nuestra lo alcanza. */
+/* The browser draws this icon near-black on a light scheme, and no colour set
+   here reaches it: opacity softens it, and `color-scheme` repaints it. */
 .fw-until-date::-webkit-calendar-picker-indicator {
     opacity: 0.55;
     cursor: pointer;
@@ -344,9 +302,7 @@
     cursor: not-allowed;
 }
 
-/* Lo único que reparte el control nativo en oscuro. Filament alterna una clase
-   `dark` en `<html>` y no emite ni una regla `prefers-color-scheme`, así que sin
-   esto el desplegable del calendario sale blanco sobre el panel oscuro. */
+/* A native control reads `color-scheme`, never the theme's `dark` class. */
 :where(.dark, .dark *) .fw-until-date {
     color-scheme: dark;
 }
@@ -370,10 +326,6 @@
     color: var(--fw-no);
 }
 
-/* The two voices. One speaks for the store and one for the screen, and the
-   panel used to run them together as one paragraph. Side by side with a name
-   each, warden's sentence reads on its own — and the width that was empty to
-   the right is what they use. */
 .fw-voices {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
@@ -410,10 +362,8 @@
     cursor: default;
 }
 
-/* The box shrank to 1.125rem; `.fw-box::before`'s glyph did not, and stayed
-   the 0.875rem meant for the 1.5rem cell it is drawn for elsewhere — oversized
-   in a box a quarter smaller. `.fw-key .fw-box` below needs the same fix, for
-   the same reason. */
+/* The glyph is sized on `::before` and does not follow the box: its 0.875rem is
+   meant for the 1.5rem cell and is oversized in this 1.125rem one. */
 .fw-voice-state .fw-box::before {
     inline-size: 0.625rem;
     block-size: 0.625rem;
@@ -445,10 +395,6 @@
     color: var(--fw-noted);
 }
 
-/* A panel once there is something in it, and a plain band while there is not:
-   an empty card announces a section that has nothing to say. Keyed off an
-   attribute the markup binds and never off `:has()`, because what used to be
-   inside it — `.fw-why` — is gone. */
 .fw-inspector[data-fw-open='true'] {
     margin-block-start: 1rem;
     padding: 0.875rem 1rem 1rem;
@@ -458,7 +404,6 @@
     background: var(--fw-raised);
 }
 
-/* The identity on one line: the FQCN used to take a row of its own. */
 .fw-inspector-head {
     display: flex;
     align-items: baseline;
@@ -535,13 +480,10 @@
 
 .fw-scroll {
     overflow-x: auto;
-    /* The head above can only stick to something that scrolls, and this is the
-       something. `overflow-x: auto` already makes this a scroll container, so
-       the head sticks to IT rather than to the page — and without a cap it
-       never scrolls vertically, which is a head that travels off screen with
-       everything else. Measured: 589px to 205px on a 384px page scroll, a
-       sticky rule that did nothing at all. The sketch has no cap either.
-       Only bites on a long catalogue; a short one never reaches it. */
+    /* The head sticks to its nearest scroll container, and `overflow-x: auto`
+       already makes this one: without a height cap it never scrolls
+       vertically, and the head travels off screen with everything else. Only
+       bites on a long catalogue; a short one never reaches the cap. */
     overflow-y: auto;
     max-block-size: 60vh;
     /* Without this a browser may recompute the whole table's layout on every
@@ -553,34 +495,26 @@
  *
  * `100%` is the only bound this rule carries. Under automatic table layout the
  * action columns take only what their content needs — pinned at `inline-size:
- * 1%` below — so any slack the 100% implies lands on the entity column
- * instead: measured on a table 1010px WIDE, the entity column grew from
- * 224px to 558px wide, and the table's own right edge — at the x-coordinate
- * 1065px in the 1120px viewport it was measured in, since the table starts
- * at x=55px — ended up flush with the card, where before this rule the cells
- * stopped 313px short of it, the width a filler column used to absorb.
- * (558px is the standalone harness this was designed in; the shipped
- * application measures 556px for the same column — see the CHANGELOG.) A
- * narrower card gives the slack back rather than compressing the matrix —
- * 392px of it in an 844px table — because this rule sets no minimum of its
- * own; what refuses to compress below a legible width is the entity
- * column's own floor, declared on it below. */
+ * 1%` below — so the slack the 100% implies lands on the entity column, and
+ * the table ends flush with the card. A narrower card gives the slack back
+ * rather than compressing the matrix, because this rule sets no minimum of its
+ * own; what refuses to compress below a legible width is the entity column's
+ * own floor, declared on it below. */
 .fw-table {
     border-collapse: separate;
     border-spacing: 0;
     inline-size: 100%;
 }
 
-/* The head is fixed down the page, which is the other half of what the entity
-   column already does across it: with twenty-seven rows you lose track of which
+/* The head is fixed down the table, which is the other half of what the entity
+   column already does across it: in a long table you lose track of which
    column you are looking at.
 
-   Stuck as ONE element rather than row by row. The sketch offsets the second row
-   by a declared first-row height, and that height is not this package's to
-   declare: it comes out of the host theme's own line-height, measured at 26px
-   against the sketch's 36px — a ten-pixel strip of body rows showing between two
-   rows that are supposed to be flush. A `<thead>` travels whole, so there is no
-   offset to get wrong and the gap is zero.
+   Stuck as ONE element rather than row by row. Offsetting the second row needs
+   the first row's height, and that height is not this package's to declare: it
+   comes out of the host theme's own line-height, and a wrong guess shows a
+   strip of body rows between two rows meant to be flush. A `<thead>` travels
+   whole, so there is no offset to get wrong.
 
    The corner is fixed on BOTH axes, so it has to beat this — without the third
    level the entity column draws over the head on a diagonal scroll. Only ever
@@ -596,11 +530,10 @@
     background: var(--fw-raised);
 }
 
-/* The corner went on `--fw-surface` while the rest of the head goes on
-   `--fw-raised`: a step visible right across the table in dark. It cannot take
-   `--fw-raised` on its own — that is a `color-mix` with transparency and this
-   cell is sticky, so the body rows would show through — so the two are stacked:
-   the tint on top, the opaque surface behind. */
+/* `--fw-raised` is a `color-mix` with transparency and this cell is sticky, so
+   on its own it would let the body rows show through; `--fw-surface` alone is
+   a step visible right across the head in dark. So the two are stacked: the
+   tint on top, the opaque surface behind. */
 .fw-table thead .fw-corner {
     z-index: 3;
     background:
@@ -616,11 +549,9 @@
     vertical-align: middle;
 }
 
-/* The action columns take what they need and no more, pinned at 1% below so
-   the auto layout algorithm shrinks each one to its content. What is left of
-   the table's 100% is the entity column's to keep, not spare space with
-   nowhere to go — see `.fw-table` above. A cell that sized itself here would
-   still let a wrapped line push the matrix apart. */
+/* Automatic table layout shrinks a `1%` column to its content, so what is left
+   of the table's 100% goes to the entity column (see `.fw-table`). A cell that
+   sized itself here would still let a wrapped line push the matrix apart. */
 .fw-table .fw-cell,
 .fw-table .fw-action,
 .fw-table .fw-manage {
@@ -643,9 +574,9 @@
        across the action columns scrolling under this sticky cell over a
        background only as wide as itself — an FQCN cut short with an ellipsis is
        not a shorter FQCN, it is a different one. The floor is what stops a
-       narrow card taking the column back. There is no ceiling: with the filler
-       column gone this is what absorbs the slack, which is what makes the table
-       reach the edge of the card. */
+       narrow card taking the column back. There is no ceiling: this column
+       absorbs the table's slack, which is what makes the table reach the edge
+       of the card. */
     inline-size: 14rem;
     min-inline-size: 14rem;
     overflow-wrap: anywhere;
@@ -809,15 +740,11 @@
     background: var(--fw-no);
 }
 
-/* The other two corners, and why they are spans rather than pseudo-elements.
-   A button has exactly two of those and both are spent: `::before` draws the
-   glyph and `::after` draws the corner above. Four marks need four boxes, so
-   the two that arrived with 3.0 are elements the template writes — which is
-   also what lets them carry their own `.fw-sr` word, since a pseudo-element
-   cannot be named to a screen reader.
-
-   Placed at the two corners the first two do not use, so no two marks ever
-   share one and a cell carrying all four is still readable. */
+/* The other two corners, as spans the template writes: a button has exactly
+   two pseudo-elements and both are spent — `::before` draws the glyph and
+   `::after` the corner above — and a pseudo-element cannot carry a
+   screen-reader word. Placed at the two corners the first two do not use, so
+   no two marks ever share one and a cell carrying all four is still readable. */
 .fw-mark {
     position: absolute;
     inline-size: 0.5rem;
@@ -846,15 +773,9 @@
     color: var(--fw-lent);
 }
 
-/* Said out loud and drawn nowhere.
-
-   A cell's state lives in its `data-*` attributes, and an attribute is not a
-   name: a screen reader reads what is inside the button. These spans carry the
-   words, one word each, so that nothing composes a sentence — not php, not the
-   browser: the accessibility tree joins them itself, and the only thing either
-   side ever does is pick a word out of a map php filled in.
-
-   No colour token, so it is the same rule in light and in dark. */
+/* Said out loud and drawn nowhere. A cell's state lives in its `data-*`
+   attributes, and an attribute is not a name: a screen reader reads what is
+   inside the button, so the words live in these spans. */
 .fw-sr {
     position: absolute;
     inline-size: 1px;
@@ -869,9 +790,9 @@
 
 /* The policy does not declare this action, so nobody can grant it. */
 .fw-void {
-    /* It now has an absolutely positioned child, and without this the child
-       would be placed against whatever ancestor happens to be positioned —
-       inside `.fw-scroll` that is a horizontal scrollbar nobody asked for. */
+    /* Its `.fw-sr` child is absolutely positioned: without this the child is
+       placed against whatever ancestor happens to be positioned, and inside
+       `.fw-scroll` that is a horizontal scrollbar nobody asked for. */
     position: relative;
     display: block;
     color: var(--fw-muted);
@@ -892,9 +813,8 @@ tr:hover .fw-shortcuts,
     opacity: 1;
 }
 
-/* The fold has no `<tr>` for the rule above to hang off, and the copy there is
-   not a hover affordance beside a row title — it is the row's own control strip.
-   Shown, with its own room. */
+/* In the fold the presets are the row's own control strip, not a hover
+   affordance beside a row title: shown, with room of their own. */
 .fw-stack-shortcuts {
     margin: 0.5rem 0.75rem 0;
     opacity: 1;
@@ -945,8 +865,7 @@ tr:hover .fw-shortcuts,
 
 /* The legend -------------------------------------------------------------- */
 
-/* The key, folded. Closed it is one line above the grid; it used to be eight
-   lines of vocabulary sitting between a cell and the panel that explains it. */
+/* The key, folded: closed, its vocabulary costs one line above the grid. */
 .fw-legend-fold {
     margin-block-end: 0.5rem;
 }
@@ -957,13 +876,11 @@ tr:hover .fw-shortcuts,
     border-block-end: 1px solid var(--fw-line);
 }
 
-/* El buscador de entidades, que hasta aquí no tenía ni una regla: el navegador
-   lo dibujaba como un `input` desnudo y se leía como texto suelto, no como algo
-   que se puede escribir. La lupa va de fondo y no como elemento — es
-   decoración, y un `<svg>` aquí sería un nodo más en el árbol de accesibilidad
-   diciendo lo que el `aria-label` ya dice.
-   Ancho acotado: un buscador a todo lo ancho de la tarjeta promete que hay
-   mucho que filtrar, y lo que filtra es una lista de entidades. */
+/* The filter above the matrix. The magnifier is a background and not an
+   element: it is decoration, and an `<svg>` here would be one more node in the
+   accessibility tree saying what the `aria-label` already says. The field's
+   width is capped: a search box across the whole card promises far more to
+   filter than one table's entities and actions. */
 .fw-filter {
     position: relative;
     display: flex;
@@ -1065,7 +982,8 @@ tr:hover .fw-shortcuts,
 }
 
 /* The shift hint carries the same class and no mark of its own: inside that
-   two-column grid its text landed in the 1.25rem column, one word per line. */
+   two-column grid its text would land in the 1.25rem column, one word per
+   line. */
 .fw-key .fw-legend-shift {
     display: block;
     margin-block-start: 0.25rem;
@@ -1084,8 +1002,8 @@ tr:hover .fw-shortcuts,
     cursor: default;
 }
 
-/* Restores what `.fw-voice-state .fw-box::before` restores above, for the
-   same reason: the glyph does not shrink with the box on its own. */
+/* The same fix as `.fw-voice-state .fw-box::before`: the glyph does not shrink
+   with the box. */
 .fw-key .fw-box::before {
     inline-size: 0.625rem;
     block-size: 0.625rem;
@@ -1131,10 +1049,8 @@ tr:hover .fw-shortcuts,
 /* The folded reading ------------------------------------------------------
  *
  * Not "the grid on a phone": the SAME grid read down the page, for when the
- * columns do not fit across it. Every cell in here is the same `.fw-box` button
- * the table draws, from the same partial, with the same `data-*` and the same
- * handler — a second wrapper over one cell, never a second cell. That is the
- * only reason this does not multiply the rules that already live written twice.
+ * columns do not fit across it. Every cell in here is the table's own `.fw-box`
+ * from the same partial, so the cell rules above hold here unchanged.
  */
 
 .fw-stack {
@@ -1259,7 +1175,7 @@ tr:hover .fw-shortcuts,
     justify-self: end;
 }
 
-/* At 390px the model shared a row with the name inside two columns, and broke
+/* On a narrow screen two columns put the model beside the name, and it breaks
    mid-word: "Permis sions". `.fw-stack-entity > summary` is a grid, not a flex
    container, so what gives the model a row of its own is one column, not
    `flex-wrap`: every line stacks full width, which is what the FQCN's own
@@ -1273,9 +1189,9 @@ tr:hover .fw-shortcuts,
 /* The condition builder --------------------------------------------------- */
 
 /* `container-type` because the rail below asks its CONTAINER how wide it is and
-   not the window: it lives at two widths at once — the whole inspector, and
-   whatever a consuming application leaves it — and a window query answers "no
-   need to stack" while the container is 19rem and the labels truncate. */
+   not the window: its width is a share of whatever the host panel leaves this
+   field, and a window query answers "no need to stack" while the container is
+   narrow and the labels truncate. */
 .fw-builder {
     margin-block-start: 1rem;
     padding-block-start: 0.875rem;
@@ -1291,10 +1207,8 @@ tr:hover .fw-shortcuts,
     font-weight: 600;
 }
 
-/* One of three, on one line. It was three stacked cards each carrying a name
-   AND a hint — the tallest thing on the panel for a choice between three, with
-   two explanations that are read once and are noise from the second reading on.
-   Only the chosen one's hint stays. */
+/* One of three, on one line, with only the chosen one's hint under it: a hint
+   per option is read once and is noise from the second reading on. */
 .fw-reach {
     display: flex;
     inline-size: 100%;
@@ -1363,8 +1277,6 @@ tr:hover .fw-shortcuts,
     font-size: 0.75rem;
 }
 
-/* Why an option cannot be picked does NOT belong inside that option: it is
-   disabled, so it cannot be focused, and there a keyboard would never reach it. */
 .fw-reach-reason {
     margin: 0.4375rem 0 0;
     padding-inline-start: 0.5rem;
@@ -1390,19 +1302,14 @@ tr:hover .fw-shortcuts,
     }
 }
 
-/* Reading above, writing below, with one line between them. A sentence and a
-   tool are not two columns of equal weight: the reading is three or four lines
-   and the builder can measure four hundred pixels, so splitting them into two
-   tracks leaves a hole by construction. */
 .fw-write {
     margin-block-start: 1rem;
     padding-block-start: 1rem;
     border-block-start: 1px solid var(--fw-line);
 }
 
-/* `.fw-builder` carried its own rule, margin and padding from when it was the
-   one separating itself from the explanation. Both drew a divider thirty pixels
-   apart. */
+/* Inside `.fw-write` the builder drops its own divider, margin and padding:
+   with both, two dividers are drawn one above the other. */
 .fw-write .fw-builder {
     margin-block-start: 0;
     padding-block-start: 0;
@@ -1414,21 +1321,18 @@ tr:hover .fw-shortcuts,
 }
 
 /* The rule on the left, what the rule MEANS on the right. The cap belongs to
-   the editor's column and never to the block: capping the block left the right
-   rail at sixty pixels.
+   the editor's track and never to the block: capping the block starves the
+   right one.
 
    ONE block for this selector, not two: `declarationsOf()` in the sheet's test
-   matches the FIRST block it finds, so a second `.fw-conditions {}` further
-   down would be read by nothing. Task 5 adds `--fw-chevron` in here. */
+   matches the FIRST block it finds, so a declaration in a second
+   `.fw-conditions` block would go unchecked. */
 .fw-conditions {
-    /* `stroke='%236b7280'` is a literal and not `var(--fw-muted)`: a
-       `background-image` data URI is a static asset — unlike `.fw-box::before`'s
-       tick and cross, which are `mask`-ed with `background: currentColor` and so
-       DO repaint per theme, this chevron cannot read a custom property at all.
-       Kept as a literal on purpose. What that means in dark: it paints the exact
-       same grey `.fw-condition select`'s light background gets, on the darker
-       `--fw-surface` the same rule sets there — it does not lighten the way
-       `--fw-muted` does for text. Not measured for contrast here. */
+    /* A literal stroke and not `var(--fw-muted)`: a `background-image` data URI
+       cannot read a custom property — unlike `.fw-box::before`'s glyphs, which
+       are masks over `currentColor` and so repaint per theme. So in dark it
+       stays the same grey on a darker surface and does not lighten the way
+       muted text does. Not measured for contrast. */
     --fw-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236b7280' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
 
     display: grid;
@@ -1448,21 +1352,18 @@ tr:hover .fw-shortcuts,
     grid-row: 2;
 }
 
-/* Y la lectura apilada, que hasta aquí no existía.
-   Las dos pistas se escribieron para el constructor a ancho completo de la
-   ficha del permiso, donde `34rem` y lo que sobre es un reparto honesto. Dentro
-   del panel de 30rem no lo es: medido, la primera pista se lleva 414px y la
-   segunda calcula CERO, así que el aviso se dibuja en una columna de un
-   carácter de ancho y quinientos píxeles de alto. No se desborda ni se corta —
-   sale, y es ilegible, que es peor que faltar.
+/* The stacked reading. At full width, `34rem` and whatever is left is an honest
+   split; in a container narrower than the first track and the gap, the first
+   takes everything and the second computes to zero, so the note is drawn one
+   character wide — not overflowing, not clipped: drawn, and unreadable, which
+   is worse than missing.
 
-   52rem = 34 de la primera pista + 2 del hueco + 16 que la nota necesita para
-   ser una nota y no una tira. Por debajo, todo a una columna en el orden en que
-   se lee: la regla, lo que añade, y después lo que la regla significa.
+   52rem = 34 for the first track + 2 for the gap + 16 the note needs to be a
+   note rather than a strip. Below it, one column in reading order: the rule,
+   what it adds, then what the rule means.
 
-   Una container query y no una media query, por lo mismo que la del panel: lo
-   que decide es el ancho que este campo recibió, y dentro del panel es 30rem
-   con la ventana en 1440. */
+   A container query and not a media query: what decides is the width this
+   field received, which the window does not know. */
 @container (width < 52rem) {
     .fw-conditions {
         grid-template-columns: minmax(0, 1fr);
@@ -1562,7 +1463,7 @@ tr:hover .fw-shortcuts,
     opacity: 0.6;
 }
 
-/* Three letters and a chevron. At 3.25rem it drew "ar". */
+/* Room for three letters and a chevron. */
 .fw-condition .fw-joiner {
     flex: 0 0 4.75rem;
     color: var(--fw-muted);
@@ -1575,22 +1476,18 @@ tr:hover .fw-shortcuts,
     text-align: center;
 }
 
-/* The row was written to wrap inside a 19rem column. Across the whole width
-   there is no second line to fall to, and the misfit note has to come off its
-   own line with it: at `nowrap` a `flex-basis: 100%` note takes the row and
-   crushes the two controls the builder exists to operate.
-   Asked of the window and not of the container, because this row is also drawn
-   by the permission screen, which has no `.fw-builder` around it to ask. */
+/* Across the whole width the row does not wrap, and the misfit note has to come
+   off its own line with it: at `nowrap` a `flex-basis: 100%` note takes the row
+   and crushes the two controls the builder exists to operate. */
 @media (min-width: 56rem) {
     .fw-condition {
         flex-wrap: nowrap;
     }
 
-    /* Prefixed, like every other control in this row: the base `.fw-misfit` rule
-       is declared later in the file at equal specificity, and a media query
-       adds none — unprefixed, this reset lost the cascade and left the note
-       taking the row at `nowrap`, which is the exact pairing the comment above
-       says must not happen. */
+    /* Prefixed, like every other control in this row: the base `.fw-misfit`
+       rule is declared later in the file at equal specificity, and a media
+       query adds none — unprefixed, this reset loses the cascade and leaves the
+       note taking the row at `nowrap`. */
     .fw-condition .fw-misfit {
         flex-basis: auto;
     }
@@ -1671,8 +1568,8 @@ tr:hover .fw-shortcuts,
     overflow-x: auto;
 }
 
-/* The verdict and the condition warning lose their fill and keep their bar:
-   they are the panel's sentences, not alerts. */
+/* The condition warning keeps its bar and drops the fill set above: it is one
+   of the panel's sentences, not an alert. */
 .fw-warn {
     background: none;
     padding-inline: 0.75rem 0;
@@ -1987,17 +1884,15 @@ tr:hover .fw-shortcuts,
    turns the pair over together, so there is no width — integer, zoomed or
    fractional — at which both are painted or neither is. Two disjoint queries
    look equivalent and are not: between their thresholds neither fires.
-   `display: none` and nothing else: it is the only way of hiding that takes the
-   losing reading out of the accessibility tree AND out of the tab order, which
-   is what makes two copies of one button safe.
+   `display: none` and nothing else: it takes the losing reading out of the
+   layout, the accessibility tree and the tab order at once, which is what
+   makes two copies of one button safe.
 
-   At the end of the file on purpose, and not where it was written: a media
-   query and its base rule share specificity, so source order decides, and
-   this one used to sit above `.fw-conditions {}` — losing at every width,
-   silently, because `declarationsOf()` and `blockOf()` can only prove a
-   declaration exists, never that it wins. Every selector below overrides one
-   whose unconditional rule is declared earlier in this file; nothing may
-   restate any of them at the root after this point. */
+   Last in the file on purpose: a media query adds no specificity, so source
+   order decides, and `declarationsOf()` and `blockOf()` can only prove a
+   declaration exists, never that it wins. The selectors below override rules
+   declared unconditionally earlier in this file; nothing may restate any of
+   them at the root after this point. */
 @media (max-width: 55.9375rem) {
     .fw-scroll {
         display: none;

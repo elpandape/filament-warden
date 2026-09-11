@@ -1,16 +1,15 @@
 {{--
     One cell, in the two shapes it can take.
 
-    Both are buttons: a locked grid still selects, because understanding why a
-    cell is the way it is is reading, not operating. What the locked one does not
-    do is cycle — and neither does a cell whose rule this screen can read and
-    cannot draw, which is the one people most need to be able to ask about.
+    Both are buttons and neither is ever `disabled`: a cell that may not be
+    changed still selects, because understanding why a cell is the way it is is
+    reading, not operating — and the one this screen cannot draw is the one
+    people most need to ask about.
 
-    The state is drawn from `data-*` for the eye and said in the spans below for
-    everything else. They are separate spans and not one sentence on purpose: the
-    accessibility tree joins the text itself, so neither php nor the browser ever
-    composes a name — each half only indexes the map php filled in. The words
-    themselves are `GridView::states()`, and the first three of it are the cycle.
+    The state is drawn from `data-*` for the eye and said in the `fw-sr` spans
+    for everything else, one span per word rather than one sentence: the
+    accessibility tree joins them itself, so nothing composes a name, and each
+    word after the label is a lookup in `GridView::states()`.
 --}}
 <button
     type="button"
@@ -59,15 +58,12 @@
     @endif
 
     {{--
-        The two marks 3.0 adds. Elements and not pseudo-elements, because a
-        button has exactly two of those and the glyph and the first corner have
-        them — and because a pseudo-element cannot carry a name, while these have
-        a word each, said in the same list as the four above.
+        Spans and not pseudo-elements: `::before` and `::after` already draw
+        the glyph and the first corner.
 
-        `x-show` and not `@if`: the server draws the first reading and the
-        browser redraws every one after it, so a mark that only existed in php
-        would vanish on the first click and one that only existed in alpine would
-        be missing until something was clicked.
+        `x-show` beside a server-drawn `display: none`: the server gets the
+        reading right before alpine boots and alpine keeps it right after every
+        click, and a mark drawn by only one of them is wrong on the other side.
     --}}
     <span
         class="fw-mark fw-mark-time"

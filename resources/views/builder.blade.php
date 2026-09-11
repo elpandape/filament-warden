@@ -1,30 +1,13 @@
 {{--
     The condition builder, inside the inspector.
-
-    It is offered on a cell that says something — abstaining is the absence of a
-    row, and a row that does not exist has no reach — and whose row has a model
-    behind it: a permission with no model and conditions on it is created, shown,
-    and grants nothing ever.
-
-    Everything here is drawn by the browser, because what it draws is unsaved.
-    The words all arrive from PHP; the only rule this file's script decides is
-    the clause cut, and `Narrowing::clauses()` is its authority.
-
-    Whether the installation offers a builder at all is `offered()`'s first
-    question, not this file's. A gate written here reads a value the browser is
-    holding: with the builder switched off the payload is `[]`, every property
-    read off it is `undefined`, and `undefined !== null` passes — so the only
-    thing that stopped a TypeError was which operand came first.
 --}}
 <template x-if="offered()">
     <div class="fw-builder">
         <div class="fw-field-label" id="{{ $ids }}-reach">{{ __('filament-warden::ui.conditions.scope') }}</div>
 
         {{--
-            A radiogroup and not three buttons: one tab stop, and the arrows walk
-            it. Which of the three can be reached is `reachEnabled()`, asked once
-            — the markup binds `disabled` to it and the arrow keys step over it,
-            so the rule is not written twice inside one component.
+            A radiogroup and not three buttons: one tab stop, and the arrows
+            walk it.
         --}}
         <div
             class="fw-reach"
@@ -56,35 +39,24 @@
         </div>
 
         {{--
-            One hint, the chosen mode's, pointed at by every option so that it is
-            announced with whichever one has focus — selection follows focus
-            here, so the shared paragraph always describes the focused radio.
+            One hint, the chosen mode's, pointed at by every option: selection
+            follows focus here, so it always describes the focused radio.
 
-            A locked cell has no entry in `modes` — `reachOf()` answers with the
-            stored `Shape`, which has six cases to that map's three — so the slot
-            carries the stored note instead, which is the sentence that says WHY
-            it is locked. It is never null when locked: the three editable shapes
-            are the only ones built without a reason.
+            A locked cell's shape is none of the three `modes` offers, so the
+            slot carries the stored note instead, the sentence that says why it
+            is locked — never null there, since only the editable shapes are
+            built without a reason.
         --}}
         <p class="fw-reach-hint" id="{{ $ids }}-reach-hint" x-text="grid.modes[reachOf()] ? grid.modes[reachOf()].hint : narrowing.stored.note"></p>
 
         {{--
-            And why an option cannot be picked lives out here, not inside it. A
-            disabled button keeps its text in the accessibility tree — a virtual
-            cursor still reads it — but it takes no focus, so in focus mode, and
-            to anyone walking the group with the arrow keys, the sentence inside
-            it is never reached.
-
-            ~~Out here it is read either way.~~ Only in browse mode, which is not
-            the mode a radiogroup puts a reader in: walking the group with the
-            arrows reads each radio's name and its description and nothing else,
-            so out here on its own it was never reached either. It is pointed at
-            now — by the ONE option it is about, and only while there is a reason
-            to give, because describing "Every row" with why "Only what it owns"
-            cannot be picked would be worse than saying nothing.
-
-            An accessibility tree dump is what showed the three options all
-            pointing at the hint and nothing pointing here.
+            Why an option cannot be picked is the description of that option
+            alone, and only while there is a reason: describing "Every row"
+            with why "Only what it owns" is unavailable would be worse than
+            saying nothing. There is a reason only while that option is
+            disabled, so the description reaches only whoever reads the option
+            in place: a disabled option takes no focus, and `stepReach()` steps
+            over it.
         --}}
         <p
             class="fw-reach-reason"

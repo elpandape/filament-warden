@@ -1,62 +1,55 @@
 /**
  * The permission grid.
  *
- * Every VALUE arrives from PHP in `grid` — the cycle order, which actions each
- * row offers, which of them are reads, the six operators, every word the builder
- * says — because the generation before this one wrote those out twice and
- * nothing could tell when the two copies disagreed.
+ * The VALUES arrive from PHP in `grid` — the cycle order, which actions each
+ * row offers, which of them are reads, the operators, every word the builder
+ * says — so none of them has a second copy here that could disagree with PHP's.
  *
- * What does NOT arrive is the RULES below. This comment claimed there was one
- * of them, and then that there were five; counted properly there are nine with
- * a counterpart in PHP and one without. They are here because a click has to
- * redraw without asking the server, so they cannot be collapsed — what they can
- * be is named, beside the file that decides the same thing on the server,
- * because each pair has to move together:
+ * What does not arrive is the RULES below. A click has to redraw without asking
+ * the server, so each is written here a second time, named beside the PHP that
+ * decides the same thing, because each pair has to move together. The PHP half
+ * is the authority: it is what gets saved, or drawn before alpine boots.
  *
  * - `drawn()`: an abstaining cell that something wider already answers is drawn
  *   as `broader`. PHP: `Cell::drawn()`.
- * - `reached()`: which wider rule wins — the row's own MANAGE column, the
- *   wildcard over every entity, or the rule for this name — with a forbidding
- *   one beating a granting one. PHP: `GridView::reach()`.
+ * - `reached()`: which wider answer wins — the row's own MANAGE column, the
+ *   wildcard over every entity, a rule over every entity for this name, or an
+ *   inherited one — with a forbidding one beating a granting one.
+ *   PHP: `GridView::reach()`.
  * - `answers()`: what one cell ANSWERS rather than what was written on it.
  *   PHP: `Cell::answers()`.
- * - `granted()`: the tab counter, which counts what the cells answer and not
- *   what the role wrote. PHP: `Tab::granted()`, and a test pins the two together
- *   on a role that holds only the wildcard.
- * - `reachOf()`: a locked cell shows the store's word, an editable one the
- *   pending click. PHP: `Conditions/Narrowing`, reached through `Grants/RoleState`.
- * - `clauses()`: the clause cut. PHP: `Narrowing::clauses()`.
- * - `preview()` and `lineOf()`: the sentence a rule reads as, and its bracketing.
- *   PHP: `Narrowing::preview()` and `Conditions/Rule::text()`.
- *
- * - `answered()`: what one row's cells answer, for the reading that folds them
- *   away — granted and forbidden, one stance more than the tab counter.
+ * - `granted()`: the tab counter, over what the cells answer.
+ *   PHP: `Tab::granted()`; `GridViewTest` pins the two on a role that holds
+ *   only the wildcard.
+ * - `answered()`: the same count over one row, forbidden as well as granted.
  *   PHP: `Row::answered()`.
- * - `stackSummary()`: that count as the line a person reads, and the only place
- *   this file puts a computed value inside a translated sentence.
- *   PHP: `GridView::summaryOf()`, and a test pins the two together.
+ * - `stackSummary()`: that count as the line the fold reads.
+ *   PHP: `GridView::summaryOf()`.
+ * - `clauses()`: the clause cut. PHP: `Narrowing::clauses()`.
+ * - `preview()` and `lineOf()`: the sentence a rule reads as, and each line of
+ *   it. PHP: `Narrowing::preview()` and `Rule::text()`.
+ * - `booleanMisfit()` and `booleanColumnMisfit()`: a condition that can never
+ *   hold, one direction each, read off `Columns::booleans()`.
+ *   PHP: `Narrowing::unsatisfiableColumns()`, which asks warden.
+ * - `offered()`: the builder only on a cell that says something, on a row with
+ *   a model. PHP: `RoleGrants::plan()`, which reads no reach for an abstaining
+ *   cell, and `RoleGrants::wanted()`, which reads none on a row with no model.
+ * - `reachOf()` and `reachEnabled()`: a locked cell stays on the store's reach
+ *   and none of the three can be picked, and "owned" needs ownership to
+ *   resolve.
+ *   PHP: `RoleGrants::plan()`, which never writes the screen's reach onto a
+ *   cell `Narrowing::isEditable()` refuses, and `Narrowing::fromPayload()`.
+ * - `untilEnabled()`: which cells may carry an end date.
+ *   PHP: `RoleGrants::plan()`.
+ * - `movedAt()`: what this screen has changed in a cell since it opened.
+ *   PHP: `RoleGrants::plan()`, where it asks whether this person touched it —
+ *   compared there as instants and rebuilt rules, here as text, so a date
+ *   re-picked to the stored day reads as moved only here.
  *
- * `booleanMisfit()` and `booleanColumnMisfit()` are the two with no counterpart:
- * PHP ships the column list they need (`Columns::booleans()`) and decides nothing
- * about it. Between them they mirror warden's own `WhereCan::compileOne()` guard,
- * which is symmetric where its in-memory sibling `ComparisonOperator::compare()`
- * is not.
- *
- * `said` is not a rule and not a word of its own: it is `stateOf()`'s answer,
- * parked where a live region can read it. Written in `write()` so a preset and
- * a keyboard cycle announce too, and deliberately NOT in `select()`, which
- * returns early when the inspector and the condition builder are both off.
- *
- * `shown()`, `matched()`, `filterCount()` and `filterEmpty()` are not on either
- * list, and that is the point of them: the filter decides what is DRAWN and the
- * server decides nothing about it, because a filter the server knew about would
- * be a filter that reaches the payload — and a payload with an entity missing is
- * written as a deliberate revoke. `verify/verify-filter-keeps-state.mjs` drives
- * that boundary.
- *
- * `cycle()` came off this list in `1.8.0`: PHP carried a second walker over the
- * same order until then. Now the order is declared once, in `Stance::order()`,
- * and only this file walks it.
+ * Not on the list, on purpose: `cycle()`, because the order is declared once,
+ * in `Stance::order()`, and only this file walks it; and the filter — `axis()`
+ * and everything that reads it — which the server must know nothing about, as
+ * `axis()` explains.
  */
 /**
  * The half both screens share: a flat list of conditions, its groups and the
@@ -73,10 +66,8 @@ const conditions = {
     },
 
     /**
-     * The groups the precedence draws. This is the one rule written twice:
-     * `Narrowing::clauses()` in PHP is the authority — it is what gets saved and
-     * what the suite pins — and this copy exists because the pending state never
-     * reaches the server between one keystroke and the next.
+     * Cut at every or, because and binds tighter — the precedence
+     * `Narrowing::clauses()` draws.
      */
     clauses() {
         const clauses = []
@@ -119,9 +110,9 @@ const conditions = {
     },
 
     /**
-     * A typed `true` or `false` against a column with no boolean cast. Warden
-     * compares strictly, so that condition is stored and never matches — and
-     * the person typing it is the only one who can still change it.
+     * A typed `true` or `false` against a column the model does not cast to
+     * boolean, which can never hold. The save refuses it; this says so while it
+     * is being typed, when it can still be changed.
      */
     booleanMisfit(rule) {
         return rule.kind === 'value'
@@ -130,24 +121,12 @@ const conditions = {
     },
 
     /**
-     * The mirror, and it is the half warden closed on its own side and not on
-     * the other: `WhereCan::compileOne()` compares `is_bool($value)` against
-     * `hasCast()` and fails closed either way round, while
-     * `ComparisonOperator::compare()` — the in-memory pass — still reads
-     * `$left === $right || ($numeric && $left == $right)`, and `is_numeric(true)`
-     * is false. So anything that is not `true`/`false` against a column the
-     * model DOES cast to boolean is stored and never matches an instance.
-     * Written as a prohibition it never fires at all, which is the direction
-     * that matters.
+     * The other direction: anything but `true` or `false` against a column the
+     * model DOES cast to boolean can never hold either, because warden's rule —
+     * `Group::unsatisfiableColumns()` — is a biconditional.
      *
      * An empty value is left alone: it is a rule still being typed, not a
-     * mistake, and `Value::cast()` refuses it on the way in anyway.
-     *
-     * Permanent, not a stopgap. Warden's 2.2.2 states that aligning
-     * `ComparisonOperator::compare()` would change documented behaviour and so
-     * cannot land in 2.x, and that a row stored before its write-time refusal
-     * still evaluates to false — written as a forbid, it never fires. Both
-     * warnings stay for as long as this package supports the 2.x line.
+     * mistake, and the save refuses it all the same.
      */
     booleanColumnMisfit(rule) {
         return rule.kind === 'value'
@@ -188,7 +167,7 @@ export default function (props) {
 
 /**
  * The condition builder on its own, over one rule and with no cell to select.
- * There are no three alternatives here: ownership is a checkbox of its own on
+ * There are no three alternatives here: ownership is a field of its own on
  * that screen, so an empty list is simply every row.
  */
 function builder({ state, words, source, interactive }) {
@@ -208,8 +187,6 @@ function builder({ state, words, source, interactive }) {
         },
 
         replaceRules(rules) {
-            // Replaced whole rather than mutated in place: livewire only notices
-            // a change it can see on the entangled property itself.
             this.state = { mode: rules.length > 0 ? 'conditions' : 'all', rules }
         },
     }
@@ -231,21 +208,20 @@ function grid({ state, grid, interactive }) {
 
         // One term for the whole grid rather than one per tab, because there is
         // exactly one matrix tab by construction: `GridView::matrix()` is
-        // private and called once. The doors tabs have no rows to filter.
+        // private and called once. The doors tabs draw no filter.
         filter: '',
 
         selected: null,
 
         // Whether the panel is on the page at all. Separate from `selected` on
         // purpose: a cell stays selected when the panel closes, so the grid keeps
-        // showing WHICH cell was being read, and reopening does not have to ask
-        // the server again for something it still holds.
+        // showing WHICH cell was being read.
         panel: false,
 
         // And whether it is showing more than one line. A third flag rather than
         // a second meaning on `panel`, because they answer different questions:
-        // `panel` is «is there an answer on screen», `expanded` is «is somebody
-        // working on it». Collapsing keeps the answer and the selection; closing
+        // `panel` is "is there an answer on screen", `expanded` is "is somebody
+        // working on it". Collapsing keeps the answer and the selection; closing
         // gives the focus back to the cell.
         //
         // It survives a click on another cell on purpose: somebody comparing two
@@ -269,10 +245,10 @@ function grid({ state, grid, interactive }) {
         // A plain counter, never an object. Alpine's reactivity (`@vue/reactivity`,
         // which it pins) wraps every object-valued property in a Proxy on each
         // read, and a Proxy is never `===` its raw target — so comparing
-        // `this.selected` back against the object assigned to it is always
-        // false-negative, on the very first uncontested click, with no race
-        // anywhere near it. A number is never wrapped, so its identity survives
-        // the round trip through reactive state.
+        // `this.selected` back against the object assigned to it never matches,
+        // on the very first uncontested click, with no race anywhere near it. A
+        // number is never wrapped, so its identity survives the round trip
+        // through reactive state.
         asked: 0,
 
         /**
@@ -292,25 +268,21 @@ function grid({ state, grid, interactive }) {
          * Three things guard the assignment, and each is a state the screen
          * would otherwise show falsely. The call is not made at all when neither
          * half of the inspector is on the page: the panel is gated by config and
-         * the click handler was not, so every click cost two round trips into
-         * markup that was never rendered. The answer is dropped when a faster
-         * click already replaced it — tracked by a token, not by comparing
-         * `this.selected` to the object this call wrote: Alpine's reactivity
-         * hands back a fresh Proxy on every read of an object property, and a
-         * Proxy is never `===` its raw target, so an object-identity guard here
-         * discards every reply, uncontested or not. And a rejected call says so
-         * — before this there was a header over an empty body and no sentence
-         * anywhere in the package to put in it.
+         * the click handler is not, so every click would cost two round trips
+         * into markup that was never rendered. The answer is dropped when a
+         * faster click already replaced it, by the `asked` token and never by
+         * `this.selected`, for the reason given where `asked` is declared. And a
+         * rejected call says so, rather than leaving the header over an empty
+         * body.
          */
         async select(row, action, label, name) {
             if (! this.grid.explain && ! this.grid.constraints) {
                 return
             }
 
-            // Kept raw and not only folded into `subtitle`: the screen voice
-            // below passes it straight to `drawn()`/`reached()`, the same
-            // catalogue name every other cell already resolves its wildcard
-            // lookup against.
+            // `name` is kept raw as well as folded into `subtitle`: the inspector
+            // hands it to `drawn()`, `reached()` and `stateOf()`, which key a
+            // rule written over every entity by its catalogue name.
             this.selected = { row, action, title: label, subtitle: name ?? row, name }
             this.panel = true
             this.why = null
@@ -318,11 +290,6 @@ function grid({ state, grid, interactive }) {
             this.failed = false
             this.loading = true
 
-            // The sequencing token. `this.selected` still names the cell on
-            // screen, but it stopped being what proves a reply is still wanted:
-            // it is an object, and Alpine reads it back through a reactive Proxy
-            // that is never `===` the raw value this method just assigned. A
-            // number is not wrapped, so it is what the three guards below compare.
             const token = (this.asked ?? 0) + 1
             this.asked = token
 
@@ -337,8 +304,8 @@ function grid({ state, grid, interactive }) {
                 }
 
                 // `[]` is the server saying it was asked nothing this grid can
-                // answer, and it is truthy here. Left as it came, the template's
-                // `why &&` passed it and drew a verdict box of undefineds.
+                // answer, and it is truthy here, so it becomes null before any
+                // `why` test in the template can take it for an answer.
                 this.why = why && why.verdict ? why : null
                 this.narrowing = narrowing
             } catch {
@@ -359,10 +326,6 @@ function grid({ state, grid, interactive }) {
             return (this.state.stances?.[row] ?? {})[action] ?? this.grid.order[0]
         },
 
-        /**
-         * What the cell draws. A cell nobody wrote still shows when a granted or
-         * forbidden wildcard already reaches it, and it says which.
-         */
         drawn(row, action, name) {
             const stance = this.stanceOf(row, action)
 
@@ -373,21 +336,11 @@ function grid({ state, grid, interactive }) {
             return this.reached(row, action, name) === null ? stance : 'broader'
         },
 
-        /**
-         * What already answers for a cell nobody wrote: the wildcard on its own
-         * row, or a rule written over every entity at once. Forbidden wins, the
-         * same way it wins when the store resolves the check.
-         */
         reached(row, action, name) {
             const candidates = [
                 action === this.grid.manage ? null : this.stanceOf(row, this.grid.manage),
                 this.grid.wider['*'] ?? null,
                 this.grid.wider[name ?? action] ?? null,
-                // An inherited answer has the same shape as a wider rule —
-                // nobody wrote this cell and something else answers it — so it
-                // is read here rather than beside it, and every counter that
-                // asks what a cell ANSWERS is right for free. Paired with
-                // `GridView::reach()`, which folds it in exactly here.
                 this.inheritedAt(row, action)?.stance ?? null,
             ].filter((stance) => stance !== null && stance !== this.grid.order[0])
 
@@ -429,11 +382,7 @@ function grid({ state, grid, interactive }) {
         },
 
         /**
-         * `read` grants the reading half and leaves the rest as it was; `all`
-         * grants the wildcard and everything the policy declares; `clear` says
-         * nothing about anything.
-         *
-         * All three also put every cell they touch back to every row: "all" that
+         * Every preset puts each cell it touches back to every row: an "all" that
          * left a condition underneath would say the opposite of what it promises.
          */
         apply(row, preset) {
@@ -465,7 +414,7 @@ function grid({ state, grid, interactive }) {
         /* ── Finding a row ───────────────────────────────────── */
 
         /**
-         * Whether a row is one of the ones being looked for.
+         * What the filter's term matches, rows and columns both.
          *
          * It reads `grid`, which PHP filled and nothing ever writes, and NEVER
          * `state`. That is the whole safety property of this feature, not a
@@ -475,9 +424,10 @@ function grid({ state, grid, interactive }) {
          * has it and is written as a deliberate revoke — with a success report
          * on top. It cannot be defended against downstream either: clearing a
          * cell deletes its key too, so the two are byte for byte the same
-         * payload. Two tests in `RoleGrantsTest` pin what that costs.
+         * payload. Two tests in `RoleGrantsTest` pin what that costs, and
+         * `verify/verify-filter-keeps-state.mjs` drives the boundary.
          *
-         * Both readings ask this same method, so the table and the fold cannot
+         * Both readings filter through it, so the table and the fold cannot
          * disagree about which rows exist.
          */
         axis() {
@@ -543,15 +493,7 @@ function grid({ state, grid, interactive }) {
         /**
          * The fold's per-entity count, which the wide reading does not need
          * because its cells are all on one line.
-         *
-         * It counts what the cells ANSWER, like the tab counter, and one stance
-         * more than it: a tab counts granted, this counts granted and forbidden,
-         * because a collapsed entity hides a prohibition just as well as a
-         * grant. PHP: `Row::answered()`, and a test pins the two together.
-         *
-         * The one place this file puts a computed value inside a translated
-         * line. Every other string it produces is a whole word looked up in a
-         * map PHP filled. `verify/verify-stack-summary.mjs` drives it.
+         * `verify/verify-filter-keeps-state.mjs` drives it.
          */
         stackSummary(row) {
             const answered = this.answered(row)
@@ -575,12 +517,6 @@ function grid({ state, grid, interactive }) {
             }
         },
 
-        /**
-         * What the tab GRANTS, which is not what was written on it: a role
-         * holding the wildcard wrote nothing on any cell and reaches all of them.
-         * `Tab::granted()` in PHP counts the same way, and there is a test that
-         * pins the two together on a role that only holds the wildcard.
-         */
         granted(tabKey) {
             const tab = this.grid.tabs.find((candidate) => candidate.key === tabKey)
 
@@ -602,11 +538,9 @@ function grid({ state, grid, interactive }) {
         },
 
         /**
-         * The three words a cell says to a screen reader, and the only thing the
-         * browser does with them: index a map php filled in, the same way it
-         * indexes the cycle. `answers()` returns a stance value and `states` is
-         * keyed by one, so nothing here has to know what a stance is called —
-         * which is a rule with a test behind it, not a preference.
+         * Looked up, never composed: `grid.states` is keyed by the stance value
+         * `answers()` returns, so nothing here has to know what a stance is
+         * called — and a test pins that the script carries no stance name.
          */
         stateOf(row, action, name) {
             return this.grid.states[this.answers(row, action, name)]
@@ -621,23 +555,23 @@ function grid({ state, grid, interactive }) {
         },
 
         /**
-         * When the grant behind this cell stops, as ISO 8601 or nothing.
+         * When the grant behind this cell stops, as an ISO 8601 string — the
+         * full one `RoleState::toPayload()` sends, or the bare date the input
+         * writes back — or null.
          *
-         * Never compared here. Whether a date has passed is already answered by
+         * Never compared here: whether a date has passed is already answered by
          * the stance beside it, decided against the SERVER's clock, and this
-         * machine's is not ours to trust. Paired with `RoleState::toPayload()`,
-         * which is why the value is a string rather than anything with methods.
+         * machine's is not ours to trust.
          */
         untilAt(row, action) {
             return (this.state.until?.[row] ?? {})[action] ?? null
         },
 
         /**
-         * The role lending this cell its answer, or nothing.
+         * The role lending this cell its answer, or null.
          *
-         * Paired with `RoleGrants::inheritedCells()`, which keeps a cell out of
-         * this map the moment it has a rule of its own — so this never has to
-         * ask whether the inheritance is the thing in force.
+         * `RoleGrants::inheritedCells()` leaves out every cell the store already
+         * answers with a rule of its own.
          */
         inheritedAt(row, action) {
             return (this.state.inherited?.[row] ?? {})[action] ?? null
@@ -662,35 +596,28 @@ function grid({ state, grid, interactive }) {
 
             this.state = { ...this.state, stances: this.replace(this.state.stances, row, held) }
 
-            // Said here and not in `pick()`, so a preset and a keyboard cycle
-            // announce too; and not in `select()`, which returns without doing
-            // anything when the inspector and the builder are both off — a
-            // configuration where a click said nothing at all, ever.
+            // Said here rather than in `pick()`, so a preset and the decision
+            // buttons announce too; and not in `select()`, which returns early
+            // when the inspector and the builder are both off.
             //
-            // AFTER the write, and through the same three methods the cell's
-            // own spans are bound to, in the same order — so the region says
-            // byte for byte what the cell now says. Taking `grid.states[stance]`
-            // instead would be a second version of one fact: a cell cleared
-            // under a granting wildcard answers "granted", and carries "reached
-            // by a broader rule" beside it, where the stance alone says "no
-            // rule".
-            //
-            // The cell is not named. The person's focus is on it, so it is
-            // already known — and a preset writes a whole row at once, where
-            // naming one of them would be worse than naming none.
-            //
-            // A preset writes one stance to every cell it touches, so the last
-            // call through here is true of all of them.
+            // After the write, so `spoken()` reads the new state. The cell is
+            // not named: a click leaves the focus on it, and a preset writes
+            // several cells of a row at once, where naming the last of them
+            // would be worse than naming none.
             this.said = this.spoken(row, action)
         },
 
         /**
          * The cell's own words, in the cell's own order.
          *
-         * `box.blade.php` binds three spans — `stateOf()`, `reachedMark()` and
-         * `markOf()` — and the accessibility tree joins them itself. This joins
-         * the same three the same way, which is what keeps one cell from having
-         * two descriptions on one screen.
+         * `box.blade.php` binds its word spans to these same methods, in this
+         * order — the label and a locked cell's fixed word aside — and the
+         * accessibility tree joins them itself; joining them the same
+         * way here keeps one cell from having two descriptions on one screen.
+         * Taking `grid.states[stance]` instead would be one of those: a cell
+         * cleared under a granting wildcard answers "granted" and carries
+         * "reached by a broader rule" beside it, where the stance alone says
+         * "no rule".
          */
         spoken(row, action) {
             const name = (this.grid.rows[row]?.cells ?? []).find((cell) => cell.action === action)?.name
@@ -705,40 +632,12 @@ function grid({ state, grid, interactive }) {
         },
 
         /**
-         * Close the panel and give the width back, keeping the selection.
-         *
-         * The reply already in `why` is kept too: it is about a cell that has
-         * not moved, so throwing it away would buy nothing and cost a round trip
-         * the next time the same cell is opened.
-         */
-        /**
-         * Shuts the panel and puts the focus back where it came from.
-         *
-         * The root arrives as an argument for the same reason the tab list does:
-         * this model never reaches for the document, so every DOM lookup starts
-         * from an element the markup handed over. `$root` is Alpine's own magic
-         * for the component's outermost element, which is the one the grid and
-         * the panel both live inside.
-         *
-         * Returning the focus is not a nicety. The panel is opened by clicking a
-         * cell and closed by a button INSIDE it, so without this the focus is
-         * left on an element that has just been hidden — and a hidden element
-         * with focus drops the caret to the top of the document, which for
-         * somebody on a keyboard means starting the whole page again.
-         *
-         * The selection outlives the panel on purpose (that is what the second
-         * flag is for), so the cell to go back to is still named. A cell that
-         * has gone from the DOM since — a filter typed while the panel was open
-         * — leaves nothing to focus, and leaving the focus where it is beats
-         * moving it somewhere arbitrary.
-         */
-        /**
          * The one line the collapsed bar says.
          *
-         * What the STORE answers plus, when there is one, the date — which is
-         * the pair somebody reads a cell for. Not the cause: that is a sentence,
-         * and a sentence in a bar that must stay one line is a sentence read to
-         * its ellipsis.
+         * What the cell answers on screen plus, when there is one, the date —
+         * which is the pair somebody reads a cell for. Not the cause: that is a
+         * sentence, and a sentence in a bar that must stay one line is a
+         * sentence read to its ellipsis.
          *
          * Composed here and not on the server for the reason every other reading
          * in this file is: the bar has to be right the instant a cell is clicked,
@@ -755,6 +654,21 @@ function grid({ state, grid, interactive }) {
             return ends ? `${stance} · ${ends}` : stance
         },
 
+        /**
+         * Shuts the panel, keeping the selection, and gives the focus back.
+         *
+         * Returning the focus is not a nicety. The panel is opened by clicking a
+         * cell and closed by a button INSIDE it, so without this the focus is
+         * left on an element that has just been hidden — and a hidden element
+         * with focus drops the caret to the top of the document, which for
+         * somebody on a keyboard means starting the whole page again.
+         *
+         * The root arrives as an argument, as `stepTab()`'s list does, so the
+         * lookup starts from an element the markup handed over: `$root` is
+         * Alpine's magic for the component's outermost element, which holds the
+         * grid and the panel both. A cell that cannot be found leaves the focus
+         * where it is, which beats moving it somewhere arbitrary.
+         */
         closePanel(root) {
             this.panel = false
             this.expanded = false
@@ -780,15 +694,15 @@ function grid({ state, grid, interactive }) {
         /**
          * Whether this cell can carry an end date at all.
          *
-         * Three noes, and each is a different sentence rather than one greyed
-         * control: warden REFUSES a date on a prohibition — `until()` on a forbid
-         * throws, `null` included — an abstention is the absence of a row and has
-         * no life to end, and a cell answered by something wider or inherited has
-         * no rule here to put a date on.
+         * Warden REFUSES a date on a prohibition — `until()` on a forbid throws,
+         * `null` included — and an abstention, a cell answered by something
+         * wider or inherited among them, has no row of its own to end.
+         * `untilReason()` says which, so a disabled control always carries its
+         * reason.
          *
-         * Advisory, not the guarantee. The payload of a disabled control still
-         * reaches the server (§6.11), so `RoleGrants::plan()` asks the same
-         * question again and drops the date whatever arrives.
+         * Advisory, not the guarantee: the payload of a disabled control still
+         * reaches the server, so `RoleGrants::plan()` asks the same question
+         * again and drops the date whatever arrives.
          */
         untilEnabled(row, action) {
             return this.grid.expiry && this.stanceOf(row, action) === this.grid.order[1]
@@ -814,8 +728,8 @@ function grid({ state, grid, interactive }) {
          * Through the same spread `write()` uses, and for the same reason: it
          * carries every key this file does not know about, `baseline` among
          * them. Rebuilding the object from the keys this file DOES know would
-         * drop the baseline on the first click and make every save read as a
-         * screen nobody had touched.
+         * drop the baseline on the first click, and a save with no baseline
+         * treats every cell as touched.
          */
         setUntil(row, action, value) {
             if (! this.untilEnabled(row, action)) {
@@ -847,8 +761,8 @@ function grid({ state, grid, interactive }) {
          * the only elements inside it ARE these buttons. So there is no empty
          * list to guard against and no lookup that can miss — a guard here would
          * be a branch nothing can reach and no javascript gate can measure. Even
-         * a `tab` that matched nothing lands at -1 and steps to the first
-         * button rather than at anything undefined.
+         * a `tab` that matched nothing lands at -1, and one step from there still
+         * indexes a real button.
          */
         stepTab(list, step) {
             const buttons = Array.from(list.querySelectorAll('[role="tab"]'))
@@ -884,14 +798,11 @@ function grid({ state, grid, interactive }) {
         },
 
         /**
-         * What the STORE holds for the selected cell.
+         * What the STORE held for the selected cell when this screen opened,
+         * read off the baseline, so nothing is asked of the server for it.
          *
-         * Read off the baseline — the third envelope the field has sent since
-         * 1.6.0 — which is by definition what the store had when this screen
-         * opened. Nothing is asked of the server for it.
-         *
-         * A host that never sent one — the infolist's payload is `{stances,
-         * narrowing}`, with no save to compare against — has nothing to read
+         * A host that never sent one — the infolist's payload carries no
+         * baseline, having no save to compare against — has nothing to read
          * there: the live state IS the store's answer on that screen, by
          * construction. Keyed off the envelope's own absence and not off
          * `interactive`, so anywhere else it goes missing fails the same safe
@@ -912,12 +823,11 @@ function grid({ state, grid, interactive }) {
         },
 
         /**
-         * What a save would change, in the cell's own words, or null when a save
-         * would change nothing here.
+         * What this screen has changed in one cell since it opened, in the
+         * cell's own words, or null when it has changed nothing there.
          *
-         * Also null with no baseline to compare against: a screen that never
-         * sent one cannot be asked what changed, because there store and screen
-         * are the same thing.
+         * Also null with no baseline to compare against, for the reason
+         * `storedStance()` gives.
          */
         movedAt(row, action) {
             if (this.state.baseline === undefined) return null
@@ -955,12 +865,10 @@ function grid({ state, grid, interactive }) {
         },
 
         /**
-         * The stored rule, said only when it says something.
-         *
-         * With the builder open and untouched, the rule on the left and the
-         * preview under the editor are one fact twice — the trap this package
-         * has already paid for once. It is said when there is no builder, or
-         * when what is on screen is no longer what the store holds.
+         * The stored rule, said only when it says something: with no builder,
+         * or when the screen no longer shows what the store holds. With the
+         * builder open and untouched, the stored rule and the builder's preview
+         * are one fact twice.
          */
         storedRuleWorthSaying() {
             const stored = this.narrowing?.stored?.preview
@@ -993,9 +901,9 @@ function grid({ state, grid, interactive }) {
         /**
          * Which of the three a cell may be moved to.
          *
-         * Asked once and read twice: the markup binds `disabled` to it and the
-         * arrow keys step over it, so the rule that decides is not the rule
-         * that skips.
+         * Asked once and read twice: the markup binds `disabled` to it and
+         * `stepReach()` skips whatever is disabled, so the arrows skip exactly
+         * what the buttons refuse.
          */
         reachEnabled(mode) {
             return this.interactive
@@ -1017,9 +925,7 @@ function grid({ state, grid, interactive }) {
         },
 
         /**
-         * The rendered buttons are the list, for the same reason `stepTab` reads
-         * them: a keydown on the group needs a focused element inside it, and
-         * the only elements inside it are these.
+         * The rendered buttons are the list, as in `stepTab()`.
          *
          * Disabled options are stepped over rather than landed on — an arrow
          * that moves somewhere and does nothing reads as a broken keyboard.
@@ -1043,8 +949,8 @@ function grid({ state, grid, interactive }) {
             next.focus()
         },
 
-        /* The two names the shared half reads. The grid keeps its own, older
-           ones so nothing else has to move. */
+        /* The two names the shared half reads; the grid keeps its own so
+           nothing else has to move. */
         get words() {
             return this.grid
         },
@@ -1066,15 +972,15 @@ function grid({ state, grid, interactive }) {
 
         /**
          * The builder is offered on a cell that says something and whose row has
-         * a model behind it: a permission with no model and conditions on it is
-         * created, shown, and grants nothing ever.
+         * a model behind it: warden refuses a condition on a permission with no
+         * entity, since there is no instance to test it against.
          *
-         * The config check is the first clause and it lives here rather than in
-         * the template. With the builder switched off `narrowing` is `[]`, and
-         * `[].model` is `undefined`, which is `!== null` — so every clause below
-         * would pass and `narrowing.stored.locked` in the markup would throw. The
-         * only thing that stopped it was the order of two operands inside an
-         * `x-if`, which is not a guard.
+         * The config check is the first clause, inside the predicate rather than
+         * ahead of it in the template's `x-if`, where only the order of two
+         * operands would keep it a guard. With the builder switched off
+         * `narrowing` is `[]`, and `[].model` is `undefined`, which is
+         * `!== null` — so every clause below would pass and
+         * `narrowing.stored.locked` in the markup would throw.
          */
         offered() {
             return this.grid.constraints

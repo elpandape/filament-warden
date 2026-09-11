@@ -6,11 +6,10 @@
     why in the field's own hint, where a person is already reading.
 --}}
 @php
-    // A bare `$entangle(...)` is a magic that Livewire's own directive
-    // registers, not a name Alpine resolves inside x-data. Scoping it to the
-    // component with `$wire.` is what `permission-grid.blade.php` already
-    // does; without it this x-data expression throws before Alpine can build
-    // it, and the whole component — clauses, source, preview — never mounts.
+    // `$entangle` exists only as a property of Alpine's `$wire` magic, never
+    // as a name of its own inside x-data, so the binding goes through `$wire.`
+    // as in `forms/permission-grid.blade.php`. Bare, the expression throws and
+    // the component never mounts.
     $binding = '$wire.'.$applyStateBindingModifiers("\$entangle('{$getStatePath()}')");
 @endphp
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">

@@ -1,22 +1,13 @@
 {{--
     The grid and its inspector, shared by the screen that hands permissions out
     and the one that only reads them.
-
-    The template decides nothing. Every condition below is a value the caller
-    already worked out: `$interactive` says whether the cells are controls, and
-    `$grid` is the whole view model.
 --}}
 @php
-    // Worked out once: a matrix includes the cell partial once per cell, and
-    // each word is a translator lookup. The id is the component's own key,
-    // which is absolute — `form.permissions` — and therefore already unique on
-    // the page, which is what a tab and its panel need to point at each other.
+    // `$states` is worked out once and handed to every cell: the partial is
+    // included once per cell, and each word is a translator lookup.
     $states = $grid->states();
     $ids = \ElPandaPe\FilamentWarden\Filament\Forms\Grid\GridView::domId($componentKey);
 
-    // Whether the class name is drawn under each entity. Read once here rather
-    // than per row: a matrix asks it once per entity and the accessor walks the
-    // packaged defaults every time.
     $showsClassNames = \ElPandaPe\FilamentWarden\Support\Config::enabled('grid.class_names');
 @endphp
 <div
@@ -30,27 +21,11 @@
     class="fw-grid"
 >
     {{--
-        The layout takes its second track only while the panel is open, which is
-        the difference between this and the fixed side column 2.11 measured and
-        threw away: that one took its width whether anybody was reading it or
-        not. `data-open` is what the stylesheet keys the second track on, and it
-        is bound rather than rendered, because the panel opens and closes without
-        a round trip.
-    --}}
-    {{--
-        Escape lives HERE and not on the panel, and the difference was measured
-        in a browser rather than reasoned about. The panel is opened by clicking
-        a cell, which leaves the focus on the cell — inside the matrix, outside
-        the panel — so a listener scoped to the panel never received the
-        keystroke on the only path anybody takes to open it. Measured: the panel
-        stayed open on Escape every time.
-
-        Still not on the window: this covers the field and nothing else, so a
-        keystroke elsewhere on a Filament page is not this component's to
-        swallow, which is the whole of the original reasoning. What it adds is
-        the matrix, where Escape means nothing else. Inside the panel the
-        builder's own inputs handle it first and it bubbles here after, exactly
-        as before.
+        Escape is heard here, on the element that holds both the matrix and the
+        panel, and not on the panel: the panel is opened from a cell, which
+        leaves the focus on the cell, outside the panel. Not on the window
+        either: a keystroke elsewhere on a Filament page is not this
+        component's to act on.
     --}}
     <div
         class="fw-layout"
@@ -101,29 +76,15 @@
                 @endif
 
                 {{--
-                    What a click just did, said once, for everyone who is not
-                    looking at the cell.
+                    What a click just did, for everyone who is not looking at
+                    the cell. The cell's own words change with it, but a name
+                    that changes under a focus that never moved is not reliably
+                    re-read by a screen reader.
 
-                    A cell's accessible name already changes on its own — every
-                    `fw-sr` span inside it is bound with `x-text` — but a name
-                    that changes under a focus that never moved is not a name a
-                    screen reader re-reads. This is the element that says it.
-
-                    Empty from the first paint and never behind a condition, for
-                    the reason the inspector's own region below already names: a
-                    live region added to the page at the same moment its content
-                    appears is not announced by NVDA or JAWS. Only its TEXT may
-                    change.
-
-                    One for the whole grid, not one per tab like the filter's:
-                    only one cell can be clicked at a time, and a second region
-                    would only ever repeat this one.
-
-                    Driven by `write()`, which every stance change goes through,
-                    and NOT by `select()` — that one returns early when the
-                    inspector and the condition builder are both switched off,
-                    which is a configuration where a click used to say nothing
-                    at all, ever.
+                    On the page and empty from the first paint, never behind a
+                    condition: NVDA and JAWS do not announce a live region that
+                    arrives with its text already in it, so only its TEXT may
+                    change. The filter's region below keeps the same rule.
                 --}}
                 <p class="fw-sr" role="status" x-text="said"></p>
 
@@ -132,10 +93,10 @@
 
                     <div class="fw-key">
                         {{--
-                            Two groups and not one list of eight: three of these
-                            are what a click puts on a cell — the shift hint
-                            belongs with them, not at the end of everything —
-                            and the rest are marks the grid adds on its own.
+                            Two groups, not one list: `legend()` lists first the
+                            three drawings a click can set, and the shift hint
+                            belongs with them rather than at the end; the rest
+                            are marks the grid adds on its own.
                         --}}
                         <section class="fw-key-group">
                             <h4>{{ __('filament-warden::ui.grid.legend.set') }}</h4>
@@ -179,8 +140,7 @@
                 </details>
 
                 {{--
-                    A tablist is ONE tab stop and the arrows walk it: that is the
-                    pattern, and it is also the only way the panel below is
+                    One tab stop, and the arrows walk it, so the panel below is
                     reachable without tabbing past every tab first. Without
                     javascript the tabs never switched anyway — the click handler
                     is `x-on:click` — so the roving tabindex takes nothing away.
@@ -231,11 +191,10 @@
                             {{--
                                 Above both readings, so one input answers for
                                 the table and for the fold. It only ever decides
-                                what is DRAWN: the state below keeps every row,
-                                filtered out or not, because a payload with an
-                                entity missing is written as a deliberate revoke
-                                (`RoleGrants::plan()` walks the catalogue, not
-                                the payload).
+                                what is DRAWN. The state keeps every row: a
+                                payload with an entity missing is written as a
+                                revoke, because `RoleGrants::plan()` walks the
+                                catalogue, not the payload.
                             --}}
                             <div class="fw-filter">
                                 <input
@@ -255,8 +214,7 @@
                                     Said out loud as well as drawn: a filter that
                                     takes rows away without announcing it is a
                                     change nobody who cannot see the screen is
-                                    told about. Same pattern as the inspector's
-                                    own line below.
+                                    told about.
                                 --}}
                                 <p class="fw-sr" role="status" x-text="! filtering() ? '' : filterCount(@js($tab->key))"></p>
                             </div>
@@ -288,28 +246,21 @@
                                         @foreach ($tab->rows as $row)
                                             <tr x-show="shown(@js($row->key))">
                                                 {{--
-                                                    Named by its two spans and
-                                                    not by its contents, because
-                                                    the preset buttons live in
-                                                    here too: without this, every
-                                                    row of the table is announced
-                                                    as "users … read all none",
-                                                    with the three button labels
-                                                    glued to the entity's name.
-                                                    Seen in an accessibility tree
-                                                    dump, not guessed.
-                                                --}}
-                                                {{--
-                                                    El `aria-labelledby` nombra
-                                                    la clase solo si la clase se
-                                                    dibuja. Una referencia a un
-                                                    id que no existe se salta en
-                                                    silencio —el nombre saldría
-                                                    igual— pero apuntar a algo
-                                                    ausente es una promesa rota
-                                                    en el marcado, y el título de
-                                                    la fila sigue llevando la
-                                                    clase entera de todos modos.
+                                                    Named by its spans and not
+                                                    by its contents, because the
+                                                    preset buttons live in here
+                                                    too: otherwise every row is
+                                                    announced with the three
+                                                    button labels glued to the
+                                                    entity's name.
+
+                                                    The class span is referenced
+                                                    only when it is drawn: an
+                                                    absent id is skipped
+                                                    silently, but it is still a
+                                                    promise the markup does not
+                                                    keep, and the `title`
+                                                    carries the class either way.
                                                 --}}
                                                 <th
                                                     class="fw-entity"
@@ -348,18 +299,12 @@
 
                             {{--
                                 The same grid read down the page, for when the
-                                columns do not fit across it. One reading is
-                                painted at a time — the stylesheet turns the pair
-                                over together with `display: none`, which is the
-                                only way of hiding that also takes the losing
-                                copy out of the accessibility tree and out of the
-                                tab order.
-
-                                Every cell here is the SAME partial, with the
-                                same arguments byte for byte, so both copies bind
-                                to one state and cannot drift apart. The notices,
-                                the tabs and the legend are not repeated: they
-                                sit above both readings, once.
+                                columns do not fit across it; the stylesheet
+                                paints one reading at a time. Every cell here is
+                                the SAME partial with the same arguments as in
+                                the table, so both copies bind to one state and
+                                cannot drift apart. The notices, the tabs and
+                                the legend sit above both readings, once.
                             --}}
                             <div class="fw-stack" x-show="matched(@js($tab->key)) > 0">
                                 @foreach ($tab->rows as $row)
@@ -369,23 +314,15 @@
                                             @if ($showsClassNames)
                                                 <span class="fw-stack-model">{{ $row->model }}</span>
                                             @endif
-                                            {{--
-                                                What the row's cells answer, for
-                                                the reading that folds them away.
-                                                Drawn by the server and redrawn
-                                                by the browser from the same
-                                                count: `Row::answered()` and
-                                                `answered()` in the script.
-                                            --}}
                                             <span class="fw-stack-summary" x-text="stackSummary(@js($row->key))">{{ $grid->summaryOf($row) }}</span>
                                         </summary>
 
                                         <div class="fw-stack-rows">
                                             {{--
                                                 The presets again, because the
-                                                fold has no `<tr>` to carry the
-                                                copy above. In the body and never
-                                                in the `<summary>`, where a click
+                                                table's copy is hidden with the
+                                                table. In the body and never in
+                                                the `<summary>`, where a click
                                                 would toggle the disclosure.
                                             --}}
                                             <span class="fw-shortcuts fw-stack-shortcuts" x-show="! narrowingColumns()" @unless ($interactive) hidden @endunless>
@@ -468,41 +405,20 @@
             x-bind:data-fw-open="panel ? 'true' : 'false'"
             x-bind:data-fw-expanded="expanded ? 'true' : 'false'"
             {{--
-                Solo con una celda seleccionada. Antes decía `panel || ! selected`,
-                que era correcto mientras el inspector era una columna con su
-                estado vacío dentro: al no haber nada elegido, la columna
-                enseñaba «pulsa una celda». Como barra pegada abajo eso es otra
-                cosa — una tira flotante que aparece nada más abrir el
-                formulario, sin que nadie haya pulsado nada, y que dice que
-                pulses algo. La invitación sobra: la rejilla está delante.
-            --}}
-            {{--
-                `panel && selected`, y las dos mitades hacen falta.
-
-                `selected` sola es lo que se puso al mover el panel abajo, y
-                rompió Escape sin que ninguna de las nueve puertas lo viera:
-                `closePanel()` baja `panel` y NO toca `selected` —a propósito,
-                porque la celda sigue marcada con su aro para decir cuál se
-                estaba leyendo— así que con `x-show="selected"` el panel se
-                quedaba en pantalla después de cerrarlo.
-
-                `panel` sola tampoco vale: era `panel || ! selected`, que sin
-                nada elegido enseñaba el estado vacío. Con las dos, entrar no
-                enseña nada, pulsar abre, y Escape cierra dejando el aro donde
-                estaba.
+                Shown once a cell has been picked and not before: with the grid
+                right there, nobody needs an invitation to click one. `panel` is
+                the half that closes it — `closePanel()` lowers `panel` and keeps
+                `selected`, so the cell keeps its ring — which is why `selected`
+                alone would leave the panel on screen after Escape.
             --}}
             x-show="panel && selected"
             x-cloak
         >
             {{--
-                La barra plegada: una línea con el dibujo, la celda y el
-                veredicto. Ahí acaba lo que la mayoría de los clics quiere saber,
-                y es lo que deja que el resto solo aparezca cuando alguien lo
-                pide — que es lo que le devuelve a la matriz su ancho entero.
-
-                El dibujo va `aria-hidden` y con `tabindex="-1"`: repite el
-                estado que la frase de al lado ya dice, y un botón más en el
-                recorrido de teclado por decir dos veces lo mismo es ruido.
+                Collapsed, the panel is this one line — the drawing, the cell
+                and what it answers — which is what most clicks want to know;
+                the rest appears when somebody asks for it. The drawing is
+                `aria-hidden` because the gist beside it already says the state.
             --}}
             <div class="fw-inspector-bar" x-show="selected" x-cloak>
                 <span
@@ -534,16 +450,12 @@
 
             <div class="fw-inspector-body" x-show="expanded || ! selected" x-cloak>
                 {{--
-                    Empty from the first paint on purpose: a live region added to
-                    the page at the same moment its content appears is not
-                    announced by NVDA or JAWS. What makes it reliable is that the
-                    element is already here and only its TEXT changes — which is
-                    also why it carries the failure sentence itself instead of
-                    leaving it to the paragraph below, whose announcement would
-                    depend on a `display` toggle. It says the verdict and not the
+                    Empty from the first paint, for the reason the grid's own
+                    region above gives, and it carries the failure sentence
+                    itself: the paragraph below appears by a `display` toggle,
+                    which announces nothing. It says `why.summary` and not the
                     whole panel, so a keystroke in the condition builder stays
-                    silent. `why` is already null or a real answer by the time it
-                    is read: `select()` normalises the empty payload.
+                    silent.
                 --}}
                 <p class="fw-sr" role="status" x-text="failed ? @js(__('filament-warden::ui.explain.failed')) : (why ? why.summary : '')"></p>
 
@@ -574,14 +486,11 @@
                     </div>
                     <div class="fw-editor-context">
                 {{--
-                    Who answers this cell, when it is not this role.
-
-                    Above the two voices rather than inside the stored one: it is
-                    not a second reading of the same rule, it is a different rule
-                    belonging to a different role — and changing the cell here
-                    writes one of this role's own on top rather than editing
-                    theirs, which is the part somebody has to know BEFORE they
-                    click.
+                    Who answers this cell when it is not this role, above the two
+                    voices rather than inside the stored one: it is a different
+                    rule belonging to a different role, not a second reading of
+                    this one, and changing the cell writes one of this role's own
+                    on top — the part somebody has to know BEFORE they click.
                 --}}
                 <template x-if="selected && inheritedAt(selected.row, selected.action) && ! loading">
                     <p class="fw-inspector-lent">
@@ -595,30 +504,9 @@
                 </template>
 
                 {{--
-                    When this cell's grant ends, and whether it may be given one.
-
-                    Three noes with three sentences rather than one greyed
-                    control: warden REFUSES a date on a prohibition — `until()`
-                    on a forbid throws, `null` included — an abstention is the
-                    absence of a row and has no life to end, and a cell answered
-                    by something wider or inherited has no rule here to date.
-
-                    Advisory only. The payload of a disabled control still
-                    reaches the server, so `RoleGrants::plan()` asks the same
-                    question again and drops the date whatever arrives.
-                --}}
-
-
-                {{--
-                    The two voices that were one paragraph.
-
-                    The panel said "No grant matches" and, three lines down,
-                    "granted". They do not disagree: the first speaks for the
-                    store and the second for the screen. Naming them is what
-                    makes warden's sentence readable.
-
-                    The stored half is read from the baseline, so none of this
-                    costs a query.
+                    Two voices, because the store and the screen can disagree:
+                    the explanation is about what is stored, and a cell changed
+                    since would otherwise read as contradicting it.
                 --}}
                 <template x-if="why && ! loading && grid.explain">
                     <div class="fw-voices">
@@ -631,12 +519,11 @@
                             <p class="fw-voice-why" x-text="why.summary"></p>
                             <p class="fw-voice-note" x-show="why.narrowed" x-text="why.narrowed" x-cloak></p>
                             {{--
-                                Beside warden's cause and never instead of it.
-                                There is no `Cause::Expired`: a lapsed grant comes
-                                back `NoMatchingGrant`, byte for byte what a cell
-                                nobody ever wrote answers, so the sentence above
-                                is true and is not the story. Same shape as the
-                                narrowed note for the same reason.
+                                Beside the sentence above, never instead of it:
+                                a lapsed grant comes back as `NoMatchingGrant`,
+                                the cause a cell nobody ever wrote gets too, so
+                                that sentence is true and is not the story.
+                                Written by `Explanation::until()`.
                             --}}
                             <p class="fw-voice-note" x-show="why.until" x-text="why.until" x-cloak></p>
                         </section>
@@ -681,13 +568,10 @@
                             x-bind:value="(untilAt(selected.row, selected.action) ?? '').slice(0, 10)"
                             x-on:change="setUntil(selected.row, selected.action, $event.target.value)"
                             {{--
-                                Pointed at FROM the control, and only while there
-                                is a reason: a disabled input keeps its label in
-                                the accessibility tree but takes no focus, so a
-                                sentence sitting beside it is read in browse mode
-                                and never in focus mode. It is the same lesson the
-                                scope rail paid for in the v2.6.0 tree dump, on
-                                the one control 3.0 added.
+                                The reason is the input's description only while
+                                there is one, which is only while the input is
+                                disabled: it reaches whoever reads the input in
+                                place, since a disabled input takes no focus.
                             --}}
                             x-bind:aria-describedby="untilReason(selected.row, selected.action) ? '{{ $ids }}-until-why' : null"
                         >
