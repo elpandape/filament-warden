@@ -15,9 +15,9 @@ class ListPermissions extends ListRecords
     protected static string $resource = PermissionResource::class;
 
     /**
-     * With no tenant active warden reads every tenant at once, so the listing
-     * holds rows that belong to none of the one being looked at. Saying so is
-     * cheaper than a reader working it out from a name.
+     * With no tenant active, warden can be reading every tenant at once —
+     * `Tenants::mixing()` says when — and the listing then mixes their rows.
+     * Saying so is cheaper than a reader working it out from a name.
      */
     public function getSubheading(): ?string
     {
@@ -25,8 +25,8 @@ class ListPermissions extends ListRecords
     }
 
     /**
-     * The same hole as the roles listing had: Filament's `getHeaderActions()`
-     * defaults to an empty array and never adds a create action of its own.
+     * Filament's `getHeaderActions()` defaults to an empty array and never adds
+     * a create action of its own.
      *
      * The visibility is written by hand because the button asks
      * `getCreateAuthorizationResponse()`, which goes straight to the policy and

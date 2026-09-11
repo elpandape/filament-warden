@@ -55,13 +55,11 @@ final class PermissionsTable
             ->emptyStateDescription(static fn (Table $table): ?string => $table->getFilterIndicators() === []
                 ? Line::of('filament-warden::ui.resources.permissions.empty.description')
                 : null)
-            // Only when the doctor found something, and only on an unfiltered
+            // Only when some rule can never be true, and only on an unfiltered
             // reading: a banner over a page that is already showing exactly
             // those rows is noise, and one over a page filtered to something
             // else names a problem that is not on the screen. Same oracle as the
-            // empty state above, and the same reason it is Filament's own
-            // (§6.42) — it covers search, per-column search and every filter,
-            // and costs no query.
+            // empty state above.
             ->description(static function (Table $table): ?string {
                 if ($table->getFilterIndicators() !== []) {
                     return null;
@@ -112,9 +110,7 @@ final class PermissionsTable
                 // One grouped read for the page, never one per row: `Holders::of()`
                 // is the honest answer for ONE record and hydrates every grant
                 // that names it, which is a page's worth of hydration per row on
-                // a listing. The three figures are a count each, and the
-                // forbidden one is apart because a denial is a state and not an
-                // absence.
+                // a listing.
                 TextColumn::make('held')
                     ->label(__('filament-warden::ui.resources.permissions.columns.held'))
                     ->badge()
@@ -166,8 +162,8 @@ final class PermissionsTable
                 SelectFilter::make('provenance')
                     ->label(__('filament-warden::ui.resources.permissions.columns.provenance'))
                     ->options(self::provenances())
-                    // Without a query closure a filter is a no-op: `apply()`
-                    // hands the query back untouched.
+                    // Without a query closure a `SelectFilter` compares a column
+                    // named after the filter, and `provenance` is not a column.
                     ->query(static function (Builder $query, array $data): void {
                         $provenance = Provenance::tryFrom(is_string($data['value'] ?? null) ? $data['value'] : '');
 
@@ -192,8 +188,7 @@ final class PermissionsTable
                 // and the rest is decided in PHP by the same call the column
                 // makes. `whereKey` over that answer, so the filter and the
                 // badge cannot drift: one of them would otherwise be a second
-                // implementation of the rule (§6.17's own lesson, where a
-                // provenance badge and its filter disagreed row by row).
+                // implementation of the rule.
                 Filter::make('unsatisfiable')
                     ->label(__('filament-warden::ui.resources.permissions.filters.unsatisfiable'))
                     ->query(static fn (Builder $query): Builder => $query->whereKey(self::unsatisfiableKeys())),
@@ -278,12 +273,11 @@ final class PermissionsTable
 
             if ((! is_int($key) && ! is_string($key)) || ! is_numeric($tally)) {
                 // Neither half is reachable and both are what `level: max`
-                // demands: `permission_id` is NOT NULL and `count(*)` is
-                // whatever the driver hands back, which `AssignedRole` declares
-                // no cast for. A key that does not read as a key matches no row
-                // anyway, which is the safe way to lose one — the same shape
-                // `RoleGrants::of()` carries, where the unreachable half rides
-                // a reachable line instead. There is no reachable half here.
+                // demands: `permission_id` is NOT NULL and `tally` is whatever
+                // the driver hands back, which warden's `Grant` declares no cast
+                // for. A key that does not read as a key matches no row anyway,
+                // which is the safe way to lose one — and with no reachable
+                // condition sharing this line, coverage has to ignore it.
                 continue; // @codeCoverageIgnore
             }
 
@@ -329,10 +323,10 @@ final class PermissionsTable
     /**
      * The keys of every row whose condition can never be true.
      *
-     * Read once per filtered render rather than per row, and narrowed in SQL to
-     * the rows that could possibly qualify before PHP is asked anything: a row
-     * with no `options` carries no condition and cannot fail a satisfiability
-     * check.
+     * Read by the table's description and by the `unsatisfiable` filter, never
+     * per row, and narrowed in SQL to the rows that could possibly qualify
+     * before PHP is asked anything: a row with no `options` carries no condition
+     * and cannot fail a satisfiability check.
      *
      * @return list<int|string>
      */
@@ -418,7 +412,7 @@ final class PermissionsTable
      * How far one row reaches, in one word.
      *
      * A row pinned to a record is not any of the six shapes: `Narrowing::of()`
-     * reads `options` and `only_owned` and never `entity_id`, so it answered
+     * reads `options` and `only_owned` and never `entity_id`, so it would answer
      * "Every row" for a rule that answers no check about the class at all. The
      * word is read literally rather than composed, so the test that fails a key
      * nothing reads can still see it.

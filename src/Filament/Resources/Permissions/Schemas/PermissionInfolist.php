@@ -20,23 +20,24 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 /**
- * The same questions the form asks, answered instead, in the sketch's own
- * layout: what the rule is on the left, and who it fell to beside it.
+ * The same questions the form asks, answered instead: what the rule is on the
+ * left, and who it fell to beside it.
  *
  * Two stacks and not one column, because the two answer different questions and
  * only the left one grows. «How far it reaches» is about the RULE — a name, an
- * entity, and the condition read out as it will be evaluated — and the bench
- * that `ViewPermission` puts under it asks that same rule about one account.
- * The aside is about the STORE: how many hold it, and what put the row there.
+ * entity, and the condition read out as it will be evaluated — and the test
+ * bench `ViewPermission` opens from its header asks that same rule about one
+ * account. The aside is about the STORE: how many hold it, and what put the
+ * row there.
  *
  * Who holds it arrives as counts and not as names: a role screen has a handful
  * of roles, and a permission can be held by every account in the installation.
- * The names are read in one place only — the moment somebody deletes it, and
- * the grants go with it.
+ * The names are drawn only where the grants are at stake — the delete modal and
+ * the edit form's aside, both through `PermissionsTable::warning()`.
  *
- * There is no identity card and the sketch has none: the name is the heading
- * Filament already draws, and the title is the subheading `ViewPermission` puts
- * under it.
+ * There is no identity section: the name is the heading Filament already
+ * draws, and the title is the subheading `ViewPermission::getSubheading()`
+ * puts under it.
  */
 final class PermissionInfolist
 {
@@ -45,11 +46,11 @@ final class PermissionInfolist
         return $schema
             ->columns(4)
             ->components([
-                // The sketch's `fi-aside`: two stacks, the wide one first. A
-                // section spanning 2 followed by one spanning 1 would fill the
-                // first row and then start the next one on the LEFT — which is
-                // how the provenance card ends up under the rule instead of
-                // under the holders. The group is what keeps a stack a stack.
+                // Two stacks, the wide one first. A section spanning 3 followed
+                // by two spanning 1 would fill the first row and then start the
+                // next one on the LEFT — which is how the provenance card ends
+                // up under the rule instead of under the holders. The group is
+                // what keeps a stack a stack.
                 Group::make([
                     Section::make(__('filament-warden::ui.resources.permissions.sections.reach'))
                         ->icon(Heroicon::OutlinedFunnel)
@@ -76,10 +77,8 @@ final class PermissionInfolist
                                 ->badge()
                                 ->state(static fn (Model $record): string => self::reach($record)),
 
-                            // The rule under the three facts that frame it, at
-                            // full width, because it is the only one of them
-                            // that can run long — and it is read out with its
-                            // brackets, the way warden will evaluate it.
+                            // Last and at full width, because it is the only
+                            // entry here that can run long.
                             TextEntry::make('rule')
                                 ->label(__('filament-warden::ui.resources.permissions.fields.conditions'))
                                 ->placeholder('—')
@@ -177,8 +176,8 @@ final class PermissionInfolist
      * The catalogue is not asked: it answers what a PANEL declares, and this
      * question is about a class — a permission derived from a policy that no
      * panel exposes is still declared by that policy, and calling it undeclared
-     * because no screen shows it would be a wrong reason for a true badge
-     * (§6.34). The badge beside it is the catalogue's answer and stays.
+     * because no screen shows it would be a wrong reason for a true badge. The
+     * badge beside it is the catalogue's answer and stays.
      */
     private static function declaredBy(Model $record): string
     {
@@ -251,8 +250,8 @@ final class PermissionInfolist
     }
 
     /**
-     * A null entity never reaches this: Filament draws the placeholder instead
-     * of formatting, so a branch for it here would be a branch nothing runs.
+     * Word for word `PermissionsTable::entity()`, so both screens name an entity
+     * the same way — and, like it, with no branch for a null that never arrives.
      */
     private static function entity(string $state): string
     {

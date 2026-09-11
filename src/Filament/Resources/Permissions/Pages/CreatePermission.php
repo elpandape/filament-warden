@@ -19,13 +19,17 @@ class CreatePermission extends CreateRecord
     /**
      * What this screen costs, said where somebody about to use it will read it.
      *
-     * `permissions.create` is off out of the box and the listing does not offer
-     * the button, so anybody standing here either turned it on or was handed the
-     * URL — and the second is worth catching. The sentence is not about the key:
-     * it is about what a hand-written row IS. Nothing derives it, so nothing asks
-     * for it until the installation's own code does, and the audit reads it as
-     * loose until `catalog.custom` names it. That is the part people find out a
-     * release later.
+     * `permissions.create` is off out of the box, and while it is off this page
+     * answers 403 — `CreateRecord::authorizeAccess()` asks the resource's
+     * `canCreate()` — so the switch is on for anybody standing here. The
+     * sentence is not about the key: it is about what a hand-written row IS.
+     * Nothing derives it, so nothing asks for it until the installation's own
+     * code does, and the audit reports it until something declares it —
+     * `forgotten` while nobody holds it, `strays` once somebody does — except a
+     * row over `*`, which the audit treats as deliberate: informational while
+     * unheld, silent once held. A loose row is declared by
+     * `catalog.custom`, and only then is it `loose`; one over a model, only by a
+     * policy method. That is the part people find out a release later.
      *
      * Unconditional, unlike the listing's, whose sentence only holds while
      * warden is reading every tenant at once. This one is true every time this
@@ -39,20 +43,15 @@ class CreatePermission extends CreateRecord
     /**
      * The catalogue's unique index, reported as a field error rather than a 500.
      *
-     * Warden 2.0 put a unique index on `(name, identity_key)`, where the
-     * identity is entity, record, ownership, tenant and a digest of the
-     * canonical conditions. `PermissionForm::exists()` is the friendly
-     * pre-check and it does not cover the whole index: it compares columns and
-     * looks only at rows with no conditions on them, because until warden 2.0 a
-     * twin was a row of its own and collided with nothing. Building the same
-     * twin twice now reaches the database.
+     * Warden's unique index is over `(name, identity_key)`, where the identity
+     * is entity, record, ownership, tenant and a digest of the canonical
+     * conditions. `PermissionForm::exists()` is the friendly pre-check and does
+     * not cover the whole index: it cannot see a duplicate twin, for the reason
+     * its docblock gives.
      *
      * The database is the authority and this is the courtesy: it turns every
      * collision path into the same field error, including the ones nobody has
-     * enumerated. Aligning `exists()` with the index itself needs the value
-     * `options` is ABOUT to take, which the builder's dehydration and
-     * `mutateFormDataBeforeSave()` settle after this rule has run; that is a
-     * change of its own and does not ride inside an upgrade.
+     * enumerated.
      *
      * @param  array<string, mixed>  $data
      */

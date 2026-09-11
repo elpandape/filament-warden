@@ -34,8 +34,6 @@ class EditRole extends EditRecord
         return [
             ViewAction::make(),
 
-            // Void on purpose: whatever `after()` returns stands in for the
-            // action's own result.
             DeleteAction::make()
                 ->modalDescription(static fn (Model $record): string => RolesTable::warning($record))
                 ->visible(fn (Model $record): bool => RoleResource::canDelete($record)),

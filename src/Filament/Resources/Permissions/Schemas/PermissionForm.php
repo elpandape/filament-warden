@@ -53,8 +53,8 @@ final class PermissionForm
             ->columns(4)
             ->components([
                 // Aliased, because `ElPandaPe\Warden\Constraints\Group` is
-                // already in this file and is the one the satisfiability check
-                // reads — the name belongs to warden's rule, not to a layout.
+                // already in this file, for the round trip in `lockedReason()`:
+                // the name belongs to warden's rule, not to a layout.
                 Column::make()
                     ->columnSpan(3)
                     ->schema([
@@ -69,16 +69,17 @@ final class PermissionForm
                                     ->maxLength(255)
                                     ->live(onBlur: true)
                                     ->disabled(static fn (?Model $record): bool => $record instanceof Model && ! PermissionResource::mayEditName($record))
-                                    // There is no unique index on this table, so `unique()`
-                                    // on one column would not describe the row: a permission
-                                    // is the tuple, and two identical ones are creatable.
+                                    // Not `unique()`: a permission is the whole tuple, and
+                                    // warden's unique index is over `(name, identity_key)`,
+                                    // a digest no rule on one column can ask about — so
+                                    // `exists()` compares the tuple itself.
                                     //
-                                    // `$get` and `$record` are injected by PARAMETER NAME,
-                                    // not by type: `Component::resolveDefault…ByName()` is
-                                    // consulted first and answers both, while the by-type
-                                    // path hands back the record for anything typed as a
-                                    // model and would leave `Get` to the container. Rename
-                                    // either and this closure stops resolving.
+                                    // `$record` is injected by PARAMETER NAME, and has to be:
+                                    // `Component::resolveDefaultClosureDependencyForEvaluationByName()`
+                                    // answers it with or without a record, while the by-type
+                                    // path only finds one to hand back when it exists — on the
+                                    // create screen it falls through to the container, which
+                                    // cannot build a `Model`. `$get` resolves either way.
                                     ->rule(static fn (?Model $record, Get $get): callable => static function (string $attribute, mixed $value, callable $fail) use ($record, $get): void {
                                         if (self::exists($value, $record, $get)) {
                                             $fail(__('filament-warden::ui.resources.permissions.fields.taken'));
@@ -100,10 +101,8 @@ final class PermissionForm
                                     // The conditions named columns of another table, and the
                                     // ownership was resolved against a column this entity may
                                     // not have. Kept, either would be a rule that cannot be
-                                    // true — and an `only_owned` warden cannot express in SQL
-                                    // says nothing about it: the branch is skipped on the grant
-                                    // pass and blocks on the forbid pass, without an error
-                                    // anywhere.
+                                    // true, and nothing would say so — how the ownership half
+                                    // fails is on `EditPermission::ownable()`.
                                     ->afterStateUpdated(static function (callable $set): void {
                                         $set('options', ['mode' => 'all', 'rules' => []]);
                                         $set('only_owned', false);
@@ -135,11 +134,8 @@ final class PermissionForm
                             ]),
                     ]),
 
-                // Read-only, and on purpose: the date belongs to a GRANT and not
-                // to this row, so a permission has no date of its own to edit —
-                // which is exactly the thing people get wrong about expiry, and
-                // saying it beside the count is cheaper than saying it in a
-                // paragraph nobody reads.
+                // Read-only on purpose: `expiry()` says why a permission has no
+                // date of its own to edit.
                 Column::make()
                     ->columnSpan(1)
                     ->schema([
@@ -166,11 +162,11 @@ final class PermissionForm
     }
 
     /**
-     * Every entity any panel knows about, plus warden's wildcard and the loose
-     * permission that points at nothing.
+     * Every entity any panel knows about, plus warden's wildcard. The loose
+     * permission that points at nothing is the select's own blank option.
      *
-     * And the row's own entity, always. The catalogue now spans every panel, so
-     * a row derived from another panel's resource is offered like any other —
+     * And the row's own entity, always. The catalogue spans every panel, so a
+     * row derived from another panel's resource is offered like any other —
      * but a row whose entity no panel declares at all (a morph alias left over,
      * a model dropped everywhere) still has to be offered, or the select would
      * refuse the value it was drawn with and the row could not be opened.
@@ -239,22 +235,19 @@ final class PermissionForm
      * Why this field is what it is, in three cases and never a fourth.
      *
      * A derived permission's name is written by the policy method that declares
-     * it. Changing it does not break anything loudly — it disconnects the row
-     * from the code that asks for it, and nothing says so afterwards.
+     * it: changing it disconnects the row from the code that asks for it, and
+     * nothing says so afterwards.
      *
      * A loose row this installation would let anyone edit, and does not, is
-     * closed by a HOLDER: `mayEditName()` refuses a row that is not orphaned,
-     * and re-pointing it would move what every one of them holds without telling
-     * any of them. That is the one case that has to be said out loud, because
-     * the field is greyed and the reason is somebody else's grant.
+     * closed by a HOLDER — see `PermissionResource::mayEditName()` — and that
+     * case has to be said out loud: the field is greyed and the reason is
+     * somebody else's grant.
      *
      * Asked as `mayEdit() && ! mayEditName()` and never as `! mayEditName()`
      * alone: the second is also false when the INSTALLATION closed this whole
      * class of row — `permissions.update` at `'title'`, or a derived row under
      * `'loose'` — where no holder is involved and claiming one would be a lie on
-     * a security screen. `mayEdit()` reads config and one attribute and touches
-     * no table, so putting it first also keeps the grant read out of every case
-     * that does not need it.
+     * a security screen.
      */
     private static function nameHelp(?Model $record): string
     {
@@ -272,8 +265,7 @@ final class PermissionForm
     }
 
     /**
-     * What warden would call it. The title is generated in the `creating` hook
-     * and only when it is null, so it never catches up with a rename on its own.
+     * What warden would call it.
      */
     private static function generated(Get $get): string
     {
@@ -284,7 +276,6 @@ final class PermissionForm
             return '';
         }
 
-        // A name this package minted has a title only this package can read back.
         return PermissionName::title($name)
             ?? PermissionTitle::generate($name, is_string($type) ? $type : null, null, (bool) $get('only_owned'));
     }
@@ -365,9 +356,9 @@ final class PermissionForm
     /**
      * Whether this screen may write the rule the row already has.
      *
-     * Kept as its own reading of `lockedReason()` because the two `disabled()`
-     * callbacks want a boolean and the hint wants a sentence, and they must never
-     * be able to disagree.
+     * Kept as its own reading of `lockedReason()` because the builder's
+     * `disabled()` wants a boolean and the hint wants a sentence, and the two
+     * must never be able to disagree.
      */
     private static function conditionsWritable(?Model $record): bool
     {
@@ -379,10 +370,10 @@ final class PermissionForm
      *
      * The question is not whether the stored rule can be READ. It is whether what
      * is stored survives being read and written back unchanged: a value stored as
-     * the string `'2'` comes back as the integer `2`, and an `or` on the first
-     * line comes back as `and`, because `Narrowing::conditions()` normalises it.
-     * Both change what the row means and both stop it matching its own twin, and
-     * a save that only touched the title would do it without a word.
+     * the string `'2'` comes back as the integer `2`, which changes what the row
+     * means and stops it matching its own twin — and a save that only touched the
+     * title would do it without a word. A first line written `or` is not such a
+     * case: `ConstraintSerializer::sameRule()` canonicalises it to `and`.
      *
      * Nothing here reads the store: `Narrowing::of()` is pure and `Columns::of()`
      * is memoised.
@@ -473,17 +464,14 @@ final class PermissionForm
     /**
      * A permission is a shared row: every role and every account holding it
      * points at the same one, and editing it here moves the rule for all of them
-     * at once. That is right for a catalogue — the row IS the rule — and it has
-     * to be said from the FIRST holder and not the second, because one holder is
-     * already somebody whose rule is about to move under them.
+     * at once. That is right for a catalogue — the row IS the rule — and it is
+     * said from the FIRST holder, because one holder is already somebody whose
+     * rule is about to move under them.
      *
-     * The sentence names its count after a label — "Holders of this row: 1" —
-     * because it fires from the FIRST holder and a count placed in front of a
-     * noun would have to agree with it. `trans_choice()` would be the other way
-     * out and it is not one: the sibling sentence on the delete modal carries
-     * three counts and Laravel pluralises on one, so both are worded to read
-     * correctly at 0, 1 and 40 instead. Still one key, so an installation that
-     * published `lang/{en,es}/ui.php` keeps its own copy — and its own old plural.
+     * So the count follows a label — "Holders of this row: 1" — rather than
+     * standing in front of a noun it would have to agree with. `trans_choice()`
+     * is no way out: the sibling sentence on the delete modal carries two counts
+     * and Laravel pluralises on one.
      */
     private static function sharedWarning(?Model $record): ?string
     {
@@ -501,39 +489,31 @@ final class PermissionForm
     /**
      * Whether the tuple is already in the catalogue.
      *
-     * A permission is (action, entity, record, ownership, TENANT) — and warden
-     * has had a unique index over `(name, identity_key)` since its own 2.0,
-     * where that key is a digest of exactly those. Since 0.6.0 the sentence this
-     * rule fires has promised "this name and entity"; the query compared the
-     * name and stopped there, so the same action over two different models could
-     * not coexist and a derived row could not be saved at all while a sibling
-     * shared its name.
+     * A permission is (action, entity, record, ownership, TENANT), and warden's
+     * unique index is over `(name, identity_key)`, where that key digests the
+     * other four together with the canonical conditions. So the scope is part of
+     * the question, asked the way `stampScope()` decides it.
      *
-     * It also read the catalogue with every scope dropped, which made it refuse
-     * a name another tenant held — a collision the index would never have
-     * raised. The scope is now part of the question, asked the way `stampScope()`
-     * decides it, which is what closes that half.
-     *
-     * The other half stays open on purpose. A DUPLICATE TWIN — two rows agreeing
-     * on all five AND on their conditions — is invisible here, because the digest
-     * needs the value `options` is about to take and this rule runs BEFORE the
-     * condition builder dehydrates and before `mutateFormDataBeforeSave()`. There
-     * is no honest answer to give at this point in the lifecycle, so the backstop
-     * on `CreatePermission`/`EditPermission` catches that one after the write and
-     * reports it on this same field. Two guards, one because the other cannot
-     * reach.
+     * A DUPLICATE TWIN — two rows agreeing on all five AND on their conditions —
+     * is invisible here, because the digest needs the value `options` is about
+     * to take and this rule runs BEFORE the condition builder dehydrates and
+     * before `mutateFormDataBeforeSave()`. There is no honest answer to give at
+     * this point in the lifecycle, so the backstop on `CreatePermission` /
+     * `EditPermission` catches that one after the write and reports it on this
+     * same field. Two guards, one because the other cannot reach.
      *
      * The entity and the ownership are read from the form, because they are what
      * is about to be saved; the record's key is read from the row, because no
      * field on this screen can move it.
      *
-     * A twin — the same tuple carrying conditions — is a row of its own and
-     * collides with nothing, so only the plain rows are compared. That has to
-     * be asked of the record being edited too, and not only of the candidates:
-     * a twin's own name never changes underneath this rule, so a save that
-     * only touches the title still runs it, and a plain sibling of the same
-     * tuple — orphaned by warden's own `reconstrain()`, or still held by
-     * another role — would otherwise read as a collision with itself.
+     * A twin — the same tuple carrying conditions — collides with nothing but an
+     * identical twin, which is the case above, so only the plain rows are
+     * compared. That has to be asked of the record being edited too, and not
+     * only of the candidates: a twin's own name never changes underneath this
+     * rule, so a save that only touches the title still runs it, and a plain
+     * sibling of the same tuple — orphaned by warden's own `reconstrain()`, or
+     * still held by another role — would otherwise read as a collision with
+     * itself.
      */
     private static function exists(mixed $name, ?Model $record, Get $get): bool
     {
@@ -553,11 +533,7 @@ final class PermissionForm
         // The scope this row would be written at, asked the way warden asks it:
         // `stampScope()` stamps a catalogue row with the active tenant unless
         // `scope.only_relations` keeps the catalogue global, in which case every
-        // permission is written at NULL. Warden's unique index is over
-        // `(name, identity_key)` and that digest carries the tenant, so two rows
-        // of the same name at different tenants are two rows it admits — while a
-        // read with every scope dropped saw the neighbour's and refused a name
-        // the database would have taken.
+        // permission is written at NULL.
         $tenancy = app(Tenancy::class);
         $scope = $tenancy->scopesCatalog() ? $tenancy->current() : null;
 
@@ -571,14 +547,9 @@ final class PermissionForm
             )
             ->where('only_owned', (bool) $get('only_owned'))
             ->whereNull('options')
-            // `Query\Builder::where()` already short-circuits a `null` value to
-            // `whereNull()` on its own, for both the two-arg form used here and
-            // the three-arg
-            // `=` form, so a plain `where('entity_type', $entityType)` would read
-            // the same rows. The explicit branch is defensive, not corrective:
-            // it says what the query means without leaning on a Laravel internal
-            // a reader of this file has no reason to have memorised, and it is
-            // what the two tests below actually exercise.
+            // Explicit, though `Query\Builder::where()` already turns a `null`
+            // value into `whereNull()`: the branch says what the query means
+            // without leaning on a Laravel internal.
             ->when(
                 $entityType === null,
                 static fn (mixed $query): mixed => $query->whereNull('entity_type'),

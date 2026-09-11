@@ -29,8 +29,7 @@ class EditPermission extends EditRecord
      * The visibility is the guarantee: a delete button asks
      * `getDeleteAuthorizationResponse()`, which goes straight to the policy, and
      * the orphan rule lives in `PermissionResource::canDelete()`, off that path.
-     * The description is the table's own — the grants go with it by a foreign
-     * key, below Eloquent and with no `Grant` event of their own.
+     * The description is `PermissionsTable::warning()`, which says why.
      *
      * @return array<Action>
      */
@@ -88,15 +87,14 @@ class EditPermission extends EditRecord
         // runs before this method against a schema rebuilt for this request, so
         // `disabled()` is re-evaluated ahead of `$data` and no payload can carry
         // `options` past it. A copy could only drift.
-        // Unset rather than re-assign. A disabled field is already gone from
-        // `$data` — `disabled()` calls `saved(false)` and Filament forgets the
-        // path — so putting the key back is the only thing that can write this
-        // column, and what it puts back is the CAST. For the three stored values
-        // Eloquent flattens to null — text that is not JSON, the empty string,
-        // the JSON literal `null` — that is SQL NULL written over a rule nobody
-        // could decode, turning it into an unconditional grant. Re-assigning the
-        // raw string instead is no good either: the `array` cast would encode it
-        // a second time. Leaving the key out touches nothing.
+        //
+        // Unset rather than re-assigned. A disabled field is already gone from
+        // `$data` (see `submitted()`), so putting the key back is the only thing
+        // that can write this column, and what it puts back is the CAST: for the
+        // three stored values Eloquent flattens to null — `Narrowing::of()` names
+        // them — that is SQL NULL written over a rule nobody could decode,
+        // turning it into an unconditional grant. The raw string is no good
+        // either: the `array` cast would encode it a second time.
         if (! PermissionResource::mayEditConditions($record)) {
             unset($data['options']);
         }
@@ -141,13 +139,11 @@ class EditPermission extends EditRecord
     /**
      * The catalogue's unique index, reported as a field error rather than a 500.
      *
-     * The same guard `CreatePermission` carries, and the path that was measured
-     * is this one: a twin moved onto an entity that already has the plain row of
-     * the same name. Choosing the entity clears the conditions — deliberately,
-     * they named another table's columns — so the row being saved is no longer a
-     * twin, while `PermissionForm::exists()` had already excused it for being
-     * one when the rule ran — which without this comes back as a raw
-     * `UniqueConstraintViolationException` rather than as a field error.
+     * The path that reaches it here: a twin moved onto an entity that already
+     * has the plain row of the same name. Choosing the entity clears the
+     * conditions — deliberately, they named another table's columns — so the
+     * row being saved is no longer a twin, while `PermissionForm::exists()` had
+     * already excused it for being one when the rule ran.
      *
      * @param  array<string, mixed>  $data
      */
@@ -178,8 +174,8 @@ class EditPermission extends EditRecord
      * A disabled field is not dehydrated — `disabled()` also calls `saved(false)`
      * — so Filament forgets its state path entirely and the key arrives ABSENT,
      * not null. At the shipped `permissions.update => 'loose'` that is every
-     * field of a derived row but the title, and `$data['name'] ?? null` turned
-     * the whole title into the empty string on a save that touched nothing.
+     * field of a derived row but the title, and reading `$data['name'] ?? null`
+     * would turn the title into the empty string on a save that touched nothing.
      *
      * `array_key_exists`, and NOT `$data[$key] ?? $record->getAttribute($key)`:
      * absent and null are different answers here. Where the field is editable,
@@ -208,11 +204,11 @@ class EditPermission extends EditRecord
      * through `WhereCan::inexpressible()` — skipped on the grant pass, and on
      * the forbid pass blocking whatever the candidate had already pinned, which
      * for a class-wide row is every row. Nothing throws; the row simply stops
-     * meaning what it says (§6.20).
+     * meaning what it says.
      *
-     * A private copy rather than making the form's predicate public. The two
-     * that must agree are held together by 'switching the entity gives up an
-     * ownership it cannot resolve', which asserts both in one test.
+     * A private copy rather than making the form's predicate public; the test
+     * 'switching the entity gives up an ownership it cannot resolve' holds the
+     * two together.
      */
     private function ownable(?string $entityType): bool
     {

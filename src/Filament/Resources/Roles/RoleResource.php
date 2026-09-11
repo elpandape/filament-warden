@@ -29,13 +29,12 @@ use UnitEnum;
  * fallback builds the class from the CONSUMING application's namespace, so a
  * package resource that leaves it unset points at a class that does not exist.
  *
- * Left non-final on purpose, and the reason is one sentence rather than sixteen:
- * the README's Stability section says these screens are not an extension point.
- * They are open so an application can experiment, not because subclassing them
- * is supported — `canDelete()` gaining an optional parameter in `1.5.0` was a
- * fatal for anyone who had overridden it, and that is the shape to expect. The
- * classes that build a form, an infolist or a table are `final`: nothing was
- * ever promised about those.
+ * Left non-final on purpose: the README's Stability section says these screens
+ * are not an extension point. They are open so an application can experiment,
+ * not because subclassing them is supported — a method that gains an optional
+ * parameter, as `canDelete()` has, is a fatal for anyone who had overridden
+ * it, and that is the shape to expect. The classes that build a form, an
+ * infolist or a table are `final`: nothing was ever promised about those.
  */
 class RoleResource extends Resource
 {
@@ -49,10 +48,10 @@ class RoleResource extends Resource
      *
      * A panel with `->tenant()` puts a global scope on every resource's MODEL —
      * not on the resource — and that scope demands a relationship named after the
-     * tenant class, throwing `LogicException` when it is missing. Measured: with
-     * this line gone, `Role::query()->count()`, `Role::create()` and the
-     * resource's own query all throw. It does not break two screens; it poisons
-     * warden's model for the whole request, its internals included.
+     * tenant class, throwing `LogicException` when it is missing. With this
+     * line gone, `Role::query()->count()`, `Role::create()` and the resource's
+     * own query all throw. It does not break two screens; it poisons warden's
+     * model for the whole request, its internals included.
      *
      * Declared as the property and never through `scopeToTenant()`, which is
      * static and would un-scope every resource of the consuming application — a
@@ -147,18 +146,17 @@ class RoleResource extends Resource
      * The assignment rows follow the role down through a foreign key, and THE
      * CASCADE IS BLIND TO THE SCOPE, as is `$record->delete()` itself. Read
      * through warden's tenant scope, an assignment stamped with another tenant is
-     * invisible, so a role somebody still holds reads as unassigned and the screen
-     * offers the delete button. Measured: held under tenant 7, it read as deletable
-     * from tenant 8, and from no tenant at all under
-     * `warden.scope.null_behavior => 'strict'`.
+     * invisible — from a neighbouring tenant, and from no tenant at all under
+     * `warden.scope.null_behavior => 'strict'` — so a role somebody still holds
+     * reads as unassigned and the screen offers the delete button.
      *
      * The criterion, and it is NOT "strip the scopes off every assigned_roles
      * query": a read that DECIDES a delete reads wide, because the cascade does.
      * A read that REPORTS what exists under the active tenant keeps its scope,
      * because reading wide there would show an assignment `retract()` cannot
-     * remove — a silent no-op from the wrong scope. The other two readers of this
-     * table, `Grants\Reach::restricted()` and `Grants\Assignment::assignments()`,
-     * are of the second kind and keep their scopes on purpose.
+     * remove — a silent no-op from the wrong scope. `Grants\Reach::restricted()`
+     * and `Grants\Assignment::assignments()` are of the second kind and keep
+     * their scopes on purpose.
      *
      * Expiry splits the same way, and this read is on the same side of it: no
      * `Expiry::live()` here, so a LAPSED assignment still makes a role

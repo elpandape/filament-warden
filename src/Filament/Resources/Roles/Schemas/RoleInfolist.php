@@ -18,22 +18,22 @@ use Illuminate\Database\Eloquent\Model;
 use WeakMap;
 
 /**
- * What the role is, in the shape the approved sketch draws it.
+ * What the role is.
  *
  * Two cards side by side above the grid — what this role reaches through other
- * roles, and who reaches it — and then the grid at full width. The order is the
- * sketch's and it is not arbitrary: the grid is the tallest thing on the page,
- * so anything under it is under a scroll.
+ * roles, and who reaches it — and then the grid at full width. The order is not
+ * arbitrary: the grid is the tallest thing on the page, so anything under it is
+ * under a scroll.
  *
- * There is no identity card, and the sketch has none either: the name is the
- * heading Filament already draws and the title is the subheading `ViewRole`
- * puts under it. A card repeating the two would be a third place to read them.
+ * There is no identity card: the name is the heading Filament already draws
+ * and the title is the subheading `ViewRole` puts under it. A card repeating
+ * the two would be a third place to read them.
  *
- * The counts are counts and never a list, for the reason the permission screen
- * already gives: a role can be held by every account in the installation, so a
- * handful of names out of a thousand is decoration. The one place this package
- * names holders is the delete modal, where the names are what somebody is about
- * to destroy.
+ * The counts are counts and never a list, for the reason `PermissionInfolist`
+ * gives: a role can be held by every account in the installation, so a handful
+ * of names out of a thousand is decoration. The one place a role's holders are
+ * named is its delete modal, where the names are what somebody is about to
+ * destroy.
  */
 final class RoleInfolist
 {
@@ -75,13 +75,9 @@ final class RoleInfolist
                     ->extraAttributes(['style' => 'block-size: 100%'])
                     ->columns(2)
                     ->schema([
-                        // Counted and never named, which is the doctrine the
-                        // permission screen already had written down and the
-                        // same reason: a role can be held by every account in
-                        // the installation, so ten names out of a thousand do
-                        // not inform, they decorate. What the figure is FOR is
-                        // the grid underneath — it says how many people the
-                        // next save reaches.
+                        // Counted and never named, for the reason on this
+                        // class. What the figure is FOR is the grid underneath:
+                        // it says how many people the next save reaches.
                         TextEntry::make('holders_held')
                             ->hiddenLabel()
                             ->columnSpanFull()
@@ -149,18 +145,18 @@ final class RoleInfolist
     /**
      * Both halves of the hierarchy, worked out once per record.
      *
-     * Memoised because eight closures on this screen ask for it and each answer
+     * Memoised because four closures on this screen ask for it and each answer
      * costs a closure walk plus a read to name what it found; and on the
-     * instance rather than on its key, for the reason §6.35 measured about
-     * `spl_object_hash()`. Nothing that WRITES an edge passes through this
-     * class, so there is no answer here that a save could leave stale —
+     * instance itself rather than on a key derived from it, because
+     * `spl_object_hash()` can be handed to a new object once the old one is
+     * collected. Nothing that WRITES an edge passes through this class, so
+     * there is no answer here that a save could leave stale —
      * `Hierarchy::apply()` is the form's, and the form draws its own sentence
      * through `ViewRole::chain()`.
      *
      * The same two translated lines the form's own summary uses, arranged as
-     * two labelled rows instead of one sentence: the sketch has a row per
-     * question, and the wording that answers each is the one this package
-     * already settled.
+     * two labelled rows instead of one sentence: a row per question, in the
+     * wording this package already settled.
      *
      * @return array{inherits: string, inherited_by: string, direct: string, reaching: string}
      */
@@ -198,10 +194,9 @@ final class RoleInfolist
     /**
      * The keys a closure hands back, named, in one read.
      *
-     * `Holders::label()` and not the `name` column: it is the same wording every
-     * other screen puts on a role, and it goes through `getAttributes()` rather
-     * than `getAttribute()`, which is what keeps a swapped-in role model from
-     * throwing under `Model::shouldBeStrict()`.
+     * `Holders::label()` and not the `name` column: the same wording every
+     * other screen puts on a role, and safe under `Model::shouldBeStrict()`
+     * for the reason given on `Holders::label()`.
      *
      * @param  list<int|string>  $keys
      */

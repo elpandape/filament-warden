@@ -22,10 +22,8 @@ class CreateRole extends CreateRecord
      *
      * The edges are rows in `assigned_roles` and not columns on this record, so
      * the field is `dehydrated(false)` — which is right, and is exactly why it
-     * needs a hook of its own here. Without one the select was drawn, filled in,
-     * and its picks dropped on the floor: the state never reached the record and
-     * nothing else read it. Measured on the create screen with nesting on, and
-     * it is the reason this method exists.
+     * needs a hook of its own here: without one its picks never reach the
+     * record and nothing else reads them.
      *
      * Read from the RAW state for the same reason `EditRole::afterSave()` does:
      * `getState()` drops a field that does not dehydrate, so there would be

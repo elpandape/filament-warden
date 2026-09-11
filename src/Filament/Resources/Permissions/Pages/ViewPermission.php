@@ -58,9 +58,7 @@ class ViewPermission extends ViewRecord
      * What the bench is being asked, and what it answered.
      *
      * Two properties and not one: the question survives the answer, so somebody
-     * can change the record and ask again without retyping the account — which
-     * is why the modal embeds a separately named schema: submitting a test
-     * preserves the account and keeps the modal open for the next question.
+     * can change the record and ask again without retyping the account.
      *
      * @var array<string, mixed>
      */
@@ -69,10 +67,8 @@ class ViewPermission extends ViewRecord
     /**
      * The card, already worded.
      *
-     * Strings and not a `Probe`: a Livewire property survives the round trip by
-     * being serialised, and a readonly object holding two models would not come
-     * back the same object. The wording happens once, where the store is, and
-     * what travels is what the page prints.
+     * Strings and not a `Probe`: the wording happens once, where the store is,
+     * and what travels between requests is what the page prints.
      *
      * @var array<string, string|null>|null
      */
@@ -94,48 +90,38 @@ class ViewPermission extends ViewRecord
     {
         $model = Columns::authorityModel();
 
-        // The header action is not offered without one, so this is the crafted
-        // request rather than the screen.
+        // This page offers no action without one, but the role screen's
+        // hand-out searches through here without checking for one.
         if ($model === null) {
             return [];
         }
 
         $clauses = array_values(array_intersect_key(self::SEARCHABLE, array_flip(Columns::texts($model))));
 
-        // With nothing to search, the closure below added no condition at all
-        // and the query answered with the first twenty accounts — every search
-        // returning the same twenty names and addresses, and none of them what
-        // was typed. A search nobody can perform returns nothing.
+        // With nothing to search, the closure below would add no condition and
+        // every search would answer with the same first twenty accounts, none of
+        // them what was typed. A search nobody can perform returns nothing.
         if ($clauses === []) {
             return [];
         }
 
-        // `%` and `_` are wildcards to LIKE, so a search for `%` matched every
-        // row and the box was a way to page through the account table rather
-        // than a way to find one in it.
+        // `%` and `_` are wildcards to LIKE, so unescaped, a search for `%`
+        // would match every row and page through the account table instead of
+        // finding one in it.
         //
-        // Escaping them takes an ESCAPE clause, and the character in it is the
-        // part that had to be measured on three engines rather than one.
-        //
-        // A backslash is not portable, and exactly ONE engine is why:
-        // `escape '\'` is a syntax error on MySQL, which reads the backslash
-        // inside the string literal unless `NO_BACKSLASH_ESCAPES` is set.
-        // SQLite and Postgres both take it as it stands (Postgres under its
-        // default `standard_conforming_strings = on`). Doubling it to
-        // `escape '\\'` satisfies MySQL and then breaks the other two, which
-        // see two characters where one is required — so there is no backslash
-        // literal that works everywhere (§6.38).
-        //
-        // `!` needs no escaping in a string literal on any of them, so the
-        // clause is the same text for every driver. Measured on SQLite,
-        // Postgres 16 and MySQL 8.4; `sqlsrv` takes ESCAPE too but nobody here
-        // has run it. It has to be escaped in the term itself like the
-        // wildcards, or a person searching for `!` would be typing an escape
-        // character.
+        // The escape character is `!` and not a backslash: `escape '\'` is a
+        // syntax error on MySQL, which reads the backslash inside the string
+        // literal unless `NO_BACKSLASH_ESCAPES` is set, while SQLite and Postgres
+        // (under its default `standard_conforming_strings = on`) take it as it
+        // stands — and doubling it to `escape '\\'` leaves those two with two
+        // characters where one is required. `!` needs no escaping in a string
+        // literal on any of them, so the clause is the same text for every
+        // driver. No test here runs MySQL, Postgres or `sqlsrv`. `!` itself is
+        // escaped in the term too, or a person searching for it would be typing
+        // an escape character.
         //
         // And the clause cannot be dropped: SQLite has no default escape
-        // character, so an escaped term without it matches nothing at all —
-        // the search would go from too wide to permanently empty.
+        // character, so an escaped term without it matches nothing at all.
         $term = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
 
         $records = $model::query()
@@ -240,16 +226,10 @@ class ViewPermission extends ViewRecord
     }
 
     /**
-     * The title, under the heading, because the heading is the code name.
-     *
-     * `recordTitleAttribute` is `name` — a grant points at it, so it is what a
-     * breadcrumb and a global search have to say — which leaves the title with
-     * nowhere to go once the identity card is gone. The sketch's header carries
-     * both, and this is where Filament puts the second one.
-     *
-     * Null and not an empty string when there is none: a subheading that is `''`
-     * still draws its paragraph, and warden only generates a title on `creating`
-     * and only when one was not given.
+     * The title, under the heading, because the heading is the code name:
+     * `recordTitleAttribute` is `name`, the word the application's code asks
+     * for, so it is what a breadcrumb has to say. The infolist draws no title of
+     * its own, which leaves this the one place it shows.
      */
     public function getSubheading(): ?string
     {
@@ -259,14 +239,14 @@ class ViewPermission extends ViewRecord
     }
 
     /**
-     * Two actions, and both visibilities are written by hand.
+     * Every visibility here is written by hand.
      *
      * An edit or delete button asks `getEditAuthorizationResponse()` /
      * `getDeleteAuthorizationResponse()`, which go straight to the policy, and
      * the resource's `canEdit()` and `canDelete()` — where `permissions.update`
-     * and the orphan rule live — are never on that path. The modal description
-     * is the table's own, because a delete takes the grants with it below
-     * Eloquent and this is the last moment anybody is told.
+     * and the orphan rule live — are never on that path. The bench and the
+     * hand-out are plain actions, which Filament authorizes against nothing
+     * (see `give()`). The delete description is `PermissionsTable::warning()`.
      *
      * @return array<int, Action>
      */
@@ -295,11 +275,10 @@ class ViewPermission extends ViewRecord
     /**
      * Whether the toggle is on the forbidding side.
      *
-     * Read through `filled()`-free comparison rather than a cast: the state
+     * Compared against the keys the field declares rather than cast: the state
      * arrives as the option key, which is an int on the way out of the browser
      * and a bool on a default, and `(bool) '0'` is false while `(bool) 'false'`
-     * is true. Comparing against the two keys the field actually declares is
-     * the only reading that cannot drift from the options above it.
+     * is true. Only the declared keys cannot drift from the options above.
      */
     private static function forbidding(Get $get): bool
     {
@@ -315,9 +294,6 @@ class ViewPermission extends ViewRecord
             : $model::query()->whereKey($key)->first();
     }
 
-    /**
-     * Asked twice on purpose — once for the button, once for the write.
-     */
     private function mayGive(Model $record): bool
     {
         $account = Filament::auth()->user();
@@ -329,18 +305,16 @@ class ViewPermission extends ViewRecord
      * The way in from the permission: a grant straight to an account, with no
      * role in between.
      *
-     * `update` on the permission is what it asks for, and it is the same choice
-     * the role screen made for the same reason: handing this row out is changing
-     * who holds it, which is the power the edit screen already needs — and
-     * re-pointing a row somebody holds moves what they hold without touching a
-     * single grant of theirs, so that ability is already this heavy. `view`
-     * would let somebody who may only look hand out everything the row carries,
-     * and `create` would be a lie: nothing is created.
+     * `update` on the permission is what it asks for, the same choice the role
+     * screen's hand-out makes: handing this row out is changing who holds it,
+     * which is the power the edit screen already needs. `view` would let
+     * somebody who may only look hand out everything the row carries, and
+     * `create` would be a lie: nothing is created.
      *
-     * The `visible()` is written by hand and checked again inside, because an
-     * action's authorization response goes straight to the policy through
-     * `Page::getDefaultActionAuthorizationResponse()` and never passes through
-     * the resource (§6.16, §6.23).
+     * The `visible()` is the only gate: for an action of the page's own,
+     * `Page::getDefaultActionAuthorizationResponse()` answers null and no policy
+     * is asked. So it is asked twice — once for the button, once inside the
+     * action for the write.
      */
     private function give(): Action
     {
@@ -384,16 +358,15 @@ class ViewPermission extends ViewRecord
                     // Not merely hidden: a prohibition CANNOT carry one.
                     // `ForbidsPermissions::until()` throws unconditionally —
                     // `null` included — so there is no date to offer and no way
-                    // to pass one along. The reason is said above the toggle
+                    // to pass one along. The reason is said on the toggle
                     // rather than left as a field that quietly disappeared.
                     ->visible(static fn (Get $get): bool => ! self::forbidding($get)),
             ])
             ->action(function (Model $record, array $data): void {
                 /** @var array<string, mixed> $data */
-                // The second of two, and the first is the `visible()` above.
-                // Unreachable while that one is right — Filament refuses to
-                // mount an action it will not show — and kept for the day
-                // somebody edits one without the other (§6.24).
+                // Unreachable while the `visible()` above is right — Filament
+                // refuses to mount an action it will not show — and kept for
+                // the day somebody edits one without the other.
                 if (! $this->mayGive($record)) {
                     return; // @codeCoverageIgnore
                 }
@@ -449,13 +422,12 @@ class ViewPermission extends ViewRecord
     }
 
     /**
-     * Whether the bench is on the page at all.
+     * Whether the bench is offered at all.
      *
      * Two conditions and neither is the other: `permissions.probe` is a choice
      * an installation makes, and an account model that does not resolve is a
      * question nobody could put — the select would have nothing to search.
-     */
-    /**
+     *
      * @return array<int, Component>
      */
     private function bench(): array
@@ -466,8 +438,8 @@ class ViewPermission extends ViewRecord
     }
 
     /**
-     * The four rows under the summary, each of which is absent rather than empty
-     * when the store had nothing to put in it.
+     * The rows under the summary, each of which is absent rather than empty when
+     * the store had nothing to put in it.
      *
      * A row with no content is a promise the answer did not make: a grant with
      * no conditions has no rule, a direct grant has no role to reach through,
@@ -514,18 +486,13 @@ class ViewPermission extends ViewRecord
         $account = self::account($data['account'] ?? null);
 
         // Unreachable from the page, and kept anyway. The select validates its
-        // value with `getInValidationRuleValues()`, which for a single
-        // searchable field calls `getOptionLabel()` — this class's own
-        // `accountLabel()`, resolving through the same `account()` — and returns
-        // an empty list when it comes back blank, so `getState()` above throws
-        // before this line for any key nobody could pick. Measured: a probe set
-        // to a key that names no row never enters this method's body past the
-        // validation.
-        //
-        // What it still answers is the race the validation cannot: the row
-        // going away between that check and this one, two queries apart. And
-        // without it `Probe::run()` would be handed a `?Model`, which is the
-        // other reason it is not a comment.
+        // value with `getInValidationRuleValues()`, which for a single field
+        // calls `getOptionLabel()` — this class's own `accountLabel()`, through
+        // the same `account()` — and returns an empty list when it comes back
+        // blank, so `getState()` above throws first for any key nobody could
+        // pick. What the guard still answers is the row going away between that
+        // check and this one, and without it `Probe::run()` would be handed a
+        // `?Model`.
         if (! $account instanceof Model) {
             return; // @codeCoverageIgnore
         }

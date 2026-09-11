@@ -27,25 +27,11 @@ class ViewRole extends ViewRecord
     protected static string $resource = RoleResource::class;
 
     /**
-     * What this role reaches, and who reaches it, as counts rather than lists.
+     * The resolved chain, for the form that offers the inheritance.
      *
-     * A count and a folded chain, never the chain itself: the number of hops is
-     * NOT available — warden's `RoleClosure::for()` returns
-     * `[restriction type, restriction id, end date]` and carries no depth — and
-     * deriving one would mean walking the closure a second time, which is the
-     * one thing this package does not do with a rule warden already owns.
-     *
-     * Two figures and not one, because they are different facts: what somebody
-     * chose, and what the choice brought along. A single total hides which is
-     * which, and only the first is a thing anybody can change from a screen.
-     */
-    /**
-     * La cadena resuelta, para el formulario que ofrece la herencia.
-     *
-     * Pública porque `RoleForm` la dibuja bajo su propio select: heredar de dos
-     * roles puede traer cinco, y esa cifra no está en ningún sitio del select.
-     * Llamada y no copiada — dos pantallas con dos redacciones del mismo hecho
-     * es lo que §6.24 mide saliendo mal.
+     * Public because `RoleForm` draws it under its own select: inheriting from
+     * two roles can bring five, and that figure is nowhere in the select.
+     * Called rather than copied: two wordings of one fact drift apart.
      */
     public static function chain(Model $record): string
     {
@@ -55,13 +41,10 @@ class ViewRole extends ViewRecord
     /**
      * The title, under the heading, because the heading is the code name.
      *
-     * `recordTitleAttribute` is `name` — grants point at it, so it is what a
-     * breadcrumb and a global search have to say — and that leaves the title
-     * with nowhere to go once the identity card is gone. The sketch's header
-     * carries both, and this is where Filament puts the second one.
-     *
-     * Null and not an empty string when there is no title: a subheading that is
-     * `''` still draws its paragraph, and warden lets a role have no title.
+     * `recordTitleAttribute` is `name` — what code and `roles.protected` refer
+     * to a role by, so it is what a breadcrumb has to say — and with no identity
+     * card on this screen, the subheading is where Filament gives the title a
+     * place. Null when there is none: warden lets a role have no title.
      */
     public function getSubheading(): ?string
     {
@@ -107,12 +90,11 @@ class ViewRole extends ViewRecord
         $holder = ViewPermission::accountFor($account);
 
         if (! $holder instanceof Model) {
-            // Unreachable through the screen, and measured rather than assumed:
-            // a `Select` adds an `in:` rule over its own options, so a key that
-            // names no row is refused before the action runs. It stays because
-            // the guarantee is about what gets WRITTEN, and that must not rest
-            // on how another package derives a validation rule (§6.24, and the
-            // same call the permission form's own server guard made).
+            // Unreachable through the screen: a `Select` adds an `in:` rule over
+            // the options it can label, so a key that names no row is refused
+            // before the action runs. It stays because the guarantee is about
+            // what gets WRITTEN, and that must not rest on how another package
+            // derives a validation rule.
             return; // @codeCoverageIgnore
         }
 
@@ -127,9 +109,6 @@ class ViewRole extends ViewRecord
         RoleHolders::forget($record);
     }
 
-    /**
-     * Asked twice on purpose — once for the button, once for the write.
-     */
     private static function mayHandOut(Model $record): bool
     {
         $account = Filament::auth()->user();
@@ -137,6 +116,19 @@ class ViewRole extends ViewRecord
         return $account instanceof Model && Access::granted($account, 'update', $record);
     }
 
+    /**
+     * What this role reaches, and who reaches it, as counts rather than lists.
+     *
+     * A count and a folded chain, never the chain itself: the number of hops is
+     * NOT available — warden's `RoleClosure::for()` returns
+     * `[restriction type, restriction id, end date]` and carries no depth — and
+     * deriving one would mean walking the closure a second time, which is the
+     * one thing this package does not do with a rule warden already owns.
+     *
+     * Two figures and not one, because they are different facts: what somebody
+     * chose, and what the choice brought along. A single total hides which is
+     * which, and only the first is a thing anybody can change from a screen.
+     */
     private static function hierarchy(Model $record): string
     {
         $hierarchy = Hierarchy::of($record);
@@ -165,7 +157,7 @@ class ViewRole extends ViewRecord
     }
 
     /**
-     * The way IN from the role, which until now only existed from the account.
+     * The way IN from the role.
      *
      * `update` on the role is what it asks for, and the choice is not arbitrary:
      * handing a role out is changing who holds it, which is the same power the
@@ -173,15 +165,12 @@ class ViewRole extends ViewRecord
      * is created — and `view` would let somebody who may only look hand out
      * every power the role has.
      *
-     * The `visible()` is written by hand and it is not decoration: an action's
-     * authorization response goes STRAIGHT to the policy through
-     * `Page::getDefaultActionAuthorizationResponse()` and never passes through
-     * `RoleResource::canEdit()` (§6.16, §6.23). And it is checked again inside
-     * the action, because `visible()` decides whether the button exists and the
-     * server is what decides whether the write happens.
-     *
-     * `until()` and `on()` go BEFORE `to()`, both of them: assignments execute
-     * on `to()`, and warden throws rather than let either be added afterwards.
+     * The `visible()` is the only gate the button has:
+     * `Page::getDefaultActionAuthorizationResponse()` maps Filament's own CRUD
+     * actions to the policy and answers `null` for any other, which an action
+     * reads as allowed. It is checked again inside the action, because
+     * `visible()` decides whether the button exists and the server is what
+     * decides whether the write happens.
      */
     private function handOut(): Action
     {
@@ -198,8 +187,8 @@ class ViewRole extends ViewRecord
                     // copied: it already resolves the account model through the
                     // panel's guard, drops the columns a `LIKE` cannot be pointed
                     // at, and escapes its wildcards WITH the clause that keeps
-                    // that from turning into an empty search (§6.38). A second
-                    // copy would be a second thing to measure on three engines.
+                    // that from turning into an empty search. A second copy
+                    // would be a second one to keep portable across engines.
                     ->getSearchResultsUsing(static fn (string $search): array => ViewPermission::accounts($search))
                     ->getOptionLabelUsing(static fn (mixed $value): ?string => ViewPermission::accountLabel($value)),
 
@@ -214,12 +203,11 @@ class ViewRole extends ViewRecord
             ])
             ->action(static function (Model $record, array $data): void {
                 // The second of two, and the first is the `visible()` above.
-                // Unreachable while that one is right: Filament refuses to mount
-                // an action it will not show, measured with a bare
-                // `mountAction`/`callMountedAction` pair. What this holds is the
-                // day somebody removes the `visible()` while editing this file,
-                // or reaches this action from a screen that never had one — the
-                // shape §6.24 measured for the permission form.
+                // Unreachable while that one is right: `mountAction()` and
+                // `callMountedAction()` refuse a disabled action, and a hidden
+                // one is disabled. What this holds is the day somebody removes
+                // the `visible()` while editing this file, or reaches this
+                // action from a screen that never had one.
                 if (! self::mayHandOut($record)) {
                     return; // @codeCoverageIgnore
                 }

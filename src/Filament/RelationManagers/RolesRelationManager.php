@@ -25,9 +25,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * A package cannot attach a relation manager to a resource it does not own —
  * `Resource::getRelations()` is a concrete static and nothing outside the
- * consuming application's own resource can write to it (AGENTS.md §6.18). What
- * a package CAN do is hand over the class, and that is the whole of this one:
- * a consuming application's `UserResource` adds one line —
+ * consuming application's own resource can write to it. What a package CAN do
+ * is hand over the class, and that is the whole of this one: a consuming
+ * application's `UserResource` adds one line —
  *
  *     public static function getRelations(): array
  *     {
@@ -36,17 +36,12 @@ use Illuminate\Database\Eloquent\Model;
  *
  * NOT `final`: Filament instantiates a relation manager by its class name, and
  * an installation may want to extend this one — a different icon, an extra
- * column — for its own account resource. This is the one deliberate exception
- * to this project's `final`-by-default convention (AGENTS.md §5).
+ * column — for its own account resource.
  *
  * Reads through `Assignment::of()`, which already dedupes a role held both with
- * and without a context to one key (AGENTS.md §6.18), and writes through
- * `Assignment::give()`/`take()`, never `attach()`/`detach()`/`sync()`. The
- * reasons are `Assignment`'s own, written on that class: the fluent actions are
- * the only path that announces the write to a listener with an actor on it, the
- * only one that reports how many rows a retraction actually removed, and the
- * only one that reads the write scope at the moment of the write rather than
- * when the relation was built.
+ * and without a context to one key, and writes through
+ * `Assignment::give()`/`take()`, never `attach()`/`detach()`/`sync()`, for the
+ * reasons written on `Assignment`.
  */
 class RolesRelationManager extends RelationManager
 {
@@ -117,11 +112,11 @@ class RolesRelationManager extends RelationManager
             // `applyPivotTenancy()` and, for a role held both with and without
             // a context, to whichever duplicate pivot row it finds first.
             ->relationship(null)
-            // Bought back from `$relatedResource` being null. Without them
-            // the label falls to `get_model_label()`, a bare
-            // `Str::plural(kebab(class_basename($model)))` — always English
-            // and lowercase whatever the locale — and the empty state heading
-            // reads exactly that label.
+            // Bought back from `$relatedResource` being null. Without them the
+            // singular label falls to `get_model_label()` — the class basename,
+            // kebab-cased with spaces and lowercase whatever the locale — the
+            // plural to its English `Str::plural()`, and the empty state heading
+            // reads that plural.
             ->modelLabel(RoleResource::getModelLabel())
             ->pluralModelLabel(RoleResource::getPluralModelLabel())
             ->query(static fn (): Builder => Context::resolve()->roleClass()::query()->whereKey(Assignment::of($account)))
@@ -137,8 +132,7 @@ class RolesRelationManager extends RelationManager
 
                 // Calculated, not a database column: `sortable()`/`searchable()`
                 // would fall back to a `held_as` column the roles table does not
-                // have, and the error would surface on click, not on build
-                // (AGENTS.md §6.17).
+                // have, and the error would surface on click, not on build.
                 TextColumn::make('held_as')
                     ->label(__('filament-warden::ui.relations.roles.held_column'))
                     ->badge()
@@ -190,9 +184,6 @@ class RolesRelationManager extends RelationManager
         };
     }
 
-    /**
-     * When this row runs out, worded, or nothing when it does not.
-     */
     private static function endsAt(Model $account, Model $record): ?string
     {
         $key = $record->getKey();
@@ -208,9 +199,6 @@ class RolesRelationManager extends RelationManager
             : null;
     }
 
-    /**
-     * The date the picker opens on: whatever the assignment carries today.
-     */
     private static function currentEnd(Model $account, Model $record): ?string
     {
         $key = $record->getKey();
@@ -222,9 +210,6 @@ class RolesRelationManager extends RelationManager
         return Assignment::endsAt($account, $key)?->toDateString();
     }
 
-    /**
-     * A date out of whatever the picker sent.
-     */
     private function date(mixed $value): ?CarbonImmutable
     {
         return is_string($value) && $value !== '' ? CarbonImmutable::parse($value) : null;
@@ -251,9 +236,8 @@ class RolesRelationManager extends RelationManager
      * `Select` does not implement `HasDescriptions`, so there is no
      * `->descriptions()` here as there is on the `CheckboxList` field.
      *
-     * The notification waits on `give()`'s return: `offers()` does not exclude
-     * a role already held, so an unguarded notice would report success for a
-     * no-op.
+     * The notification waits on `give()`'s return, for the reason given on
+     * `Assignment::give()`.
      */
     private function assignAction(Model $account): Action
     {
@@ -270,13 +254,12 @@ class RolesRelationManager extends RelationManager
                     ->options(static fn (): array => Assignment::options())
                     ->disableOptionWhen(static fn (mixed $value): bool => ! Assignment::offers($account, $value)),
 
-                // A date, and deliberately NOT a context. §6.21 settled that one
-                // and it has not moved: this package shows a restricted
-                // assignment, marks it and leaves it alone. Offering to create
-                // one here would mint rows this very screen then refuses to take
-                // back — `offers()` answers false for a restricted role, so both
-                // the retract action and the checkbox would go quiet on a row
-                // somebody had just made.
+                // A date, and deliberately NOT a context: this package shows a
+                // restricted assignment, marks it and leaves it alone. Offering
+                // to create one here would mint rows this very screen then
+                // refuses to take back — `offers()` answers false for a
+                // restricted role, so both the retract action and the checkbox
+                // would go quiet on a row somebody had just made.
                 DatePicker::make('until')
                     ->label(__('filament-warden::ui.relations.roles.assign.until'))
                     ->helperText(__('filament-warden::ui.relations.roles.assign.until_help'))
@@ -339,10 +322,7 @@ class RolesRelationManager extends RelationManager
             ->action(function (Model $record, array $data) use ($account): void {
                 $key = $record->getKey();
 
-                // Repeated, and for the same reason the header action repeats
-                // its own: `Action::call()` consults neither `isDisabled()` nor
-                // `isVisible()`, so anything arriving by that route has only
-                // this line in front of it.
+                // Repeated, for the reason the header action gives.
                 $moved = ! $this->isReadOnly()
                     && (is_int($key) || is_string($key))
                     && Assignment::renew($account, $key, $this->date($data['until'] ?? null));
@@ -384,9 +364,7 @@ class RolesRelationManager extends RelationManager
             ->action(function (Model $record) use ($account): void {
                 $key = $record->getKey();
 
-                // Repeated, not only in `->visible()`: `Action::call()` checks
-                // neither `isDisabled()` nor `isVisible()`, so anything reaching
-                // it by another route has only this line in front of it.
+                // Repeated, for the reason the header action gives.
                 $written = ! $this->isReadOnly()
                     && (is_int($key) || is_string($key))
                     && Assignment::take($account, $key);

@@ -26,16 +26,15 @@ use UnitEnum;
 /**
  * The catalogue, with its provenance visible.
  *
- * Read-only out of the box, and deliberately: a fresh installation cannot mint a
- * permission nothing consults. Every one of the six switches under
- * `permissions.*` is read here — opening any of them is one line of config, and
+ * Closed to new rows out of the box, and deliberately: a fresh installation
+ * cannot mint a permission nothing consults. The `permissions.*` switches decide
+ * what these screens open — opening any of them is one line of config, and
  * closing it again afterwards means cleaning up whatever was created meanwhile.
  *
- * Left non-final on purpose, and the reason is one sentence rather than sixteen:
- * the README's Stability section says these screens are not an extension point.
- * They are open so an application can experiment, not because subclassing them
- * is supported — `canDelete()` gaining an optional parameter in `1.5.0` was a
- * fatal for anyone who had overridden it, and that is the shape to expect. The
+ * Left non-final on purpose: the README's Stability section says these screens
+ * are not an extension point. They are open so an application can experiment,
+ * not because subclassing them is supported — they change whenever the screens
+ * change, and an override that no longer matches a signature is a fatal. The
  * classes that build a form, an infolist or a table are `final`: nothing was
  * ever promised about those.
  */
@@ -48,7 +47,7 @@ class PermissionResource extends Resource
     /**
      * Warden's models belong to no tenant of Filament's, and saying so is not
      * optional. `RoleResource` carries the same guard, and the reasoning — why
-     * the property and never `scopeToTenant()` — is written there once (§6.21).
+     * the property and never `scopeToTenant()` — is written there once.
      */
     protected static bool $isScopedToTenant = false;
 
@@ -218,9 +217,9 @@ class PermissionResource extends Resource
      *
      * Kept apart from `mayEditName()` because the conditions and the ownership
      * hang off this one and they are a different decision: they narrow what the
-     * row means, they do not re-point it. Public since 1.1.0, because the form
-     * needs the two apart to tell a person WHY a field is closed: this one is
-     * the installation's answer about a whole class of row, and the difference
+     * row means, they do not re-point it. Public because the form needs the two
+     * apart to tell a person WHY a field is closed: this one is the
+     * installation's answer about a whole class of row, and the difference
      * between the two is a holder. Reading config and one attribute, it costs no
      * query, so asking it first short-circuits the one that does.
      */

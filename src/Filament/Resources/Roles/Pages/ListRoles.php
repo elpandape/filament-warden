@@ -16,8 +16,7 @@ class ListRoles extends ListRecords
     /**
      * Filament never adds this by itself: `getHeaderActions()` defaults to an
      * empty array, so a listing that does not declare one has no way in to its
-     * own create page. Reported from an installation where the page answered 200
-     * and nothing on the screen led to it.
+     * own create page.
      *
      * The policy closes the button on its own — `isHidden()` ends in
      * `isAuthorizedOrNotHiddenWhenUnauthorized()`, and the response comes from

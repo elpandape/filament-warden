@@ -22,29 +22,32 @@ use Illuminate\Database\Eloquent\Model;
 final class RolesTable
 {
     /**
-     * A memo apiece for the two closures below — `$heldCounts` for the
-     * informing column, `$assignedRoleIds` for the deciding button — each one
-     * query the first row asks for and every row after reuses.
+     * A memo per closure-fed column — `$heldCounts`, `$ruleCounts` and
+     * `$inherits` for the informing ones, `$assignedRoleIds` for the deciding
+     * button — each filled by the first row that asks and reused by every row
+     * after it.
      *
-     * Neither is bounded by the PAGE: a column closure cannot reach the record
-     * set Filament paginated. Both are bounded by the CATALOGUE instead, one
-     * row per role however many assignments exist — which a statement count
-     * cannot see, so `RoleResourceTest` counts hydrated rows as well.
+     * None is bounded by the PAGE: a column closure cannot reach the record
+     * set Filament paginated. They are bounded by the CATALOGUE instead — a
+     * row per role, or a role-to-role edge — however many assignments exist,
+     * which a statement count cannot see, so `RoleResourceTest` counts
+     * hydrated rows as well.
      *
-     * Never merged into one query: they answer different questions under
-     * different scope rules. `$assignedRoleIds` reads wide because it feeds a
-     * DELETE and the cascade is blind to tenancy; `$heldCounts` keeps the
-     * active tenant because it only INFORMS, and a wider number is one
-     * `retract()` could not act on from here.
+     * `$assignedRoleIds` and `$heldCounts` are never merged into one query:
+     * they answer different questions under different scope rules.
+     * `$assignedRoleIds` reads wide because it feeds a DELETE and the cascade
+     * is blind to tenancy; `$heldCounts` keeps the active tenant because it
+     * only INFORMS, and a wider number is one `retract()` could not act on
+     * from here.
      *
-     * Local variables rather than static properties: a fresh pair per
+     * Local variables rather than static properties: a fresh set per
      * `configure()`, so nothing outlives the render or leaks between tests.
      */
     public static function configure(Table $table): Table
     {
-        // Anotados: los dos viajan por referencia a varios cierres, y a
-        // `level: max` una variable capturada por referencia es `mixed` desde el
-        // segundo lector — cualquiera de ellos puede haberla escrito.
+        // Annotated here and again inside each closure that reads them: at
+        // `level: max` the `@var` on a declaration does not reach a variable
+        // captured by reference, so each closure narrows its own read.
         /** @var array<int|string, array{held: int, ending: int}>|null $heldCounts */
         $heldCounts = null;
         /** @var array<int|string, int>|null $ruleCounts */
@@ -56,15 +59,14 @@ final class RolesTable
             ->extraAttributes(['class' => 'fw-resource-table'])
             ->defaultSort('name')
             ->columns([
-                // Una columna y no dos, como el boceto y como la tabla de
-                // permisos ya hacen: la fila se lee por cómo la gente LLAMA al
-                // rol, y el nombre de código va debajo en mono porque es lo que
-                // las concesiones apuntan. Dos columnas obligaban a mirar dos
-                // sitios para identificar una fila.
+                // One column, not two: a row is recognised by what people CALL
+                // the role, and the code name goes underneath because it is
+                // what code and `roles.protected` refer to it by. Two columns
+                // meant looking in two places to identify one row.
                 //
-                // Ordena y busca por el TÍTULO, que es lo que se ve; el nombre
-                // entra en la búsqueda igualmente, porque quien lo teclea sabe
-                // exactamente lo que busca.
+                // Sorted and searched by the TITLE, which is what shows; the
+                // name is searchable too, because whoever types it knows
+                // exactly what they are after.
                 TextColumn::make('title')
                     ->label(__('filament-warden::ui.resources.roles.columns.role'))
                     ->description(static fn (Model $record): string => self::nameOf($record))
@@ -75,14 +77,13 @@ final class RolesTable
                 // Neither sortable nor searchable: both fall back to the
                 // column's own name and would ask the database for a column
                 // that does not exist — an error at click time, not at build
-                // time (§6.17).
+                // time.
                 TextColumn::make('inherits')
                     ->label(__('filament-warden::ui.resources.roles.columns.inherits'))
                     ->badge()
                     ->placeholder('—')
                     // Three and a tally, never the whole list: a role can inherit
-                    // from a dozen and the column is one cell wide. `+n` is the
-                    // same shape the holders sentence has used since 1.0.
+                    // from a dozen and the column is one cell wide.
                     ->limitList(3)
                     ->expandableLimitedList()
                     ->visible(static fn (): bool => WardenConfig::nestedRoles())
@@ -94,25 +95,15 @@ final class RolesTable
                         return (is_int($key) || is_string($key)) ? ($inherits[$key] ?? []) : [];
                     }),
 
-                // Cuántas reglas ha escrito el rol. Del mismo agrupado por página
-                // que los titulares y por el mismo motivo: una consulta por fila
-                // es lo que la v1.5.0 midió en 22 MB.
-                //
-                // Lo que ESCRIBIÓ y no lo que contesta: contestar exige resolver
-                // el catálogo entero por rol, que es el coste que esta tabla no
-                // puede pagar. Un rol con el comodín escribe una regla y contesta
-                // todas, y esa distinción la cuenta la rejilla, que es donde se
-                // ve.
+                // What the role has WRITTEN, not what it answers: answering
+                // means resolving the whole catalogue per role, which is the
+                // cost this table cannot pay. A wildcard role writes one rule
+                // and answers every cell, and the grid is where that shows.
                 TextColumn::make('rules')
                     ->label(__('filament-warden::ui.resources.roles.columns.rules'))
                     ->badge()
                     ->color('gray')
                     ->state(static function (Model $record) use (&$ruleCounts): int {
-                        // Estrechado en una local: a `level: max` una variable
-                        // capturada por referencia y leída desde más de un
-                        // cierre vuelve a ser `mixed` en cada lectura, porque
-                        // cualquiera de ellos pudo escribirla. El `@var` de la
-                        // declaración no alcanza; el de aquí sí.
                         /** @var array<int|string, int> $counts */
                         $counts = $ruleCounts ??= self::ruleCounts();
 
@@ -149,18 +140,13 @@ final class RolesTable
                     }),
             ])
             ->recordActions([
-                // The screen it opens has existed since `v0.4.0` and nothing
-                // ever pointed at it: the route was registered, the page was
-                // written and tested, and the listing offered edit and delete
-                // only — so the only way in was typing the URL. It is §6.23 one
-                // screen over, and the same cure: Filament adds no action a
-                // table does not declare.
+                // Filament adds no action a table does not declare — the same
+                // gap `ListRoles::getHeaderActions()` closes for creating.
                 //
-                // No `visible()` of its own, unlike the two below it. The
-                // resource leaves `canView()` alone, so the policy closes this
-                // on its own; the config rules that make `canEdit()`/
-                // `canDelete()` say more than the policy does have no reading
-                // half to speak of.
+                // No `visible()` of its own, like the edit action and unlike
+                // the delete one: the resource overrides neither `canView()`
+                // nor `canEdit()`, so the policy closes both on its own, while
+                // `canDelete()` carries config the policy does not know.
                 ViewAction::make(),
 
                 EditAction::make(),
@@ -184,8 +170,8 @@ final class RolesTable
 
     /**
      * What goes away with it, said the way `PermissionsTable::warning()`
-     * already says it — public for the same reason (§6.23): `EditRole` and
-     * `ViewRole` carry their own `DeleteAction` and reuse this directly.
+     * already says it — public for the same reason: `EditRole` and `ViewRole`
+     * carry their own `DeleteAction` and reuse this directly.
      *
      * Read wide on purpose: the assignment rows follow the role down through a
      * foreign key and THE CASCADE IS BLIND TO THE SCOPE — and to the clock —
@@ -262,27 +248,8 @@ final class RolesTable
     }
 
     /**
-     * How many rows each role has in `assigned_roles`, scoped, one row per
-     * role: a badge that informs keeps its scope, or it shows a number
-     * `retract()` from this screen could not act on.
-     *
-     * The aggregate is what bounds it — reducing in PHP answers the same
-     * question and hydrates the whole table, which a statement count cannot
-     * see. A holder restricted to a context counts like any other.
-     *
-     * `count(*)` is whatever the driver hands back and `AssignedRole` declares
-     * no casts, so it is narrowed with `is_numeric()` rather than assumed. The
-     * other values this class reads are keys, not aggregates, and take
-     * `is_int() || is_string()`.
-     *
-     * @return array<int|string, array{held: int, ending: int}>
-     */
-    /**
-     * El nombre de código de un rol, o nada si la fila no lo lleva.
-     *
-     * Leído con guarda porque la suite corre bajo `Model::shouldBeStrict()` y
-     * el modelo es el que la instalación configure: preguntar por una columna
-     * que no tiene lanza.
+     * The role's code name, or an empty string: `getAttribute()` answers
+     * `mixed`, and both closures that draw it are typed `string`.
      */
     private static function nameOf(Model $record): string
     {
@@ -292,12 +259,12 @@ final class RolesTable
     }
 
     /**
-     * Cuántas filas de `grants` ha escrito cada rol, en una consulta por página.
+     * How many `grants` rows each role has written, in one grouped read per
+     * render.
      *
-     * Sin `Expiry::live()`: una concesión vencida SIGUE escrita, y esta columna
-     * cuenta lo que hay en la tienda, no lo que contesta hoy. Quitarla de aquí
-     * haría que un rol pareciera no tener nada mientras sus filas siguen ahí
-     * bloqueando su borrado.
+     * No `Expiry::live()`: a lapsed grant is still written, and this column
+     * counts what the store holds, not what answers today — filtering lapsed
+     * rows out would draw a role as empty while its rows are still there.
      *
      * @return array<int|string, int>
      */
@@ -336,10 +303,9 @@ final class RolesTable
      * question and hydrates the whole table, which a statement count cannot
      * see. A holder restricted to a context counts like any other.
      *
-     * `count(*)` is whatever the driver hands back and `AssignedRole` declares
-     * no casts, so it is narrowed with `is_numeric()` rather than assumed. The
-     * other values this class reads are keys, not aggregates, and take
-     * `is_int() || is_string()`.
+     * An aggregate is whatever the driver hands back — none of `AssignedRole`'s
+     * casts names `held` or `ending` — so both are narrowed with `is_numeric()`
+     * rather than assumed; keys take `is_int() || is_string()`.
      *
      * @return array<int|string, array{held: int, ending: int}>
      */
@@ -356,9 +322,10 @@ final class RolesTable
             // bounded by a test that counts statements AND hydrated rows, so a
             // second one shows up.
             ->selectRaw('sum(case when expires_at is not null then 1 else 0 end) as ending')
-            // A badge that informs counts what somebody actually holds. The two
-            // reads below it decide a DELETE and count the lapsed rows too,
-            // because the cascade removes them all the same.
+            // A badge that informs counts what somebody actually holds.
+            // `assignedRoleIds()` and `assignments()` serve a DELETE and count
+            // the lapsed rows too, because the cascade removes them all the
+            // same.
             ->tap(Expiry::live(...))
             ->groupBy('role_id')
             ->get();
@@ -382,30 +349,24 @@ final class RolesTable
     /**
      * Which roles each role was GIVEN, named.
      *
-     * Two reads for the whole table and never one per row: this is the listing
-     * v1.5.0 measured at 22 MB when a fix counted statements and not rows.
-     *
-     * Not scoped to the page, and that is the cheaper half rather than the
-     * lazier one: the rows are role-to-role EDGES, which are bounded by the
-     * catalogue and are the rarest thing in this schema — a `whereIn` on the
-     * page's keys would add a binding list per render to save nothing, and
-     * `heldCounts()` beside it already groups over the whole table for the same
-     * reason.
+     * Two reads for the whole table and never one per row. Not scoped to the
+     * page, and that is the cheaper half rather than the lazier one: the rows
+     * are role-to-role EDGES, which are bounded by the catalogue and are the
+     * rarest thing in this schema — a `whereIn` on the page's keys would add a
+     * binding list per render to save nothing, and `heldCounts()` beside it
+     * already groups over the whole table for the same reason. They are read
+     * here rather than through `RoleClosure::for()`, which answers for one
+     * authority at a time.
      *
      * Direct edges only — what somebody chose — because the rest is what the
      * choice brought along, and a chip saying so would be a chip nobody put
      * there.
      *
      * `warden.roles.nested` is asked ONCE, on the column's `visible()`, and not
-     * again here. A hidden column never evaluates its state, so a second check
-     * would be a line nothing can reach — and this project runs its coverage
-     * gate at 100% with no baseline, which is how that showed up rather than
-     * sitting there looking careful.
-     *
-     * Empty when nesting is off, and asked here rather than of warden's closure
-     * for the same reason `RoleGrants` asks it: `RoleClosure::for()` returns
-     * direct edges under either setting, because for an ACCOUNT those are simply
-     * its roles.
+     * here: a hidden column never evaluates its state, so a second check would
+     * be a line nothing can reach, and the coverage gate runs at 100% with no
+     * baseline. `RoleGrants::inheritedFrom()` asks it itself, and says why
+     * there.
      *
      * @return array<int|string, list<string>>
      */
@@ -458,9 +419,8 @@ final class RolesTable
      * `distinct()` is what bounds it to the catalogue rather than the
      * assignment table.
      *
-     * A set rather than a list, so `isDeletable()` does one `isset()` per row.
-     * No cast either way: PHP normalises a canonical numeric string key back to
-     * `int`, so a set built from either type answers for either.
+     * A set rather than a list, so `isDeletable()` does one `isset()` per row —
+     * uncast, for the reason given on `RoleResource::isDeletable()`.
      *
      * @return array<int|string, true>
      */

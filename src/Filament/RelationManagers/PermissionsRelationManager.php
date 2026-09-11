@@ -28,15 +28,13 @@ use Illuminate\Database\Eloquent\Model;
  * permission screen's own hand-out.
  *
  * A direct grant is the hardest access in an installation to find again: it
- * belongs to no role, so no role's grid draws it, and until 3.0 the only screen
- * that could name one was the permission's own, one row at a time. That is
- * exactly why it is off out of the box — `permissions.direct` — and why turning
- * it on is a decision rather than a default: the screen does not only show
- * direct grants, it hands them out.
+ * belongs to no role, so no role's grid draws it. The screen is off out of the
+ * box — `permissions.direct` — and turning it on is a decision rather than a
+ * default, because it does not only show direct grants, it hands them out.
  *
- * A package cannot attach a relation manager to a resource it does not own
- * (§6.18), so this is handed over the same way the roles one is: a consuming
- * application's own account resource names it in `getRelations()`.
+ * A package cannot attach a relation manager to a resource it does not own —
+ * `RolesRelationManager` says why — so this is handed over the same way: a
+ * consuming application's own account resource names it in `getRelations()`.
  *
  * NOT `final`, for the same reason its sibling is not: Filament instantiates a
  * relation manager by class name and an installation may want to extend this one.
@@ -103,7 +101,7 @@ class PermissionsRelationManager extends RelationManager
                     // why. A row that is shown, marked and left alone is the one
                     // that most needs explaining: without the sentence the
                     // revoke action is simply missing, which reads as a bug
-                    // rather than as a decision (§6.15).
+                    // rather than as a decision.
                     ->description(static fn (Model $record): string => self::describe($account, $record))
                     ->searchable(['name', 'title']),
 
@@ -113,7 +111,7 @@ class PermissionsRelationManager extends RelationManager
 
                 // Calculated, so no `sortable()`/`searchable()`: there is no
                 // such column on the permissions table and the failure would
-                // surface on click rather than on build (§6.17).
+                // surface on click rather than on build.
                 TextColumn::make('polarity')
                     ->label(__('filament-warden::ui.relations.permissions.polarity'))
                     ->badge()
@@ -139,8 +137,6 @@ class PermissionsRelationManager extends RelationManager
     }
 
     /**
-     * The permission keys this account holds directly.
-     *
      * @return list<int|string>
      */
     private static function heldKeys(Model $account): array
@@ -173,9 +169,6 @@ class PermissionsRelationManager extends RelationManager
         return null; // @codeCoverageIgnore
     }
 
-    /**
-     * The row's own name, plus the reason nothing here can touch it.
-     */
     private static function describe(Model $account, Model $record): string
     {
         $name = self::text($record->getAttribute('name'));
@@ -239,8 +232,7 @@ class PermissionsRelationManager extends RelationManager
      *
      * A grant from another tenant is shown, marked and left alone, exactly as
      * the grid treats one: `disallow()` targets one exact scope, so a revoke
-     * from here would delete nothing, report success and come back unchanged
-     * (§6.21).
+     * from here would delete nothing, report success and come back unchanged.
      */
     private function writable(Model $account, Model $record): bool
     {
@@ -259,8 +251,7 @@ class PermissionsRelationManager extends RelationManager
      * NOT repeat that check, unlike the roles manager's own header action.
      * `mountAction()` and `callMountedAction()` both consult `isDisabled()`,
      * which is true whenever `isHidden()` is, so a copy would be a line nothing
-     * can reach — measured, with a bare mount pair on a `ViewRecord`, and this
-     * project runs the coverage gate at 100% with no baseline.
+     * can reach, and the coverage gate runs at 100% with no baseline.
      *
      * What holds the write is not the page mode anyway: it is
      * `DirectGrants::write()`, which asks `mayWrite()` whatever screen called
@@ -310,8 +301,6 @@ class PermissionsRelationManager extends RelationManager
     }
 
     /**
-     * The write behind the modal, once the screen has agreed to it.
-     *
      * @param  array<string, mixed>  $data
      */
     private function hand(Model $account, array $data): void
@@ -353,9 +342,10 @@ class PermissionsRelationManager extends RelationManager
             ->modalDescription(__('filament-warden::ui.relations.permissions.revoke.description'))
             ->visible(fn (Model $record): bool => $this->writable($account, $record))
             ->action(function (Model $record) use ($account): void {
-                // Repeated for the same reason the header action repeats its
-                // own, and it is not the same check: `writable()` also answers
-                // whether the row is one this scope can delete at all.
+                // Repeated from `->visible()` for anything reaching
+                // `Action::call()`, which consults neither `isDisabled()` nor
+                // `isVisible()` — and `writable()` is more than the page mode:
+                // it also answers whether this scope can delete the row at all.
                 if ($this->writable($account, $record) && DirectGrants::revoke($account, $record)) {
                     Notification::make()
                         ->title(__('filament-warden::ui.relations.permissions.revoke.notified'))

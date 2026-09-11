@@ -36,39 +36,34 @@ final class RoleForm
     public static function configure(Schema $schema): Schema
     {
         return $schema
-            // Dos pistas arriba y la rejilla entera debajo, que es lo que el
-            // boceto aprobado dibuja: identidad y herencia son dos preguntas
-            // cortas y caben una al lado de la otra, mientras la matriz necesita
-            // todo el ancho que haya.
+            // Two tracks above and the whole grid below: identity and
+            // inheritance are two short questions that fit side by side, while
+            // the matrix needs all the width there is.
             //
-            // La identidad ocupa las dos pistas cuando la herencia no está: media
-            // tarjeta con la otra mitad vacía es peor que una entera, y con
-            // `warden.roles.nested` apagado — el valor de fábrica — no hay nada
-            // que poner al lado.
+            // Identity takes both tracks when inheritance is absent: half a card
+            // beside an empty half is worse than a whole one, and with
+            // `warden.roles.nested` off — the default — there is nothing to put
+            // beside it.
             ->columns(2)
             ->components([
                 Section::make(__('filament-warden::ui.resources.roles.sections.identity'))
                     ->icon(Heroicon::OutlinedIdentification)
-                    // Las dos tarjetas de la fila llegan al mismo bajo, como el
-                    // boceto las dibuja. Filament ya estira el CONTENEDOR de cada
-                    // una — medido: los dos `.fi-sc-component` miden lo mismo —
-                    // pero la tarjeta de dentro se queda con su altura de
-                    // contenido, así que la que tiene menos texto flota sobre un
-                    // hueco.
+                    // Both cards in the row reach the same bottom. Filament
+                    // already stretches each one's `.fi-sc-component` WRAPPER,
+                    // but the card inside keeps its content height, so the one
+                    // with less text floats above a gap.
                     //
-                    // Estilo en línea y no una clase: el CSS del panel lo compila
-                    // la aplicación anfitriona y su build no escanea las vistas de
-                    // este paquete (§6.7), así que una utility que solo use el
-                    // plugin puede no compilarse. Y una regla en la hoja propia
-                    // tendría que apuntar a `.fi-sc-section`, que es de Filament y
-                    // está en toda la aplicación.
+                    // An inline style and not a class: the host application
+                    // compiles the panel's CSS and its build does not scan this
+                    // package's views, so a utility only the plugin uses may
+                    // never be compiled. And a rule in the package's own
+                    // stylesheet would have to target `.fi-sc-section`, which is
+                    // Filament's and is everywhere in the application.
                     ->extraAttributes(['style' => 'block-size: 100%'])
                     ->columnSpan(static fn (): int => WardenConfig::nestedRoles() ? 1 : 2)
-                    // Apilados cuando la tarjeta va a media anchura y en dos
-                    // columnas cuando la ocupa entera: dos campos de texto uno
-                    // al lado del otro en media tarjeta son dos cajas
-                    // demasiado estrechas para el nombre de clase que a veces
-                    // llevan al lado.
+                    // Stacked at half width and side by side at full width: two
+                    // text inputs next to each other in half a card are two
+                    // boxes too narrow for what they hold.
                     ->columns(static fn (): int => WardenConfig::nestedRoles() ? 1 : 2)
                     ->schema([
                         TextInput::make('name')
@@ -117,12 +112,6 @@ final class RoleForm
                             // so it is the grid by another door.
                             ->disabled(static fn (?Model $record): bool => $record instanceof Model && RoleResource::isProtected($record)),
 
-                        // Lo que la elección de arriba TRAE, contado: heredar de
-                        // dos roles puede traer cinco, y esa cifra no está en
-                        // ningún sitio del select. Es la misma frase que la ficha
-                        // de solo lectura ya dice, llamada y no copiada — dos
-                        // pantallas con dos redacciones del mismo hecho es lo que
-                        // §6.24 mide saliendo mal.
                         TextEntry::make('chain')
                             ->hiddenLabel()
                             ->visible(static fn (?Model $record): bool => $record instanceof Model)
@@ -165,13 +154,11 @@ final class RoleForm
 
         $roles = $context->roleClass()::query()
             ->when($barred !== [], static fn (Builder $query): Builder => $query->whereKeyNot($barred))
-            // `%` and `_` are wildcards, so an unescaped `%` here would page
-            // through the role table rather than search it — and escaping them
-            // WITHOUT an `escape` clause is worse than not escaping at all:
-            // SQLite has no default escape character, so the search goes from
-            // too wide to permanently empty. `!` and not a backslash, for the
-            // reason `ViewPermission` measured on three engines: `escape '\'`
-            // is a syntax error on MySQL and doubling it breaks the other two.
+            // `%` and `_` are wildcards, so an unescaped `%` would page through
+            // the role table rather than search it; escaped WITHOUT the clause,
+            // SQLite, which has no default escape character, would match
+            // nothing. `!` rather than a backslash, for the engine-by-engine
+            // reasons on `ViewPermission::accounts()`.
             ->where(static function (Builder $query) use ($search): void {
                 $like = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
 
@@ -235,8 +222,8 @@ final class RoleForm
      * compiles to `Rule::notIn([])` — `not_in:` with one null parameter, a rule
      * with no opinion rather than an error.
      *
-     * The sentence is wired on `not_in`, the snake-cased basename of the rule
-     * object, and carries no placeholder: the list is unbounded, and in the
+     * The sentence is wired on `not_in`, the string rule the `NotIn` object is
+     * cast to, and carries no placeholder: the list is unbounded, and in the
      * empty case above the rule passes and the sentence never renders.
      *
      * @return list<string>
