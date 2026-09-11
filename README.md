@@ -538,8 +538,10 @@ public static function getRelations(): array
 > keeps every permission behind a role should leave it off, and the tab will not appear.
 
 Each row says its polarity (a direct prohibition beats every grant the account's roles carry), its
-reach, and when it ends. A grant written outside the tenant you are viewing from is shown, marked
-and left alone — a revoke from there would delete nothing and still report success. Flipping a row
+reach, and when it ends. The list keeps to the tenant you are viewing from: another tenant's grants
+stay out of it. A grant that tenant can see but not write to — a global one, or every tenant's while
+warden reads them all — is shown, marked and left alone, because a revoke from there would delete
+nothing and still report success. Flipping a row
 from granted to forbidden is a write **and** a delete, because `forbidden` is part of warden's
 unique index and the two coexist as separate rows.
 
