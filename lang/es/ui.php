@@ -110,7 +110,7 @@ return [
                 'description' => 'La tienda se llena conforme se dan permisos a los roles: abre un rol y usa su rejilla. Para ver lo que declaran los paneles antes de que nada esté guardado, ejecuta `php artisan filament-warden:catalog`.',
             ],
             'create' => [
-                'subheading' => 'Solo con `permissions.create` encendido, y de fábrica está apagado. Un permiso que ninguna Policy declara es uno que nadie consulta hasta que lo pregunte tu propio código, así que la auditoría lo lee como suelto mientras `catalog.custom` no lo nombre.',
+                'subheading' => 'Solo con `permissions.create` encendido, y de fábrica está apagado. Un permiso que ninguna Policy declara es uno que nadie consulta hasta que lo pregunte tu propio código, así que la auditoría lo señala hasta que algo lo declare: `catalog.custom` si no apunta a ningún modelo, un método de Policy si apunta a uno.',
             ],
             'fields' => [
                 'name' => 'Nombre',
@@ -272,7 +272,7 @@ return [
             'partial' => 'Cae sobre al menos :matched de :total filas. Es una consulta, no la respuesta del panel: una Policy que deniegue no aparece nunca en ella, y esta cuenta tiene además un rol asignado en un contexto, que la consulta tampoco ve — el panel contestará por más filas que estas.',
         ],
         'narrowed_label' => 'Por qué la clase no pudo contestar',
-        'narrowed' => 'Esta regla necesita una fila delante. Preguntada por la clase, warden se la salta y contesta que no casó nada — que se lee exactamente igual que si la regla no existiera. Elige un registro para preguntar de verdad.',
+        'narrowed' => 'Esta regla necesita una fila delante. Preguntada por la clase, warden no la evalúa: una regla limitada a lo que la cuenta posee se salta como si no existiera, una concesión con condiciones contesta que no se cumplieron, y una prohibición con condiciones prohíbe sin más. Elige un registro para preguntar de verdad.',
         'no_record' => 'Ninguna fila de esa entidad tiene esa clave, así que no se preguntó nada. No es la misma respuesta que «no casa».',
         'no_model' => 'Este permiso no tiene ningún modelo detrás, así que no hay fila que ponerle delante. Se pregunta sin ella.',
         'unresolved' => 'La entidad a la que apunta este permiso ya no resuelve a ningún modelo. No falla con ruido: simplemente deja de casar con nada.',

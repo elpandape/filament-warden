@@ -110,7 +110,7 @@ return [
                 'description' => 'The store fills as roles are given permissions: open a role and use its grid. To see what the panels declare before any of it is stored, run `php artisan filament-warden:catalog`.',
             ],
             'create' => [
-                'subheading' => 'Only with `permissions.create` on, and it is off out of the box. A permission no policy declares is one nothing asks for until your own code does, so the audit reads it as loose until `catalog.custom` names it.',
+                'subheading' => 'Only with `permissions.create` on, and it is off out of the box. A permission no policy declares is one nothing asks for until your own code does, so the audit reports it until something declares it: `catalog.custom` for one over no model, a policy method for one over a model.',
             ],
             'fields' => [
                 'name' => 'Name',
@@ -272,7 +272,7 @@ return [
             'partial' => 'It falls on at least :matched of :total rows. That is a query, not the panel\'s own answer: a policy that denies never shows up in it, and this account holds a role in a context, which the query cannot see either — the panel will answer for more rows than this.',
         ],
         'narrowed_label' => 'Why the class could not answer',
-        'narrowed' => 'This rule needs a record in front of it. Asked about the class, warden skips it and answers that nothing matched — which reads exactly like the rule not being there. Choose a record to ask properly.',
+        'narrowed' => 'This rule needs a record in front of it. Asked about the class, warden never tests it: a rule limited to what the account owns is skipped as if it were not there, a grant with conditions answers that they were not met, and a prohibition with conditions forbids outright. Choose a record to ask properly.',
         'no_record' => 'No row of that entity has that key, so nothing was asked. This is not the same answer as nothing matching.',
         'no_model' => 'This permission has no model behind it, so there is no row to put in front of it. It is asked without one.',
         'unresolved' => 'The entity this permission points at no longer resolves to a model. It does not fail loudly: it simply stops matching anything.',
