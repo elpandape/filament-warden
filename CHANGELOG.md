@@ -10,6 +10,10 @@ what is covered is listed under **Stability** in the README and pinned by
 
 ## [3.4.0] - 2026-09-11
 
+The grid filters, searches and shows what a save will change before it happens; every comment in
+the package is rewritten against the code it describes; and an account's direct permissions stay in
+their tenant.
+
 ### Added
 
 - Saved-state filters, action search and pending-change review in the permission grid.
@@ -53,6 +57,19 @@ what is covered is listed under **Stability** in the README and pinned by
   said warden skips the rule and answers that nothing matched, which is true only of a rule limited
   to what the account owns: a grant with conditions answers that its conditions were not met, and a
   prohibition with conditions forbids.
+
+### Not included
+
+- **The inspector's live region is silent while the panel is folded.** It sits inside the body that
+  folds away, so a screen reader hears the cell change but not the explanation.
+- **Rules the redesign overrides are still in the stylesheet.** The package-owned surfaces win by
+  specificity over several older rules, three inspector selectors match nothing any view draws, and
+  `StylesheetTest` still pins values those older rules no longer apply.
+- **The pending-change review compares end dates as text.** A date picked again on the stored day is
+  listed as pending, while the save writes nothing.
+- **Two role-key comparisons are strict where their siblings compare as text** —
+  `Assignment::isRestricted()` and `isElsewhere()`. The assign action reaches them with a string key,
+  but `isHeld()` refuses any role the account already holds first, so no outcome changes today.
 
 ## [3.3.0] - 2026-09-08
 
