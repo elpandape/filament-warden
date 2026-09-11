@@ -14,7 +14,7 @@ return [
             'sections' => [
                 'identity' => 'The role',
                 'inherits' => 'Inherits from',
-                'inherits_help' => 'Everything these roles grant, this one grants too — today, and as they grow. A prohibition still wins, wherever it comes from.',
+                'inherits_help' => 'Inherits permissions; prohibitions take precedence.',
                 'hierarchy' => 'Hierarchy',
                 'holders' => 'Who holds it',
             ],
@@ -36,12 +36,6 @@ return [
                 'ending' => '{1} 1 ends soon|[2,*] :count end soon',
                 'held' => 'Held by',
             ],
-            'reach' => [
-                'nobody' => 'Nobody holds this role and no role inherits it, so what you change here reaches only whoever it is given to next.',
-                'held' => '{1} 1 account holds it.|[2,*] :count accounts hold it.',
-                'inherited' => '{1} 1 role inherits it.|[2,*] :count roles inherit it.',
-                'applies' => 'What you change applies to all of them, on save.',
-            ],
             'hierarchy' => [
                 'description' => 'What this role reaches through other roles, and what reaches it.',
                 'none' => 'This role inherits nothing, and nothing inherits it.',
@@ -57,7 +51,7 @@ return [
             ],
             'holders' => [
                 'ending' => 'Ending',
-                'description' => 'Counted under the tenant you are in. An assignment made elsewhere does not show here; one restricted to a context does, counted the same as any other.',
+                'description' => 'Current tenant.',
                 'nobody' => 'Nobody holds this role here.',
                 'held' => 'Held by :count, under this tenant.',
             ],
@@ -136,8 +130,8 @@ return [
                 'conditions_shared' => 'Holders of this row: :count. It is one row and one rule, so editing it here changes the rule for everyone who holds it.',
             ],
             'holders' => [
-                'description' => 'Counted, not named. A permission can be held by every account in the installation.',
-                'every_tenant' => 'Counted across every tenant, because deleting this permission takes its grants with it through a foreign key — and that cascade does not look at the tenant.',
+                'description' => 'Totals across all tenants.',
+                'every_tenant' => 'Deleting this permission removes every grant.',
                 'roles' => 'Roles',
                 'accounts' => 'Accounts',
                 'everyone' => 'Everyone',
@@ -226,6 +220,12 @@ return [
     ],
 
     'explain' => [
+        'decision' => 'Own rule',
+        'decisions' => [
+            'abstain' => 'No own rule',
+            'granted' => 'Grant',
+            'forbidden' => 'Forbid',
+        ],
         'causes' => [
             'granted-directly' => 'Granted by the permission :permission, held by the role itself.',
             'granted-via-role' => 'Granted by the permission :permission, through the role :role.',
@@ -373,6 +373,19 @@ return [
     ],
 
     'conditions' => [
+        'column' => 'Record field',
+        'comparison' => 'Comparison',
+        'authority_field' => 'Account field',
+        'connector' => 'Connector',
+        'preview' => 'Rule expression',
+        'comparisons' => [
+            '=' => 'is equal to',
+            '!=' => 'is not equal to',
+            '>' => 'is greater than',
+            '>=' => 'is at least',
+            '<' => 'is less than',
+            '<=' => 'is at most',
+        ],
         'scope' => 'Rule scope',
         'if' => 'if',
         'and' => 'and',
@@ -420,6 +433,22 @@ return [
     ],
 
     'grid' => [
+        'only' => [
+            'label' => 'Filter by state',
+            'all' => 'All',
+            'own' => 'Own rules',
+            'forbidden' => 'Prohibitions',
+            'narrowed' => 'Narrowed',
+            'ending' => 'Expiring',
+            'inherited' => 'Inherited',
+            'stored' => 'Filters use saved rules. Rows stay visible while you edit and refresh after saving.',
+        ],
+        'pending' => [
+            'title' => 'Unsaved changes',
+            'help' => 'Review your draft. Saving validates each change against the current stored rules.',
+            'reach' => 'scope changed',
+            'until' => 'expiry changed',
+        ],
         'panel' => 'The panel',
         'locked' => 'This role is protected: what it can do is fixed here.',
         'read_only' => 'This grid cannot be changed from here: its cells select, they do not cycle.',
@@ -430,7 +459,7 @@ return [
         'manage' => 'Everything',
         'undeclared' => 'The policy does not declare this action',
         'filter' => [
-            'label' => 'Filter entities',
+            'label' => 'Filter entities and actions',
             'count' => ':matched of :total · the tab counters still count the whole tab',
             'empty' => 'Nothing matches ":term".',
         ],

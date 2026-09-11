@@ -225,6 +225,8 @@ function grid({ state, grid, interactive }) {
 
         state: state ?? {},
 
+        only: 'all',
+
         tab: grid.tabs.length > 0 ? grid.tabs[0].key : null,
 
         // One term for the whole grid rather than one per tab, because there is
@@ -396,6 +398,28 @@ function grid({ state, grid, interactive }) {
             return candidates.includes(this.grid.order[2]) ? this.grid.order[2] : this.grid.order[1]
         },
 
+        decisionEnabled() {
+            if (! this.interactive || ! this.selected) return false
+            const { row, action } = this.selected
+            return action === this.grid.manage
+                ? this.grid.rows[row]?.manage === true
+                : (this.grid.rows[row]?.actions ?? []).includes(action)
+        },
+
+        setDecision(stance) {
+            if (! this.decisionEnabled() || ! this.grid.order.includes(stance)) return
+            this.write(this.selected.row, this.selected.action, stance)
+        },
+
+        stepDecision(group, step) {
+            const buttons = Array.from(group.querySelectorAll('[role="radio"]:not([disabled])'))
+            if (buttons.length === 0) return
+            const at = buttons.indexOf(document.activeElement)
+            const next = buttons[(at + step + buttons.length) % buttons.length]
+            next.click()
+            next.focus()
+        },
+
         cycle(row, action, backwards = false) {
             const order = this.grid.order
             const step = backwards ? order.length - 1 : 1
@@ -456,16 +480,46 @@ function grid({ state, grid, interactive }) {
          * Both readings ask this same method, so the table and the fold cannot
          * disagree about which rows exist.
          */
-        shown(row) {
+        axis() {
             const term = this.filter.trim().toLowerCase()
-
-            if (term === '') {
-                return true
+            if (this._axis?.term === term) return this._axis
+            const columns = this.grid.axisColumns ?? {}
+            this._axis = {
+                term,
+                rows: Object.keys(this.grid.rows).filter((key) => {
+                    const row = this.grid.rows[key]
+                    return (row.label + ' ' + (row.model ?? '')).toLowerCase().includes(term)
+                }),
+                actions: Object.keys(columns).filter((key) => (key + ' ' + columns[key].label).toLowerCase().includes(term)),
             }
+            return this._axis
+        },
 
+        shown(row) {
             const found = this.grid.rows[row] ?? {}
+            if (this.only !== 'all' && ! found.has?.[this.only]) return false
+            const axis = this.axis()
+            if (axis.term === '' || axis.rows.includes(row)) return true
+            return axis.rows.length === 0 && axis.actions.length > 0
+                && (found.cells ?? []).some((cell) => axis.actions.includes(cell.action))
+        },
 
-            return (found.label + ' ' + (found.model ?? '')).toLowerCase().includes(term)
+        shownAction(action) {
+            if (action === this.grid.manage) return true
+            const axis = this.axis()
+            return axis.term === '' || axis.actions.length === 0 || axis.actions.includes(action)
+        },
+
+        shownIn(scope) {
+            return Object.entries(this.grid.axisColumns ?? {}).filter(([action, column]) => column.scope === scope && this.shownAction(action)).length
+        },
+
+        narrowingColumns() {
+            return this.axis().term !== '' && this.axis().actions.length > 0
+        },
+
+        filtering() {
+            return this.filter.trim() !== '' || this.only !== 'all'
         },
 
         matched(tabKey) {
@@ -865,16 +919,30 @@ function grid({ state, grid, interactive }) {
          * sent one cannot be asked what changed, because there store and screen
          * are the same thing.
          */
-        moved() {
-            if (this.selected === null || this.state.baseline === undefined) {
-                return null
-            }
-
-            const { row, action } = this.selected
-            const was = (this.state.baseline.stances?.[row] ?? {})[action] ?? this.grid.order[0]
+        movedAt(row, action) {
+            if (this.state.baseline === undefined) return null
+            const baseline = this.state.baseline
+            const was = baseline.stances?.[row]?.[action] ?? this.grid.order[0]
             const now = this.stanceOf(row, action)
+            const reach = JSON.stringify(baseline.narrowing?.[row]?.[action] ?? { mode: 'all', rules: [] })
+                !== JSON.stringify(this.state.narrowing?.[row]?.[action] ?? { mode: 'all', rules: [] })
+            const until = (baseline.until?.[row]?.[action] ?? null) !== (this.state.until?.[row]?.[action] ?? null)
+            return was === now && ! reach && ! until ? null : { from: this.grid.states[was], to: this.grid.states[now], reach, until }
+        },
 
-            return was === now ? null : { from: this.grid.states[was], to: this.grid.states[now] }
+        moved() {
+            return this.selected === null || this.state.baseline === undefined ? null : this.movedAt(this.selected.row, this.selected.action)
+        },
+
+        pending() {
+            const changes = []
+            Object.entries(this.grid.rows).forEach(([row, data]) => {
+                data.cells.forEach(({ action, name }) => {
+                    const change = this.movedAt(row, action)
+                    if (change) changes.push({ row, action, name, label: data.label, ...change })
+                })
+            })
+            return changes
         },
 
         /** The catalogue row warden matched, when it named one. */

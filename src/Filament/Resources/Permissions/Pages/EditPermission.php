@@ -13,6 +13,7 @@ use ElPandaPe\Warden\Facades\Warden;
 use ElPandaPe\Warden\Support\Titles\PermissionTitle;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -20,6 +21,8 @@ use Illuminate\Validation\ValidationException;
 
 class EditPermission extends EditRecord
 {
+    public static bool $formActionsAreSticky = true;
+
     protected static string $resource = PermissionResource::class;
 
     /**
@@ -34,6 +37,8 @@ class EditPermission extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            ViewAction::make(),
+
             DeleteAction::make()
                 ->modalDescription(static fn (Model $record): string => PermissionsTable::warning($record))
                 ->visible(fn (Model $record): bool => PermissionResource::canDelete($record)),

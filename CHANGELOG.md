@@ -8,6 +8,27 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [3.4.0] - 2026-09-11
+
+### Added
+
+- Saved-state filters, action search and pending-change review in the permission grid.
+- Explicit grant decisions and labelled condition fields in the permission inspector.
+
+### Changed
+
+- Keep native Filament sections and sticky native form actions on role and permission forms.
+- Arrange the permission editor and its explanation in responsive columns within the page flow.
+- Keep grid filters beside the search field when space permits and shorten role inheritance guidance.
+- Open the permission test bench in a reusable modal from the header.
+- Add native View actions to role and permission edit pages.
+- Use a 3:1 desktop layout for record details, with concise holder notes.
+- Remove the role edit impact subtitle and its unused `resources.roles.reach.*` translations.
+
+### Fixed
+
+- Keep inspector initialization stable while editing permissions so explanation requests do not close it.
+
 ## [3.3.0] - 2026-09-08
 
 The roles listing reads like the sketch, Escape closes the panel, and the class under an entity is

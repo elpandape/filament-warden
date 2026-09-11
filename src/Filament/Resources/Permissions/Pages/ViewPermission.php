@@ -30,7 +30,6 @@ use Filament\Schemas\Components\Actions as SchemaActions;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -60,8 +59,8 @@ class ViewPermission extends ViewRecord
      *
      * Two properties and not one: the question survives the answer, so somebody
      * can change the record and ask again without retyping the account — which
-     * is the whole shape of using this thing, and the reason it stopped being a
-     * modal. A modal threw the question away on every submit.
+     * is why the modal embeds a separately named schema: submitting a test
+     * preserves the account and keeps the modal open for the next question.
      *
      * @var array<string, mixed>
      */
@@ -175,46 +174,12 @@ class ViewPermission extends ViewRecord
     }
 
     /**
-     * The page, with the bench between the record and its relation managers.
-     *
-     * Written out rather than appended to `parent::content()`, because a
-     * `Schema` has no "add one more" — `components()` replaces. The parent's two
-     * branches are kept as they are, including the one where relation managers
-     * are combined into tabs with the content: there the bench rides inside the
-     * content tab, by `getContentTabComponent()`, so an installation that turns
-     * that on does not silently lose it.
-     */
-    public function content(Schema $schema): Schema
-    {
-        if ($this->hasCombinedRelationManagerTabsWithContent()) {
-            return $schema->components([$this->getRelationManagersContentComponent()]);
-        }
-
-        return $schema->components([
-            $this->getInfolistContentComponent(),
-            ...$this->bench(),
-            $this->getRelationManagersContentComponent(),
-        ]);
-    }
-
-    public function getContentTabComponent(): Tab
-    {
-        return parent::getContentTabComponent()->schema([
-            $this->getInfolistContentComponent(),
-            ...$this->bench(),
-        ]);
-    }
-
-    /**
      * The test bench: `explain()` asked the way the application asks it, with a
      * real account and — when the permission has a model — a real row.
      *
-     * On the page since 3.0, and no longer in a modal. The reason the modal
-     * carried is gone: it was there for the searchable select, which any schema
-     * gives, and what it cost was the whole shape of using this thing. Every
-     * submit threw the question away, so changing only the record meant finding
-     * the account again — and the answer arrived as a notification, beside the
-     * screen rather than under the question it answers.
+     * The named schema stores its question on the page, independently of the
+     * enclosing action. Submitting the nested test action keeps the question
+     * and its answer available for the next comparison inside the same modal.
      */
     public function probeForm(Schema $schema): Schema
     {
@@ -308,6 +273,14 @@ class ViewPermission extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('test')
+                ->label(__('filament-warden::ui.resources.permissions.probe.label'))
+                ->icon(Heroicon::OutlinedBeaker)
+                ->schema(fn (): array => $this->bench())
+                ->modalSubmitAction(false)
+                ->modalCancelActionLabel(__('filament-warden::ui.explain.close'))
+                ->visible(fn (): bool => $this->bench() !== []),
+
             $this->give(),
 
             EditAction::make()

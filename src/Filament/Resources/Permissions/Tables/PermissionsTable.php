@@ -38,6 +38,7 @@ final class PermissionsTable
         $heldCounts = null;
 
         return $table
+            ->extraAttributes(['class' => 'fw-resource-table'])
             ->defaultSort('name')
             // A fresh install has no rows at all, and Filament's own default
             // says only "No Permissions" — true, and no help: this store fills

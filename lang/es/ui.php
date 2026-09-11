@@ -14,7 +14,7 @@ return [
             'sections' => [
                 'identity' => 'El rol',
                 'inherits' => 'Hereda de',
-                'inherits_help' => 'Todo lo que concedan estos roles lo concede también éste, hoy y cuando crezcan. Una prohibición gana igual, venga de donde venga.',
+                'inherits_help' => 'Hereda permisos; las prohibiciones tienen prioridad.',
                 'hierarchy' => 'Jerarquía',
                 'holders' => 'Quién lo tiene',
             ],
@@ -36,12 +36,6 @@ return [
                 'ending' => '{1} 1 termina pronto|[2,*] :count terminan pronto',
                 'held' => 'Lo tienen',
             ],
-            'reach' => [
-                'nobody' => 'Nadie tiene este rol y ningún rol lo hereda, así que lo que cambies aquí solo alcanza a quien se le dé después.',
-                'held' => '{1} Lo tiene 1 cuenta.|[2,*] Lo tienen :count cuentas.',
-                'inherited' => '{1} Lo hereda 1 rol.|[2,*] Lo heredan :count roles.',
-                'applies' => 'Lo que cambies se aplica a todos ellos al guardar.',
-            ],
             'hierarchy' => [
                 'description' => 'Lo que este rol alcanza a través de otros roles, y lo que lo alcanza a él.',
                 'none' => 'Este rol no hereda nada, y nada lo hereda.',
@@ -57,7 +51,7 @@ return [
             ],
             'holders' => [
                 'ending' => 'Caducan',
-                'description' => 'Contado bajo el tenant en el que estás. Una asignación hecha en otro tenant no aparece aquí; una restringida a un contexto sí, contada igual que cualquier otra.',
+                'description' => 'Tenant actual.',
                 'nobody' => 'Nadie tiene este rol aquí.',
                 'held' => 'Lo tienen :count, bajo este tenant.',
             ],
@@ -136,8 +130,8 @@ return [
                 'conditions_shared' => 'Titulares de esta fila: :count. Es una fila y una regla, así que editarla aquí cambia la regla para quien la tenga.',
             ],
             'holders' => [
-                'description' => 'Contados, no nombrados. Un permiso puede estar en poder de todas las cuentas de la instalación.',
-                'every_tenant' => 'Contados en todos los tenants, porque borrar este permiso se lleva sus concesiones por una clave ajena — y esa cascada no mira el tenant.',
+                'description' => 'Totales de todos los tenants.',
+                'every_tenant' => 'Eliminar el permiso revoca todas sus concesiones.',
                 'roles' => 'Roles',
                 'accounts' => 'Cuentas',
                 'everyone' => 'Todo el mundo',
@@ -226,6 +220,12 @@ return [
     ],
 
     'explain' => [
+        'decision' => 'Regla propia',
+        'decisions' => [
+            'abstain' => 'Sin regla propia',
+            'granted' => 'Conceder',
+            'forbidden' => 'Prohibir',
+        ],
         'causes' => [
             'granted-directly' => 'Concedido por el permiso :permission, en poder del propio rol.',
             'granted-via-role' => 'Concedido por el permiso :permission, a través del rol :role.',
@@ -373,6 +373,19 @@ return [
     ],
 
     'conditions' => [
+        'column' => 'Campo del registro',
+        'comparison' => 'Comparación',
+        'authority_field' => 'Campo de la cuenta',
+        'connector' => 'Conector',
+        'preview' => 'Expresión de la regla',
+        'comparisons' => [
+            '=' => 'es igual a',
+            '!=' => 'es distinto de',
+            '>' => 'es mayor que',
+            '>=' => 'es al menos',
+            '<' => 'es menor que',
+            '<=' => 'es como máximo',
+        ],
         'scope' => 'Alcance de la regla',
         'if' => 'si',
         'and' => 'y',
@@ -420,6 +433,22 @@ return [
     ],
 
     'grid' => [
+        'only' => [
+            'label' => 'Filtrar por estado',
+            'all' => 'Todas',
+            'own' => 'Con regla propia',
+            'forbidden' => 'Prohibiciones',
+            'narrowed' => 'Estrechadas',
+            'ending' => 'Caducan',
+            'inherited' => 'Heredadas',
+            'stored' => 'Los filtros usan las reglas guardadas. Las filas permanecen visibles mientras editas y se actualizan al guardar.',
+        ],
+        'pending' => [
+            'title' => 'Cambios sin guardar',
+            'help' => 'Revisa el borrador. Al guardar, cada cambio se valida contra las reglas actuales.',
+            'reach' => 'alcance modificado',
+            'until' => 'caducidad modificada',
+        ],
         'panel' => 'El panel',
         'locked' => 'Este rol está protegido: lo que puede hacer no se toca desde aquí.',
         'read_only' => 'Esta rejilla no se cambia desde aquí: sus celdas se seleccionan, no ciclan.',
@@ -430,7 +459,7 @@ return [
         'manage' => 'Todo',
         'undeclared' => 'La Policy no declara esta acción',
         'filter' => [
-            'label' => 'Filtrar entidades',
+            'label' => 'Filtrar entidades y acciones',
             'count' => ':matched de :total · los contadores siguen contando la pestaña entera',
             'empty' => 'Nada casa con «:term».',
         ],

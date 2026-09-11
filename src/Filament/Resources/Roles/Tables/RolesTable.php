@@ -53,6 +53,7 @@ final class RolesTable
         $inherits = null;
 
         return $table
+            ->extraAttributes(['class' => 'fw-resource-table'])
             ->defaultSort('name')
             ->columns([
                 // Una columna y no dos, como el boceto y como la tabla de

@@ -43,7 +43,7 @@ final class PermissionInfolist
     public static function configure(Schema $schema): Schema
     {
         return $schema
-            ->columns(3)
+            ->columns(4)
             ->components([
                 // The sketch's `fi-aside`: two stacks, the wide one first. A
                 // section spanning 2 followed by one spanning 1 would fill the
@@ -87,12 +87,11 @@ final class PermissionInfolist
                                 ->helperText(static fn (Model $record): ?string => self::ruleHelp($record))
                                 ->columnSpanFull(),
                         ]),
-                ])->columnSpan(2),
+                ])->columnSpan(3),
 
                 Group::make([
                     Section::make(__('filament-warden::ui.resources.permissions.sections.holders'))
                         ->icon(Heroicon::OutlinedUsers)
-                        ->description(__('filament-warden::ui.resources.permissions.holders.description').' '.__('filament-warden::ui.resources.permissions.holders.every_tenant'))
                         ->columns(2)
                         ->schema([
                             TextEntry::make('roles')
@@ -140,6 +139,12 @@ final class PermissionInfolist
                                 ->badge()
                                 ->color(static fn (Model $record): string => Holders::of($record)->lapsed > 0 ? 'warning' : 'gray')
                                 ->state(static fn (Model $record): int => Holders::of($record)->lapsed),
+
+                            TextEntry::make('holders_note')
+                                ->hiddenLabel()
+                                ->color('gray')
+                                ->columnSpanFull()
+                                ->state(__('filament-warden::ui.resources.permissions.holders.description').' '.__('filament-warden::ui.resources.permissions.holders.every_tenant')),
                         ]),
 
                     // Its own card rather than a badge among the identity

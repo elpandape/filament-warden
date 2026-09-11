@@ -43,11 +43,12 @@ final class RoleInfolist
     public static function configure(Schema $schema): Schema
     {
         return $schema
-            ->columns(2)
+            ->columns(4)
             ->components([
                 Section::make(__('filament-warden::ui.resources.roles.sections.hierarchy'))
                     ->icon(Heroicon::OutlinedLink)
                     ->description(__('filament-warden::ui.resources.roles.hierarchy.description'))
+                    ->columnSpan(3)
                     // Off out of the box, and the section goes with it rather
                     // than drawing two empty rows: with nesting off a role→role
                     // edge grants nothing, so a card about them would be a card
@@ -69,11 +70,10 @@ final class RoleInfolist
                 Section::make(__('filament-warden::ui.resources.roles.sections.holders'))
                     ->icon(Heroicon::OutlinedUsers)
                     ->description(__('filament-warden::ui.resources.roles.holders.description'))
-                    // The sketch's two columns, and one card across both when
-                    // there is no sibling to sit beside.
-                    ->columnSpan(static fn (): int => WardenConfig::nestedRoles() ? 1 : 2)
+                    // Fill the row when hierarchy has no section to occupy the main track.
+                    ->columnSpan(static fn (): int => WardenConfig::nestedRoles() ? 1 : 4)
                     ->extraAttributes(['style' => 'block-size: 100%'])
-                    ->columns(4)
+                    ->columns(2)
                     ->schema([
                         // Counted and never named, which is the doctrine the
                         // permission screen already had written down and the

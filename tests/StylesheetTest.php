@@ -368,12 +368,8 @@ test('the panel never takes width from the matrix, and sticks until it is opened
     expect($sheet)->not->toContain("[data-open='true']")
         ->and($sheet)->not->toContain('minmax(0, 1fr) 30rem');
 
-    // Collapsed it is stuck to the bottom, because a cell in row 3 of forty
-    // opens an answer that would otherwise be off the screen. Expanded it stops
-    // sticking: it is no longer a footnote, it is where the work is.
-    expect($sheet)->toContain('.fw-inspector {')
-        ->and($sheet)->toContain('inset-block-end: 0;')
-        ->and($sheet)->toMatch("/\.fw-inspector\[data-fw-expanded='true'\] \{[^}]*position: static;/s");
+    expect(declarationsOf('.fw-inspector'))->toContain('position: static;')
+        ->not->toContain('position: sticky;');
 });
 
 test('the condition builder is what the width was needed for, and it gets it', function (): void {

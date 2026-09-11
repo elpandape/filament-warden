@@ -13,10 +13,23 @@ use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Features\SupportTesting\Testable;
 
 use function Pest\Livewire\livewire;
 
 pest()->extend(TestCase::class);
+
+/**
+ * @param  Testable<ViewPermission>  $page
+ */
+function permissionBenchHtml(Testable $page): string
+{
+    // Livewire's page HTML does not contain the separately rendered action modal.
+    /** @var ViewPermission $screen */
+    $screen = $page->instance();
+
+    return $screen->getSchema('probeForm')?->toHtml() ?? '';
+}
 
 function readablePermission(): string
 {
@@ -135,6 +148,8 @@ test('the test bench answers for the account it is asked about', function (): vo
     Warden::allow($holder)->to('viewAny', roleClass());
 
     livewire(ViewPermission::class, ['record' => $key])
+        ->assertActionVisible('test')
+        ->mountAction('test')
         ->set('ask.account', $holder->getKey())
         ->callAction(TestAction::make('ask')->schemaComponent('bench', 'probeForm'))
         // The card is asserted through the property and not only through the
@@ -143,7 +158,9 @@ test('the test bench answers for the account it is asked about', function (): vo
         // assertion alone would go green on a card that says the right word for
         // the wrong reason.
         ->assertSet('answered.status', 'granted')
-        ->assertSee('granted');
+        ->tap(static function (Testable $page): void {
+            expect(permissionBenchHtml($page))->toContain('granted');
+        });
 });
 
 test('the test bench is closed when the installation closed it', function (): void {
@@ -156,6 +173,7 @@ test('the test bench is closed when the installation closed it', function (): vo
         // `assertActionDoesNotExist()` swallows «could not be resolved» and
         // calls it a pass: the page still has to render, and still has to show
         // the rest of what it says.
+        ->assertActionHidden('test')
         ->assertDontSee('Ask the store')
         ->assertSee('Who holds it');
 });
@@ -210,7 +228,10 @@ test('a permission with no model is asked without a record to put in front of it
 
     livewire(ViewPermission::class, ['record' => $loose->getKey()])
         ->assertSee('None: a loose permission')
-        ->assertSee('Ask the store')
+        ->mountAction('test')
+        ->tap(static function (Testable $page): void {
+            expect(permissionBenchHtml($page))->toContain('Ask the store');
+        })
         // No entity, so there is no row to put in front of it and the field
         // that would ask for one is not offered.
         ->assertDontSee('The key of the row to put in front of it');
@@ -243,6 +264,7 @@ test('the test bench puts the row it is given in front of the rule', function ()
     $twin = permissionClass()::query()->withoutGlobalScopes()->whereNotNull('options')->firstOrFail();
 
     livewire(ViewPermission::class, ['record' => $twin->getKey()])
+        ->mountAction('test')
         ->set('ask.account', $holder->getKey())
         ->set('ask.record', recordKey($alpha))
         ->callAction(TestAction::make('ask')->schemaComponent('bench', 'probeForm'))
@@ -271,6 +293,7 @@ test('an account key that names nobody is refused by the field, not by the store
     // same rule §6.12 measured for `assertOk()`, read off the declared type
     // rather than off what it actually hands back.
     $page = livewire(ViewPermission::class, ['record' => $permission->getKey()])
+        ->mountAction('test')
         ->set('ask.account', 9999)
         ->callAction(TestAction::make('ask')->schemaComponent('bench', 'probeForm'));
 
@@ -289,6 +312,7 @@ test('an explicit denial comes back as a denial', function (): void {
     $row = permissionClass()::query()->withoutGlobalScopes()->where('name', 'viewAny')->orderByDesc('id')->firstOrFail();
 
     livewire(ViewPermission::class, ['record' => $row->getKey()])
+        ->mountAction('test')
         ->set('ask.account', $holder->getKey())
         ->callAction(TestAction::make('ask')->schemaComponent('bench', 'probeForm'))
         ->assertSet('answered.status', 'forbidden');
@@ -303,6 +327,7 @@ test('a grant comes back as a grant, which is the word a denial has to differ fr
     Warden::allow($holder)->to('viewAny', roleClass());
 
     livewire(ViewPermission::class, ['record' => latestPermission('viewAny')->getKey()])
+        ->mountAction('test')
         ->set('ask.account', $holder->getKey())
         ->callAction(TestAction::make('ask')->schemaComponent('bench', 'probeForm'))
         ->assertSet('answered.status', 'granted');
@@ -316,6 +341,7 @@ test('a row nobody holds comes back as abstaining, which is neither of the two',
     $holder = makeUser('Holder');
 
     livewire(ViewPermission::class, ['record' => makePermission('export-reports')->getKey()])
+        ->mountAction('test')
         ->set('ask.account', $holder->getKey())
         ->callAction(TestAction::make('ask')->schemaComponent('bench', 'probeForm'))
         ->assertSet('answered.status', 'abstain');
@@ -351,6 +377,7 @@ test('the test bench says how far the permission reaches, when it can be counted
     $twin = permissionClass()::query()->withoutGlobalScopes()->whereNotNull('options')->firstOrFail();
 
     livewire(ViewPermission::class, ['record' => $twin->getKey()])
+        ->mountAction('test')
         ->set('ask.account', $holder->getKey())
         ->callAction(TestAction::make('ask')->schemaComponent('bench', 'probeForm'))
         // Read off the card and not recomputed beside it: the count is worked
@@ -404,10 +431,15 @@ test('the card is not there until somebody has asked', function (): void {
     $key = readablePermission();
 
     livewire(ViewPermission::class, ['record' => $key])
-        ->assertSee('Ask the store')
+        ->mountAction('test')
+        ->tap(static function (Testable $page): void {
+            expect(permissionBenchHtml($page))->toContain('Ask the store');
+        })
         // Absent, not blank. The question has not been put, so there is nothing
         // to answer and nothing to leave stale under the next one.
-        ->assertDontSee('What the store answered')
+        ->tap(static function (Testable $page): void {
+            expect(permissionBenchHtml($page))->not->toContain('What the store answered');
+        })
         ->assertSet('answered', null);
 });
 
@@ -424,10 +456,10 @@ test('the question survives the answer, so the next one costs one field', functi
 
     $twin = permissionClass()::query()->withoutGlobalScopes()->whereNotNull('options')->firstOrFail();
 
-    // This is the whole reason the bench left the modal: a modal threw the
-    // account away on every submit, so comparing two rows meant finding the
-    // same person twice. Changing only the record has to be enough.
+    // The outer modal must keep the account when the nested test action submits.
+    // Comparing another row must not require selecting the same person again.
     livewire(ViewPermission::class, ['record' => $twin->getKey()])
+        ->mountAction('test')
         ->set('ask.account', $holder->getKey())
         ->set('ask.record', recordKey($alpha))
         ->callAction(TestAction::make('ask')->schemaComponent('bench', 'probeForm'))
@@ -447,11 +479,16 @@ test('a card whose grant ends says when, under the verdict', function (): void {
     Warden::allow($holder)->until(now()->addWeeks(2))->to('viewAny', roleClass());
 
     livewire(ViewPermission::class, ['record' => latestPermission('viewAny')->getKey()])
+        ->mountAction('test')
         ->set('ask.account', $holder->getKey())
         ->callAction(TestAction::make('ask')->schemaComponent('bench', 'probeForm'))
         ->assertSet('answered.status', 'granted')
-        ->assertSee('Until')
-        ->assertSee('The grant that answered ends on');
+        ->tap(static function (Testable $page): void {
+            expect(permissionBenchHtml($page))->toContain('Until');
+        })
+        ->tap(static function (Testable $page): void {
+            expect(permissionBenchHtml($page))->toContain('The grant that answered ends on');
+        });
 });
 
 test('a row with nothing to say about time says nothing about time', function (): void {
@@ -461,6 +498,7 @@ test('a row with nothing to say about time says nothing about time', function ()
     Warden::allow($holder)->to('viewAny', roleClass());
 
     livewire(ViewPermission::class, ['record' => $key])
+        ->mountAction('test')
         ->set('ask.account', $holder->getKey())
         ->callAction(TestAction::make('ask')->schemaComponent('bench', 'probeForm'))
         ->assertSet('answered.until', null)
@@ -483,23 +521,26 @@ test('a class check against a narrowed rule prints the note it needs', function 
     $twin = permissionClass()::query()->withoutGlobalScopes()->whereNotNull('options')->firstOrFail();
 
     livewire(ViewPermission::class, ['record' => $twin->getKey()])
+        ->mountAction('test')
         ->set('ask.account', $holder->getKey())
         ->callAction(TestAction::make('ask')->schemaComponent('bench', 'probeForm'))
         ->assertSet('answered.status', 'abstain')
-        ->assertSee('Why the class could not answer')
-        ->assertSee('needs a record in front of it');
+        ->tap(static function (Testable $page): void {
+            expect(permissionBenchHtml($page))->toContain('Why the class could not answer');
+        })
+        ->tap(static function (Testable $page): void {
+            expect(permissionBenchHtml($page))->toContain('needs a record in front of it');
+        });
 });
 
 test('the bench survives relation managers folded into the content tab', function (): void {
     $key = readablePermission();
 
-    // The arrangement the parent's own `content()` branches on, and the one an
-    // installation turns on with one method. Written out rather than trusted:
-    // the bench rides in the content tab there, and a page that quietly lost it
-    // would look identical to one that never had it.
+    // Combining relation tabs with record content must not remove the separate
+    // test action or make its modal depend on the currently selected tab.
     livewire(CombinedTabsViewPermission::class, ['record' => $key])
-        ->assertOk()
-        ->assertSee('Ask the store');
+        ->mountAction('test')
+        ->assertActionMounted('test');
 });
 
 test('a permission can be handed straight to an account, with an end date', function (): void {

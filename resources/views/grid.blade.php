@@ -245,7 +245,12 @@
                                     aria-label="{{ __('filament-warden::ui.grid.filter.label') }}"
                                     placeholder="{{ __('filament-warden::ui.grid.filter.label') }}"
                                 >
-                                <span class="fw-filter-count" x-show="filter.trim() !== ''" x-cloak x-text="filterCount(@js($tab->key))"></span>
+                                <div class="fw-only" role="radiogroup" aria-label="{{ __('filament-warden::ui.grid.only.label') }}" x-on:keydown.arrow-right.prevent="stepDecision($el, 1)" x-on:keydown.arrow-left.prevent="stepDecision($el, -1)">
+                                    @foreach (['all', 'own', 'forbidden', 'narrowed', 'ending', 'inherited'] as $filter)
+                                        <button type="button" role="radio" class="fw-only-chip" x-bind:aria-checked="only === @js($filter) ? 'true' : 'false'" x-bind:tabindex="only === @js($filter) ? 0 : -1" x-on:click="only = @js($filter)">{{ __('filament-warden::ui.grid.only.'.$filter) }}</button>
+                                    @endforeach
+                                </div>
+                                <span class="fw-filter-count" x-show="filtering()" x-cloak x-text="filterCount(@js($tab->key))"></span>
                                 {{--
                                     Said out loud as well as drawn: a filter that
                                     takes rows away without announcing it is a
@@ -253,9 +258,10 @@
                                     told about. Same pattern as the inspector's
                                     own line below.
                                 --}}
-                                <p class="fw-sr" role="status" x-text="filter.trim() === '' ? '' : filterCount(@js($tab->key))"></p>
+                                <p class="fw-sr" role="status" x-text="! filtering() ? '' : filterCount(@js($tab->key))"></p>
                             </div>
 
+                            <p class="fw-only-help" x-show="only !== 'all'" x-cloak>{{ __('filament-warden::ui.grid.only.stored') }}</p>
                             <p class="fw-filter-empty" x-show="matched(@js($tab->key)) === 0" x-cloak x-text="filterEmpty()"></p>
                             <div class="fw-scroll" x-show="matched(@js($tab->key)) > 0">
                                 <table class="fw-table">
@@ -264,13 +270,13 @@
                                             <th class="fw-corner" rowspan="2" scope="col">{{ __('filament-warden::ui.grid.entity') }}</th>
                                             <th class="fw-manage" rowspan="2" scope="col">{{ __('filament-warden::ui.grid.manage') }}</th>
                                             @foreach ($grid->groups as $group)
-                                                <th class="fw-group" data-scope="{{ $group->scope->value }}" colspan="{{ count($group->columns) }}" scope="colgroup">{{ $group->label }}</th>
+                                                <th class="fw-group" data-scope="{{ $group->scope->value }}" colspan="{{ count($group->columns) }}" x-bind:colspan="shownIn(@js($group->scope->value))" x-show="shownIn(@js($group->scope->value)) > 0" scope="colgroup">{{ $group->label }}</th>
                                             @endforeach
                                         </tr>
                                         <tr>
                                             @foreach ($grid->groups as $group)
                                                 @foreach ($group->columns as $column)
-                                                    <th class="fw-action" data-scope="{{ $group->scope->value }}" scope="col">
+                                                    <th class="fw-action" x-show="shownAction(@js($column->action))" data-scope="{{ $group->scope->value }}" scope="col">
                                                         <span class="fw-action-label">{{ $column->label }}</span>
                                                         <span class="fw-action-name">{{ $column->action }}</span>
                                                     </th>
@@ -315,7 +321,7 @@
                                                     @if ($showsClassNames)
                                                         <span class="fw-entity-model" id="{{ $ids }}-row-{{ $loop->index }}-model">{{ $row->model }}</span>
                                                     @endif
-                                                    <span class="fw-shortcuts" @unless ($interactive) hidden @endunless>
+                                                    <span class="fw-shortcuts" x-show="! narrowingColumns()" @unless ($interactive) hidden @endunless>
                                                         @foreach (['read', 'all', 'clear'] as $preset)
                                                             <button
                                                                 type="button"
@@ -326,7 +332,7 @@
                                                     </span>
                                                 </th>
                                                 @foreach ($row->allCells() as $cell)
-                                                    <td class="fw-cell">
+                                                    <td class="fw-cell" x-show="shownAction(@js($cell->action))">
                                                         @if ($cell->declared)
                                                             @include('filament-warden::box', ['cell' => $cell, 'label' => $row->label.' · '.$cell->label, 'interactive' => $interactive, 'states' => $states])
                                                         @else
@@ -382,7 +388,7 @@
                                                 in the `<summary>`, where a click
                                                 would toggle the disclosure.
                                             --}}
-                                            <span class="fw-shortcuts fw-stack-shortcuts" @unless ($interactive) hidden @endunless>
+                                            <span class="fw-shortcuts fw-stack-shortcuts" x-show="! narrowingColumns()" @unless ($interactive) hidden @endunless>
                                                 @foreach (['read', 'all', 'clear'] as $preset)
                                                     <button
                                                         type="button"
@@ -400,11 +406,11 @@
                                             @endif
 
                                             @foreach ($grid->groups as $group)
-                                                <details class="fw-stack-scope" data-scope="{{ $group->scope->value }}">
+                                                <details class="fw-stack-scope" data-scope="{{ $group->scope->value }}" x-show="shownIn(@js($group->scope->value)) > 0">
                                                     <summary><span>{{ $group->label }}</span></summary>
 
                                                     @foreach ($row->inScope($group->scope) as $cell)
-                                                        <div class="fw-stack-row">
+                                                        <div class="fw-stack-row" x-show="shownAction(@js($cell->action))">
                                                             <span class="fw-stack-label">{{ $cell->label }}<span class="fw-stack-action">{{ $cell->action }}</span></span>
                                                             @if ($cell->declared)
                                                                 @include('filament-warden::box', ['cell' => $cell, 'label' => $row->label.' · '.$cell->label, 'interactive' => $interactive, 'states' => $states])
@@ -438,9 +444,24 @@
                 @endforeach
         </div>
 
+        @if ($interactive)
+            <details class="fw-pending" x-show="pending().length > 0" x-cloak>
+                <summary>{{ __('filament-warden::ui.grid.pending.title') }} <span x-text="pending().length"></span></summary>
+                <p class="fw-only-help">{{ __('filament-warden::ui.grid.pending.help') }}</p>
+                <template x-for="change in pending()" :key="change.row + '|' + change.action">
+                    <button type="button" class="fw-pending-line" x-on:click="select(change.row, change.action, change.label, change.name); expanded = true">
+                        <strong x-text="change.label"></strong> · <span x-text="grid.axisColumns[change.action]?.label ?? change.action"></span>:
+                        <span x-text="change.from"></span> → <span x-text="change.to"></span>
+                        <span x-show="change.reach">· {{ __('filament-warden::ui.grid.pending.reach') }}</span>
+                        <span x-show="change.until">· {{ __('filament-warden::ui.grid.pending.until') }}</span>
+                    </button>
+                </template>
+            </details>
+        @endif
+
         @if ($grid->alpine()['explain'] || $grid->alpine()['constraints'])
         <aside
-            class="fw-inspector"
+            class="fw-inspector fw-permission-editor"
             aria-label="{{ __('filament-warden::ui.explain.title') }}"
             data-fw-open="false"
             data-fw-expanded="false"
@@ -506,17 +527,9 @@
                         : @js(__('filament-warden::ui.explain.expand'))"></span>
                 </button>
 
-                {{--
-                    Sin equis, a propósito. Una barra que no tapa nada no
-                    necesita descartarse: pulsar otra celda la mueve, y
-                    «Personalizar» la pliega. Una equis pedía una decisión
-                    —¿cerrar qué, si no estorba?— y dejaba la celda sin
-                    seleccionar, que es un estado que nadie pide.
-
-                    Escape SIGUE cerrándola, y sigue devolviendo el foco a la
-                    celda: es la salida que un teclado necesita y no ocupa
-                    píxeles.
-                --}}
+                <button type="button" class="fw-inspector-close" x-on:click="closePanel($root)" aria-label="{{ __('filament-warden::ui.explain.close') }}">
+                    <x-filament::icon icon="heroicon-o-x-mark" class="fw-close-icon" />
+                </button>
             </div>
 
             <div class="fw-inspector-body" x-show="expanded || ! selected" x-cloak>
@@ -538,6 +551,28 @@
                 <p class="fw-inspector-empty" x-show="selected && loading" x-cloak>{{ __('filament-warden::ui.explain.loading') }}</p>
                 <p class="fw-inspector-empty fw-inspector-failed" x-show="selected && failed && ! loading" x-cloak>{{ __('filament-warden::ui.explain.failed') }}</p>
 
+                <div class="fw-editor-layout">
+                    <div class="fw-editor-controls">
+                        <template x-if="selected && interactive">
+                            <div class="fw-decision">
+                                <h4 class="fw-field-label">{{ __('filament-warden::ui.explain.decision') }}</h4>
+                                <div class="fw-stance" role="radiogroup" aria-label="{{ __('filament-warden::ui.explain.decision') }}" x-on:keydown.arrow-right.prevent="stepDecision($el, 1)" x-on:keydown.arrow-left.prevent="stepDecision($el, -1)">
+                                    @foreach (['abstain', 'granted', 'forbidden'] as $stance)
+                                        <button type="button" role="radio" data-fw-stance="{{ $stance }}"
+                                            x-bind:aria-checked="stanceOf(selected.row, selected.action) === @js($stance) ? 'true' : 'false'"
+                                            x-bind:tabindex="stanceOf(selected.row, selected.action) === @js($stance) ? 0 : -1"
+                                            x-bind:disabled="! decisionEnabled()"
+                                            x-on:click="setDecision(@js($stance))"
+                                        >{{ __('filament-warden::ui.explain.decisions.'.$stance) }}</button>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </template>
+                <div class="fw-write">
+                    @include('filament-warden::builder')
+                </div>
+                    </div>
+                    <div class="fw-editor-context">
                 {{--
                     Who answers this cell, when it is not this role.
 
@@ -572,36 +607,7 @@
                     reaches the server, so `RoleGrants::plan()` asks the same
                     question again and drops the date whatever arrives.
                 --}}
-                <template x-if="selected && grid.constraints && interactive && ! loading">
-                    <div class="fw-until">
-                        <span class="fw-until-label">{{ __('filament-warden::ui.grid.until.label') }}</span>
-                        <input
-                            type="date"
-                            class="fw-until-date"
-                            aria-label="{{ __('filament-warden::ui.grid.until.label') }}"
-                            x-bind:disabled="! untilEnabled(selected.row, selected.action)"
-                            x-bind:value="(untilAt(selected.row, selected.action) ?? '').slice(0, 10)"
-                            x-on:change="setUntil(selected.row, selected.action, $event.target.value)"
-                            {{--
-                                Pointed at FROM the control, and only while there
-                                is a reason: a disabled input keeps its label in
-                                the accessibility tree but takes no focus, so a
-                                sentence sitting beside it is read in browse mode
-                                and never in focus mode. It is the same lesson the
-                                scope rail paid for in the v2.6.0 tree dump, on
-                                the one control 3.0 added.
-                            --}}
-                            x-bind:aria-describedby="untilReason(selected.row, selected.action) ? '{{ $ids }}-until-why' : null"
-                        >
-                        <p
-                            class="fw-until-why"
-                            id="{{ $ids }}-until-why"
-                            x-show="untilReason(selected.row, selected.action)"
-                            x-text="untilReason(selected.row, selected.action)"
-                            x-cloak
-                        ></p>
-                    </div>
-                </template>
+
 
                 {{--
                     The two voices that were one paragraph.
@@ -663,8 +669,38 @@
                     </div>
                 </template>
 
-                <div class="fw-write">
-                    @include('filament-warden::builder')
+
+                <template x-if="selected && grid.constraints && interactive && ! loading">
+                    <div class="fw-until">
+                        <span class="fw-until-label">{{ __('filament-warden::ui.grid.until.label') }}</span>
+                        <input
+                            type="date"
+                            class="fw-until-date"
+                            aria-label="{{ __('filament-warden::ui.grid.until.label') }}"
+                            x-bind:disabled="! untilEnabled(selected.row, selected.action)"
+                            x-bind:value="(untilAt(selected.row, selected.action) ?? '').slice(0, 10)"
+                            x-on:change="setUntil(selected.row, selected.action, $event.target.value)"
+                            {{--
+                                Pointed at FROM the control, and only while there
+                                is a reason: a disabled input keeps its label in
+                                the accessibility tree but takes no focus, so a
+                                sentence sitting beside it is read in browse mode
+                                and never in focus mode. It is the same lesson the
+                                scope rail paid for in the v2.6.0 tree dump, on
+                                the one control 3.0 added.
+                            --}}
+                            x-bind:aria-describedby="untilReason(selected.row, selected.action) ? '{{ $ids }}-until-why' : null"
+                        >
+                        <p
+                            class="fw-until-why"
+                            id="{{ $ids }}-until-why"
+                            x-show="untilReason(selected.row, selected.action)"
+                            x-text="untilReason(selected.row, selected.action)"
+                            x-cloak
+                        ></p>
+                    </div>
+                </template>
+                    </div>
                 </div>
             </div>
         </aside>

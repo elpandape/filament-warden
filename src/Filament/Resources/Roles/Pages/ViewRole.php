@@ -53,36 +53,6 @@ class ViewRole extends ViewRecord
     }
 
     /**
-     * A cuánta gente alcanza este rol, para el subtítulo de la pantalla de
-     * edición: lo tienen N y lo heredan N.
-     *
-     * Dos cifras y no una: quien lo tiene lo ejerce, y quien lo hereda reparte
-     * lo que este conceda a su propia gente. Un total las escondería, y son la
-     * diferencia entre «edito un rol» y «edito lo que N personas pueden hacer».
-     */
-    public static function reach(Model $record): string
-    {
-        $held = RoleHolders::of($record)->total;
-        $reaching = count(Hierarchy::reaching($record));
-
-        if ($held === 0 && $reaching === 0) {
-            return (string) __('filament-warden::ui.resources.roles.reach.nobody');
-        }
-
-        $clauses = [];
-
-        if ($held > 0) {
-            $clauses[] = trans_choice('filament-warden::ui.resources.roles.reach.held', $held);
-        }
-
-        if ($reaching > 0) {
-            $clauses[] = trans_choice('filament-warden::ui.resources.roles.reach.inherited', $reaching);
-        }
-
-        return implode(' ', $clauses).' '.__('filament-warden::ui.resources.roles.reach.applies');
-    }
-
-    /**
      * The title, under the heading, because the heading is the code name.
      *
      * `recordTitleAttribute` is `name` — grants point at it, so it is what a

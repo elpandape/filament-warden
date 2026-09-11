@@ -108,6 +108,7 @@ class RolesRelationManager extends RelationManager
         $account = $this->getOwnerRecord();
 
         return $table
+            ->extraAttributes(['class' => 'fw-resource-table'])
             ->recordTitleAttribute('name')
             // `->query()` alone is not enough: the base table keeps its own
             // relationship closure, and `resolveTableRecord()` — what routes a

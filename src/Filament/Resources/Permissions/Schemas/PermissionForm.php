@@ -46,17 +46,17 @@ final class PermissionForm
     public static function configure(Schema $schema): Schema
     {
         return $schema
-            // Three tracks, so the form keeps two of them and the aside keeps
+            // Four tracks, so the form keeps three of them and the aside keeps
             // one: a form is read left to right and what a row costs is read
             // beside it, not underneath. Below the split's own breakpoint
             // Filament stacks the two, which is the reading a phone gets.
-            ->columns(3)
+            ->columns(4)
             ->components([
                 // Aliased, because `ElPandaPe\Warden\Constraints\Group` is
                 // already in this file and is the one the satisfiability check
                 // reads — the name belongs to warden's rule, not to a layout.
                 Column::make()
-                    ->columnSpan(2)
+                    ->columnSpan(3)
                     ->schema([
                         Section::make(__('filament-warden::ui.resources.permissions.sections.identity'))
                             ->icon(Heroicon::OutlinedKey)

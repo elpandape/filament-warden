@@ -487,7 +487,7 @@ test('the panel names its two voices, and the raw cause is not one of them', fun
     // not the literal word: the suite sets no locale.
     $title = preg_quote(__('filament-warden::ui.explain.title'), '/');
 
-    expect($html)->toMatch('/<aside[^>]+class="fw-inspector"[^>]+aria-label="'.$title.'"/');
+    expect($html)->toMatch('/<aside[^>]+class="fw-inspector fw-permission-editor"[^>]+aria-label="'.$title.'"/');
 });
 
 test('the script asks the server for the answer and composes none of it', function (): void {
@@ -1151,10 +1151,12 @@ test('the filter says out loud what it took away', function (): void {
     // regions — the inspector has had one since `1.1.0` — so a second one
     // landing anywhere near the filter would have kept this green with the
     // filter's own gone. It asks for the filter's own node now.
-    $filter = mb_substr($html, (int) mb_strpos($html, 'class="fw-filter"'), 900);
+    $filterStart = (int) mb_strpos($html, 'class="fw-filter"');
+    $filterEnd = (int) mb_strpos($html, 'class="fw-filter-empty"', $filterStart);
+    $filter = mb_substr($html, $filterStart, $filterEnd - $filterStart);
 
     expect($filter)->toContain('role="status"')
-        ->and($filter)->toContain('x-text="filter.trim() === \'\' ? \'\' : filterCount(')
+        ->and($filter)->toContain('x-text="! filtering() ? \'\' : filterCount(')
         ->and($filter)->toContain('class="fw-sr"');
 });
 
@@ -1403,12 +1405,9 @@ test('the panel takes its track only once a cell is opened, and gives it back', 
         // received the keystroke on the only path anybody takes to open it.
         // Still not on the window: this covers the field and nothing else.
         //
-        // And it is now the ONLY way to dismiss it: the close button went. A bar
-        // that covers nothing does not need dismissing — clicking another cell
-        // moves it and «Customise» folds it — while Escape is the exit a
-        // keyboard needs and costs no pixels.
         ->toContain('x-on:keydown.escape="closePanel($root)"')
-        ->not->toContain('class="fw-inspector-close"');
+        ->toContain('class="fw-inspector-close"')
+        ->toContain('x-on:click="closePanel($root)"');
 });
 
 test('the panel offers a date, and says which of the three noes stops it', function (): void {

@@ -16,6 +16,7 @@
 
                         <select
                             class="fw-joiner"
+                            aria-label="{{ __('filament-warden::ui.conditions.connector') }}"
                             x-show="rule.at > 0"
                             x-bind:disabled="! interactive"
                             x-on:change="edit(rule.at, 'logic', $event.target.value)"
@@ -25,6 +26,8 @@
                             </template>
                         </select>
 
+                        <label class="fw-rule-field">
+                            <span>{{ __('filament-warden::ui.conditions.column') }}</span>
                         <select
                             class="fw-column"
                             x-bind:disabled="! interactive"
@@ -34,17 +37,23 @@
                                 <option :value="column" :selected="rule.column === column" x-text="column"></option>
                             </template>
                         </select>
+                        </label>
 
+                        <label class="fw-rule-field">
+                            <span>{{ __('filament-warden::ui.conditions.comparison') }}</span>
                         <select
                             class="fw-operator"
                             x-bind:disabled="! interactive"
                             x-on:change="edit(rule.at, 'operator', $event.target.value)"
                         >
                             <template x-for="operator in words.operators" :key="operator">
-                                <option :value="operator" :selected="rule.operator === operator" x-text="operator"></option>
+                                <option :value="operator" :selected="rule.operator === operator" x-text="@js(__('filament-warden::ui.conditions.comparisons'))[operator] ?? operator"></option>
                             </template>
                         </select>
+                        </label>
 
+                        <label class="fw-rule-field" x-show="rule.kind === 'column'">
+                            <span>{{ __('filament-warden::ui.conditions.authority_field') }}</span>
                         <select
                             class="fw-against"
                             x-show="rule.kind === 'column'"
@@ -59,7 +68,10 @@
                                 ></option>
                             </template>
                         </select>
+                        </label>
 
+                        <label class="fw-rule-field" x-show="rule.kind === 'value'">
+                            <span>{{ __('filament-warden::ui.conditions.value') }}</span>
                         <input
                             type="text"
                             x-show="rule.kind === 'value'"
@@ -68,6 +80,7 @@
                             x-on:input="edit(rule.at, 'value', $event.target.value)"
                             placeholder="{{ __('filament-warden::ui.conditions.value') }}"
                         >
+                        </label>
 
                         <span
                             class="fw-misfit"
@@ -87,7 +100,7 @@
                             x-show="interactive"
                             x-on:click="drop(rule.at)"
                             aria-label="{{ __('filament-warden::ui.conditions.drop') }}"
-                        >&times;</button>
+                        ><x-filament::icon icon="heroicon-o-trash" class="fw-drop-icon" /></button>
                     </div>
                 </template>
             </div>
@@ -109,5 +122,8 @@
 
         <p class="fw-warn">{{ __('filament-warden::ui.conditions.warning') }}</p>
 
-        <code class="fw-preview" x-show="rules().length > 0" x-text="preview()"></code>
+        <div class="fw-rule-preview" x-show="rules().length > 0">
+            <span class="fw-field-label">{{ __('filament-warden::ui.conditions.preview') }}</span>
+            <code class="fw-preview" x-text="preview()"></code>
+        </div>
     </div>

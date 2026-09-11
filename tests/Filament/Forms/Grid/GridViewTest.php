@@ -517,3 +517,17 @@ test('an inherited cell answers, so it counts — and names the role it heard', 
         ->and($cell?->inheritedFrom)->toBe('Inner')
         ->and($cell?->stance)->toBe(Stance::Abstain);
 });
+
+test('pending stances never change the alpine initialization payload', function (): void {
+    $catalog = Catalog::for(Panel::make()->id('scratch')->resources([PostResource::class]));
+    $stored = new RoleState([Post::class => ['view' => 'granted']]);
+    $initial = GridView::for($catalog, $stored, $stored->stances);
+    $pending = GridView::for($catalog, $stored, [Post::class => ['*' => 'forbidden']]);
+
+    // An x-data attribute change reinitializes Alpine after the explanation request.
+    expect($pending->alpine())->toBe($initial->alpine());
+    expect(GridView::for($catalog, new RoleState, [Post::class => ['view' => 'granted']])->alpine())
+        ->toBe(GridView::for($catalog)->alpine())
+        ->and($initial->alpine()['rows'][Post::class]['has']['own'])->toBeTrue()
+        ->and($pending->alpine()['rows'][Post::class]['has']['forbidden'])->toBeFalse();
+});

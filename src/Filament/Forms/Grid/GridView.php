@@ -160,8 +160,9 @@ final readonly class GridView
      * @return array{
      *     order: list<string>,
      *     manage: string,
-     *     rows: array<string, array{label: string, model: string|null, actions: list<string>, read: list<string>, cells: list<array{action: string, name: string|null}>}>,
+     *     rows: array<string, array{label: string, model: string|null, has: array<string, bool>, manage: bool, actions: list<string>, read: list<string>, cells: list<array{action: string, name: string|null}>}>,
      *     tabs: list<array{key: string, rows: list<string>}>,
+     *     axisColumns: array<string, array{label: string, scope: string}>,
      *     wider: array<string, string>,
      *     states: array<string, string>,
      *     filter: array{count: string, empty: string},
@@ -191,6 +192,8 @@ final readonly class GridView
                     // the DOM back.
                     'label' => $row->label,
                     'model' => $row->model,
+                    'has' => $this->storedFilterFlags($row),
+                    'manage' => $row->manage?->isEditable() ?? false,
                     'actions' => $row->editableActions(),
                     'read' => $row->readActions(),
                     'cells' => $row->drawnCells(),
@@ -198,10 +201,19 @@ final readonly class GridView
             }
         }
 
+        $columns = [];
+
+        foreach ($this->groups as $group) {
+            foreach ($group->columns as $column) {
+                $columns[$column->action] = ['label' => $column->label, 'scope' => $group->scope->value];
+            }
+        }
+
         return [
             'order' => Stance::order(),
             'manage' => StateKey::MANAGE,
             'rows' => $rows,
+            'axisColumns' => $columns,
             'tabs' => array_map(static fn (Tab $tab): array => [
                 'key' => $tab->key,
                 'rows' => array_map(static fn (Row $row): string => $row->key, $tab->rows),
@@ -617,6 +629,34 @@ final readonly class GridView
     private static function humanize(string $value): string
     {
         return Str::headline($value);
+    }
+
+    /**
+     * Stored facts, including locked narrowings, keep filtered rows stable while editing.
+     *
+     * @return array{own: bool, forbidden: bool, narrowed: bool, ending: bool, inherited: bool}
+     */
+    private function storedFilterFlags(Row $row): array
+    {
+        $flags = ['own' => false, 'forbidden' => false, 'narrowed' => false, 'ending' => false, 'inherited' => false];
+
+        foreach ($row->allCells() as $cell) {
+            if (! $cell->declared) {
+                continue;
+            }
+
+            $stance = Stance::tryFrom($this->stored['stances'][$row->key][$cell->action] ?? '') ?? Stance::Abstain;
+            $reach = self::reach($row->key, $cell->action, $cell->entry->name ?? $cell->action, $this->stored['stances'], $this->wider, $this->stored['inherited']);
+            $answer = $stance->isWritten() ? $stance : ($reach ?? Stance::Abstain);
+
+            $flags['own'] = $flags['own'] || $stance->isWritten();
+            $flags['forbidden'] = $flags['forbidden'] || $answer === Stance::Forbidden;
+            $flags['narrowed'] = $flags['narrowed'] || $cell->isNarrowed();
+            $flags['ending'] = $flags['ending'] || $cell->until !== null;
+            $flags['inherited'] = $flags['inherited'] || $cell->inheritedFrom !== null;
+        }
+
+        return $flags;
     }
 
     private function state(string $key): string

@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class CreateRole extends CreateRecord
 {
+    public static bool $formActionsAreSticky = true;
+
     protected static string $resource = RoleResource::class;
 
     /**

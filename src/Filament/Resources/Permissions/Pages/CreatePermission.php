@@ -12,6 +12,8 @@ use Illuminate\Validation\ValidationException;
 
 class CreatePermission extends CreateRecord
 {
+    public static bool $formActionsAreSticky = true;
+
     protected static string $resource = PermissionResource::class;
 
     /**
