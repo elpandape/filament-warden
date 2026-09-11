@@ -168,12 +168,13 @@ test('an ownership row on a model that resolves no ownership is a finding', func
     Warden::allow($role)->toOwn(Post::class, 'update');
     Warden::allow($role)->to('viewAny', Post::class);
 
-    // Turned off AFTER the write, which is the honest order: warden's `toOwn()`
-    // asks nothing on the way in, so the row that exists now is exactly the one
-    // a seeder leaves behind on an installation that never registered ownership.
-    // `Context` is a singleton built from config on first resolve, and booting
-    // the panel already resolved it — without this the config change is inert
-    // and the test passes green having changed nothing.
+    // Turned off AFTER the write: warden's `toOwn()` only logs a warning when
+    // ownership does not resolve and writes the row anyway, so the row that
+    // exists now is exactly the one a seeder leaves behind on an installation
+    // that never registered ownership. `Context` is a singleton built from
+    // config on first resolve, and booting the panel already resolved it —
+    // without this the config change is inert and the test passes green having
+    // changed nothing.
     config()->set('warden.ownership.default_attribute');
     app()->forgetInstance(Context::class);
 
@@ -190,8 +191,9 @@ test('an ownership row a model does resolve is not a finding', function (): void
 
     // `title` is a real column on `posts`, which is what makes this resolve:
     // `Ownership::of()` confirms a string resolver against the table before it
-    // says yes. Registered before the write only for readability — `toOwn()`
-    // asks nothing either way.
+    // says yes. Registered before the write only for readability: the shipped
+    // `user_id` default already makes ownership resolvable for `Post`, so
+    // `toOwn()` logs nothing either way and writes the same row.
     Warden::ownedVia(Post::class, 'title');
 
     Warden::allow($role)->toOwn(Post::class, 'update');

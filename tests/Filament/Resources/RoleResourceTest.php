@@ -1969,10 +1969,10 @@ test('a role is one column with its code name under it, not two to read across',
 
     makeRole('editor');
 
-    // Una columna y no dos, como la tabla de permisos ya hacía: la fila se lee
-    // por cómo la gente LLAMA al rol, y el nombre de código va debajo porque es
-    // lo que las concesiones apuntan. Con dos columnas había que mirar dos
-    // sitios para identificar una fila.
+    // One column, not two, as the permissions table already has it: a row is
+    // recognised by what people CALL the role, and the code name goes underneath
+    // because it is the name the application's code asks for. Two columns meant
+    // looking in two places to identify one row.
     livewire(ListRoles::class)
         ->assertSee('Editor')
         ->assertSee('editor')
@@ -1987,10 +1987,10 @@ test('the rules a role has written are counted from one query, not one per row',
     Warden::allow($role)->to('viewAny', roleClass());
     Warden::allow($role)->to('view', roleClass());
 
-    // Lo que ESCRIBIÓ y no lo que contesta: contestar exige resolver el catálogo
-    // entero por rol, que es el coste que esta tabla no puede pagar. Un rol con
-    // el comodín escribe una regla y contesta todas, y esa distinción la cuenta
-    // la rejilla, que es donde se ve.
+    // What the role WROTE, not what it answers: answering means resolving the
+    // whole catalogue per role, which is the cost this table cannot pay. A
+    // wildcard role writes one rule and answers every cell, and that difference
+    // is the grid's to count, where it shows.
     DB::flushQueryLog();
     DB::enableQueryLog();
 
@@ -2004,7 +2004,7 @@ test('the rules a role has written are counted from one query, not one per row',
 
     DB::disableQueryLog();
 
-    // Una agrupada para las reglas y otra para los titulares: dos por página,
-    // nunca dos por fila.
+    // One grouped read for the rules and one for the holders: two per page,
+    // never two per row.
     expect(count($grouped))->toBeLessThanOrEqual(2);
 });

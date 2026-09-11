@@ -1240,9 +1240,10 @@ test('a row is named by its entity, not by the buttons that sit beside it', func
     // is announced with the three button labels glued on: "Roles … read all
     // none", on every row. Seen in an accessibility tree dump, not guessed.
     expect($html)->toContain('aria-labelledby="')
-        // `title` entra entre `scope` y `aria-labelledby` desde que la clase es
-        // opcional: se queda en la fila lleve o no el nombre debajo, así que
-        // apagar `grid.class_names` no pierde el dato, solo lo baja al ratón.
+        // `title` sits between `scope` and `aria-labelledby` because the class
+        // name is optional: the title stays on the row whether or not the name
+        // is drawn underneath, so turning `grid.class_names` off loses nothing,
+        // it only moves the name to the hover.
         ->and($html)->toMatch('/<th\s+class="fw-entity"\s+scope="row"\s+title="[^"]*"\s+aria-labelledby="[^"]+-name [^"]+-model"/');
 
     // The spare-width column is gone: nothing in the head is a column header
@@ -1482,10 +1483,10 @@ test('closing the inspector puts the focus back on the cell that opened it', fun
     // hidden — and a hidden element with focus drops the caret to the top of
     // the document, which on a keyboard means starting the page again.
     //
-    // Both doors, because they are two listeners and only one of them is the
-    // obvious one.
-    // Solo Escape: el botón de cerrar se retiró, así que la vuelta del foco
-    // cuelga de esa única puerta y es la que hay que fijar.
+    // Two doors call `closePanel($root)`: Escape, pinned here, and the close
+    // button, pinned by "the panel takes its track only once a cell is opened,
+    // and gives it back". The focus goes back inside the method, which is what
+    // `cell.focus()` below pins.
     expect($html)->toContain('x-on:keydown.escape="closePanel($root)"');
 
     $script = (string) file_get_contents(dirname(__DIR__, 3).'/resources/js/permission-grid.js');
@@ -1502,11 +1503,11 @@ test('the panel is not on the page until a cell has been picked', function (): v
     // floating strip that appears the moment the form opens, before anybody has
     // clicked anything, telling them to click something. The grid is right
     // there; the invitation is noise.
-    // Las DOS mitades. `selected` sola dejaba el panel en pantalla después de
-    // Escape — `closePanel()` baja `panel` y no toca `selected`, a propósito,
-    // porque la celda conserva su aro. `panel` sola era el estado vacío
-    // flotante de antes. Medido en un navegador: con `selected` sola, Escape no
-    // cerraba nada y ninguna de las nueve puertas lo vio.
+    //
+    // Never `selected` alone: `closePanel()` lowers `panel` and leaves
+    // `selected` alone on purpose, because the cell keeps its ring, so
+    // `selected` alone left the panel on screen after Escape. Seen in a
+    // browser: Escape closed nothing, and no gate caught it.
     expect($html)->toContain('x-show="panel && selected"')
         ->and($html)->not->toContain('x-show="panel || ! selected"');
 });

@@ -329,14 +329,14 @@ test('a role value that is not a key writes nothing through the header action', 
  * risked handing a check right after a write a stale row list) without
  * capping it, unlike every other cost this codebase measures and defers.
  *
- * `Select::getOptionsForJs()` calls `isOptionDisabled()` once per option
- * (`Select.php:155`), and `disableOptionWhen()` here is
- * `! Assignment::offers()`, which used to cost two unmemoised `assignments()`
- * reads per role — `isRestricted()` and `isElsewhere()` each looping it
- * fresh. `assignments()` is memoised now, invalidated by every writer
- * `Assignment` has (`give()`, `take()`, `apply()`), so every one of those 400
- * calls against one account instance shares the one query the first of them
- * makes. Measured against this exact 200-role fixture: 405 before, 3 after.
+ * `Select::getOptionsForJs()` calls `isOptionDisabled()` once per option, and
+ * `disableOptionWhen()` here is `! Assignment::offers()`, which used to cost
+ * two unmemoised `assignments()` reads per role — `isRestricted()` and
+ * `isElsewhere()` each looping it fresh. `assignments()` is memoised now,
+ * invalidated by every writer `Assignment` has (`give()`, `take()`,
+ * `renew()`, `apply()`), so every one of those 400 calls against one account
+ * instance shares the one query the first of them makes. Measured against
+ * this exact 200-role fixture: 405 before, 3 after.
  *
  * Three and not two because this line is two simulated requests, not one —
  * constructing the component and then mounting the action — and Livewire

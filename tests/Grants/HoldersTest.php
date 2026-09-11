@@ -23,8 +23,8 @@ pest()->extend(TestCase::class);
  *
  * The one test below that reads the SAME instance twice across a write
  * depends on that write NOT reaching the memoised answer on its own —
- * `forget()` is what closes that gap, and nothing in `src/` ever calls it,
- * so this file is the only thing that exercises it at all.
+ * `forget()` is what closes that gap. `ViewPermission` calls it after writing
+ * a grant; this file calls it directly.
  */
 function heldPermission(string $name = 'viewAny'): Model
 {

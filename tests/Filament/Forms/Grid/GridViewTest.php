@@ -413,11 +413,10 @@ test('a cell is named the way the grid names it, so a save says the same words',
         Panel::make()->id('labels')->resources([PostResource::class])->pages([Reports::class]),
     );
 
-    // `Posts` y no `posts`: la etiqueta sale de Filament, y de su variante en
-    // mayúscula inicial — la que Filament usa en sus propios títulos. La cruda
-    // devuelve `Str::snake()` en minúscula, así que una entidad CON recurso
-    // salía «users» mientras una SIN recurso caía al `humanize()` y salía
-    // «Activity»: dos grafías en la misma columna.
+    // `Posts`, not `posts`: the label comes from Filament, in the title-case
+    // variant Filament uses in its own headings. The raw one is lowercase, so an
+    // entity WITH a resource came out "users" while one WITHOUT a resource fell
+    // to `humanize()` and came out "Activities": two spellings in one column.
     expect(GridView::cellLabel($catalog, Post::class, 'viewAny'))->toBe('Posts · List')
         ->and(GridView::cellLabel($catalog, Post::class, StateKey::MANAGE))->toBe('Posts · Everything');
 });
