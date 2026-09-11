@@ -24,10 +24,31 @@ what is covered is listed under **Stability** in the README and pinned by
 - Add native View actions to role and permission edit pages.
 - Use a 3:1 desktop layout for record details, with concise holder notes.
 - Remove the role edit impact subtitle and its unused `resources.roles.reach.*` translations.
+- Rewrite the comments in `src/` and `resources/` against the code they describe. 817 comment lines
+  are gone (463 in `src/`, where the share of comment falls from 38.8 % to 36.9 %, and 354 across
+  the script, the stylesheet and the views), and roughly 110 statements the code or warden 3.0
+  contradicts are corrected — among them the reason `Assignment::isHeld()` gives for its guard, two
+  docblocks saying `attach()` leaves warden's cache stale, and an inspector said to print a raw
+  cause nothing reads. Twelve comment blocks written in Spanish are translated, five orphaned
+  docblocks are moved or removed, and pointers to internal notes that do not ship with the package
+  are gone. No token of code changed in `src/` or `resources/`, apart from one import Pint removed
+  once nothing named it.
 
 ### Fixed
 
 - Keep inspector initialization stable while editing permissions so explanation requests do not close it.
+- Give the roles table a View action. `ViewRole` has existed since `v0.4.0`, but `recordActions()`
+  declared only edit and delete, and Filament adds no view action of its own, so the page could
+  only be reached by typing its URL.
+- Correct the permission create screen's subheading, in both languages. It said the audit reads a
+  permission no policy declares as loose until `catalog.custom` names it. It is the other way
+  round: until something declares it the audit reports it — among the red `forgotten` rows when
+  nobody holds it, among the strays when somebody does — and `catalog.custom` can only declare one
+  over no model; one over a model needs a policy method.
+- Correct the test bench's note for a narrowed rule asked about the class, in both languages. It
+  said warden skips the rule and answers that nothing matched, which is true only of a rule limited
+  to what the account owns: a grant with conditions answers that its conditions were not met, and a
+  prohibition with conditions forbids.
 
 ## [3.3.0] - 2026-09-08
 
