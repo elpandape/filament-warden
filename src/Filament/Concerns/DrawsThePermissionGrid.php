@@ -57,13 +57,11 @@ trait DrawsThePermissionGrid
      * Why one cell is the way it is — asked for, never volunteered.
      *
      * `explain()` costs three to five queries with no cache and no batching —
-     * three when the check abstains, five at the ceiling when a role is what
-     * granted it, measured against a query log on warden 2.2.1, which reads
-     * `assigned_roles` once per call where it used to read it twice — so a grid
-     * that explained every cell on render would still spend a hundred on a
-     * screen nobody may ask a question about. It
-     * answers one cell at a time, and `#[Renderless]` keeps the click from
-     * re-rendering the whole page.
+     * three when the check abstains, five when a role is what granted it, the
+     * counts `ExplanationTest` pins — so a grid that explained every cell on
+     * render would pay that for every cell on a screen nobody may ask a
+     * question about. It answers one cell at a time, and `#[Renderless]` keeps
+     * the click from re-rendering the whole page.
      *
      * The answer is about what is STORED — that is all `explain()` can read — so
      * the payload also carries the stance on screen when the two disagree. The
@@ -88,7 +86,7 @@ trait DrawsThePermissionGrid
         // Two guards and not one, because only one of them is a state a person
         // can see: a cell that is not in this catalogue is nobody's click,
         // while a role that has not been saved is the first screen a new admin
-        // opens. One guard answering `[]` for both said nothing to either.
+        // opens, and it gets an answer.
         if (! $entry instanceof Entry) {
             return [];
         }
@@ -292,17 +290,14 @@ trait DrawsThePermissionGrid
      *
      * Not the same question as whether this screen can change it. On the form
      * the two coincide, because the field is disabled for exactly this reason;
-     * on a screen that changes nothing they never coincide, and reading one off
-     * the other announced every role as protected.
+     * on a screen that changes nothing they never do, so one cannot be read
+     * off the other.
      *
-     * The class check is not ceremony. This trait is shared by the two names an
-     * application is invited to write — `PermissionGrid` and
-     * `PermissionGridEntry` — and either may be handed any record at all.
-     * `roles.protected` matches by `name`, so on a record of some other class
-     * the question is either wrong or fatal: wrong for one that happens to have
-     * a column called `name`, fatal under `Model::shouldBeStrict()` for one that
-     * does not. It is asked only of a role, and of the configured class rather
-     * than the shipped one, which is how warden asks it everywhere else.
+     * The class check is not ceremony: this trait backs `PermissionGrid` and
+     * `PermissionGridEntry`, either of which may be handed any record, and
+     * `roles.protected` matches by `name` — wrong on another class that has a
+     * `name` column, fatal under `Model::shouldBeStrict()` on one that does
+     * not. It asks the configured role class, as warden does everywhere else.
      */
     private function protectedRole(): bool
     {

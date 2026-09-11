@@ -94,7 +94,7 @@ final class ConditionBuilder extends Field
     }
 
     /**
-     * What this screen can build a condition from, and every word it says.
+     * What this screen can build a condition from.
      *
      * @return array{
      *     model: class-string<Model>|null,
@@ -130,16 +130,15 @@ final class ConditionBuilder extends Field
     }
 
     /**
-     * A permission with no model behind it can hold conditions, and they can
-     * never be tested: with no instance to compare, `passesConstraints()`
-     * answers the polarity of the pass, so as a grant it never grants and as a
-     * prohibition it always forbids. Nothing upstream refuses the row: this
-     * screen writes `options` through Eloquent, never through the fluent chain,
-     * and that chain's own guard turns away only a permission with neither an
-     * entity nor ownership to test — while this answers null for the wildcard
-     * and for a morph alias that no longer resolves as well, both of which the
-     * guard lets through. This null is what refuses the row here; the ones
-     * already stored are read and left alone.
+     * A permission with no model behind it can hold conditions that can never
+     * be tested: with no instance to compare, `passesConstraints()` answers the
+     * polarity of the pass, so as a grant it never grants and as a prohibition
+     * it always forbids. Nothing upstream refuses the row: this screen writes
+     * `options` through Eloquent, and the fluent chain's guard, in
+     * `GrantsPermissions::reconstrain()`, turns away only a permission with
+     * neither an entity nor ownership — the wildcard and a morph alias that no
+     * longer resolves both get past it. This null is what refuses the row here;
+     * the ones already stored are read and left alone.
      *
      * @return class-string<Model>|null
      */

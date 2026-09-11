@@ -14,8 +14,8 @@ use Throwable;
  * `getRawState()` answers `[]`, `null` or `''` depending on how it was written.
  * All three mean the same thing here: the role says nothing yet.
  *
- * A cell carries three things, so the state carries three maps: the stance, how
- * far it reaches, and when it stops.
+ * A cell carries three things a save can write, so this reads three maps: the
+ * stance, how far it reaches, and when it stops.
  */
 final class State
 {
@@ -56,18 +56,13 @@ final class State
     /**
      * When each cell stops, as the browser hands it back.
      *
-     * An ABSENT map and a map MISSING A KEY are different answers, and the
-     * difference is the same one `narrowings` carries: no map at all means the
-     * screen never offered dates, so the store keeps what it has; a map without
-     * this cell's key means the person cleared it. Reading the second as the
-     * first would make a cleared date impossible to save; reading the first as
-     * the second would drop every date on the grid the first time anybody saved
-     * from a screen with the feature switched off.
+     * A missing map reads as an empty one here. Telling "no dates were offered"
+     * from "every date was cleared" is `PermissionGrid::gridUntils()`'s job.
      *
-     * A value that will not parse is dropped rather than guessed at. The browser
-     * is handed ISO 8601 and hands it back; anything else did not come from this
-     * screen, and inventing a date for it is the one direction that can widen a
-     * grant's life.
+     * A value that will not parse is dropped, never guessed at: the browser is
+     * handed ISO 8601 and hands it back, so anything else did not come from this
+     * screen. Dropped, it reads as a cleared date in `RoleGrants::plan()`, not
+     * as the date the store holds.
      *
      * @return array<string, array<string, CarbonImmutable>>
      */

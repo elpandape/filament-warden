@@ -57,18 +57,16 @@ final class PermissionGrid extends Field
             // one shape, and one place it is worked out.
             $payload = $component->storedState()->toPayload();
 
-            // And a second, untouched copy of it: what this screen was showing
-            // when it opened. The save needs it to tell what this person moved
-            // from what the store moved under them, and it cannot be worked out
-            // later — by then `storedState()` answers about now. It cannot live
-            // on the component either, because Filament rebuilds the schema on
-            // every request. So it travels in the state, which is the only thing
-            // that makes the round trip.
+            // And an untouched copy: what this screen showed when it opened, so
+            // the save can tell what this person moved from what the store
+            // moved under them. It travels in the state because nothing else
+            // makes the round trip: by the save, `storedState()` answers about
+            // the present, and Filament rebuilds the schema on every request.
             //
             // The browser never writes it: `permission-grid.js` rebuilds state
             // with `{ ...this.state, stances: … }`, a spread that carries keys
-            // it knows nothing about. That is load-bearing, not incidental, and
-            // `verify/verify-baseline-survives.mjs` is what says so.
+            // it knows nothing about. That is load-bearing, and
+            // `verify/verify-baseline-survives.mjs` pins it.
             $component->state($payload + ['baseline' => $payload]);
         });
 
@@ -76,11 +74,11 @@ final class PermissionGrid extends Field
             $role = $component->getRecord();
 
             // Filament already skips a disabled field here, because `isSaved()` is
-            // false for one — measured, not assumed. The check stays anyway: a
-            // locked grid is a guarantee about who can take power away, and it
-            // should not rest on how another package derives a flag. The browser's
-            // payload still reaches the field's state even when it is disabled, so
-            // this is the last thing standing between it and the store.
+            // false for one. The check stays anyway: a locked grid is a guarantee
+            // about who can take power away, and it should not rest on how
+            // another package derives a flag. The browser's payload still reaches
+            // the field's state even when it is disabled, so this is the last
+            // thing standing between it and the store.
             if ((! $component->isDisabled()) && $role instanceof Model) {
                 $report = RoleGrants::apply(
                     $role,
@@ -91,9 +89,9 @@ final class PermissionGrid extends Field
                     $component->gridUntils(),
                 );
 
-                // Kept reachable for a page that wants to say something more of
-                // its own — not the only place the fact is said any more, since
-                // the field announces it below.
+                // Bound for the rest of the request, so `savedBody()` — or a
+                // page this package does not own — can say more than the
+                // field's own notices below.
                 app()->instance(SaveReport::class, $report);
 
                 // The screen tells the truth again, on ANY page. `EditRole` gets
@@ -120,7 +118,7 @@ final class PermissionGrid extends Field
      * second toast, because an ordinary save is the common case and two
      * notifications for it would be noise. The exceptional halves stay with
      * `announce()`: only the field can name a cell, and only it knows the ones
-     * a save met or refused.
+     * a save met, refused or left unwritten.
      *
      * Static, and reading the report off the container, because the pages that
      * want it are not the field and Filament rebuilds every component in the
@@ -130,11 +128,9 @@ final class PermissionGrid extends Field
      *
      * Only the counts above zero become clauses, and no clause means no
      * sentence: a save that changed nothing says ABSENT rather than a row of
-     * zeroes. Guarding on `written` as well reads like a second defence and is
-     * not one — every change carries one of the three stances, so the counts
-     * sum to `written` by construction and the two questions have the same
-     * answer. Measured: with that guard in and the clause one out, nothing
-     * goes red; with the clause one in and it out, the sentence is right.
+     * zeroes. A second guard on `written` would defend nothing — every change
+     * carries one of the three stances, so the counts sum to `written` by
+     * construction.
      */
     public static function savedBody(): ?string
     {
@@ -241,9 +237,6 @@ final class PermissionGrid extends Field
         return State::stances($this->getState());
     }
 
-    /**
-     * The application decides, by disabling the field or not.
-     */
     protected function gridInteracts(): bool
     {
         return ! $this->isDisabled();
@@ -254,9 +247,6 @@ final class PermissionGrid extends Field
         return self::stanceIn($this->gridState(), $row, $action);
     }
 
-    /**
-     * The refused cells, in the grid's own words.
-     */
     private function refusedCells(SaveReport $report): string
     {
         return $this->namedCells($report->refused);
@@ -265,10 +255,10 @@ final class PermissionGrid extends Field
     /**
      * A list of cells, in the grid's own words.
      *
-     * Asking the catalogue again is free since it was memoised per panel, and
-     * it is what keeps one cell from having two names on one screen. Shared by
-     * the two lists a save can report, which name cells for different reasons
-     * and must not name them differently.
+     * Asking the catalogue again costs nothing, because it is memoised per
+     * panel, and it is what keeps one cell from having two names on one screen.
+     * Shared by every list a save can report, which name cells for different
+     * reasons and must not name them differently.
      *
      * @param  list<array{row: string, action: string}>  $cells
      */
@@ -353,8 +343,10 @@ final class PermissionGrid extends Field
      *
      * Null and an empty map are different answers here, exactly as they are for
      * the reach: null keeps every date the store holds, and an empty map clears
-     * them all. So a screen with the feature switched off must answer null, or
-     * the first save from it would end every timed grant on the grid.
+     * them all. So a screen with the feature switched off answers null, and the
+     * store keeps its dates whatever the browser sends back. And a map is never
+     * read as null: a cell missing from it is a date the person cleared, and
+     * reading it as kept would make that impossible to save.
      *
      * @return array<string, array<string, CarbonImmutable>>|null
      */

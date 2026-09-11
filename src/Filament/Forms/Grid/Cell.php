@@ -20,11 +20,9 @@ use ElPandaPe\FilamentWarden\Conditions\Narrowing;
  * Red is a rule this screen can read and cannot draw, and it is shown, explained
  * and left exactly as it is.
  *
- * `inheritedFrom` names the role lending this cell its answer. It arrives with
- * the answer already folded into `reach`, because an inherited answer has the
- * same shape as a wider rule — nobody wrote this cell and something else answers
- * it — so every counter that asks what a cell ANSWERS gets it for free. What
- * this carries is only WHICH role, which no counter needs and every reader does.
+ * `inheritedFrom` names the role lending this cell its answer. The answer
+ * itself is already folded into `reach` — `GridView::reach()` says why — so
+ * this carries only WHICH role, which no counter needs and every reader does.
  *
  * `until` is when the grant behind the cell stops. It arrives already judged
  * against the server's clock: a written stance beside a date means the access
@@ -62,8 +60,8 @@ final readonly class Cell
      *
      * A role holding the wildcard has written nothing on any cell — `*` over `*`
      * is not a cell — and every one of them still answers granted. Counting what
-     * was written made the most dangerous role in the installation tally zero
-     * while the whole grid was ticks.
+     * was written would tally the most dangerous role in the installation at
+     * zero while the whole grid is ticks.
      */
     public function answers(): Stance
     {
@@ -75,8 +73,8 @@ final readonly class Cell
      * the dashed mark of a rule this cell never asked for.
      *
      * The browser reaches the same answer, but it does not read it here — it
-     * re-derives it from `RoleState::toPayload()`, which is why a screen that
-     * handed over an empty payload drew empty boxes over correct ones.
+     * re-derives it from `RoleState::toPayload()`, so a screen that hands over
+     * an empty payload draws empty boxes over correct ones.
      */
     public function drawn(): string
     {
@@ -125,10 +123,9 @@ final readonly class Cell
     /**
      * Whether a rule wider than this cell is what answers it.
      *
-     * The template asked this by comparing `drawn()` against the literal
-     * `'broader'`, which put one of this class's own words in a file that is
-     * supposed to decide nothing — and left it to drift silently if the word
-     * ever changed.
+     * Asked here so the template never compares `drawn()` against the literal
+     * `'broader'`: that would put one of this class's own words in a file that
+     * decides nothing, free to drift silently if the word ever changed.
      */
     public function isBroader(): bool
     {
@@ -138,10 +135,10 @@ final readonly class Cell
     /**
      * Whether a person can work this cell at all.
      *
-     * Two conditions, and the template was holding the `&&`: the screen has to
-     * be interactive — an application may have disabled the field, and the
-     * read-only page never is — and the cell has to be one this screen can
-     * draw. Neither half is a rendering decision.
+     * The screen has to be interactive — an application may have disabled the
+     * field, and the read-only page never is — and the cell has to be one this
+     * screen can draw, or a tangled one, which accepts being emptied. Neither
+     * half is a rendering decision.
      */
     public function isOperable(bool $interactive): bool
     {

@@ -14,16 +14,16 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Handing roles to an account, from the account's own screen.
  *
- * A field and not a relation manager, for two measured reasons. A package cannot
- * attach a relation manager to a resource it does not own — `getRelations()` is
- * a concrete static and nothing can write to it — and the actions of one,
- * `AttachAction` and `DetachAction`, **check no policy at all** in Filament 5.7:
- * they are gated only by `isReadOnly()`, which is false on any edit page.
+ * A package cannot put a relation manager on a resource it does not own —
+ * `Resource::getRelations()` is a concrete static nothing else can write to —
+ * so this is a field the application adds to its own form, and
+ * `RolesRelationManager` is the same job as a tab for an application that
+ * registers it. Neither uses Filament's `AttachAction` or `DetachAction`:
+ * `RelationManager::getDefaultActionAuthorizationResponse()` gates both only
+ * on `isReadOnly()`, which is false on any edit page, and checks no policy.
  *
- * And it does not use `->relationship()` either, which is what most packages
- * reach for: that saves through `sync()`, and `sync()`, `attach()` and `detach()`
- * all skip warden's cache bump — a role handed out that way goes on answering
- * the old way, silently. The whole write goes through the fluent API instead.
+ * Nor `->relationship()`, which saves through `sync()`: the whole write goes
+ * through `Assignment` and warden's fluent API, for the reasons on that class.
  *
  * The consuming application adds one line to its own account form:
  *
@@ -84,9 +84,9 @@ final class RoleAssignment extends CheckboxList
                 // does not own can say more than this field's one notification
                 // — the same recipe the grid offers, and it is offered from
                 // both screens or the README cannot describe it as one thing.
-                // Thinner here on purpose: `refused` and `unresolved` are
-                // always empty from this screen, and no stance exists to split
-                // `written` by, so what a caller gets is the two counts.
+                // Thinner here on purpose: every list of cells is always empty
+                // from this screen, and no stance exists to split `written` by,
+                // so what a caller gets is the two counts.
                 app()->instance(SaveReport::class, $report);
 
                 // The screen tells the truth again, and the next save starts from
@@ -179,9 +179,8 @@ final class RoleAssignment extends CheckboxList
             ->title(__('filament-warden::ui.relations.roles.concurrent.kept_title'))
             ->body(trans_choice('filament-warden::ui.relations.roles.concurrent.kept', $report->preserved));
 
-        // `Model::getConnection()` returns the concrete `Connection`, which
-        // declares `afterCommit()`; `Builder::getConnection()` is typed
-        // `ConnectionInterface` and does not.
+        // Reached through a model, as in `PermissionGrid::sendAfterCommit()`,
+        // whose docblock says why.
         (new (Context::resolve()->grantClass()))->getConnection()->afterCommit(
             static function () use ($notification): void {
                 $notification->send();
@@ -216,8 +215,8 @@ final class RoleAssignment extends CheckboxList
      * Each of the three obvious alternatives is wrong somewhere, and each has a
      * test:
      *
-     * - a property named `data` — Filament mounts schemas under five more roots
-     *   besides, so the field is unprotected wherever the name differs;
+     * - a property named `data` — Filament mounts schemas under other roots
+     *   too, so the field is unprotected wherever the name differs;
      * - the ROOT of the state path — an action modal's is `mountedActions`, and
      *   a string key in it breaks `array_key_last()`, `array_pop()` and
      *   `getMountedActionSchemaName()`;

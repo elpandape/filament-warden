@@ -80,15 +80,7 @@ final readonly class GridView
             self::doors('loose', $catalog, [Origin::Custom, Origin::Panel], $state, $narrowings, $untils, $wider, $inherited),
         ];
 
-        // `reach()` below is one of seven decisions this package makes twice —
-        // once here for the server-rendered pass and once in
-        // `resources/js/permission-grid.js`, because a click has to redraw
-        // without a round trip. Most of the others live in `Cell`,
-        // `Conditions/Narrowing` and `Conditions/Rule`; that file's docblock is
-        // the index and names which of ours each of its rules pairs with.
-
-        // An empty tab is a tab that shows nothing: the generation before this
-        // one shipped one, and the grid could open on it.
+        // An empty tab shows nothing, and the grid could open on it.
         return new self(
             tabs: array_values(array_filter($tabs, static fn (Tab $tab): bool => ! $tab->isEmpty())),
             groups: $groups,
@@ -116,11 +108,10 @@ final readonly class GridView
      * How the grid names one cell, for a caller that holds its keys and needs
      * its words.
      *
-     * A save that refuses a cell has to name it, and naming it any other way
-     * would give one cell two vocabularies on one screen — the store's
-     * `deleteAny on warden.role` beside the grid's own `Roles - Delete any`.
-     * The catalogue this reads is memoised per panel, so asking for it again
-     * here costs nothing.
+     * A save that leaves a cell unwritten has to name it, and naming it any
+     * other way would give one cell two vocabularies on one screen — the
+     * store's `deleteAny on warden.role` beside the grid's own
+     * `Roles · Delete any`.
      */
     public static function cellLabel(Catalog $catalog, string $row, string $action): string
     {
@@ -151,11 +142,11 @@ final readonly class GridView
     }
 
     /**
-     * What the browser needs and nothing more: the cycle order, which actions a
-     * granted wildcard reaches on each row, and which rows belong to each tab.
+     * What the browser needs to redraw a click without a round trip.
      *
-     * The words the builder needs travel with it, so the only rule written twice
-     * is the clause cut — and even that one is warden's, not this package's.
+     * The rules it re-derives from this, written in both languages, are indexed
+     * in the docblock of `resources/js/permission-grid.js`, each named beside
+     * its PHP counterpart.
      *
      * @return array{
      *     order: list<string>,
@@ -220,8 +211,9 @@ final readonly class GridView
             ], $this->tabs),
             'wider' => $this->wider,
             'states' => $this->states(),
-            // The one sentence the browser composes rather than looks up whole,
-            // because its numbers only exist once a cell has been clicked.
+            // Composed in the browser rather than looked up whole, because what
+            // fills them changes without a round trip: the filter's term and
+            // count as a person types, the fold's count as a cell is clicked.
             'filter' => [
                 'count' => self::translated('filament-warden::ui.grid.filter.count', ':matched / :total'),
                 'empty' => self::translated('filament-warden::ui.grid.filter.empty', ':term'),
@@ -256,10 +248,10 @@ final readonly class GridView
      *
      * The browser redraws it from the same count the moment a cell is clicked
      * — `stackSummary()` in the script — so this is the half that is right
-     * before alpine boots, and the two are pinned together by a test. The
-     * placeholder substitution is the one this package does in two places on
-     * purpose (§6.15's rule: a rule written twice is named beside its
-     * counterpart, not collapsed).
+     * before alpine boots. The substitution is written in both places on
+     * purpose, each named beside the other rather than collapsed, and both
+     * halves are pinned against the same sentence: this one by the suite,
+     * `stackSummary()` by `verify/verify-filter-keeps-state.mjs`.
      */
     public function summaryOf(Row $row): string
     {
@@ -297,11 +289,8 @@ final readonly class GridView
      * names the cause, and the reader can act on it. The other two ways of
      * arriving at a grid that is not a control — a field the application
      * disabled, a screen that only reads — get one sentence between them,
-     * because the package cannot tell them apart honestly and naming a cause it
-     * cannot check is the defect this answer exists to remove.
-     *
-     * The exclusivity lives here and not in the template for the reason every
-     * other rule does: `src/` is the half the coverage gate measures.
+     * because the package cannot tell them apart honestly, and a cause it
+     * cannot check is not one to name.
      */
     public function isReadOnly(): bool
     {
@@ -309,9 +298,7 @@ final readonly class GridView
     }
 
     /**
-     * The seven drawings, each with the sample the reader compares against. It
-     * lives here and not in the template for the same reason everything else
-     * does: this is the half that is measured.
+     * The drawings, each with the sample the reader compares against.
      *
      * @return list<array{state: string, broader: string|null, void: bool, noted: bool, locked: bool, label: string}>
      */
@@ -333,7 +320,7 @@ final readonly class GridView
      * prints beside its sample. A legend line is a caption with a subject in it
      * — "the role abstains" — and this one is read after the cell's own name and
      * after the row and column headers, so it has to survive being said in a
-     * list. Two of the seven happen to coincide today; welding them would mean a
+     * list. Some of them happen to coincide today; welding them would mean a
      * change to a caption silently changed a control's name.
      *
      * The first three keys are `Stance::order()`, and in that order on purpose:
@@ -352,9 +339,9 @@ final readonly class GridView
             $states[$stance] = $this->state($stance);
         }
 
-        // `expires` and `inherited` joined in 3.0.0. They are marks like the
-        // four beside them — a word said after the cell's own name, in a list —
-        // and not captions, which is why they are here and not in the legend.
+        // `expires` and `inherited` are marks like the four beside them — a
+        // word said after the cell's own name, in a list — and not captions,
+        // which is why they are here and not in the legend.
         foreach (['broader', 'narrowed', 'locked', 'undeclared', 'expires', 'inherited'] as $mark) {
             $states[$mark] = $this->state($mark);
         }
@@ -534,8 +521,9 @@ final readonly class GridView
 
     /**
      * What already answers for a cell nobody wrote: the wildcard on its own row,
-     * or a rule written over every entity at once. Forbidden wins, the same way
-     * it wins when the store resolves the check.
+     * a rule written over every entity at once, or a role this one inherits.
+     * Forbidden wins, the same way it wins when the store resolves the check.
+     * The browser re-derives this in `reached()`; the two move together.
      *
      * @param  array<string, array<string, string>>  $state
      * @param  array<string, string>  $wider
@@ -549,10 +537,10 @@ final readonly class GridView
             $wider[$name] ?? null,
             // An inherited answer is the same SHAPE as a wider rule: nobody
             // wrote this cell and something else answers it. Reading it here
-            // rather than beside it is what keeps the tab counters honest for
-            // free — they count what a cell ANSWERS (§6.11), and the browser
-            // re-derives the same thing from the same payload. What differs is
-            // only WHICH thing answers, and that is `inheritedFrom` on the cell.
+            // rather than beside it keeps the tab counters honest for free —
+            // they count what a cell ANSWERS, and the browser re-derives the
+            // same thing from the same payload. Only WHICH thing answers
+            // differs, and that is `Cell::$inheritedFrom`.
             $inherited[$row][$action]['stance'] ?? null,
         ];
 
@@ -582,16 +570,15 @@ final readonly class GridView
     {
         foreach ($entries as $entry) {
             if ($entry->source !== null && is_subclass_of($entry->source, \Filament\Resources\Resource::class)) {
-                // La variante en MAYÚSCULA INICIAL, que es la que Filament usa
-                // en sus propios títulos. `getPluralModelLabel()` devuelve la
-                // forma cruda —«users», en minúscula, porque sale de
-                // `Str::snake()`— mientras una entidad sin recurso cae al
-                // `humanize()` de abajo y sale «Activity». Dos fuentes, dos
-                // grafías, en la misma columna.
+                // The title-case variant, which is the one Filament titles its
+                // own list pages with. `getPluralModelLabel()` answers the raw
+                // form — "users", lowercase, as `get_model_label()` builds it —
+                // while an entity with no resource falls to `humanize()` below
+                // and reads "Activities": two spellings in one column otherwise.
                 //
-                // Y respeta la decisión de la aplicación: `hasTitleCaseModelLabel()`
-                // apagado devuelve la forma cruda igualmente, así que quien
-                // quiera minúsculas las conserva.
+                // It also keeps the application's choice: with
+                // `hasTitleCaseModelLabel()` off it answers the raw form anyway,
+                // so an application that wants lowercase keeps it.
                 return $entry->source::getTitleCasePluralModelLabel();
             }
         }
@@ -616,11 +603,6 @@ final readonly class GridView
         return self::translated('filament-warden::ui.actions.'.$action, $action);
     }
 
-    /**
-     * Falls back to the humanised value when nothing translates it, because the
-     * catalogue is derived from the application's policies and no shipped file
-     * can list their names in advance.
-     */
     private static function translated(string $key, string $fallback): string
     {
         return Line::orHumanize($key, $fallback);
@@ -632,7 +614,10 @@ final readonly class GridView
     }
 
     /**
-     * Stored facts, including locked narrowings, keep filtered rows stable while editing.
+     * The facts the row filter matches on, read from the store rather than the
+     * screen so a row does not leave a filter while its cells are being edited.
+     * `inherited` is the exception: it follows `Cell::$inheritedFrom`, which a
+     * cell written on screen clears.
      *
      * @return array{own: bool, forbidden: bool, narrowed: bool, ending: bool, inherited: bool}
      */

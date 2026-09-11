@@ -43,8 +43,9 @@ final readonly class Row
      * and with one stance more: a tab counts granted, this counts granted and
      * forbidden, because a collapsed entity hides a prohibition just as well
      * as it hides a grant. The browser re-derives it in `answered()` — a click
-     * has to redraw the number without asking the server — and a test pins the
-     * two together.
+     * has to redraw the number without asking the server — and both are pinned
+     * against the same sentence, through `GridView::summaryOf()` and the
+     * script's `stackSummary()`.
      *
      * @return array{granted: int, forbidden: int, total: int}
      */
@@ -72,8 +73,10 @@ final readonly class Row
     }
 
     /**
-     * The actions the browser is allowed to cycle on this row, which is also
-     * what a granted wildcard reaches.
+     * The actions the decision buttons and the `all` and `clear` presets may
+     * write on this row: the script's `decisionEnabled()` and `apply()` read
+     * this list. A tangled cell is not in it, though a click still cycles one,
+     * and the save writes only its clearing.
      *
      * @return list<string>
      */
@@ -117,8 +120,8 @@ final readonly class Row
      * Every cell the browser draws on this row, with the permission name each one
      * stands for — which is what a rule written over every entity is keyed by.
      *
-     * The tally counts over this and not over what was written: a cell nobody
-     * wrote still answers when a wildcard reaches it.
+     * The tally counts over this and not over what was written — see
+     * `Cell::answers()`.
      *
      * @return list<array{action: string, name: string|null}>
      */

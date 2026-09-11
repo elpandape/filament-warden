@@ -20,12 +20,8 @@ enum Stance: string
      * The cycle a cell walks on click, and backwards on shift-click.
      *
      * Declared once, here, and handed to the browser in the component's own
-     * payload: the script reads this order, it never carries one of its own.
-     * The generation before this one implemented the same rule twice, in two
-     * languages, and the two could disagree without a test noticing. This one
-     * did it twice in ONE language: a `next()`/`previous()` pair sat directly
-     * below this method, spelling the same cycle out again, called by nothing
-     * but its own test. They are gone; the order is here.
+     * payload: the script reads this order and never carries one of its own,
+     * because two copies of one cycle can disagree without a test noticing.
      *
      * @return list<string>
      */
