@@ -199,7 +199,9 @@ on where warden was:
 composer update elpandape/warden elpandape/filament-warden
 
 # 2. Coming from warden 3.0.0 only: once, after deploying. It deletes the grants with
-#    an authority type and no key that 3.0.0 could write, which grant nobody since 3.0.1.
+#    an authority type and no key that 3.0.0 could write, which grant nobody since 3.0.1,
+#    and — like every `warden:clean` — every permission no grant points at. Its
+#    `--dry-run` lists only the permissions: it says nothing about the stranded rows.
 php artisan warden:clean --stranded
 ```
 
