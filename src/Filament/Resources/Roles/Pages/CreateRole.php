@@ -7,6 +7,7 @@ namespace ElPandaPe\FilamentWarden\Filament\Resources\Roles\Pages;
 use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Grants\Hierarchy;
+use ElPandaPe\Warden\Facades\Warden;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
@@ -16,6 +17,17 @@ class CreateRole extends CreateRecord
     public static bool $formActionsAreSticky = true;
 
     protected static string $resource = RoleResource::class;
+
+    /**
+     * One creation, one warden operation, for the reason `EditRole::save()`
+     * gives: the role, its grid and its inheritance reach warden separately.
+     */
+    public function create(bool $another = false): void
+    {
+        Warden::operation(function () use ($another): void {
+            parent::create($another);
+        });
+    }
 
     /**
      * The inheritance the form offered, written after the role exists.

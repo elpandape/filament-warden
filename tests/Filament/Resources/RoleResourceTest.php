@@ -319,6 +319,53 @@ test('a role is created with its name and its title', function (): void {
     expect(roleClass()::query()->where('name', 'auditor')->value('title'))->toBe('Auditor');
 });
 
+test('one save of the edit screen is one operation, the record included', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $role = makeRole();
+
+    // The title reaches warden as a catalog write through the model and the
+    // cell as a call, and warden names an operation for each unless the page
+    // runs them inside one.
+    $operations = operationsDuring(static function () use ($role): void {
+        livewire(EditRole::class, ['record' => $role->getKey()])
+            ->fillForm([
+                'title' => 'Editors',
+                'permissions' => ['stances' => [roleClass() => ['viewAny' => 'granted']]],
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+    });
+
+    expect(count($operations))->toBeGreaterThan(1)
+        ->and($operations)->not->toContain(null)
+        ->and(array_unique($operations))->toHaveCount(1);
+});
+
+test('creating a role is one operation, its grid included', function (): void {
+    $user = signIn();
+    Warden::allow($user)->to('viewAny', roleClass());
+    Warden::allow($user)->to('create', roleClass());
+    Warden::allow($user)->to('update', roleClass());
+
+    $operations = operationsDuring(static function (): void {
+        livewire(CreateRole::class)
+            ->fillForm([
+                'name' => 'auditor',
+                'title' => 'Auditor',
+                'permissions' => ['stances' => [roleClass() => ['viewAny' => 'granted']]],
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+    });
+
+    expect(count($operations))->toBeGreaterThan(1)
+        ->and($operations)->not->toContain(null)
+        ->and(array_unique($operations))->toHaveCount(1);
+});
+
 test('the listing carries the way in, and only for an authority that may create', function (): void {
     $user = signIn();
     Warden::allow($user)->to('viewAny', roleClass());

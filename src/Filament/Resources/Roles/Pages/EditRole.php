@@ -8,6 +8,7 @@ use ElPandaPe\FilamentWarden\Filament\Forms\PermissionGrid;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\RoleResource;
 use ElPandaPe\FilamentWarden\Filament\Resources\Roles\Tables\RolesTable;
 use ElPandaPe\FilamentWarden\Grants\Hierarchy;
+use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
@@ -20,6 +21,21 @@ class EditRole extends EditRecord
     public static bool $formActionsAreSticky = true;
 
     protected static string $resource = RoleResource::class;
+
+    /**
+     * One save, one warden operation.
+     *
+     * The record's own write, the grid and the inheritance each reach warden on
+     * their own — the first as a catalog write through the model, the others as
+     * calls — and warden names an operation for each. Inside one, they share
+     * its id, so an audit log reads the save as the one act it was.
+     */
+    public function save(bool $shouldRedirect = true, bool $shouldSendSavedNotification = true): void
+    {
+        Warden::operation(function () use ($shouldRedirect, $shouldSendSavedNotification): void {
+            parent::save($shouldRedirect, $shouldSendSavedNotification);
+        });
+    }
 
     /**
      * The `visible()` is the guarantee, not decoration: a delete button asks
