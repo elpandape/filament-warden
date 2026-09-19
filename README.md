@@ -81,7 +81,11 @@
 | PHP | `^8.4` |
 | Laravel | `^13.0` |
 | Filament | `^5.7` |
-| elpandape/warden | `^2.2.2` |
+| elpandape/warden | `^3.2` |
+
+> ⚠️ Warden lets an application swap its role and permission models (`warden.models.*`). A swapped
+> model that uses `SoftDeletes` is **not supported**: no screen offers restore or force delete, and
+> a grid save that asks for a rule warden keeps in the trash fails instead of saving something wider.
 
 ---
 
@@ -182,6 +186,29 @@ The tag matters. `warden-migrations` publishes `create_warden_tables`, whose `Sc
 `php artisan filament-warden:audit --check` reports an unmigrated catalogue as its own finding and exits 1, so a deploy pipeline goes red before the deploy rather than after it. That bucket stays permanently empty afterwards, which is what it is supposed to do.
 
 **Existing titles are not rewritten by the upgrade itself.** Warden 2.0 changed how it generates a title — `viewAny` on `Post` is `View any posts` now, where 1.x wrote `ViewAny posts` — and neither warden nor this package retitles rows in place when you upgrade, so an upgraded catalogue shows mixed wording until somebody converges it. `php artisan warden:retitle` is what does that, since warden 2.1: it rewrites a title an older warden generated, leaves a title a person typed alone, and leaves a `null` null. `--dry-run` reports the count first. Nothing here is urgent — what this package guarantees meanwhile is that it still RECOGNISES the old wording, asking warden which titles warden has ever written, so renaming a permission still regenerates it whichever generation the row carries.
+
+### Upgrading to 3.5 from 3.4
+
+`filament-warden 3.5` requires `elpandape/warden ^3.2`, so `composer update` brings warden forward
+too. Nothing in this package moves: no database, no config keys, no assets, no change to the
+`{stances, narrowing, until, inherited, baseline}` envelope. What to run is warden's, and it depends
+on where warden was:
+
+```bash
+# 1. Both packages together
+composer update elpandape/warden elpandape/filament-warden
+
+# 2. Coming from warden 3.0.0 only: once, after deploying. It deletes the grants with
+#    an authority type and no key that 3.0.0 could write, which grant nobody since 3.0.1.
+php artisan warden:clean --stranded
+```
+
+If any listener of warden's events is queued, read warden's
+[UPGRADE.md](https://github.com/elpandape/warden/blob/main/UPGRADE.md) first: jobs queued under an
+older warden have to drain before the new one reads them. Warden's cache starts cold once.
+
+What an audit log sees changes: every event warden dispatches during one save of these screens now
+carries the same `$operation` — see [Reacting to a Save](#reacting-to-a-save).
 
 ### Upgrading to 3.3 from 3.2
 
@@ -826,7 +853,7 @@ It writes nothing, and reports eleven things:
 - **permissions restricted to what the holder owns, on a model that resolves no ownership** — they grant nothing and forbid nothing: there is no attribute to compare, and the query side fails closed. `Warden::ownedVia()` is what registers it, or the row comes out;
 - **warden's catalogue still in its pre-2.0 shape** — no `identity_key` column, so the first permission anybody saves fails. It turns `--check` red on purpose and stays permanently empty once migrated, which is what it is for: a deploy pipeline should learn this before the deploy, not after;
 - **config entries this package reads and cannot use** — each one was dropped in silence, so what is missing from a screen never said why;
-- **grants and role assignments whose authority no longer exists** — *informational, like the permissions-the-catalogue-declares-that-no-grant-points-at bucket above (third bullet): this one never turns `--check` red either*. Warden's schema puts a foreign key on `assigned_roles.role_id` and on `grants.permission_id`, never on the two columns that name a grant's authority, so no database cascade reaches them. Warden 2.0 sweeps some: `CacheInvalidations::markCascade()` deletes the grants of a deleted role, but only when the model's class is exactly the configured role class — an account, a role subclass, and anything deleted by query builder or raw SQL are all left behind, because it hangs off `eloquent.deleted`. `warden:clean --stranded` sweeps the rest — both pivots since warden 3.0, because nesting let `assigned_roles` hold an edge whose authority is a role — and it is opt-in. This bucket reports what is left over. Reported once per stranded authority — the deduplicated `type:key` a whole cluster of grants can share — and once per authority type this installation cannot even resolve.
+- **grants and role assignments whose authority no longer exists** — *informational, like the permissions-the-catalogue-declares-that-no-grant-points-at bucket above (third bullet): this one never turns `--check` red either*. Warden's schema puts a foreign key on `assigned_roles.role_id` and on `grants.permission_id`, never on the two columns that name a grant's authority, so no database cascade reaches them. Warden sweeps some: deleting a role through its model deletes the grants and the role assignments that role held, but only when the model's class is exactly the configured role class — an account, a role subclass, and anything deleted by query builder or raw SQL are all left behind, because the sweep runs from the model's own `deleted` hook. `warden:clean --stranded` sweeps the rest — both pivots since warden 3.0, because nesting let `assigned_roles` hold an edge whose authority is a role — and it is opt-in. This bucket reports what is left over. Reported once per stranded authority — the deduplicated `type:key` a whole cluster of grants can share — and once per authority type this installation cannot even resolve.
 
 `--check` returns 1 for every finding above except the two informational ones.
 
@@ -924,6 +951,19 @@ Event::listen(\ElPandaPe\Warden\Events\PermissionGranted::class, function ($even
 ```
 
 They are coarser than a cell: one event names every permission written in the same group, and a cell this screen *refused* to write fires nothing at all, because nothing was written.
+
+**Which save it was — `$operation`.** Every warden event carries `$operation`, one id per act. A save of the grid, of an account's roles, of a role's inheritance, and a flip of a direct grant each run as one operation, so every event that save dispatched shares it. The role screens go one step further: `EditRole` and `CreateRole` run the whole save as one, so the role's own write lands in the same operation as its grid and its inheritance.
+
+A form of your own that carries one of these fields gets the field's writes as one operation, and the record's own write as another. To join them, run your page's save inside `Warden::operation()`:
+
+```php
+public function save(bool $shouldRedirect = true, bool $shouldSendSavedNotification = true): void
+{
+    Warden::operation(function () use ($shouldRedirect, $shouldSendSavedNotification): void {
+        parent::save($shouldRedirect, $shouldSendSavedNotification);
+    });
+}
+```
 
 **What the save did — the report in the container.** Both screens leave a `Grants\SaveReport` bound for the rest of the request, so a page of your own can say more than the field's own notification:
 
