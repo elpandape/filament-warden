@@ -11,24 +11,29 @@ use ElPandaPe\FilamentWarden\Filament\Forms\Grid\Stance;
 use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\FilamentWarden\Grants\RoleGrants;
 use ElPandaPe\FilamentWarden\Grants\RoleState;
+use ElPandaPe\FilamentWarden\Grants\SaveReport;
 use ElPandaPe\FilamentWarden\Support\Access;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Pages\Reports;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Filament\Resources\PostResource;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
+use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\TrashablePermission;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Vault;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Events\GrantingPermission;
 use ElPandaPe\Warden\Events\PermissionGranted;
+use ElPandaPe\Warden\Exceptions\TrashedCatalogRow;
 use ElPandaPe\Warden\Facades\Warden;
 use ElPandaPe\Warden\Support\PermissionIdentity;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * `StateKey::MANAGE` and warden's `'*'` are one value wearing two hats.
@@ -1802,6 +1807,39 @@ test('a rule that can never be true is not written, and does not leave a plain g
         ->and($report->written)->toBe(0)
         ->and(grantCount())->toBe(0)
         ->and(Access::granted($user, 'view', $post))->toBeFalse();
+});
+
+test('a rule whose twin is in the trash fails the save instead of widening it', function (): void {
+    Schema::table(Context::resolve()->table('permissions'), static function (Blueprint $table): void {
+        $table->softDeletes();
+    });
+    config()->set('warden.models.permission', TrashablePermission::class);
+    app()->forgetInstance(Context::class);
+
+    $role = makeRole();
+    $user = makeUser();
+    Warden::assign($role)->to($user);
+
+    $alpha = Post::query()->create(['title' => 'alpha']);
+    $beta = Post::query()->create(['title' => 'beta']);
+
+    $narrowTo = static fn (string $title): SaveReport => RoleGrants::apply($role, gridCatalog(), [Post::class => ['view' => 'granted']], [
+        Post::class => ['view' => conditionOn('title', $title)],
+    ]);
+
+    $narrowTo('alpha');
+    $alphaTwin = latestPermission('view');
+    $narrowTo('beta');
+
+    // Moving the rule on leaves the `alpha` twin in the catalogue with no grant,
+    // which is what `warden:clean` sends to the trash of a model that has one.
+    // Asking for that rule again makes warden refuse AFTER the plain grant is
+    // written: swallowed, the cell would read as every row.
+    $alphaTwin->delete();
+
+    expect(static fn (): SaveReport => $narrowTo('alpha'))->toThrow(TrashedCatalogRow::class)
+        ->and(Access::granted($user, 'view', $beta))->toBeTrue()
+        ->and(Access::granted($user, 'view', $alpha))->toBeFalse();
 });
 
 test('a stored rule that can never be true is drawn locked, not offered for editing', function (): void {

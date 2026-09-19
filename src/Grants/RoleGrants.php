@@ -18,6 +18,7 @@ use ElPandaPe\FilamentWarden\Filament\Forms\Grid\StateKey;
 use ElPandaPe\Warden\Actions\GrantsPermissions;
 use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Exceptions\ConfigurationException;
+use ElPandaPe\Warden\Exceptions\TrashedCatalogRow;
 use ElPandaPe\Warden\Facades\Warden;
 use ElPandaPe\Warden\Support\Config as WardenConfig;
 use ElPandaPe\Warden\Tenancy\Tenancy;
@@ -851,7 +852,15 @@ final class RoleGrants
             foreach ($change->narrowing->rules as $index => $rule) {
                 $rule->applyTo($chain, $index === 0);
             }
-        } catch (ConfigurationException) {
+        } catch (ConfigurationException $configurationException) {
+            // A rule whose twin is in the trash is refused the same way, after
+            // the plain grant, and it is the one refusal thrown on: this package
+            // can neither restore nor force-delete the twin, and the transaction
+            // `apply()` opened takes the plain grant back with the save.
+            if ($configurationException instanceof TrashedCatalogRow) {
+                throw $configurationException;
+            }
+
             // TWO causes reach here, and neither is an error of this
             // screen. A narrowing needs a grant in front of it, and an
             // application listening to `GrantingPermission` can veto the one
