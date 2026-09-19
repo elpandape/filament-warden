@@ -7,6 +7,7 @@ use ElPandaPe\Warden\Context;
 use ElPandaPe\Warden\Facades\Warden;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 
 /*
@@ -132,6 +133,32 @@ function signedIn(): Model
     $user = Auth::user();
 
     return $user instanceof Model ? $user : makeUser();
+}
+
+/**
+ * The operation of every event warden dispatched while `$work` ran, in order.
+ *
+ * A wildcard, not a list of classes: the claim these tests make is that nothing
+ * warden announces during one save escapes its operation, and a list would only
+ * check the events somebody thought of. Listened to, never faked, because
+ * `Event::fake()` without a list also stops warden's own model hooks.
+ *
+ * @return list<string|null>
+ */
+function operationsDuring(callable $work): array
+{
+    $seen = [];
+
+    Event::listen('ElPandaPe\\Warden\\Events\\*', static function (string $event, array $payload) use (&$seen): void {
+        $fired = $payload[0] ?? null;
+        $operation = is_object($fired) && property_exists($fired, 'operation') ? $fired->operation : null;
+
+        $seen[] = is_string($operation) ? $operation : null;
+    });
+
+    $work();
+
+    return $seen;
 }
 
 /**

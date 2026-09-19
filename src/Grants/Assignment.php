@@ -294,8 +294,9 @@ final class Assignment
         $preserved = 0;
 
         // On warden's own connection, for the reason `RoleGrants::apply()`
-        // gives: a transaction anywhere else wraps none of these writes.
-        DB::connection(Context::resolve()->connection())->transaction(static function () use ($account, $wanted, $held, $was, &$written, &$preserved): void {
+        // gives: a transaction anywhere else wraps none of these writes. And in
+        // one warden operation, for the other reason it gives.
+        $save = static function () use ($account, $wanted, $held, $was, &$written, &$preserved): void {
             foreach (self::byKey() as $key => $role) {
                 if (! self::mayHandOut($role)
                     || self::isRestricted($account, $key)
@@ -337,6 +338,10 @@ final class Assignment
 
                 Warden::retract($role)->from($account);
             }
+        };
+
+        Warden::operation(static function () use ($save): void {
+            DB::connection(Context::resolve()->connection())->transaction($save);
         });
 
         // Cleared once the transaction commits, not per write: every

@@ -112,24 +112,28 @@ final readonly class Hierarchy
 
         $context = Context::resolve();
 
-        foreach ($context->roleClass()::query()->whereKey([...$keys, ...$held])->get() as $inner) {
-            $key = $inner->getKey();
+        // One warden operation for the whole edit, for the reason
+        // `RoleGrants::apply()` gives.
+        Warden::operation(static function () use ($context, $role, $keys, $held): void {
+            foreach ($context->roleClass()::query()->whereKey([...$keys, ...$held])->get() as $inner) {
+                $key = $inner->getKey();
 
-            if (! is_int($key) && ! is_string($key)) {
-                continue; // @codeCoverageIgnore
+                if (! is_int($key) && ! is_string($key)) {
+                    continue; // @codeCoverageIgnore
+                }
+
+                $shouldHold = in_array($key, $keys, true);
+                $doesHold = in_array($key, $held, true);
+
+                if ($shouldHold && ! $doesHold) {
+                    Warden::assign($inner)->to($role);
+                }
+
+                if ($doesHold && ! $shouldHold) {
+                    Warden::retract($inner)->from($role);
+                }
             }
-
-            $shouldHold = in_array($key, $keys, true);
-            $doesHold = in_array($key, $held, true);
-
-            if ($shouldHold && ! $doesHold) {
-                Warden::assign($inner)->to($role);
-            }
-
-            if ($doesHold && ! $shouldHold) {
-                Warden::retract($inner)->from($role);
-            }
-        }
+        });
     }
 
     /**

@@ -1842,6 +1842,19 @@ test('a rule whose twin is in the trash fails the save instead of widening it', 
         ->and(Access::granted($user, 'view', $alpha))->toBeFalse();
 });
 
+test('a grid save is one operation, however many calls it takes', function (): void {
+    $role = makeRole();
+
+    $operations = operationsDuring(static fn (): SaveReport => RoleGrants::apply($role, gridCatalog(), [Post::class => [
+        'viewAny' => 'granted',
+        'delete' => 'forbidden',
+    ]]));
+
+    expect(count($operations))->toBeGreaterThan(1)
+        ->and($operations)->not->toContain(null)
+        ->and(array_unique($operations))->toHaveCount(1);
+});
+
 test('a stored rule that can never be true is drawn locked, not offered for editing', function (): void {
     $role = makeRole();
 

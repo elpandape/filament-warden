@@ -243,6 +243,23 @@ test('taking a role away takes it away, and the store stops answering', function
         ->and(assignmentCount())->toBe(0);
 });
 
+test('handing one role out and taking another back in one save is one operation', function (): void {
+    signInAsHandOut();
+
+    $account = makeUser();
+    $given = makeRole('editor');
+    $taken = makeRole('auditor');
+    Warden::assign($taken)->to($account);
+
+    $operations = operationsDuring(static function () use ($account, $given): void {
+        Assignment::apply($account, [roleKey($given)]);
+    });
+
+    expect(count($operations))->toBeGreaterThan(1)
+        ->and($operations)->not->toContain(null)
+        ->and(array_unique($operations))->toHaveCount(1);
+});
+
 test('a payload naming a role nobody may hand out writes nothing', function (): void {
     signIn();
 

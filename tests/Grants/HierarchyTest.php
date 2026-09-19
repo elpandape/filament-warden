@@ -99,3 +99,20 @@ test('a screen that never offered the field keeps every edge the store holds', f
 
     expect(Hierarchy::of($outer)->direct)->toBeEmpty();
 });
+
+test('one save of the inheritance is one operation', function (): void {
+    config()->set('warden.roles.nested', true);
+
+    $outer = makeRole('outer');
+    $given = makeRole('given');
+    $taken = makeRole('taken');
+    Warden::assign($taken)->to($outer);
+
+    $operations = operationsDuring(static function () use ($outer, $given): void {
+        Hierarchy::apply($outer, [$given->getKey()]);
+    });
+
+    expect(count($operations))->toBeGreaterThan(1)
+        ->and($operations)->not->toContain(null)
+        ->and(array_unique($operations))->toHaveCount(1);
+});

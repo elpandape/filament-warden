@@ -217,9 +217,16 @@ final class RoleGrants
         // transaction, so the UNCONSTRAINED grant would commit — authorizing
         // every instance — before `reconstrain()` opened anything. A plain
         // grant or revoke never reaches `reconstrain()` at all.
-        DB::connection(Context::resolve()->connection())->transaction(static function () use ($role, $changes): void {
-            self::revoke($role, $changes);
-            self::grant($role, $changes);
+        //
+        // And one warden operation around it, so an audit log reads the save
+        // as the one act it was: warden names an operation per public call, and
+        // a save makes a call per group of cells. The operation opens no
+        // transaction and holds nothing back; the id is all it changes.
+        Warden::operation(static function () use ($role, $changes): void {
+            DB::connection(Context::resolve()->connection())->transaction(static function () use ($role, $changes): void {
+                self::revoke($role, $changes);
+                self::grant($role, $changes);
+            });
         });
 
         return $report;

@@ -203,15 +203,19 @@ final readonly class DirectGrants
             return false;
         }
 
-        if ($forbidding) {
-            Warden::disallow($account)->to($permission);
-            Warden::forbid($account)->to($permission);
+        // One warden operation for the pair, so a log reads a flip as the one
+        // act it was rather than as a removal and a write.
+        Warden::operation(static function () use ($account, $permission, $forbidding, $until): void {
+            if ($forbidding) {
+                Warden::disallow($account)->to($permission);
+                Warden::forbid($account)->to($permission);
 
-            return true;
-        }
+                return;
+            }
 
-        Warden::unforbid($account)->to($permission);
-        Warden::allow($account)->until($until)->to($permission);
+            Warden::unforbid($account)->to($permission);
+            Warden::allow($account)->until($until)->to($permission);
+        });
 
         return true;
     }
@@ -231,8 +235,10 @@ final readonly class DirectGrants
             return false;
         }
 
-        Warden::disallow($account)->to($permission);
-        Warden::unforbid($account)->to($permission);
+        Warden::operation(static function () use ($account, $permission): void {
+            Warden::disallow($account)->to($permission);
+            Warden::unforbid($account)->to($permission);
+        });
 
         return ! Context::resolve()->grantClass()::query()
             ->withoutGlobalScopes()

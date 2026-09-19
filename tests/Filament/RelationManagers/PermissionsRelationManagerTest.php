@@ -219,6 +219,42 @@ test('a prohibition is taken back by the same button', function (): void {
     expect(grantRows($account))->toBe(0);
 });
 
+test('flipping a direct grant into a prohibition is one operation', function (): void {
+    signInAsGrantManager();
+
+    $account = makeUser('Holder');
+    $row = makePermission('export-reports');
+    DirectGrants::write($account, $row, false, null);
+
+    $operations = operationsDuring(static function () use ($account, $row): void {
+        DirectGrants::write($account, $row, true, null);
+    });
+
+    expect(count($operations))->toBeGreaterThan(1)
+        ->and($operations)->not->toContain(null)
+        ->and(array_unique($operations))->toHaveCount(1);
+});
+
+test('taking back a permission held in both polarities is one operation', function (): void {
+    signInAsGrantManager();
+
+    $account = makeUser('Holder');
+    $row = makePermission('export-reports');
+
+    // `write()` never leaves both rows; warden's own API does, and `revoke()`
+    // sends both removals because it cannot know which one it will find.
+    Warden::allow($account)->to($row);
+    Warden::forbid($account)->to($row);
+
+    $operations = operationsDuring(static function () use ($account, $row): void {
+        DirectGrants::revoke($account, $row);
+    });
+
+    expect(count($operations))->toBeGreaterThan(1)
+        ->and($operations)->not->toContain(null)
+        ->and(array_unique($operations))->toHaveCount(1);
+});
+
 test('an authority without update over permissions writes nothing', function (): void {
     config()->set('filament-warden.permissions.direct', true);
 
