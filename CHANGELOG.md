@@ -8,6 +8,45 @@ Before `1.0.0` the public API changed between minor versions. From `1.0.0` on,
 what is covered is listed under **Stability** in the README and pinned by
 `tests/FrozenTest.php`.
 
+## [3.5.0] - 2026-09-18
+
+Built on warden 3.2: one save of these screens is one warden operation, a rule warden keeps in the
+trash fails a save instead of widening it, and sentences warden 3.1 made false are corrected.
+
+### Changed
+
+- Require `elpandape/warden ^3.2`. See **Upgrading to 3.5 from 3.4** in the README: coming from
+  warden 3.0.0, `php artisan warden:clean --stranded` runs once.
+- Run each save as one warden operation. A save of the permission grid, of an account's roles or of
+  a role's inheritance, and a flip or removal of a direct grant, each give every event they dispatch
+  the same `$operation`; `EditRole::save()` and `CreateRole::create()` run the whole page save as
+  one, the role's own write included. An audit log that groups by `$operation` reads each save as
+  the one act it was. Nothing else moves: an operation opens no transaction and holds nothing back.
+
+### Fixed
+
+- Stop a grid save from widening a rule whose twin is in the trash. With a swapped permission model
+  that uses `SoftDeletes`, warden 3.2 refuses to recreate a narrowed rule that sits in its trash, and
+  refuses after the unconditional grant is already written. The grid took that refusal for one it
+  may shrug off and kept the grant, so the cell read as every row and the save reported success. The
+  refusal now fails the save, which rolls back. Such a model stays unsupported.
+- Stop the role delete warning saying the assignments go "with no trace afterwards", in both
+  languages. Since warden 3.1 deleting a role dispatches a `RoleRetracted` for every holder.
+- List the right warden requirement in the README, which still said `^2.2.2`.
+- Correct comments that warden 3.0.1 and 3.1 made false: what warden sweeps when a role is deleted,
+  what `nestedRoles()` allows, why the inheritance is never synced, and what announcing a
+  permission's cascade reads.
+
+### Not included
+
+- **A grant with an authority type and no key still counts as everyone** on the permissions screen —
+  in its holders, its delete rule and its rename lock. Warden reads such a row as nobody's since
+  3.0.1, and `warden:clean --stranded` deletes it.
+- **A role or permission model with `SoftDeletes`.** Granting from the grid a permission whose plain
+  row is in the trash still ends in warden's `TrashedCatalogRow`, as an error page.
+- **What 3.4.0 left open** — the inspector's live region, the overridden stylesheet rules, the
+  pending review's date comparison and the two strict role-key comparisons — is still open.
+
 ## [3.4.0] - 2026-09-11
 
 The grid filters, searches and shows what a save will change before it happens; every comment in
