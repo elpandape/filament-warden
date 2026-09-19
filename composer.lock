@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "bfa4d01107e13497a124ed639010bfa4",
+    "content-hash": "e630dfd828156b3c0a7816decd340db9",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -996,23 +996,24 @@
         },
         {
             "name": "elpandape/warden",
-            "version": "v3.0.0",
+            "version": "v3.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/elpandape/warden.git",
-                "reference": "351756b4a460dd37c4585d96a77bfe28e4351432"
+                "reference": "1abd918a954bc04d44630e3d3aead85b4c1fbcf0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/elpandape/warden/zipball/351756b4a460dd37c4585d96a77bfe28e4351432",
-                "reference": "351756b4a460dd37c4585d96a77bfe28e4351432",
+                "url": "https://api.github.com/repos/elpandape/warden/zipball/1abd918a954bc04d44630e3d3aead85b4c1fbcf0",
+                "reference": "1abd918a954bc04d44630e3d3aead85b4c1fbcf0",
                 "shasum": ""
             },
             "require": {
                 "illuminate/auth": "^13.0",
                 "illuminate/contracts": "^13.0",
                 "illuminate/database": "^13.0",
-                "php": "^8.4"
+                "php": "^8.4",
+                "symfony/uid": "^7.4 || ^8.0"
             },
             "conflict": {
                 "elpandape/bouncer": "*",
@@ -1076,7 +1077,7 @@
                 "issues": "https://github.com/elpandape/warden/issues",
                 "source": "https://github.com/elpandape/warden"
             },
-            "time": "2026-09-07T18:36:52+00:00"
+            "time": "2026-09-19T01:40:11+00:00"
         },
         {
             "name": "filament/actions",
