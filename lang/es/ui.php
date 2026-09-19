@@ -57,7 +57,7 @@ return [
             ],
             'delete' => [
                 'nobody' => 'Nadie tiene este rol, así que no se lleva nada.',
-                'holders' => 'Cada asignación que apunta a este rol se va con él, en la base de datos y sin rastro después — :count en total. Son: :names.',
+                'holders' => 'Cada asignación que apunta a este rol se va con él, en la base de datos — :count en total. Son: :names.',
             ],
         ],
         'permissions' => [

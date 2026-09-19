@@ -57,7 +57,7 @@ return [
             ],
             'delete' => [
                 'nobody' => 'Nobody holds this role, so nothing goes with it.',
-                'holders' => 'Every assignment that points at this role goes with it, in the database and with no trace afterwards — :count in total. They are: :names.',
+                'holders' => 'Every assignment that points at this role goes with it, in the database — :count in total. They are: :names.',
             ],
         ],
         'permissions' => [

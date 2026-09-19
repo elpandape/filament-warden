@@ -22,6 +22,7 @@ use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\Post;
 use ElPandaPe\FilamentWarden\Tests\Fixtures\Models\User;
 use ElPandaPe\FilamentWarden\Tests\TestCase;
 use ElPandaPe\Warden\Context;
+use ElPandaPe\Warden\Events\RoleRetracted;
 use ElPandaPe\Warden\Facades\Warden;
 use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\Select;
@@ -1157,6 +1158,23 @@ test('the delete warning names who it takes with it', function (): void {
 
     expect($warning)->toContain('1 in total')
         ->and($warning)->toContain('Amaru Quispe');
+});
+
+test('the delete warning does not call the loss silent, because warden announces each holder', function (): void {
+    $role = makeRole();
+    Warden::assign($role)->to(makeUser('Amaru Quispe'));
+
+    $retracted = 0;
+
+    Event::listen(RoleRetracted::class, static function () use (&$retracted): void {
+        $retracted++;
+    });
+
+    $warning = RolesTable::warning($role);
+    $role->delete();
+
+    expect($retracted)->toBe(1)
+        ->and($warning)->not->toContain('no trace');
 });
 
 test('the delete warning names a holder restricted to a context too', function (): void {
