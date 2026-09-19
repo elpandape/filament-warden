@@ -458,19 +458,18 @@ final readonly class Audit
      * — and both polymorphic authority pairs are plain columns with an index
      * and no constraint.
      *
-     * Warden's own listener is narrower than it sounds.
-     * `CacheInvalidations::markCascade()` calls `sweepStrandedGrants()`, which
-     * returns immediately unless the deleted model's class is EXACTLY
-     * `Context::roleClass()`: an account, any other authority, and a role
-     * SUBCLASS are all left behind, and even for a role it deletes from
-     * `grants` alone. And it hangs off `eloquent.deleted`, so a `delete()` on a
-     * query builder, raw SQL and a truncate never reach it.
-     * `warden:clean --stranded` sweeps the rest, but it is opt-in and it is a
-     * command somebody has to run.
+     * Warden's own sweep is narrower than it sounds.
+     * `CacheInvalidations::settleCascade()` deletes the grants and the role
+     * assignments a deleted ROLE held, and only when the model's class is
+     * EXACTLY `Context::roleClass()`: an account, any other authority, and a
+     * role SUBCLASS are all left behind. And it runs from the model's own
+     * `deleted` hook, so a `delete()` on a query builder, raw SQL and a
+     * truncate never reach it. `warden:clean --stranded` sweeps the rest, but
+     * it is opt-in and it is a command somebody has to run.
      *
      * So this bucket has work, and the work is what is left over: the authority
-     * that went away without a model event, that was never a role to begin
-     * with, or that held a role assignment the sweep never touches.
+     * that went away without a model event, or that was never a role to begin
+     * with.
      *
      * Informational, never red: this package can neither write nor delete such
      * a row, and the cure is a command, not a code change here.

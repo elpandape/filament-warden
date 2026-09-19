@@ -26,10 +26,9 @@ use Illuminate\Database\Eloquent\Model;
  * screens draw — "inherits from" is what somebody chose, the rest is what that
  * choice brought along.
  *
- * `Role::nestedRoles()` is deliberately not used for either. It is a plain
- * `belongsToMany` with a pivot condition and NO expiry filter, so it lists an
- * edge the engine has already stopped reading; `apply()` says why nothing
- * writes through it either.
+ * `Role::nestedRoles()` is deliberately not used for either. It reads the pivot
+ * with NO expiry filter, so it lists an edge the engine has already stopped
+ * reading, and every writer it declares throws.
  */
 final readonly class Hierarchy
 {
@@ -80,13 +79,11 @@ final readonly class Hierarchy
     /**
      * Make the direct edges say what the screen says, and nothing more.
      *
-     * A diff and never a sync: `Warden::sync()` forces `entity: null`, and the
-     * whole point of these rows is that the entity is a role. So what is gone
-     * gets `retract()`ed and what is new gets `assign()`ed, one at a time,
-     * through the fluent API — which is what dispatches the events with an
-     * actor, reports `retractedCount()`, and is the only place `until()` exists
-     * at all. `nestedRoles()->sync()` would do none of the three and would
-     * capture its write scope when the relation was built.
+     * A diff and never a sync. What is gone gets `retract()`ed and what is new
+     * gets `assign()`ed, one at a time, through the fluent API, which announces
+     * each edge on its own and is the only place `until()` exists at all.
+     * `Warden::sync()->roles()` announces one diff for the lot and takes no
+     * date.
      *
      * `null` means the screen never offered the field — nesting off, or a form
      * that does not carry it — and keeps every edge the store holds. An empty

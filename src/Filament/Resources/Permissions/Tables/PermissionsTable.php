@@ -218,9 +218,8 @@ final class PermissionsTable
      * delete and then dispatches one `PermissionRevoked` per row — or
      * `PermissionUnforbidden` where the row was a prohibition — with the
      * authority, the row's own scope and the resolved actor. But
-     * `warden.events_enabled` switches it off, it costs a query per row to
-     * hydrate the authority, and it goes only to a listener the application
-     * wrote. None of it reaches the person clicking Delete, so this is still the
+     * `warden.events_enabled` switches it off, it reads every holder back to
+     * name it, and it goes only to a listener the application wrote. None of it reaches the person clicking Delete, so this is still the
      * only moment they are told.
      */
     public static function warning(Model $record): string

@@ -59,10 +59,9 @@ test('a lapsed edge is not an inheritance', function (): void {
 
     Carbon::setTestNow('2026-09-09 12:00:00');
 
-    // `Role::nestedRoles()` would still list it: it is a plain `belongsToMany`
-    // with a pivot condition and no expiry filter, so it names an edge the
-    // engine has already stopped reading. That is why neither half of this
-    // class goes through it.
+    // `Role::nestedRoles()` would still list it: it reads the pivot with no
+    // expiry filter, so it names an edge the engine has already stopped
+    // reading. That is why neither half of this class goes through it.
     expect(Hierarchy::of($outer)->direct)->toBeEmpty();
 
     Carbon::setTestNow();
